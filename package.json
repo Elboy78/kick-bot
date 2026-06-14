@@ -1,7 +1,7 @@
 {
   "name": "kick-loyalty-bot",
   "version": "1.0.0",
-  "description": "Bot de fidélité pour chaîne Kick.com — points par temps de visionnage",
+  "description": "Bot de fid\u00e9lit\u00e9 pour cha\u00eene Kick.com \u2014 points par temps de visionnage",
   "main": "bot.js",
   "scripts": {
     "start": "node bot.js",
@@ -9,13 +9,14 @@
     "dev": "node bot.js & node panel.js"
   },
   "dependencies": {
-    "axios": "^1.6.7",
+    "ws": "^8.16.0",
     "better-sqlite3": "^9.4.3",
-    "cors": "^2.8.5",
-    "dotenv": "^16.4.4",
     "express": "^4.18.3",
-    "playwright": "^1.44.0",
-    "puppeteer": "^25.1.0",
-    "ws": "^8.16.0"
+    "axios": "^1.6.7",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.4"
+  },
+  "engines": {
+    "node": "20.x"
   }
 }
