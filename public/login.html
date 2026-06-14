@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>KickBot — Connexion</title>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{--bg:#09090b;--surface:#111114;--surface2:#18181c;--border:#ffffff0f;--border2:#ffffff18;--text:#f4f4f5;--muted:#71717a;--accent:#22c55e;--accent2:#818cf8;--r:12px}
+body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(--text);min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px}
+.box{width:100%;max-width:400px}
+.logo{text-align:center;margin-bottom:32px}
+.logo-icon{width:52px;height:52px;background:var(--accent);border-radius:14px;display:flex;align-items:center;justify-content:center;font-size:24px;font-weight:800;color:#000;margin:0 auto 12px}
+.logo-title{font-size:22px;font-weight:700}.logo-title span{color:var(--muted);font-weight:400}
+.logo-sub{font-size:13px;color:var(--muted);margin-top:4px}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:28px}
+.step{display:none}.step.active{display:block}
+label{font-size:12px;font-weight:500;color:var(--muted);display:block;margin-bottom:6px}
+.input{width:100%;background:var(--surface2);border:1px solid var(--border2);border-radius:8px;padding:10px 14px;color:var(--text);font-size:14px;outline:none;transition:border .2s;font-family:inherit}
+.input:focus{border-color:var(--accent2)}.input::placeholder{color:var(--muted)}
+.btn{width:100%;padding:11px;border-radius:8px;border:none;cursor:pointer;font-size:14px;font-weight:600;font-family:inherit;transition:all .15s;margin-top:14px}
+.btn-primary{background:var(--accent);color:#000}.btn-primary:hover{background:#16a34a}
+.btn-primary:disabled{opacity:.5;cursor:not-allowed}
+.msg{margin-top:12px;padding:10px 14px;border-radius:8px;font-size:13px;display:none}
+.msg.ok{background:#22c55e18;color:var(--accent);border:1px solid #22c55e30;display:block}
+.msg.err{background:#f8717118;color:#f87171;border:1px solid #f8717130;display:block}
+.msg.warn{background:#fbbf2418;color:#fbbf24;border:1px solid #fbbf2430;display:block}
+.divider{border:none;border-top:1px solid var(--border);margin:20px 0}
+.status-icon{font-size:40px;text-align:center;margin-bottom:12px}
+.status-title{font-size:18px;font-weight:700;text-align:center;margin-bottom:8px}
+.status-sub{font-size:13px;color:var(--muted);text-align:center;line-height:1.6}
+.kick-badge{display:inline-flex;align-items:center;gap:6px;background:#53fc1820;border:1px solid #53fc1840;border-radius:6px;padding:4px 10px;font-size:12px;font-weight:700;color:#53fc18;margin-top:12px}
+</style>
+</head>
+<body>
+<div class="box">
+  <div class="logo">
+    <div class="logo-icon">K</div>
+    <div class="logo-title">Kick<span>Bot</span></div>
+    <div class="logo-sub">Panel de gestion — Accès restreint</div>
+  </div>
+
+  <div class="card">
+
+    <!-- Étape 1 : Saisie du pseudo -->
+    <div class="step active" id="step-1">
+      <label>Ton pseudo Kick</label>
+      <input class="input" id="username-input" placeholder="Ex: elboy78" autocomplete="off"
+        onkeydown="if(event.key==='Enter')submitRequest()">
+      <button class="btn btn-primary" onclick="submitRequest()">Demander l'accès →</button>
+      <div class="msg" id="step1-msg"></div>
+    </div>
+
+    <!-- Étape 2 : En attente -->
+    <div class="step" id="step-2">
+      <div class="status-icon">⏳</div>
+      <div class="status-title">Demande envoyée !</div>
+      <div class="status-sub">
+        Ton pseudo <span id="display-username" style="color:var(--text);font-weight:600"></span> a été soumis.<br>
+        Attends que le streamer valide ton accès.
+      </div>
+      <div class="divider"></div>
+      <button class="btn btn-primary" onclick="checkStatus()" id="check-btn">Vérifier mon accès</button>
+      <div class="msg" id="step2-msg"></div>
+    </div>
+
+    <!-- Étape 3 : Approuvé -->
+    <div class="step" id="step-3">
+      <div class="status-icon">✅</div>
+      <div class="status-title">Accès accordé !</div>
+      <div class="status-sub">Bienvenue <span id="approved-username" style="color:var(--accent);font-weight:600"></span> — tu peux accéder au panel.</div>
+      <button class="btn btn-primary" onclick="enterPanel()" style="margin-top:20px">Accéder au panel →</button>
+    </div>
+
+    <!-- Étape 4 : Refusé -->
+    <div class="step" id="step-4">
+      <div class="status-icon">🚫</div>
+      <div class="status-title">Accès refusé</div>
+      <div class="status-sub">Ton accès a été révoqué ou refusé par le streamer.</div>
+      <button class="btn" style="background:var(--surface2);color:var(--muted);border:1px solid var(--border2);margin-top:16px" onclick="resetForm()">← Retour</button>
+    </div>
+
+  </div>
+</div>
+
+<script>
+let currentUsername = '';
+
+// Vérifier si déjà connecté au chargement
+window.addEventListener('load', () => {
+  const saved = localStorage.getItem('kick_panel_user');
+  if (saved) {
+    currentUsername = saved;
+    checkStatus(true);
+  }
+});
+
+function showStep(n) {
+  document.querySelectorAll('.step').forEach(s => s.classList.remove('active'));
+  document.getElementById('step-'+n).classList.add('active');
+}
+
+function showMsg(id, msg, type) {
+  const el = document.getElementById(id);
+  el.textContent = msg; el.className = 'msg ' + type;
+}
+
+async function submitRequest() {
+  const username = document.getElementById('username-input').value.trim();
+  if (!username || username.length < 2) return showMsg('step1-msg', 'Entre ton pseudo Kick', 'err');
+
+  const btn = document.querySelector('#step-1 .btn');
+  btn.disabled = true; btn.textContent = 'Envoi…';
+
+  try {
+    const r = await fetch('/api/auth/request?username=' + encodeURIComponent(username));
+    const d = await r.json();
+
+    currentUsername = username;
+    localStorage.setItem('kick_panel_user', username);
+    document.getElementById('display-username').textContent = username;
+    document.getElementById('approved-username').textContent = username;
+
+    if (d.status === 'approved') {
+      showStep(3);
+    } else if (d.status === 'revoked') {
+      showStep(4);
+    } else {
+      showStep(2);
+    }
+  } catch(e) {
+    showMsg('step1-msg', 'Erreur de connexion', 'err');
+  } finally {
+    btn.disabled = false; btn.textContent = 'Demander l\'accès →';
+  }
+}
+
+async function checkStatus(silent = false) {
+  if (!currentUsername) return;
+  const btn = document.getElementById('check-btn');
+  if (btn) { btn.disabled = true; btn.textContent = 'Vérification…'; }
+
+  try {
+    const r = await fetch('/api/auth/check?username=' + encodeURIComponent(currentUsername));
+    const d = await r.json();
+
+    if (d.status === 'approved') {
+      document.getElementById('approved-username').textContent = currentUsername;
+      showStep(3);
+    } else if (d.status === 'revoked') {
+      showStep(4);
+    } else if (!silent) {
+      showMsg('step2-msg', 'Pas encore validé — réessaie dans quelques instants.', 'warn');
+    }
+  } catch(e) {
+    if (!silent) showMsg('step2-msg', 'Erreur de connexion', 'err');
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = 'Vérifier mon accès'; }
+  }
+}
+
+function enterPanel() {
+  localStorage.setItem('kick_panel_user', currentUsername);
+  localStorage.setItem('kick_panel_approved', '1');
+  window.location.href = '/';
+}
+
+function resetForm() {
+  localStorage.removeItem('kick_panel_user');
+  localStorage.removeItem('kick_panel_approved');
+  currentUsername = '';
+  document.getElementById('username-input').value = '';
+  showStep(1);
+}
+</script>
+</body>
+</html>

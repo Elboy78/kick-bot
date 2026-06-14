@@ -363,6 +363,63 @@ module.exports = {
   createGiveaway, getActiveGiveaway, joinGiveaway, closeGiveaway, getGiveawayHistory,
 };
 
+// ─── Accès Panel ─────────────────────────────────────────────────────────────
+
+function initPanelAccess() {
+  try {
+    getDB().prepare(`CREATE TABLE IF NOT EXISTS panel_access (
+      id         INTEGER PRIMARY KEY AUTOINCREMENT,
+      username   TEXT NOT NULL UNIQUE COLLATE NOCASE,
+      status     TEXT NOT NULL DEFAULT 'pending',
+      role       TEXT NOT NULL DEFAULT 'viewer',
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+    )`).run();
+  } catch(e) {}
+}
+
+function requestAccess(username) {
+  initPanelAccess();
+  try {
+    getDB().prepare(`
+      INSERT INTO panel_access (username) VALUES (?)
+      ON CONFLICT(username) DO UPDATE SET updated_at = datetime('now')
+      WHERE status = 'pending'
+    `).run(username.toLowerCase());
+    return true;
+  } catch(e) { return false; }
+}
+
+function getAccessStatus(username) {
+  initPanelAccess();
+  return getDB().prepare(`SELECT * FROM panel_access WHERE username = ? COLLATE NOCASE`).get(username.toLowerCase());
+}
+
+function getAllAccessRequests() {
+  initPanelAccess();
+  return getDB().prepare(`SELECT * FROM panel_access ORDER BY created_at DESC`).all();
+}
+
+function approveAccess(username, role = 'viewer') {
+  initPanelAccess();
+  getDB().prepare(`UPDATE panel_access SET status='approved', role=?, updated_at=datetime('now') WHERE username=? COLLATE NOCASE`).run(role, username.toLowerCase());
+}
+
+function revokeAccess(username) {
+  initPanelAccess();
+  getDB().prepare(`UPDATE panel_access SET status='revoked', updated_at=datetime('now') WHERE username=? COLLATE NOCASE`).run(username.toLowerCase());
+}
+
+function deleteAccessRequest(username) {
+  initPanelAccess();
+  getDB().prepare(`DELETE FROM panel_access WHERE username=? COLLATE NOCASE`).run(username.toLowerCase());
+}
+
+module.exports = Object.assign(module.exports, {
+  initPanelAccess, requestAccess, getAccessStatus, getAllAccessRequests,
+  approveAccess, revokeAccess, deleteAccessRequest
+});
+
 // ─── Lobby ────────────────────────────────────────────────────────────────────
 
 function getLobby() {

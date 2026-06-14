@@ -85,6 +85,51 @@ app.delete('/api/admin/objectives/:id',requireAuth, (req, res) => { db.deleteObj
 app.post('/api/admin/giveaway/start',  requireAuth, (req, res) => { const {title,prize,cost}=req.body; if(!title||!prize) return res.status(400).json({error:'title et prize requis'}); const id=db.createGiveaway(title,prize,cost||0); res.json({success:true,id}); });
 app.post('/api/admin/giveaway/close',  requireAuth, (req, res) => { const g=db.getActiveGiveaway(); if(!g) return res.status(404).json({error:'Aucun giveaway actif'}); const winner=db.closeGiveaway(g.id); res.json({success:true,winner}); });
 
+// ── Authentification panel ───────────────────────────────────────────────────
+
+// Routes publiques (sans auth)
+app.get('/api/auth/request', (req, res) => {
+  const { username } = req.query;
+  if (!username || username.trim().length < 2) return res.status(400).json({ error: 'Pseudo invalide' });
+  const status = db.getAccessStatus(username.trim());
+  if (status?.status === 'approved') return res.json({ status: 'approved', role: status.role });
+  if (status?.status === 'revoked')  return res.json({ status: 'revoked' });
+  db.requestAccess(username.trim());
+  res.json({ status: status?.status || 'pending' });
+});
+
+app.get('/api/auth/check', (req, res) => {
+  const { username } = req.query;
+  if (!username) return res.status(400).json({ error: 'Username requis' });
+  const status = db.getAccessStatus(username.trim());
+  if (!status) return res.json({ status: 'unknown' });
+  res.json({ status: status.status, role: status.role });
+});
+
+// Routes admin accès
+app.get('/api/admin/access',           requireAuth, (req, res) => res.json({ data: db.getAllAccessRequests() }));
+app.post('/api/admin/access/approve',  requireAuth, (req, res) => { const {username,role}=req.body; if(!username) return res.status(400).json({error:'username requis'}); db.approveAccess(username,role||'viewer'); res.json({success:true}); });
+app.post('/api/admin/access/revoke',   requireAuth, (req, res) => { const {username}=req.body; if(!username) return res.status(400).json({error:'username requis'}); db.revokeAccess(username); res.json({success:true}); });
+app.delete('/api/admin/access/:username', requireAuth, (req, res) => { db.deleteAccessRequest(req.params.username); res.json({success:true}); });
+
+// Middleware auth pour le panel HTML — vérifie le cookie de session
+function requirePanelAuth(req, res, next) {
+  // API admin toujours accessible avec la clé
+  if (req.path.startsWith('/api/')) return next();
+  // Page de login toujours accessible
+  if (req.path === '/login' || req.path === '/login.html') return next();
+  // Fichiers statiques de login
+  if (req.path === '/login.css') return next();
+  next();
+}
+
+app.use(requirePanelAuth);
+
+// Page login
+app.get('/login', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'login.html'));
+});
+
 app.get('*', (req, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));
 
 app.listen(PORT, () => {
