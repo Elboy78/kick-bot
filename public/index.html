@@ -231,6 +231,7 @@ label.label:first-child{margin-top:0}
 .live-pill.off{background:var(--surface3);border-color:var(--border2);color:var(--muted)}
 .live-pill.off .live-dot{background:var(--muted);animation:none}
 /* ── Scrollbar ── */
+@keyframes fadeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
 ::-webkit-scrollbar{width:4px;height:4px}
 ::-webkit-scrollbar-track{background:transparent}
 ::-webkit-scrollbar-thumb{background:var(--surface3);border-radius:2px}
@@ -262,10 +263,14 @@ label.label:first-child{margin-top:0}
   <div class="sidebar-section">Données</div>
   <button class="nav-item" onclick="showPage('historique')"><span class="icon">📅</span><span>Historique</span></button>
   <button class="nav-item" onclick="showPage('commands')"><span class="icon">💬</span><span>Commandes</span></button>
+  <button class="nav-item" onclick="showPage('dbd')"><span class="icon">🔪</span><span>DBD</span></button>
   <button class="nav-item" onclick="showPage('admin')"><span class="icon">⚙️</span><span>Admin</span></button>
 
   <div class="sidebar-footer">
     <div id="live-pill" class="live-pill" style="background:var(--surface3);border-color:var(--border2);color:var(--muted)"><div class="live-dot" style="background:var(--muted)"></div><span id="live-text">Vérification…</span></div>
+    <button id="live-toggle-btn" onclick="toggleForceLive()" style="width:100%;margin-top:8px;padding:7px;border-radius:8px;border:1px solid var(--border2);background:var(--surface2);color:var(--muted);font-size:11px;font-weight:600;cursor:pointer;transition:all .2s" title="Forcer l'état du live manuellement">
+      ⚡ Forcer Live OFF
+    </button>
   </div>
 </aside>
 
@@ -570,6 +575,54 @@ label.label:first-child{margin-top:0}
   </div>
 </div>
 
+<!-- ══════════ DBD ══════════ -->
+<div class="page" id="page-dbd">
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+
+    <!-- Survivants -->
+    <div class="card">
+      <div class="card-header">
+        <div class="card-title"><span class="icon">🏃</span>Perks Survivant</div>
+        <button class="btn btn-primary btn-sm" onclick="spinDBD('survivor')">🎲 Lancer</button>
+      </div>
+      <div style="font-size:12px;color:var(--muted);margin-bottom:14px">4 perks aléatoires parmi tous les perks survivants</div>
+      <div id="dbd-survivor-result" style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <div class="empty" style="grid-column:1/-1"><div class="empty-icon">🎴</div><p>Clique sur Lancer pour générer un build</p></div>
+      </div>
+      <div style="margin-top:16px;text-align:center">
+        <div id="dbd-survivor-spin" style="font-size:13px;color:var(--muted);min-height:20px"></div>
+      </div>
+    </div>
+
+    <!-- Tueurs -->
+    <div class="card">
+      <div class="card-header">
+        <div class="card-title"><span class="icon">🔪</span>Perks Tueur</div>
+        <button class="btn btn-danger btn-sm" onclick="spinDBD('killer')">🎲 Lancer</button>
+      </div>
+      <div style="font-size:12px;color:var(--muted);margin-bottom:14px">4 perks aléatoires parmi tous les perks tueurs</div>
+      <div id="dbd-killer-result" style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <div class="empty" style="grid-column:1/-1"><div class="empty-icon">🎴</div><p>Clique sur Lancer pour générer un build</p></div>
+      </div>
+      <div style="margin-top:16px;text-align:center">
+        <div id="dbd-killer-spin" style="font-size:13px;color:var(--muted);min-height:20px"></div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Historique des builds -->
+  <div class="card" style="margin-top:16px">
+    <div class="card-header">
+      <div class="card-title"><span class="icon">📋</span>Historique des builds</div>
+      <button class="btn btn-secondary btn-sm" onclick="clearDBDHistory()">Effacer</button>
+    </div>
+    <div id="dbd-history" style="max-height:200px;overflow-y:auto">
+      <div class="empty"><p>Aucun build généré</p></div>
+    </div>
+  </div>
+</div>
+
 <!-- ══════════ ADMIN ══════════ -->
 <div class="page" id="page-admin">
   <div class="grid-2">
@@ -632,7 +685,7 @@ label.label:first-child{margin-top:0}
 const API = '';
 const MEDALS = ['🥇','🥈','🥉'];
 let lbData = [], levels = [];
-const PAGE_TITLES = {dashboard:'Dashboard',classement:'Classement',lobby:'Lobby',jeux:'Jeux & Giveaway',objectifs:'Objectifs',historique:'Historique',commands:'Commandes',admin:'Administration'};
+const PAGE_TITLES = {dashboard:'Dashboard',classement:'Classement',lobby:'Lobby',jeux:'Jeux & Giveaway',objectifs:'Objectifs',historique:'Historique',commands:'Commandes',dbd:'Dead by Daylight',admin:'Administration'};
 
 // ── Navigation ─────────────────────────────────────────────────────────────────
 function showPage(name) {
@@ -650,6 +703,7 @@ function showPage(name) {
   if(name==='historique') { loadHistory(); loadFullLogs(); }
   if(name==='admin') { loadCmds(); loadAdminLevels(); }
   if(name==='commands') { loadCommandsPage(); loadSystemCommands(); }
+  if(name==='dbd') initDBD();
   if(name==='lobby') loadLobby();
 }
 
@@ -1179,6 +1233,174 @@ async function deleteCmdPage(trigger) {
   toast('Commande ' + trigger + ' supprimée');
   loadCommandsPage();
   loadCmds();
+}
+
+// ── Live manuel ───────────────────────────────────────────────────────────────
+let forceLive = null; // null = auto, true = forcé ON, false = forcé OFF
+
+function toggleForceLive() {
+  const btn = document.getElementById('live-toggle-btn');
+  if (forceLive === true) {
+    forceLive = false;
+    btn.style.background = 'var(--red-dim)';
+    btn.style.color = 'var(--red)';
+    btn.style.borderColor = '#f8717144';
+    btn.textContent = '⚡ Forcé HORS LIGNE';
+    toast('Stream forcé HORS LIGNE — points désactivés', false);
+  } else if (forceLive === false) {
+    forceLive = null;
+    btn.style.background = 'var(--surface2)';
+    btn.style.color = 'var(--muted)';
+    btn.style.borderColor = 'var(--border2)';
+    btn.textContent = '⚡ Mode auto';
+    toast('Mode automatique rétabli');
+  } else {
+    forceLive = true;
+    btn.style.background = 'var(--accent-dim)';
+    btn.style.color = 'var(--accent)';
+    btn.style.borderColor = '#22c55e44';
+    btn.textContent = '⚡ Forcé EN LIGNE';
+    toast('Stream forcé EN LIGNE — points activés !');
+  }
+  // Mettre à jour le pill
+  const pill = document.getElementById('live-pill');
+  const txt  = document.getElementById('live-text');
+  if (pill && txt) {
+    if (forceLive === true)  { pill.className='live-pill on'; txt.textContent='● LIVE (forcé)'; }
+    if (forceLive === false) { pill.className='live-pill off'; txt.textContent='Hors ligne (forcé)'; }
+    if (forceLive === null)  loadLiveStatus();
+  }
+}
+
+// ── DBD ───────────────────────────────────────────────────────────────────────
+const DBD_SURVIVOR_PERKS = [
+  'Adrénaline','Altruisme Extrême','Ami Fiable','Amélioration Rapide','Anaïs','Apaisement',
+  'Audace','Auto-Récupération','Avant-Gardiste','Babysitter','Bien Cultivé','Biochimiste',
+  'Bon Sens','Boomerang','Camouflage','Catharsis','Chercheur','Clairvoyance',
+  'Coéquipiers Solides','Compassion','Contre-Mesures','Corrosif','Coup de Théâtre',
+  'Courage Désespéré','Coût du Sacrifice','Croissance Personnelle','Débrouillardie',
+  'Décision Rapide','Décisif','Déjà Vu','Déni de la Mort','Détermination',
+  'Discrétion','Distraction','Divination','Dos au Mur','Éclaireur',
+  'Efficacité','Empathie','En Alerte','Endurance','Enjambée',
+  'Entraîné','Entêtement','Évasion','Éveil','Expertise','Exploiteur',
+  'Fuite Rapide','Garde du Corps','Générosité','Génie Improvisé','Grâce',
+  'Guérisseur Né','Guide des Âmes','Habitude','Ingéniosité','Initié',
+  'Instinct de Survie','Intuition','Iron Will','Jardinage','Leader',
+  'Lien Indéfectible','Loup Solitaire','Maîtrise','Mécanicien Né','Méticulosité',
+  'Miroir Brisé','Mondain','Mots d'Encouragement','Nuit Noire','Obstination',
+  'Œil de Lynx','Opportuniste','Pied Léger','Plaquage','Poigne de Fer',
+  'Poids Plume','Prémonition','Preuve d'Existence','Présence d'Esprit','Professionnalisme',
+  'Protection Rapprochée','Prudence','Quartier Général','Rebond','Récupération',
+  'Résilience','Résistance','Retournement','Réveilleur','Sacrifice Béni','Sang-Froid',
+  'Sans Peur','Sauveur','Savoir-Faire','Second Souffle','Sens Aiguisés',
+  'Sentinelle','Solidarité','Sprint Intense','Stabilité','Starter',
+  'Survie par la Force','Symbiose','Tendance au Risque','Ténacité','Thriller',
+  'Traqueur','Travail d'Équipe','Urgence','Vigilance','Vision Périphérique',
+  'Vivacité','Voie Libre','Voyance','Zèle','Zone de Sécurité'
+];
+
+const DBD_KILLER_PERKS = [
+  'Agitation','Alarme','Alchimiste Macabre','Aliénation','Analyse Comportementale',
+  'Angoisse','Anneau du Sacrifice','Apocalypse','Appel du Néant','Archiviste',
+  'Aura de Terreur','Autorité','Barrière de Chair','Barbecue et Chili','Bestiaire',
+  'Blessure Profonde','Boucherie','Brûlure','Cacophonie','Carnage',
+  'Châtiment','Chasse à l'Homme','Chasseur Né','Cloche Funèbre','Coercition',
+  'Colère Aveugle','Corruption','Coup Fatal','Croc-en-Jambe','Cycle Infernal',
+  'Déchirement','Découragement','Démoralisation','Désorientation','Détresse',
+  'Discorde','Domination','Écorché','Effacement','Embuscade',
+  'Empreinte Obscure','Endoctrinement','Enfermement','Entrave','Épuisement',
+  'Esprit Brisé','Étouffement','Évasion Bloquée','Exécuteur','Exil',
+  'Expertise Mortelle','Explosion de Rage','Extinction','Faux Espoir','Flagellant',
+  'Fourbe','Fracture','Furie','Gardien','Génie du Mal',
+  'Glaive Tranchant','Gourmandise','Griffe Acérée','Hantise','Hégémonie',
+  'Hérésie','Hexe','Hexe : Chasse à Courre','Hexe : Dévoration','Hexe : Équilibre',
+  'Hexe : Malédiction Persistante','Hexe : Méfiance','Hexe : Meule de Douleur','Hexe : Moissonneur','Hexe : Nécromancien',
+  'Hexe : No One Escapes Death','Hexe : Rancune','Hexe : Ruine','Hexe : Tiers Monde','Hexe : Verrouillage',
+  'Horreur Insaisissable','Impitoyable','Infection','Instinct Bestial','Instinct de Chasseur',
+  'Intimidation','Isolation','Jeu Cruel','Joie Sadique','Labyrinthe',
+  'Lame Sanglante','Lien de Sang','Lynchage','Machination','Maître du Jeu',
+  'Malédiction','Manipulation','Marque du Chasseur','Massacre','Méfiance',
+  'Mémoire Photographique','Menace Constante','Mépris','Meurtre Méthodique','Miasme',
+  'Minuteur','Monstre','Mort Imminente','Némésis','Nœud Coulant',
+  'Obsession Malsaine','Œil de Corbeau','Oppression','Panique','Parasite',
+  'Persécution','Peur Viscérale','Piège','Pire Cauchemar','Piétinement',
+  'Pouvoir des Ténèbres','Prédateur','Présence Écrasante','Pression','Propagation',
+  'Punition','Rage Incontrôlable','Rancœur','Récidiviste','Résurgence',
+  'Revendicateur','Rituel Sanglant','Sadisme','Saignée','Sens Aiguisés du Tueur',
+  'Silence Mortel','Sombre Dévotion','Souillure','Spectre','Supplication',
+  'Surpuissance','Surveillance','Terreur Nocturne','Torture','Tourment',
+  'Traque Méthodique','Traumatisme','Tremblement de Terre','Vengeance','Vicieux'
+];
+
+let dbdHistory = [];
+let dbdSpinning = { survivor: false, killer: false };
+
+function initDBD() {
+  renderDBDHistory();
+}
+
+function spinDBD(side) {
+  if (dbdSpinning[side]) return;
+  dbdSpinning[side] = true;
+
+  const perks = side === 'survivor' ? DBD_SURVIVOR_PERKS : DBD_KILLER_PERKS;
+  const resultEl = document.getElementById(`dbd-${side}-result`);
+  const spinEl   = document.getElementById(`dbd-${side}-spin`);
+  const color    = side === 'survivor' ? 'var(--accent)' : 'var(--red)';
+  const emoji    = side === 'survivor' ? '🏃' : '🔪';
+
+  // Animation de slot machine
+  let ticks = 0;
+  const maxTicks = 20;
+  const interval = setInterval(() => {
+    ticks++;
+    // Afficher 4 perks aléatoires pendant l'animation
+    const tmp = [...perks].sort(() => Math.random() - 0.5).slice(0, 4);
+    resultEl.innerHTML = tmp.map(p => `
+      <div style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:10px 12px;text-align:center;font-size:12px;font-weight:500;opacity:.6">
+        ${emoji} ${p}
+      </div>`).join('');
+    spinEl.textContent = '🎰 Tirage en cours…';
+
+    if (ticks >= maxTicks) {
+      clearInterval(interval);
+      // Résultat final
+      const chosen = [...perks].sort(() => Math.random() - 0.5).slice(0, 4);
+      resultEl.innerHTML = chosen.map((p, i) => `
+        <div style="background:var(--surface2);border:1px solid ${color}44;border-radius:8px;padding:14px 12px;text-align:center;animation:fadeIn .3s ease ${i*0.1}s both">
+          <div style="font-size:20px;margin-bottom:6px">${emoji}</div>
+          <div style="font-size:13px;font-weight:700;color:var(--text)">${p}</div>
+          <div style="font-size:10px;color:var(--muted);margin-top:4px">${side === 'survivor' ? 'Survivant' : 'Tueur'}</div>
+        </div>`).join('');
+      spinEl.textContent = '✅ Build généré !';
+      dbdSpinning[side] = false;
+
+      // Ajouter à l'historique
+      dbdHistory.unshift({ side, perks: chosen, time: new Date().toLocaleTimeString('fr-FR') });
+      if (dbdHistory.length > 10) dbdHistory.pop();
+      renderDBDHistory();
+    }
+  }, 80);
+}
+
+function renderDBDHistory() {
+  const el = document.getElementById('dbd-history');
+  if (!el) return;
+  if (!dbdHistory.length) {
+    el.innerHTML = '<div class="empty"><p>Aucun build généré</p></div>';
+    return;
+  }
+  el.innerHTML = dbdHistory.map(h => `
+    <div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border);font-size:12px">
+      <span style="font-size:16px">${h.side==='survivor'?'🏃':'🔪'}</span>
+      <span style="color:var(--muted);min-width:45px">${h.time}</span>
+      <span style="flex:1;color:var(--text)">${h.perks.join(' · ')}</span>
+    </div>`).join('');
+}
+
+function clearDBDHistory() {
+  dbdHistory = [];
+  renderDBDHistory();
 }
 
 loadAll();
