@@ -1,0 +1,1190 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Kick Loyalty — Panel</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#09090b;
+  --surface:#111114;
+  --surface2:#18181c;
+  --surface3:#1e1e24;
+  --border:#ffffff0f;
+  --border2:#ffffff18;
+  --text:#f4f4f5;
+  --muted:#71717a;
+  --muted2:#52525b;
+  --accent:#22c55e;
+  --accent-dim:#22c55e18;
+  --accent2:#818cf8;
+  --accent2-dim:#818cf818;
+  --gold:#fbbf24;
+  --gold-dim:#fbbf2418;
+  --red:#f87171;
+  --red-dim:#f8717118;
+  --cyan:#22d3ee;
+  --r:10px;--r2:14px;--r3:18px;
+}
+body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--text);font-size:14px;min-height:100vh;-webkit-font-smoothing:antialiased}
+
+/* ── Sidebar layout ── */
+.layout{display:flex;min-height:100vh}
+aside{width:220px;flex-shrink:0;background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column;position:fixed;top:0;left:0;height:100vh;z-index:50}
+.main-wrap{margin-left:220px;flex:1;display:flex;flex-direction:column;min-height:100vh}
+
+/* ── Sidebar ── */
+.sidebar-logo{padding:20px 20px 8px;display:flex;align-items:center;gap:10px}
+.logo-icon{width:34px;height:34px;background:var(--accent);border-radius:9px;display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:800;color:#000;flex-shrink:0}
+.logo-text{font-size:15px;font-weight:700;color:var(--text)}.logo-text span{color:var(--muted);font-weight:400}
+.sidebar-section{padding:8px 12px 4px;font-size:10px;font-weight:600;color:var(--muted2);letter-spacing:.8px;text-transform:uppercase;margin-top:8px}
+.nav-item{display:flex;align-items:center;gap:10px;padding:9px 12px;margin:1px 8px;border-radius:8px;cursor:pointer;color:var(--muted);font-size:13px;font-weight:500;transition:all .15s;border:none;background:none;width:calc(100% - 16px);text-align:left}
+.nav-item:hover{background:var(--surface2);color:var(--text)}
+.nav-item.active{background:var(--accent-dim);color:var(--accent)}
+.nav-item .icon{font-size:16px;width:20px;text-align:center;flex-shrink:0}
+.sidebar-footer{margin-top:auto;padding:16px;border-top:1px solid var(--border)}
+.live-pill{display:flex;align-items:center;gap:6px;padding:7px 12px;border-radius:8px;background:var(--red-dim);border:1px solid #f8717130;font-size:12px;font-weight:600;color:var(--red)}
+.live-dot{width:7px;height:7px;border-radius:50%;background:var(--red);animation:pulse 1.5s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+
+/* ── Top bar ── */
+topbar{display:flex;align-items:center;gap:12px;padding:14px 24px;background:var(--surface);border-bottom:1px solid var(--border);position:sticky;top:0;z-index:40}
+.page-title{font-size:16px;font-weight:700;color:var(--text)}
+.topbar-right{margin-left:auto;display:flex;align-items:center;gap:10px}
+.upd-text{font-size:11px;color:var(--muted2)}
+.ref-btn{background:var(--surface2);border:1px solid var(--border2);color:var(--muted);padding:6px 12px;border-radius:8px;cursor:pointer;font-size:12px;font-weight:500;transition:all .2s;display:flex;align-items:center;gap:5px}
+.ref-btn:hover{border-color:var(--accent);color:var(--accent)}
+
+/* ── Pages ── */
+.content{padding:24px;flex:1}
+.page{display:none}.page.active{display:block}
+
+/* ── Stat cards ── */
+.stat-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:20px}
+.stat-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r2);padding:18px 20px;position:relative;overflow:hidden;transition:border .2s}
+.stat-card:hover{border-color:var(--border2)}
+.stat-card::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:var(--card-accent,var(--accent));opacity:.6}
+.stat-icon{font-size:20px;margin-bottom:10px}
+.stat-label{font-size:11px;color:var(--muted);font-weight:500;margin-bottom:6px;text-transform:uppercase;letter-spacing:.5px}
+.stat-value{font-size:26px;font-weight:700;color:var(--text);line-height:1}
+.stat-sub{font-size:11px;color:var(--muted);margin-top:5px}
+
+/* ── Cards ── */
+.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r2);padding:20px;margin-bottom:16px}
+.card:last-child{margin-bottom:0}
+.card-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px}
+.card-title{font-size:13px;font-weight:600;color:var(--text);display:flex;align-items:center;gap:8px}
+.card-title .icon{font-size:15px}
+.card-actions{display:flex;gap:8px}
+
+/* ── Grids ── */
+.grid-2{display:grid;grid-template-columns:1fr 380px;gap:16px}
+.grid-3{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+.grid-half{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+
+/* ── Table ── */
+.table-wrap{overflow-x:auto}
+table{width:100%;border-collapse:collapse}
+thead tr{border-bottom:1px solid var(--border)}
+th{text-align:left;font-size:10px;color:var(--muted2);font-weight:600;padding:8px 12px;text-transform:uppercase;letter-spacing:.6px}
+td{padding:11px 12px;border-bottom:1px solid var(--border);font-size:13px}
+tr:last-child td{border-bottom:none}
+tbody tr{transition:background .1s}
+tbody tr:hover td{background:var(--surface2)}
+
+/* ── Inputs ── */
+.input{background:var(--surface2);border:1px solid var(--border2);border-radius:8px;padding:8px 12px;color:var(--text);font-size:13px;outline:none;transition:border .2s;font-family:inherit;width:100%}
+.input:focus{border-color:var(--accent2)}
+.input::placeholder{color:var(--muted2)}
+.input-sm{padding:6px 10px;font-size:12px}
+label.label{font-size:11px;font-weight:500;color:var(--muted);display:block;margin-bottom:6px;margin-top:12px}
+label.label:first-child{margin-top:0}
+
+/* ── Buttons ── */
+.btn{padding:8px 16px;border-radius:8px;border:none;cursor:pointer;font-size:12px;font-weight:600;transition:all .15s;display:inline-flex;align-items:center;gap:6px;font-family:inherit}
+.btn:active{transform:scale(.97)}
+.btn-primary{background:var(--accent);color:#000}
+.btn-primary:hover{background:#16a34a}
+.btn-secondary{background:var(--surface2);color:var(--text);border:1px solid var(--border2)}
+.btn-secondary:hover{border-color:var(--border2);background:var(--surface3)}
+.btn-danger{background:var(--red-dim);color:var(--red);border:1px solid #f8717130}
+.btn-danger:hover{background:#f8717125}
+.btn-purple{background:var(--accent2-dim);color:var(--accent2);border:1px solid #818cf830}
+.btn-purple:hover{background:#818cf825}
+.btn-gold{background:var(--gold-dim);color:var(--gold);border:1px solid #fbbf2430}
+.btn-sm{padding:5px 10px;font-size:11px;border-radius:6px}
+
+/* ── Badges niveaux ── */
+.badge{display:inline-flex;align-items:center;gap:4px;font-size:10px;font-weight:700;padding:3px 8px;border-radius:20px;letter-spacing:.2px}
+.lv-bronze{background:#cd7f3215;color:#cd7f32;border:1px solid #cd7f3230}
+.lv-argent{background:#a0aab415;color:#a0aab4;border:1px solid #a0aab430}
+.lv-or{background:#fbbf2415;color:#fbbf24;border:1px solid #fbbf2430}
+.lv-platine{background:#818cf815;color:#818cf8;border:1px solid #818cf830}
+.lv-diamant{background:#22d3ee15;color:#22d3ee;border:1px solid #22d3ee30}
+.lv-légende{background:#f4375015;color:#f43750;border:1px solid #f4375030}
+
+/* ── Progress bar ── */
+.pb{height:3px;background:var(--surface3);border-radius:2px;overflow:hidden;margin-top:5px}
+.pbf{height:100%;background:var(--accent);border-radius:2px;transition:width .8s cubic-bezier(.4,0,.2,1)}
+
+/* ── Rank ── */
+.rank-num{font-size:12px;font-weight:700;color:var(--muted2);width:32px;text-align:center}
+.rank-1{color:var(--gold);font-size:18px}
+.rank-2{color:#94a3b8;font-size:18px}
+.rank-3{color:#cd7f32;font-size:18px}
+
+/* ── Notifications ── */
+.toast{position:fixed;bottom:20px;right:20px;padding:12px 18px;border-radius:10px;font-size:13px;font-weight:500;z-index:9999;transform:translateY(80px);opacity:0;transition:all .3s;pointer-events:none;max-width:320px}
+.toast.show{transform:translateY(0);opacity:1}
+.toast.ok{background:#22c55e20;border:1px solid #22c55e40;color:var(--accent)}
+.toast.err{background:#f8717120;border:1px solid #f8717140;color:var(--red)}
+
+/* ── Log items ── */
+.log-item{display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border)}
+.log-item:last-child{border-bottom:none}
+.log-user{font-weight:600;font-size:13px}
+.log-pts{font-size:12px;font-weight:700;padding:2px 8px;border-radius:6px}
+.log-pts.pos{background:var(--accent-dim);color:var(--accent)}
+.log-pts.neg{background:var(--red-dim);color:var(--red)}
+.log-time{font-size:10px;color:var(--muted2)}
+.log-reason{font-size:10px;color:var(--muted2);margin-top:1px}
+
+/* ── Giveaway card ── */
+.gw-active{background:linear-gradient(135deg,#22c55e08,#818cf808);border:1px solid #22c55e25;border-radius:var(--r2);padding:18px}
+.gw-title{font-size:16px;font-weight:700;margin-bottom:4px}
+.gw-count{font-size:32px;font-weight:800;color:var(--accent);line-height:1.1}
+.cmd-pill{display:inline-flex;align-items:center;gap:4px;background:var(--surface3);border:1px solid var(--border2);border-radius:6px;padding:3px 8px;font-family:monospace;font-size:11px;color:var(--text)}
+
+/* ── Objectifs ── */
+.obj-card{background:var(--surface2);border:1px solid var(--border);border-radius:var(--r);padding:14px;margin-bottom:10px}
+.obj-card:last-child{margin-bottom:0}
+.obj-title{font-weight:600;font-size:13px;margin-bottom:4px}
+.obj-reward{font-size:11px;color:var(--accent2);margin-top:4px}
+.obj-bar{height:5px;background:var(--surface3);border-radius:3px;overflow:hidden;margin-top:8px}
+.obj-bar-fill{height:100%;background:linear-gradient(90deg,var(--accent2),var(--accent));border-radius:3px;transition:width .8s}
+.obj-pct{font-size:10px;color:var(--muted2);margin-top:4px}
+
+/* ── Lobby ── */
+.player-row{display:flex;align-items:center;justify-content:space-between;padding:10px 12px;border-radius:8px;background:var(--surface2);margin-bottom:6px;border:1px solid var(--border)}
+.player-row:last-child{margin-bottom:0}
+.player-name{font-weight:600;font-size:13px}
+.player-time{font-size:10px;color:var(--muted2)}
+
+/* ── Wheel ── */
+.wheel-wrap{display:flex;flex-direction:column;align-items:center;gap:16px;padding:8px 0}
+#wheel-canvas{border-radius:50%;display:block}
+.wheel-result{font-size:18px;font-weight:700;color:var(--accent);min-height:28px;text-align:center}
+
+/* ── Command list ── */
+.cmd-row{display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border);font-size:12px}
+.cmd-row:last-child{border-bottom:none}
+.cmd-trigger{font-family:monospace;background:var(--surface2);padding:2px 8px;border-radius:5px;font-size:11px;color:var(--accent2)}
+.cmd-response{color:var(--muted);flex:1;margin:0 12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+/* ── History ── */
+.hist-row{display:flex;align-items:center;gap:16px;padding:12px 0;border-bottom:1px solid var(--border)}
+.hist-row:last-child{border-bottom:none}
+.hist-date{font-size:12px;color:var(--muted);min-width:130px}
+.hist-dur{font-size:13px;font-weight:600;color:var(--accent);min-width:70px}
+.hist-peak{font-size:12px;color:var(--muted)}
+
+/* ── Empty state ── */
+.empty{text-align:center;padding:32px 20px;color:var(--muted2)}
+.empty .empty-icon{font-size:32px;margin-bottom:10px;opacity:.4}
+.empty p{font-size:13px}
+
+/* ── Divider ── */
+.divider{border:none;border-top:1px solid var(--border);margin:16px 0}
+
+/* ── Viewer search result ── */
+.viewer-card{background:var(--surface2);border-radius:var(--r);padding:14px;margin-top:12px;display:none}
+.viewer-card.show{display:block}
+.viewer-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px}
+.viewer-stat{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:10px 12px}
+.viewer-stat .vl{font-size:10px;color:var(--muted2);margin-bottom:4px}
+.viewer-stat .vv{font-size:16px;font-weight:700}
+
+/* ── Levels grid ── */
+.level-card{background:var(--surface2);border:1px solid var(--border);border-radius:var(--r);padding:14px;text-align:center;transition:border .2s}
+.level-card:hover{border-color:var(--border2)}
+.level-emoji{font-size:28px;margin-bottom:8px}
+.level-name{font-size:13px;font-weight:700;margin-bottom:4px}
+.level-pts{font-size:11px;color:var(--muted2)}
+
+/* ── Danger zone ── */
+.danger-zone{background:var(--red-dim);border:1px solid #f8717125;border-radius:var(--r);padding:14px}
+.danger-title{font-size:11px;font-weight:700;color:var(--red);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px}
+
+/* ── Toggle switch ── */
+.toggle-wrap{display:flex;align-items:center;gap:8px}
+.toggle{position:relative;width:36px;height:20px;flex-shrink:0}
+.toggle input{opacity:0;width:0;height:0}
+.toggle-slider{position:absolute;inset:0;background:var(--surface3);border:1px solid var(--border2);border-radius:20px;cursor:pointer;transition:all .2s}
+.toggle-slider::before{content:'';position:absolute;width:14px;height:14px;left:2px;top:2px;background:var(--muted2);border-radius:50%;transition:all .2s}
+.toggle input:checked + .toggle-slider{background:var(--accent-dim);border-color:var(--accent)}
+.toggle input:checked + .toggle-slider::before{transform:translateX(16px);background:var(--accent)}
+/* ── Live pill states ── */
+.live-pill.on{background:var(--red-dim);border-color:#f8717130;color:var(--red)}
+.live-pill.on .live-dot{background:var(--red)}
+.live-pill.off{background:var(--surface3);border-color:var(--border2);color:var(--muted)}
+.live-pill.off .live-dot{background:var(--muted);animation:none}
+/* ── Scrollbar ── */
+::-webkit-scrollbar{width:4px;height:4px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:var(--surface3);border-radius:2px}
+
+/* ── Responsive ── */
+@media(max-width:1100px){.grid-2{grid-template-columns:1fr}.stat-grid{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:768px){aside{width:60px}.main-wrap{margin-left:60px}.nav-item span{display:none}.sidebar-logo .logo-text{display:none}.sidebar-section{display:none}.stat-grid{grid-template-columns:1fr 1fr}}
+</style>
+</head>
+<body>
+<div class="layout">
+
+<!-- ══════════════ SIDEBAR ══════════════ -->
+<aside>
+  <div class="sidebar-logo">
+    <div class="logo-icon">K</div>
+    <div class="logo-text">Kick<span>Bot</span></div>
+  </div>
+
+  <div class="sidebar-section">Principal</div>
+  <button class="nav-item active" onclick="showPage('dashboard')"><span class="icon">📊</span><span>Dashboard</span></button>
+  <button class="nav-item" onclick="showPage('classement')"><span class="icon">🏆</span><span>Classement</span></button>
+
+  <div class="sidebar-section">Outils</div>
+  <button class="nav-item" onclick="showPage('lobby')"><span class="icon">🎮</span><span>Lobby</span></button>
+  <button class="nav-item" onclick="showPage('jeux')"><span class="icon">⚔️</span><span>Jeux</span></button>
+  <button class="nav-item" onclick="showPage('objectifs')"><span class="icon">🎯</span><span>Objectifs</span></button>
+
+  <div class="sidebar-section">Données</div>
+  <button class="nav-item" onclick="showPage('historique')"><span class="icon">📅</span><span>Historique</span></button>
+  <button class="nav-item" onclick="showPage('commands')"><span class="icon">💬</span><span>Commandes</span></button>
+  <button class="nav-item" onclick="showPage('admin')"><span class="icon">⚙️</span><span>Admin</span></button>
+
+  <div class="sidebar-footer">
+    <div id="live-pill" class="live-pill" style="background:var(--surface3);border-color:var(--border2);color:var(--muted)"><div class="live-dot" style="background:var(--muted)"></div><span id="live-text">Vérification…</span></div>
+  </div>
+</aside>
+
+<!-- ══════════════ MAIN ══════════════ -->
+<div class="main-wrap">
+<topbar>
+  <div class="page-title" id="page-title">Dashboard</div>
+  <div class="topbar-right">
+    <span class="upd-text" id="upd"></span>
+    <button class="ref-btn" onclick="loadAll()">↻ Actualiser</button>
+  </div>
+</topbar>
+
+<div class="content">
+
+<!-- ══════════ DASHBOARD ══════════ -->
+<div class="page active" id="page-dashboard">
+  <div class="stat-grid">
+    <div class="stat-card" style="--card-accent:var(--accent)">
+      <div class="stat-icon">👥</div>
+      <div class="stat-label">Viewers enregistrés</div>
+      <div class="stat-value" id="s-viewers">—</div>
+      <div class="stat-sub">depuis le début</div>
+    </div>
+    <div class="stat-card" style="--card-accent:var(--accent2)">
+      <div class="stat-icon">⭐</div>
+      <div class="stat-label">Points distribués</div>
+      <div class="stat-value" id="s-points" style="color:var(--accent2)">—</div>
+      <div class="stat-sub">total cumulé</div>
+    </div>
+    <div class="stat-card" style="--card-accent:var(--cyan)">
+      <div class="stat-icon">⏱</div>
+      <div class="stat-label">Temps de visionnage</div>
+      <div class="stat-value" id="s-minutes" style="color:var(--cyan);font-size:20px">—</div>
+      <div class="stat-sub">cumulé tous viewers</div>
+    </div>
+    <div class="stat-card" style="--card-accent:var(--gold)">
+      <div class="stat-icon">👑</div>
+      <div class="stat-label">Top viewer</div>
+      <div class="stat-value" id="s-top" style="color:var(--gold);font-size:18px">—</div>
+      <div class="stat-sub" id="s-top-sub"></div>
+    </div>
+  </div>
+
+  <div class="grid-2">
+    <div>
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title"><span class="icon">🏆</span>Top 10 viewers</div>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>#</th><th>Viewer</th><th>Niveau</th><th>Points</th><th>Temps</th></tr></thead>
+            <tbody id="dash-lb"><tr><td colspan="5"><div class="empty"><div class="empty-icon">👥</div><p>Chargement…</p></div></td></tr></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+    <div>
+      <div class="card" id="gw-card">
+        <div class="card-header">
+          <div class="card-title"><span class="icon">🎁</span>Giveaway en cours</div>
+        </div>
+        <div id="gw-status"><div class="empty"><div class="empty-icon">🎁</div><p>Aucun giveaway actif</p></div></div>
+      </div>
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title"><span class="icon">⚡</span>Activité récente</div>
+        </div>
+        <div style="max-height:280px;overflow-y:auto" id="dash-logs">
+          <div class="empty"><div class="empty-icon">📋</div><p>Chargement…</p></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════ CLASSEMENT ══════════ -->
+<div class="page" id="page-classement">
+  <div class="card">
+    <div class="card-header">
+      <div class="card-title"><span class="icon">🏆</span>Classement complet</div>
+      <div class="card-actions">
+        <input type="text" class="input input-sm" id="lb-search" placeholder="Filtrer…" oninput="filterLB()" style="width:160px">
+        <select class="input input-sm" id="lb-limit" onchange="loadLeaderboard()" style="width:90px">
+          <option value="10">Top 10</option><option value="25">Top 25</option>
+          <option value="50">Top 50</option><option value="100">Top 100</option>
+        </select>
+      </div>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>#</th><th>Viewer</th><th>Niveau</th><th>Points</th><th>Temps regardé</th><th>Vu il y a</th></tr></thead>
+        <tbody id="lb-body"><tr><td colspan="6"><div class="empty"><p>Chargement…</p></div></td></tr></tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-header"><div class="card-title"><span class="icon">⭐</span>Grille des niveaux</div></div>
+    <div class="grid-3" id="levels-grid" style="gap:12px"></div>
+  </div>
+</div>
+
+<!-- ══════════ LOBBY ══════════ -->
+<div class="page" id="page-lobby">
+  <div class="grid-2">
+    <div>
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title"><span class="icon">🎮</span>Lobby — <span id="lobby-count" style="color:var(--accent)">0</span> joueurs</div>
+          <div class="card-actions">
+            <button class="btn btn-danger btn-sm" onclick="clearLobby()">Vider</button>
+          </div>
+        </div>
+        <div style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:10px 14px;margin-bottom:14px;font-size:12px;color:var(--muted)">
+          Les viewers tapent <span class="cmd-pill">!lobby</span> dans le chat pour rejoindre
+        </div>
+        <div id="lobby-list"><div class="empty"><div class="empty-icon">🎮</div><p>Aucun joueur inscrit</p></div></div>
+        <div id="lobby-toast" style="margin-top:10px"></div>
+      </div>
+    </div>
+    <div>
+      <div class="card">
+        <div class="card-header"><div class="card-title"><span class="icon">🎡</span>Roue aléatoire</div></div>
+        <div class="wheel-wrap">
+          <canvas id="wheel-canvas" width="320" height="320"></canvas>
+          <button class="btn btn-primary" style="padding:10px 32px;font-size:14px" onclick="spinWheel()">🎲 Tourner la roue</button>
+          <div class="wheel-result" id="wheel-result"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════ JEUX ══════════ -->
+<div class="page" id="page-jeux">
+  <div class="grid-2">
+    <div>
+      <div class="card">
+        <div class="card-header"><div class="card-title"><span class="icon">🎁</span>Giveaway</div></div>
+        <div id="gw-active-detail"><div class="empty"><div class="empty-icon">🎁</div><p>Aucun giveaway en cours</p></div></div>
+        <div class="divider"></div>
+        <div class="card-title" style="margin-bottom:12px;font-size:12px">Créer un giveaway</div>
+        <div class="grid-half" style="gap:10px">
+          <div><label class="label">Titre</label><input class="input" id="gw-title" placeholder="Ex: PC Gaming"></div>
+          <div><label class="label">Lot / récompense</label><input class="input" id="gw-prize" placeholder="Ex: 50€ Amazon"></div>
+        </div>
+        <label class="label">Coût en pts (0 = gratuit)</label>
+        <input type="number" class="input" id="gw-cost" placeholder="0" style="width:120px">
+        <div style="display:flex;gap:8px;margin-top:12px">
+          <button class="btn btn-primary" onclick="startGiveaway()">🚀 Lancer</button>
+          <button class="btn btn-danger" onclick="closeGiveaway()">🎲 Tirer au sort</button>
+        </div>
+        <div id="gw-msg" style="margin-top:8px"></div>
+      </div>
+
+      <div class="card">
+        <div class="card-header"><div class="card-title"><span class="icon">📜</span>Historique giveaways</div></div>
+        <table>
+          <thead><tr><th>Titre</th><th>Lot</th><th>Gagnant</th><th>Participants</th></tr></thead>
+          <tbody id="gw-history"><tr><td colspan="4"><div class="empty"><p>Aucun historique</p></div></td></tr></tbody>
+        </table>
+      </div>
+    </div>
+    <div>
+      <div class="card">
+        <div class="card-header"><div class="card-title"><span class="icon">⚔️</span>Duels récents</div></div>
+        <div style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:10px 14px;margin-bottom:14px;font-size:12px;color:var(--muted)">
+          Chat → <span class="cmd-pill">!duel @pseudo montant</span> pour défier
+        </div>
+        <table>
+          <thead><tr><th>Challenger</th><th>Opponent</th><th>Mise</th><th>Résultat</th></tr></thead>
+          <tbody id="duels-list"><tr><td colspan="4"><div class="empty"><p>Aucun duel</p></div></td></tr></tbody>
+        </table>
+      </div>
+
+      <div class="card">
+        <div class="card-header"><div class="card-title"><span class="icon">💬</span>Commandes disponibles</div></div>
+        <table style="font-size:12px">
+          <thead><tr><th>Commande</th><th>Description</th></tr></thead>
+          <tbody>
+            <tr><td><span class="cmd-pill">!points</span></td><td style="color:var(--muted)">Voir ses points et niveau</td></tr>
+            <tr><td><span class="cmd-pill">!top</span></td><td style="color:var(--muted)">Top 5 classement</td></tr>
+            <tr><td><span class="cmd-pill">!rang</span></td><td style="color:var(--muted)">Son rang exact</td></tr>
+            <tr><td><span class="cmd-pill">!niveau</span></td><td style="color:var(--muted)">Niveau et progression</td></tr>
+            <tr><td><span class="cmd-pill">!lobby</span></td><td style="color:var(--muted)">Rejoindre le lobby</td></tr>
+            <tr><td><span class="cmd-pill">!duel @x N</span></td><td style="color:var(--muted)">Défier pour N pts</td></tr>
+            <tr><td><span class="cmd-pill">!accepter</span></td><td style="color:var(--muted)">Accepter un duel</td></tr>
+            <tr><td><span class="cmd-pill">!refuser</span></td><td style="color:var(--muted)">Refuser un duel</td></tr>
+            <tr><td><span class="cmd-pill">!participer</span></td><td style="color:var(--muted)">Rejoindre giveaway</td></tr>
+            <tr><td><span class="cmd-pill">!giveaway</span></td><td style="color:var(--muted)">Infos giveaway</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════ OBJECTIFS ══════════ -->
+<div class="page" id="page-objectifs">
+  <div class="grid-2">
+    <div>
+      <div class="card">
+        <div class="card-header"><div class="card-title"><span class="icon">🎯</span>Objectifs actifs</div></div>
+        <div id="obj-list"><div class="empty"><div class="empty-icon">🎯</div><p>Aucun objectif</p></div></div>
+      </div>
+      <div class="card">
+        <div class="card-header"><div class="card-title"><span class="icon">✅</span>Objectifs atteints</div></div>
+        <div id="obj-done-list"><div class="empty"><div class="empty-icon">✅</div><p>Aucun atteint</p></div></div>
+      </div>
+    </div>
+    <div>
+      <div class="card">
+        <div class="card-header"><div class="card-title"><span class="icon">➕</span>Créer un objectif</div></div>
+        <label class="label">Titre</label>
+        <input class="input" id="obj-title" placeholder="Ex: 10 000 points distribués">
+        <label class="label">Description (optionnel)</label>
+        <input class="input" id="obj-desc" placeholder="Description…">
+        <label class="label">Objectif en points distribués</label>
+        <input type="number" class="input" id="obj-target" placeholder="Ex: 10000">
+        <label class="label">Récompense annoncée dans le chat</label>
+        <input class="input" id="obj-reward" placeholder="Ex: Game offert au top viewer !">
+        <button class="btn btn-purple" style="width:100%;margin-top:16px;justify-content:center" onclick="createObjective()">Créer l'objectif</button>
+        <div id="obj-msg" style="margin-top:8px"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════ HISTORIQUE ══════════ -->
+<div class="page" id="page-historique">
+  <div class="grid-2">
+    <div>
+      <div class="card">
+        <div class="card-header"><div class="card-title"><span class="icon">📅</span>Sessions de stream</div></div>
+        <div id="hist-list"><div class="empty"><div class="empty-icon">📅</div><p>Chargement…</p></div></div>
+      </div>
+    </div>
+    <div>
+      <div class="card">
+        <div class="card-header"><div class="card-title"><span class="icon">📊</span>Logs de points</div></div>
+        <div style="max-height:500px;overflow-y:auto" id="full-logs">
+          <div class="empty"><div class="empty-icon">📊</div><p>Chargement…</p></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════ COMMANDES ══════════ -->
+<div class="page" id="page-commands">
+  <div class="grid-2">
+    <div>
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title"><span class="icon">💬</span>Commandes personnalisées (<span id="cmd-count">0</span>)</div>
+        </div>
+        <div style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:11px 14px;margin-bottom:16px;font-size:12px;color:var(--muted);line-height:1.7">
+          Ces commandes sont actives dans le <b style="color:var(--text)">chat Kick</b>. Quand un viewer tape le trigger, le bot répond automatiquement avec le message configuré.
+        </div>
+        <div id="cmd-page-list">
+          <div class="empty"><div class="empty-icon">💬</div><p>Aucune commande — ajoutez-en une à droite</p></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header"><div class="card-title"><span class="icon">📌</span>Commandes système</div></div>
+        <div id="sys-cmd-list"><div class="empty"><p>Chargement…</p></div></div>
+      </div>
+    </div>
+
+    <div>
+      <div class="card" style="position:sticky;top:80px">
+        <div class="card-header"><div class="card-title"><span class="icon">➕</span>Ajouter une commande</div></div>
+
+        <label class="label">Trigger (avec le !)</label>
+        <input class="input" id="cmd-page-trigger" placeholder="Ex: !discord" maxlength="30">
+        <div style="font-size:11px;color:var(--muted2);margin-top:4px">Commencez toujours par ! — ex: !discord, !youtube, !rs</div>
+
+        <label class="label" style="margin-top:14px">Réponse dans le chat</label>
+        <textarea class="input" id="cmd-page-response" placeholder="Ex: Rejoins notre Discord : discord.gg/xxx" rows="4" style="resize:vertical;line-height:1.6"></textarea>
+        <div style="font-size:11px;color:var(--muted2);margin-top:4px">Vous pouvez utiliser @{user} pour mentionner le viewer</div>
+
+        <button class="btn btn-primary" style="width:100%;justify-content:center;margin-top:16px;padding:10px" onclick="addCmdPage()">
+          ➕ Ajouter la commande
+        </button>
+        <div id="cmd-page-msg" style="margin-top:8px"></div>
+
+        <div class="divider"></div>
+
+        <div style="font-size:11px;color:var(--muted2);line-height:1.8">
+          <b style="color:var(--muted)">Exemples utiles :</b><br>
+          <span class="cmd-pill" style="margin:2px 0;display:inline-block">!discord</span> → Lien Discord<br>
+          <span class="cmd-pill" style="margin:2px 0;display:inline-block">!youtube</span> → Lien YouTube<br>
+          <span class="cmd-pill" style="margin:2px 0;display:inline-block">!twitter</span> → Lien Twitter/X<br>
+          <span class="cmd-pill" style="margin:2px 0;display:inline-block">!rs</span> → RS / pseudo jeu<br>
+          <span class="cmd-pill" style="margin:2px 0;display:inline-block">!config</span> → Config PC / setup
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════ ADMIN ══════════ -->
+<div class="page" id="page-admin">
+  <div class="grid-2">
+    <div>
+      <div class="card">
+        <div class="card-header"><div class="card-title"><span class="icon">🔑</span>Authentification</div></div>
+        <label class="label">Clé secrète (PANEL_SECRET)</label>
+        <input type="password" class="input" id="admin-key" placeholder="••••••••••">
+      </div>
+
+      <div class="card">
+        <div class="card-header"><div class="card-title"><span class="icon">👤</span>Gestion d'un viewer</div></div>
+        <div style="display:flex;gap:8px">
+          <input class="input" id="admin-user" placeholder="Pseudo exact" onkeydown="if(event.key==='Enter')searchViewer()">
+          <button class="btn btn-secondary" onclick="searchViewer()">Chercher</button>
+        </div>
+        <div class="viewer-card" id="viewer-result"></div>
+        <div style="display:flex;gap:8px;margin-top:12px;align-items:center">
+          <input type="number" class="input" id="admin-pts" placeholder="Pts" style="width:90px">
+          <button class="btn btn-primary btn-sm" onclick="adminAdd()">+ Ajouter</button>
+          <button class="btn btn-danger btn-sm" onclick="adminRemove()">− Retirer</button>
+          <button class="btn btn-secondary btn-sm" onclick="adminReset()">Reset</button>
+        </div>
+        <div id="admin-msg" style="margin-top:8px"></div>
+      </div>
+
+      <div class="card">
+        <div class="card-header"><div class="card-title"><span class="icon">💬</span>Commandes personnalisées</div></div>
+        <div id="cmds-list" style="margin-bottom:14px"></div>
+        <div style="display:flex;gap:8px">
+          <input class="input input-sm" id="cmd-trigger" placeholder="!commande" style="width:120px">
+          <input class="input input-sm" id="cmd-response" placeholder="Réponse dans le chat" style="flex:1">
+          <button class="btn btn-purple btn-sm" onclick="addCmd()">Ajouter</button>
+        </div>
+        <div id="cmd-msg" style="margin-top:8px"></div>
+      </div>
+    </div>
+    <div>
+      <div class="card">
+        <div class="card-header"><div class="card-title"><span class="icon">⭐</span>Niveaux</div></div>
+        <div id="admin-levels"></div>
+      </div>
+
+      <div class="danger-zone">
+        <div class="danger-title">⚠ Zone dangereuse</div>
+        <p style="font-size:12px;color:var(--muted);margin-bottom:12px">Ces actions sont irréversibles. Assure-toi d'avoir entré ta clé secrète.</p>
+        <button class="btn btn-danger" style="width:100%;justify-content:center" onclick="clearAll()">🗑 Remettre TOUS les points à zéro</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+</div><!-- /content -->
+</div><!-- /main-wrap -->
+</div><!-- /layout -->
+
+<div class="toast" id="toast"></div>
+
+<script>
+const API = '';
+const MEDALS = ['🥇','🥈','🥉'];
+let lbData = [], levels = [];
+const PAGE_TITLES = {dashboard:'Dashboard',classement:'Classement',lobby:'Lobby',jeux:'Jeux & Giveaway',objectifs:'Objectifs',historique:'Historique',commands:'Commandes',admin:'Administration'};
+
+// ── Navigation ─────────────────────────────────────────────────────────────────
+function showPage(name) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(t => t.classList.remove('active'));
+  const page = document.getElementById('page-'+name);
+  if(page) page.classList.add('active');
+  document.querySelectorAll('.nav-item').forEach(t => {
+    if(t.getAttribute('onclick') === "showPage('"+name+"')") t.classList.add('active');
+  });
+  document.getElementById('page-title').textContent = PAGE_TITLES[name] || name;
+  if(name==='classement') loadLeaderboard();
+  if(name==='jeux') { loadDuels(); loadGiveaways(); loadActiveGiveaway(); }
+  if(name==='objectifs') loadObjectives();
+  if(name==='historique') { loadHistory(); loadFullLogs(); }
+  if(name==='admin') { loadCmds(); loadAdminLevels(); }
+  if(name==='commands') { loadCommandsPage(); loadSystemCommands(); }
+  if(name==='lobby') loadLobby();
+}
+
+// ── Toast ──────────────────────────────────────────────────────────────────────
+let toastTimer;
+function toast(msg, ok=true) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.className = 'toast show '+(ok?'ok':'err');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.classList.remove('show'), 3500);
+}
+
+// ── API ────────────────────────────────────────────────────────────────────────
+async function get(url) { const r = await fetch(API+url); return (await r.json()).data; }
+async function post(url, body) {
+  const r = await fetch(API+url, { method:'POST', headers:{'Content-Type':'application/json','x-panel-key':getKey()}, body:JSON.stringify(body) });
+  const j = await r.json(); return { ok:r.ok, ...j };
+}
+async function del(url) {
+  await fetch(API+url, { method:'DELETE', headers:{'Content-Type':'application/json','x-panel-key':getKey()} });
+}
+
+// ── Load all ───────────────────────────────────────────────────────────────────
+async function loadAll() {
+  loadLiveStatus();
+  await Promise.all([loadStats(), loadDashLB(), loadDashLogs(), loadLevels(), loadActiveGiveaway()]);
+  document.getElementById('upd').textContent = 'Mis à jour ' + new Date().toLocaleTimeString('fr-FR');
+}
+
+async function loadStats() {
+  try {
+    const d = await get('/api/stats'); if(!d) return;
+    document.getElementById('s-viewers').textContent = (d.total_viewers||0).toLocaleString('fr');
+    document.getElementById('s-points').textContent  = (d.total_points_distributed||0).toLocaleString('fr');
+    document.getElementById('s-minutes').textContent = fmtMin(d.total_minutes_watched||0);
+    document.getElementById('s-top').textContent     = d.top_viewer || '—';
+    document.getElementById('s-top-sub').textContent = d.max_points ? d.max_points.toLocaleString('fr')+' pts' : '';
+  } catch(e){}
+}
+
+async function loadLevels() {
+  try { levels = await get('/api/levels') || []; renderLevelsGrid(); renderAdminLevels(); } catch(e){}
+}
+
+async function loadDashLB() {
+  try {
+    lbData = await get('/api/leaderboard?limit=10') || [];
+    const max = lbData[0]?.points || 1;
+    document.getElementById('dash-lb').innerHTML = lbData.map((v,i) => `
+      <tr>
+        <td><span class="${i<3?'rank-'+(i+1):'rank-num'}">${i<3?MEDALS[i]:'#'+v.rank}</span></td>
+        <td style="font-weight:600">${esc(v.username)}</td>
+        <td>${lvBadge(v.level)}</td>
+        <td>
+          <div style="font-weight:700;color:var(--accent)">${(v.points||0).toLocaleString('fr')}</div>
+          <div class="pb"><div class="pbf" style="width:${Math.round((v.points/max)*100)}%"></div></div>
+        </td>
+        <td style="color:var(--muted);font-size:12px">${fmtMin(v.total_minutes||0)}</td>
+      </tr>`).join('') || emptyRow(5,'👥','Aucun viewer');
+  } catch(e){}
+}
+
+async function loadDashLogs() {
+  try {
+    const logs = await get('/api/logs?limit=20') || [];
+    document.getElementById('dash-logs').innerHTML = logs.map(l => `
+      <div class="log-item">
+        <div>
+          <div class="log-user">${esc(l.username)}</div>
+          <div class="log-reason">${fmtReason(l.reason)}</div>
+        </div>
+        <div style="text-align:right">
+          <div class="log-pts ${l.points>=0?'pos':'neg'}">${l.points>0?'+':''}${l.points} pts</div>
+          <div class="log-time">${timeAgo(l.created_at)}</div>
+        </div>
+      </div>`).join('') || '<div class="empty"><div class="empty-icon">⚡</div><p>Aucune activité</p></div>';
+  } catch(e){}
+}
+
+async function loadLeaderboard() {
+  try {
+    const limit = document.getElementById('lb-limit')?.value || 10;
+    lbData = await get('/api/leaderboard?limit='+limit) || [];
+    renderLB(lbData);
+  } catch(e){}
+}
+
+function renderLB(data) {
+  const max = data[0]?.points || 1;
+  document.getElementById('lb-body').innerHTML = data.map(v => {
+    const r = Number(v.rank);
+    return `<tr>
+      <td><span class="${r<=3?'rank-'+r:'rank-num'}">${r<=3?MEDALS[r-1]:'#'+r}</span></td>
+      <td style="font-weight:600">${esc(v.username)}</td>
+      <td>${lvBadge(v.level)}</td>
+      <td>
+        <div style="font-weight:700;color:var(--accent)">${(v.points||0).toLocaleString('fr')}</div>
+        <div class="pb"><div class="pbf" style="width:${Math.round((v.points/max)*100)}%"></div></div>
+      </td>
+      <td style="color:var(--muted);font-size:12px">${fmtMin(v.total_minutes||0)}</td>
+      <td style="color:var(--muted2);font-size:11px">${v.last_seen?timeAgo(v.last_seen):'—'}</td>
+    </tr>`;
+  }).join('') || emptyRow(6,'🏆','Aucun viewer enregistré');
+}
+
+function filterLB() {
+  const q = document.getElementById('lb-search').value.trim().toLowerCase();
+  renderLB(q ? lbData.filter(v=>v.username.toLowerCase().includes(q)) : lbData);
+}
+
+function renderLevelsGrid() {
+  const emojis=['🥉','🥈','🥇','💎','💠','👑'];
+  document.getElementById('levels-grid').innerHTML = levels.map((l,i) => `
+    <div class="level-card">
+      <div class="level-emoji">${emojis[i]||'⭐'}</div>
+      <div class="level-name">${l.name}</div>
+      <div class="level-pts">${l.min.toLocaleString('fr')} pts min</div>
+    </div>`).join('');
+}
+
+// ── Giveaway ───────────────────────────────────────────────────────────────────
+async function loadActiveGiveaway() {
+  try {
+    const g = await get('/api/giveaway/active');
+    const html = g ? (() => {
+      const n = JSON.parse(g.entries||'[]').length;
+      return `<div class="gw-active">
+        <div class="gw-title">${esc(g.title)}</div>
+        <div style="font-size:12px;color:var(--muted);margin-bottom:12px">Lot : <b style="color:var(--text)">${esc(g.prize)}</b> · ${g.cost>0?g.cost+' pts':'Gratuit'}</div>
+        <div class="gw-count">${n}</div>
+        <div style="font-size:12px;color:var(--muted);margin-top:4px">participant${n>1?'s':''} · <span class="cmd-pill">!participer</span></div>
+      </div>`;
+    })() : '<div class="empty"><div class="empty-icon">🎁</div><p>Aucun giveaway actif</p></div>';
+    ['gw-status','gw-active-detail'].forEach(id => { const el=document.getElementById(id); if(el) el.innerHTML=html; });
+  } catch(e){}
+}
+
+async function startGiveaway() {
+  const title=document.getElementById('gw-title').value.trim(), prize=document.getElementById('gw-prize').value.trim(), cost=parseInt(document.getElementById('gw-cost').value)||0;
+  if(!title||!prize) return showInline('gw-msg','Titre et lot requis',false);
+  const r=await post('/api/admin/giveaway/start',{title,prize,cost});
+  if(!r.ok) return showInline('gw-msg',r.error||'Erreur',false);
+  toast('Giveaway lancé ! Les viewers tapent !participer ✓');
+  loadActiveGiveaway();
+}
+
+async function closeGiveaway() {
+  if(!confirm('Tirer au sort et fermer le giveaway ?')) return;
+  const r=await post('/api/admin/giveaway/close',{});
+  if(!r.ok) return showInline('gw-msg',r.error||'Aucun giveaway actif',false);
+  toast(r.winner ? '🎉 Gagnant : '+r.winner+' !' : 'Aucun participant.', !!r.winner);
+  loadActiveGiveaway(); loadGiveaways();
+}
+
+async function loadGiveaways() {
+  try {
+    const data=await get('/api/giveaways')||[];
+    document.getElementById('gw-history').innerHTML = data.map(g => {
+      const n=JSON.parse(g.entries||'[]').length;
+      return `<tr><td style="font-weight:600">${esc(g.title)}</td><td style="color:var(--muted)">${esc(g.prize)}</td>
+        <td style="color:var(--accent);font-weight:600">${g.winner?esc(g.winner):'—'}</td>
+        <td style="color:var(--muted2)">${n}</td></tr>`;
+    }).join('')||emptyRow(4,'📜','Aucun historique');
+  } catch(e){}
+}
+
+// ── Duels ──────────────────────────────────────────────────────────────────────
+async function loadDuels() {
+  try {
+    const data=await get('/api/duels')||[];
+    document.getElementById('duels-list').innerHTML = data.map(d=>`
+      <tr>
+        <td style="font-weight:600">${esc(d.challenger)}</td>
+        <td style="font-weight:600">${esc(d.opponent)}</td>
+        <td style="color:var(--gold);font-weight:700">${d.amount} pts</td>
+        <td>${d.status==='resolved'?`<span style="color:var(--accent);font-weight:600">${esc(d.winner||'?')}</span>`:d.status==='cancelled'?`<span style="color:var(--muted2);font-size:11px">Annulé</span>`:`<span style="color:var(--gold);font-size:11px">En attente</span>`}</td>
+      </tr>`).join('')||emptyRow(4,'⚔️','Aucun duel');
+  } catch(e){}
+}
+
+// ── Objectifs ──────────────────────────────────────────────────────────────────
+async function loadObjectives() {
+  try {
+    const data=await get('/api/objectives')||[], stats=await get('/api/stats');
+    const pts=stats?.total_points_distributed||0;
+    const active=data.filter(o=>o.active&&!o.achieved), done=data.filter(o=>o.achieved);
+    document.getElementById('obj-list').innerHTML = active.map(o=>{
+      const pct=Math.min(100,Math.round((pts/o.target)*100));
+      return `<div class="obj-card">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start">
+          <div class="obj-title">${esc(o.title)}</div>
+          <button class="btn btn-danger btn-sm" onclick="deleteObj(${o.id})">✕</button>
+        </div>
+        ${o.description?`<div style="font-size:12px;color:var(--muted);margin-top:3px">${esc(o.description)}</div>`:''}
+        ${o.reward?`<div class="obj-reward">🎁 ${esc(o.reward)}</div>`:''}
+        <div class="obj-bar"><div class="obj-bar-fill" style="width:${pct}%"></div></div>
+        <div class="obj-pct">${pts.toLocaleString('fr')} / ${o.target.toLocaleString('fr')} pts · ${pct}%</div>
+      </div>`;
+    }).join('')||'<div class="empty"><div class="empty-icon">🎯</div><p>Aucun objectif actif</p></div>';
+    document.getElementById('obj-done-list').innerHTML = done.map(o=>`
+      <div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border)">
+        <span style="font-size:16px">✅</span>
+        <div><div style="font-weight:600;font-size:13px">${esc(o.title)}</div>${o.reward?`<div style="font-size:11px;color:var(--muted)">${esc(o.reward)}</div>`:''}</div>
+      </div>`).join('')||'<div class="empty"><p>Aucun objectif atteint</p></div>';
+  } catch(e){}
+}
+
+async function createObjective() {
+  const title=document.getElementById('obj-title').value.trim(), desc=document.getElementById('obj-desc').value.trim(), target=parseInt(document.getElementById('obj-target').value), reward=document.getElementById('obj-reward').value.trim();
+  if(!title||isNaN(target)||target<=0) return showInline('obj-msg','Titre et objectif requis',false);
+  const r=await post('/api/admin/objectives',{title,description:desc,target,reward});
+  if(!r.ok) return showInline('obj-msg',r.error||'Erreur',false);
+  toast('Objectif créé ✓');
+  ['obj-title','obj-desc','obj-target','obj-reward'].forEach(id=>document.getElementById(id).value='');
+  loadObjectives();
+}
+
+async function deleteObj(id) {
+  if(!confirm('Supprimer cet objectif ?')) return;
+  await del('/api/admin/objectives/'+id);
+  loadObjectives();
+}
+
+// ── Historique ─────────────────────────────────────────────────────────────────
+async function loadHistory() {
+  try {
+    const data=await get('/api/history')||[];
+    document.getElementById('hist-list').innerHTML = data.map(s=>`
+      <div class="hist-row">
+        <div class="hist-date">${new Date(s.started_at+'Z').toLocaleString('fr-FR',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'})}</div>
+        <div class="hist-dur">${fmtMin(s.duration_min||0)}</div>
+        <div class="hist-peak">👥 ${s.peak_viewers} viewers max</div>
+      </div>`).join('')||'<div class="empty"><div class="empty-icon">📅</div><p>Aucun stream enregistré</p></div>';
+  } catch(e){}
+}
+
+async function loadFullLogs() {
+  try {
+    const data=await get('/api/logs?limit=100')||[];
+    document.getElementById('full-logs').innerHTML = data.map(l=>`
+      <div class="log-item">
+        <div><div class="log-user">${esc(l.username)}</div><div class="log-reason">${fmtReason(l.reason)}</div></div>
+        <div style="text-align:right">
+          <div class="log-pts ${l.points>=0?'pos':'neg'}">${l.points>0?'+':''}${l.points} pts</div>
+          <div class="log-time">${timeAgo(l.created_at)}</div>
+        </div>
+      </div>`).join('')||'<div class="empty"><p>Aucun log</p></div>';
+  } catch(e){}
+}
+
+// ── Admin ──────────────────────────────────────────────────────────────────────
+function getKey() { return document.getElementById('admin-key').value.trim(); }
+
+async function searchViewer() {
+  const u=document.getElementById('admin-user').value.trim(); if(!u) return;
+  const el=document.getElementById('viewer-result');
+  try {
+    const r=await fetch('/api/viewer/'+encodeURIComponent(u));
+    if(r.status===404){el.innerHTML='<div style="color:var(--muted);font-size:12px;padding:8px 0">Viewer introuvable</div>';el.classList.add('show');return;}
+    const {data:v}=await r.json();
+    el.innerHTML=`<div style="font-size:14px;font-weight:700;margin-bottom:4px">${esc(v.username)}</div>
+      <div>${lvBadge(v.level||'Bronze')}</div>
+      <div class="viewer-grid">
+        <div class="viewer-stat"><div class="vl">Points</div><div class="vv" style="color:var(--accent)">${(v.points||0).toLocaleString('fr')}</div></div>
+        <div class="viewer-stat"><div class="vl">Rang</div><div class="vv" style="color:var(--accent2)">#${v.rank||'?'}</div></div>
+        <div class="viewer-stat"><div class="vl">Temps regardé</div><div class="vv" style="font-size:14px">${fmtMin(v.total_minutes||0)}</div></div>
+        <div class="viewer-stat"><div class="vl">Vu il y a</div><div class="vv" style="font-size:13px">${v.last_seen?timeAgo(v.last_seen):'—'}</div></div>
+      </div>`;
+    el.classList.add('show');
+  } catch(e){}
+}
+
+async function adminAdd(){const u=document.getElementById('admin-user').value.trim(),p=parseInt(document.getElementById('admin-pts').value);if(!u||isNaN(p)||p<=0)return showInline('admin-msg','Pseudo et pts requis',false);const r=await post('/api/admin/points',{username:u,points:p,reason:'admin_add'});if(!r.ok)return showInline('admin-msg',r.error||'Erreur (clé ?)',false);toast('+'+p+' pts ajoutés à '+u+' ✓');loadAll();}
+async function adminRemove(){const u=document.getElementById('admin-user').value.trim(),p=parseInt(document.getElementById('admin-pts').value);if(!u||isNaN(p)||p<=0)return showInline('admin-msg','Pseudo et pts requis',false);const r=await post('/api/admin/points',{username:u,points:-p,reason:'admin_remove'});if(!r.ok)return showInline('admin-msg',r.error||'Erreur (clé ?)',false);toast('−'+p+' pts retirés à '+u+' ✓');loadAll();}
+async function adminReset(){const u=document.getElementById('admin-user').value.trim();if(!u)return showInline('admin-msg','Pseudo requis',false);if(!confirm('Réinitialiser les points de '+u+' ?'))return;const r=await post('/api/admin/reset',{username:u});if(!r.ok)return showInline('admin-msg',r.error||'Erreur (clé ?)',false);toast('Points de '+u+' réinitialisés ✓');loadAll();}
+async function clearAll(){if(!confirm('⚠️ Remettre TOUS les points à zéro ?'))return;if(!confirm('Dernière confirmation ?'))return;const r=await post('/api/admin/clear-all',{});if(!r.ok)return showInline('admin-msg',r.error||'Erreur (clé ?)',false);toast('Tous les points remis à zéro ✓');loadAll();}
+
+async function loadCmds() {
+  try {
+    const data=await get('/api/commands')||[];
+    document.getElementById('cmds-list').innerHTML = data.length
+      ? data.map(c=>`<div class="cmd-row"><span class="cmd-trigger">${esc(c.trigger)}</span><span class="cmd-response">${esc(c.response)}</span><button class="btn btn-danger btn-sm" onclick="deleteCmd('${esc(c.trigger)}')">✕</button></div>`).join('')
+      : '<div style="font-size:12px;color:var(--muted2);padding:8px 0">Aucune commande personnalisée</div>';
+  } catch(e){}
+}
+async function addCmd(){const t=document.getElementById('cmd-trigger').value.trim(),res=document.getElementById('cmd-response').value.trim();if(!t||!res)return showInline('cmd-msg','Trigger et réponse requis',false);const r=await post('/api/admin/commands',{trigger:t,response:res});if(!r.ok)return showInline('cmd-msg',r.error||'Erreur (clé ?)',false);toast('Commande '+t+' ajoutée ✓');document.getElementById('cmd-trigger').value='';document.getElementById('cmd-response').value='';loadCmds();}
+async function deleteCmd(t){await del('/api/admin/commands/'+encodeURIComponent(t));loadCmds();}
+
+function loadAdminLevels(){renderAdminLevels();}
+function renderAdminLevels(){const el=document.getElementById('admin-levels');if(!el||!levels.length)return;const em=['🥉','🥈','🥇','💎','💠','👑'];el.innerHTML=levels.map((l,i)=>`<div style="display:flex;justify-content:space-between;align-items:center;padding:9px 0;border-bottom:1px solid var(--border)"><span>${em[i]||'⭐'} <b style="margin-left:4px">${l.name}</b></span><span style="color:var(--muted2);font-size:12px">${l.min.toLocaleString('fr')} pts</span></div>`).join('');}
+
+// ── Lobby ──────────────────────────────────────────────────────────────────────
+let lobbyData=[], wheelSpinning=false, wheelAngle=0;
+
+async function loadLobby(){
+  try{
+    lobbyData=await get('/api/lobby')||[];
+    document.getElementById('lobby-count').textContent=lobbyData.length;
+    const el=document.getElementById('lobby-list');
+    el.innerHTML=lobbyData.length
+      ? lobbyData.map(v=>`<div class="player-row">
+          <div><div class="player-name">${esc(v.username)}</div><div class="player-time">Inscrit ${timeAgo(v.joined_at)}</div></div>
+          <button class="btn btn-danger btn-sm" onclick="removeLobby('${esc(v.username)}')">Retirer</button>
+        </div>`).join('')
+      : '<div class="empty"><div class="empty-icon">🎮</div><p>Aucun joueur — les viewers tapent !lobby</p></div>';
+    drawWheel();
+  }catch(e){}
+}
+
+async function removeLobby(username){
+  await fetch('/api/admin/lobby/remove',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username})});
+  loadLobby();
+}
+
+async function clearLobby(){
+  if(!confirm('Vider tout le lobby ?'))return;
+  await fetch('/api/admin/lobby/clear',{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'});
+  toast('Lobby vidé ✓');loadLobby();
+}
+
+function drawWheel(hi=-1){
+  const cv=document.getElementById('wheel-canvas');if(!cv)return;
+  const ctx=cv.getContext('2d'),cx=cv.width/2,cy=cv.height/2,r=cx-10;
+  ctx.clearRect(0,0,cv.width,cv.height);
+  const names=lobbyData.map(v=>v.username);
+  if(!names.length){
+    ctx.fillStyle='#18181c';ctx.beginPath();ctx.arc(cx,cy,r,0,Math.PI*2);ctx.fill();
+    ctx.fillStyle='#52525b';ctx.font='14px Inter,sans-serif';ctx.textAlign='center';ctx.textBaseline='middle';
+    ctx.fillText('Aucun joueur',cx,cy);return;
+  }
+  const colors=['#22c55e','#818cf8','#fbbf24','#f87171','#22d3ee','#f97316','#a855f7','#10b981','#fb923c','#38bdf8'];
+  const slice=(Math.PI*2)/names.length;
+  names.forEach((name,i)=>{
+    const s=wheelAngle+i*slice,e=s+slice,win=i===hi;
+    ctx.beginPath();ctx.moveTo(cx,cy);ctx.arc(cx,cy,r,s,e);ctx.closePath();
+    ctx.fillStyle=win?'#ffffff':colors[i%colors.length];ctx.fill();
+    ctx.strokeStyle='#09090b';ctx.lineWidth=2;ctx.stroke();
+    ctx.save();ctx.translate(cx,cy);ctx.rotate(s+slice/2);
+    ctx.textAlign='right';ctx.fillStyle=win?'#000':'rgba(0,0,0,0.85)';
+    ctx.font=`${Math.min(600,Math.max(400,600))} ${Math.min(13,110/names.length+5)}px Inter,sans-serif`;
+    ctx.fillText(name.length>11?name.slice(0,10)+'…':name,r-12,5);
+    ctx.restore();
+  });
+  ctx.beginPath();ctx.arc(cx,cy,16,0,Math.PI*2);ctx.fillStyle='#09090b';ctx.fill();ctx.strokeStyle='#2a2a35';ctx.lineWidth=2;ctx.stroke();
+  ctx.beginPath();ctx.moveTo(cv.width-2,cy);ctx.lineTo(cv.width-26,cy-11);ctx.lineTo(cv.width-26,cy+11);ctx.closePath();
+  ctx.fillStyle='#fff';ctx.fill();
+}
+
+function spinWheel(){
+  if(wheelSpinning||!lobbyData.length)return;
+  wheelSpinning=true;
+  document.getElementById('wheel-result').textContent='';
+  const names=lobbyData.map(v=>v.username);
+  const wi=Math.floor(Math.random()*names.length);
+  const slice=(Math.PI*2)/names.length;
+  const target=-(wi*slice+slice/2);
+  const spins=7+Math.random()*4;
+  const final=target-spins*Math.PI*2;
+  const dur=4500+Math.random()*1000;
+  const start=wheelAngle,t0=performance.now();
+  function ease(t){return 1-Math.pow(1-t,4);}
+  function frame(now){
+    const p=Math.min((now-t0)/dur,1);
+    wheelAngle=start+(final-start)*ease(p);
+    drawWheel();
+    if(p<1){requestAnimationFrame(frame);}
+    else{
+      wheelAngle=final%(Math.PI*2);
+      drawWheel(wi);
+      document.getElementById('wheel-result').textContent='🎉 '+names[wi]+' est sélectionné !';
+      wheelSpinning=false;
+    }
+  }
+  requestAnimationFrame(frame);
+}
+
+// ── Helpers ────────────────────────────────────────────────────────────────────
+function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+
+function lvBadge(level){
+  const cls={Bronze:'lv-bronze',Argent:'lv-argent',Or:'lv-or',Platine:'lv-platine',Diamant:'lv-diamant','Légende':'lv-légende'};
+  const em={Bronze:'🥉',Argent:'🥈',Or:'🥇',Platine:'💎',Diamant:'💠','Légende':'👑'};
+  const l=level||'Bronze';
+  return `<span class="badge ${cls[l]||'lv-bronze'}">${em[l]||'🥉'} ${l}</span>`;
+}
+
+function fmtReason(r){return{watch_time:'⏱ Temps de stream',duel_win:'⚔️ Duel gagné',duel_loss:'⚔️ Duel perdu',admin_add:'➕ Ajout admin',admin_remove:'➖ Retrait admin',admin_manual:'⚙️ Admin',giveaway_entry:'🎁 Giveaway'}[r]||r;}
+
+function emptyRow(cols,icon,txt){return `<tr><td colspan="${cols}"><div class="empty"><div class="empty-icon">${icon}</div><p>${txt}</p></div></td></tr>`;}
+
+function showInline(id,msg,ok){
+  const el=document.getElementById(id);if(!el)return;
+  el.innerHTML=`<div style="font-size:12px;padding:7px 10px;border-radius:7px;${ok?'background:var(--accent-dim);color:var(--accent);border:1px solid #22c55e30':'background:var(--red-dim);color:var(--red);border:1px solid #f8717130'}">${msg}</div>`;
+  setTimeout(()=>{if(el)el.innerHTML='';},4000);
+}
+
+function timeAgo(iso){
+  const d=Math.floor((Date.now()-new Date(iso+(iso.includes('Z')||iso.includes('+')?'':'Z')).getTime())/1000);
+  if(d<60)return d+'s';if(d<3600){const m=Math.floor(d/60);return m+' min';}
+  if(d<7200){const m=Math.floor((d%3600)/60);return m>0?'1h '+m+'min':'1h';}
+  if(d<86400){const h=Math.floor(d/3600),m=Math.floor((d%3600)/60);return m>0?h+'h '+m+'min':h+'h';}
+  if(d<172800){const h=Math.floor((d%86400)/3600);return h>0?'1j '+h+'h':'1j';}
+  if(d<604800){const dd=Math.floor(d/86400),h=Math.floor((d%86400)/3600);return h>0?dd+'j '+h+'h':dd+'j';}
+  const dd=Math.floor(d/86400),s=Math.floor(dd/7),j=dd%7;return j>0?s+'sem '+j+'j':s+'sem';
+}
+
+function fmtMin(m){
+  if(!m||m<60)return(m||0)+' min';const h=Math.floor(m/60),min=m%60;
+  if(h<24)return min>0?h+'h '+min+'min':h+'h';
+  const dd=Math.floor(h/24),rh=h%24;if(dd<7)return rh>0?dd+'j '+rh+'h':dd+'j';
+  const s=Math.floor(dd/7),r=dd%7;return r>0?s+'sem '+r+'j':s+'sem';
+}
+
+const SYS_CMD_DESCS = {'!points':'Affiche les points et le niveau','!top':'Top 5 du classement','!rang':'Rang du viewer','!niveau':'Niveau et progression','!aide':'Liste toutes les commandes','!duel':'Défier quelqu\'un pour N pts','!accepter':'Accepter un duel','!refuser':'Refuser un duel','!participer':'Rejoindre le giveaway','!giveaway':'Infos giveaway en cours','!lobby':'Rejoindre le lobby'};
+
+async function loadLiveStatus() {
+  try {
+    const r = await fetch('/api/live');
+    const d = await r.json();
+    const pill = document.getElementById('live-pill');
+    const txt  = document.getElementById('live-text');
+    if (!pill || !txt) return;
+    if (d.live) {
+      pill.className = 'live-pill on';
+      pill.querySelector('.live-dot').style.background = '';
+      pill.querySelector('.live-dot').style.animation = '';
+      txt.textContent = '● LIVE' + (d.viewers ? ' · ' + d.viewers + ' viewers' : '');
+    } else {
+      pill.className = 'live-pill off';
+      txt.textContent = 'Hors ligne';
+    }
+  } catch(e) {}
+}
+
+async function loadSystemCommands() {
+  try {
+    const data = await get('/api/system-commands') || [];
+    const stateMap = {};
+    data.forEach(r => stateMap[r.trigger] = r.enabled);
+    const el = document.getElementById('sys-cmd-list');
+    if (!el) return;
+    el.innerHTML = Object.entries(SYS_CMD_DESCS).map(([cmd, desc]) => {
+      const enabled = stateMap[cmd] !== undefined ? stateMap[cmd] : 1;
+      return `<div style="display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--border)">
+        <label class="toggle">
+          <input type="checkbox" ${enabled ? 'checked' : ''} onchange="toggleSysCmd('${cmd}', this.checked)">
+          <span class="toggle-slider"></span>
+        </label>
+        <span class="cmd-pill" style="${!enabled ? 'opacity:.4' : ''}">${cmd}</span>
+        <span style="font-size:12px;color:var(--muted);flex:1">${desc}</span>
+      </div>`;
+    }).join('');
+  } catch(e) {}
+}
+
+async function toggleSysCmd(trigger, enabled) {
+  const r = await post('/api/admin/system-commands/toggle', { trigger, enabled });
+  if (!r.ok) { toast('Erreur (clé admin requise ?)', false); return; }
+  toast((enabled ? '✅ ' : '🔴 ') + trigger + (enabled ? ' activée' : ' désactivée'));
+  loadSystemCommands();
+}
+
+async function toggleCustomCmd(trigger, enabled) {
+  const r = await post('/api/admin/commands/toggle', { trigger, enabled });
+  if (!r.ok) { toast('Erreur (clé admin requise ?)', false); return; }
+  toast((enabled ? '✅ ' : '🔴 ') + trigger + (enabled ? ' activée' : ' désactivée'));
+  loadCommandsPage();
+}
+
+async function loadCommandsPage() {
+  try {
+    const data = await get('/api/commands') || [];
+    document.getElementById('cmd-count').textContent = data.length;
+    const el = document.getElementById('cmd-page-list');
+    if (!data.length) {
+      el.innerHTML = '<div class="empty"><div class="empty-icon">💬</div><p>Aucune commande — ajoutez-en une à droite</p></div>';
+      return;
+    }
+    el.innerHTML = data.map(c => {
+      const enabled = c.enabled !== undefined ? c.enabled : 1;
+      return `<div style="display:flex;align-items:center;gap:12px;padding:12px 14px;background:var(--surface2);border:1px solid var(--border);border-radius:9px;margin-bottom:8px;opacity:${enabled?1:.55};transition:all .15s">
+        <label class="toggle">
+          <input type="checkbox" ${enabled?'checked':''} onchange="toggleCustomCmd('${esc(c.trigger)}', this.checked)">
+          <span class="toggle-slider"></span>
+        </label>
+        <div style="flex:1;min-width:0">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
+            <span class="cmd-pill">${esc(c.trigger)}</span>
+          </div>
+          <div style="font-size:12px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(c.response)}</div>
+        </div>
+        <div style="display:flex;gap:6px;flex-shrink:0">
+          <button class="btn btn-secondary btn-sm" onclick="editCmd('${esc(c.trigger)}', \`${esc(c.response)}\`)">Modifier</button>
+          <button class="btn btn-danger btn-sm" onclick="deleteCmdPage('${esc(c.trigger)}')">Supprimer</button>
+        </div>
+      </div>`;
+    }).join('');
+  } catch(e) {}
+}
+
+async function addCmdPage() {
+  const trigger = document.getElementById('cmd-page-trigger').value.trim();
+  const response = document.getElementById('cmd-page-response').value.trim();
+  if (!trigger) return showInline('cmd-page-msg', 'Le trigger est requis (ex: !discord)', false);
+  if (!trigger.startsWith('!')) return showInline('cmd-page-msg', 'Le trigger doit commencer par !', false);
+  if (!response) return showInline('cmd-page-msg', 'La réponse est requise', false);
+  const r = await post('/api/admin/commands', { trigger, response });
+  if (!r.ok) return showInline('cmd-page-msg', r.error || 'Erreur (clé admin requise ?)', false);
+  toast('Commande ' + trigger + ' ajoutée ✓');
+  document.getElementById('cmd-page-trigger').value = '';
+  document.getElementById('cmd-page-response').value = '';
+  loadCommandsPage();
+  loadCmds(); // sync avec admin
+}
+
+function editCmd(trigger, response) {
+  document.getElementById('cmd-page-trigger').value = trigger;
+  document.getElementById('cmd-page-response').value = response;
+  document.getElementById('cmd-page-trigger').focus();
+  showInline('cmd-page-msg', 'Modifie la réponse puis clique sur Ajouter pour sauvegarder', true);
+}
+
+async function deleteCmdPage(trigger) {
+  if (!confirm('Supprimer la commande ' + trigger + ' ?')) return;
+  await del('/api/admin/commands/' + encodeURIComponent(trigger));
+  toast('Commande ' + trigger + ' supprimée');
+  loadCommandsPage();
+  loadCmds();
+}
+
+loadAll();
+setInterval(loadAll,30000);
+setInterval(loadLiveStatus, 60000);
+setInterval(()=>{if(document.getElementById('page-lobby').classList.contains('active'))loadLobby();},10000);
+</script>
+</body>
+</html>
