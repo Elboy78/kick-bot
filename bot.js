@@ -65,6 +65,8 @@ function connect() {
     console.log('[BOT] Connecté ✓');
     reconnectDelay = 5000;
     subscribe(`chatrooms.${CONFIG.channelId}.v2`);
+    // S'abonner aussi au channel principal pour les événements live/stop
+    if (CONFIG.channelId) subscribe(`channel.${CONFIG.channelId}`);
     pingInterval = setInterval(() => {
       if (ws.readyState === WebSocket.OPEN)
         ws.send(JSON.stringify({ event: 'pusher:ping', data: {} }));
@@ -127,9 +129,29 @@ function handleEvent(msg) {
       break;
     }
     case 'App\\Events\\StreamerIsLive': case 'StreamerIsLive':
-      console.log('[BOT] Stream live !'); break;
+    case 'App\\Events\\LivestreamUpdated': case 'LivestreamUpdated': {
+      const wasLive = isLive;
+      isLive = true;
+      if (!wasLive) {
+        console.log('[STREAM] 🔴 Stream démarré via WebSocket — points activés !');
+        if (!currentSessionId) startSession();
+      }
+      break;
+    }
     case 'App\\Events\\StopStreamBroadcast': case 'StopStreamBroadcast':
-      console.log('[BOT] Stream terminé.'); cleanup(); break;
+    case 'App\\Events\\LivestreamCancelled': case 'LivestreamCancelled': {
+      const wasLive2 = isLive;
+      isLive = false;
+      if (wasLive2) {
+        console.log('[STREAM] ⚫ Stream terminé via WebSocket — points désactivés.');
+        if (currentSessionId) {
+          const dur = sessionStart ? Math.floor((Date.now() - sessionStart) / 60000) : 0;
+          db.endSession(currentSessionId, peakViewers, dur);
+          currentSessionId = null;
+        }
+      }
+      break;
+    }
   }
 }
 
@@ -532,6 +554,13 @@ if (!CONFIG.token) {
   console.warn('[AUTH] ⚠ Aucun token configuré — le bot ne pourra pas envoyer de messages.');
   console.warn('[AUTH]   Lance: node refresh-token.js pour obtenir un token automatiquement.');
 }
+
+// Vérifier l'état live au démarrage
+(async () => {
+  console.log('[STREAM] Vérification de l'état du live au démarrage...');
+  const live = await checkLiveStatus();
+  console.log(`[STREAM] État initial : ${live ? '🔴 EN LIVE' : '⚫ Hors ligne'}`);
+})();
 
 console.log('╔════════════════════════════════════════╗');
 console.log('║     Kick Loyalty Bot v2.0              ║');
