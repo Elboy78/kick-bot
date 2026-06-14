@@ -1632,7 +1632,7 @@ async function loadAccessRequests() {
           <button class="btn btn-danger btn-sm" onclick="deleteAccess('${esc(a.username)}')">Supprimer</button>
         </div>`).join('')}` : ''}
 
-      ${!data.length ? '<div class="empty"><p>Aucune demande d'accès</p></div>' : ''}
+      ${!data.length ? '<div class="empty"><p>Aucune demande d\'acc\u00e8s</p></div>' : ''}
     `;
   } catch(e) {}
 }
@@ -1645,7 +1645,7 @@ async function approveAccess(username) {
 }
 
 async function revokeAccess(username) {
-  if (!confirm('Révoquer l'accès de ' + username + ' ?')) return;
+  if (!confirm("Révoquer l'accès de " + username + " ?")) return;
   const r = await post('/api/admin/access/revoke', { username });
   if (!r.ok) return toast('Erreur (clé admin ?)', false);
   toast(username + ' révoqué');
