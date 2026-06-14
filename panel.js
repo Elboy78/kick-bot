@@ -132,6 +132,17 @@ app.get('/login', (req, res) => {
 
 app.get('*', (req, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));
 
+// Auto-approuver le propriétaire au démarrage
+const PANEL_OWNER = process.env.PANEL_OWNER || '';
+if (PANEL_OWNER) {
+  try {
+    db.initPanelAccess();
+    db.requestAccess(PANEL_OWNER);
+    db.approveAccess(PANEL_OWNER, 'admin');
+    console.log(`[PANEL] Propriétaire auto-approuvé : ${PANEL_OWNER}`);
+  } catch(e) {}
+}
+
 app.listen(PORT, () => {
   console.log(`╔════════════════════════════════════════╗`);
   console.log(`║  Panel Web → http://localhost:${PORT}      ║`);

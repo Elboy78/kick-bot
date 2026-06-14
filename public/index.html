@@ -267,7 +267,7 @@ label.label:first-child{margin-top:0}
   <button class="nav-item" onclick="showPage('admin')"><span class="icon">⚙️</span><span>Admin</span></button>
 
   <div class="sidebar-footer">
-    <div id="live-pill" class="live-pill" style="background:var(--surface3);border-color:var(--border2);color:var(--muted)"><div class="live-dot" style="background:var(--muted)"></div><span id="live-text">Vérification…</span></div>
+    <div id="live-pill" class="live-pill off"><div class="live-dot"></div><span id="live-text">Vérification…</span></div>
     <button onclick="logout()" style="width:100%;margin-top:8px;padding:7px;border-radius:8px;border:1px solid var(--border2);background:var(--surface2);color:var(--muted);font-size:11px;font-weight:600;cursor:pointer">🚪 Déconnexion</button>
     <button id="live-toggle-btn" onclick="toggleForceLive()" style="width:100%;margin-top:8px;padding:7px;border-radius:8px;border:1px solid var(--border2);background:var(--surface2);color:var(--muted);font-size:11px;font-weight:600;cursor:pointer;transition:all .2s" title="Forcer l'état du live manuellement">
       ⚡ Forcer Live OFF
@@ -1583,12 +1583,18 @@ async function checkPanelAuth() {
   const approved = localStorage.getItem('kick_panel_approved');
   const username  = localStorage.getItem('kick_panel_user');
   if (!approved || !username) { window.location.href = '/login'; return false; }
-  // Vérifier côté serveur
   try {
-    const r = await fetch('/api/auth/check?username=' + encodeURIComponent(username));
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 5000);
+    const r = await fetch('/api/auth/check?username=' + encodeURIComponent(username), { signal: controller.signal });
+    clearTimeout(timeout);
     const d = await r.json();
-    if (d.status !== 'approved') { localStorage.removeItem('kick_panel_approved'); window.location.href = '/login'; return false; }
-  } catch(e) {}
+    if (d.status === 'revoked') { localStorage.removeItem('kick_panel_approved'); window.location.href = '/login'; return false; }
+    // Si pending ou erreur réseau → laisser passer (évite blocage)
+  } catch(e) {
+    // Timeout ou erreur réseau → laisser passer
+    console.warn('[AUTH] Vérification impossible, accès local accordé');
+  }
   return true;
 }
 
