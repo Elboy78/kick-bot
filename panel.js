@@ -9,34 +9,50 @@ const PORT   = parseInt(process.env.PANEL_PORT || '3000');
 
 app.use(cors());
 app.use(express.json());
-app.use(express.static(path.join(__dirname, 'public')));
 
 function requireAuth(req, res, next) { next(); }
 
-// Init DB
+// Init DB avant de démarrer
+let dbReady = false;
 db.ensureInit().then(async () => {
   const owner = process.env.PANEL_OWNER || '';
   if (owner) {
-    await db.requestAccess(owner);
-    await db.approveAccess(owner, 'admin');
-    console.log(`[PANEL] Propriétaire auto-approuvé : ${owner}`);
+    try {
+      await db.requestAccess(owner);
+      await db.approveAccess(owner, 'admin');
+      console.log(`[PANEL] Propriétaire auto-approuvé : ${owner}`);
+    } catch(e) {}
   }
-}).catch(console.error);
+  dbReady = true;
+  console.log('[PANEL] DB prête ✓');
+  // Servir les fichiers statiques seulement après init
+  app.use(express.static(path.join(__dirname, 'public')));
+}).catch(err => {
+  console.error('[PANEL] Erreur init DB:', err);
+  // Démarrer quand même sans DB
+  app.use(express.static(path.join(__dirname, 'public')));
+});
+
+// Middleware : attendre que la DB soit prête
+function waitDB(req, res, next) {
+  if (!dbReady) return res.status(503).json({ error: 'Base de données en cours de chargement, réessaie dans 5 secondes' });
+  next();
+}
 
 // ── API lecture ───────────────────────────────────────────────────────────────
-app.get('/api/leaderboard',    async (req,res) => { try { res.json({data: await db.getLeaderboard(Math.min(parseInt(req.query.limit||10),100))}); } catch(e){res.json({data:[]}); }});
-app.get('/api/viewer/:u',      async (req,res) => { try { const v=await db.getViewer(req.params.u); if(!v) return res.status(404).json({error:'Introuvable'}); res.json({data:{...v,rank:await db.getViewerRank(req.params.u)}}); } catch(e){res.status(500).json({error:e.message}); }});
-app.get('/api/stats',          async (req,res) => { try { res.json({data: await db.getGlobalStats()}); } catch(e){res.json({data:{}}); }});
-app.get('/api/logs',           async (req,res) => { try { res.json({data: await db.getRecentLogs(Math.min(parseInt(req.query.limit||50),500))}); } catch(e){res.json({data:[]}); }});
+app.get('/api/leaderboard',    waitDB,    async (req,res) => { try { res.json({data: await db.getLeaderboard(Math.min(parseInt(req.query.limit||10),100))}); } catch(e){res.json({data:[]}); }});
+app.get('/api/viewer/:u',      waitDB,      async (req,res) => { try { const v=await db.getViewer(req.params.u); if(!v) return res.status(404).json({error:'Introuvable'}); res.json({data:{...v,rank:await db.getViewerRank(req.params.u)}}); } catch(e){res.status(500).json({error:e.message}); }});
+app.get('/api/stats',          waitDB,          async (req,res) => { try { res.json({data: await db.getGlobalStats()}); } catch(e){res.json({data:{}}); }});
+app.get('/api/logs',           waitDB,           async (req,res) => { try { res.json({data: await db.getRecentLogs(Math.min(parseInt(req.query.limit||50),500))}); } catch(e){res.json({data:[]}); }});
 app.get('/api/active',         async (req,res) => { try { res.json({data: await db.getActiveViewers(parseInt(req.query.minutes||10))}); } catch(e){res.json({data:[]}); }});
 app.get('/api/levels',         (req,res) => res.json({data: db.LEVELS}));
-app.get('/api/commands',       async (req,res) => { try { res.json({data: await db.getCustomCommands()}); } catch(e){res.json({data:[]}); }});
-app.get('/api/objectives',     async (req,res) => { try { res.json({data: await db.getObjectives()}); } catch(e){res.json({data:[]}); }});
+app.get('/api/commands',       waitDB,       async (req,res) => { try { res.json({data: await db.getCustomCommands()}); } catch(e){res.json({data:[]}); }});
+app.get('/api/objectives',     waitDB,     async (req,res) => { try { res.json({data: await db.getObjectives()}); } catch(e){res.json({data:[]}); }});
 app.get('/api/history',        async (req,res) => { try { res.json({data: await db.getStreamHistory(parseInt(req.query.limit||20))}); } catch(e){res.json({data:[]}); }});
 app.get('/api/duels',          async (req,res) => { try { res.json({data: await db.getRecentDuels(parseInt(req.query.limit||20))}); } catch(e){res.json({data:[]}); }});
 app.get('/api/giveaways',      async (req,res) => { try { res.json({data: await db.getGiveawayHistory(parseInt(req.query.limit||20))}); } catch(e){res.json({data:[]}); }});
 app.get('/api/giveaway/active',async (req,res) => { try { res.json({data: await db.getActiveGiveaway()}); } catch(e){res.json({data:null}); }});
-app.get('/api/lobby',          async (req,res) => { try { res.json({data: await db.getLobby()}); } catch(e){res.json({data:[]}); }});
+app.get('/api/lobby',          waitDB,          async (req,res) => { try { res.json({data: await db.getLobby()}); } catch(e){res.json({data:[]}); }});
 
 // ── Auth panel ────────────────────────────────────────────────────────────────
 app.get('/api/auth/request', async (req, res) => {
