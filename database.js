@@ -1,29 +1,74 @@
 /**
- * database.js — Base de données SQLite complète
+ * database.js — Base de données Turso (libSQL)
+ * Persiste entre les redéploiements Render
  */
 
-const Database = require('better-sqlite3');
-const path = require('path');
+const { createClient } = require('@libsql/client');
 
-const DB_PATH = path.join(__dirname, 'data', 'viewers.db');
-let db;
+let client = null;
 
 function getDB() {
-  if (!db) {
-    db = new Database(DB_PATH);
-    db.pragma('journal_mode = WAL');
-    db.pragma('foreign_keys = ON');
-    initSchema();
+  if (!client) {
+    if (process.env.TURSO_URL && process.env.TURSO_TOKEN) {
+      client = createClient({
+        url:       process.env.TURSO_URL,
+        authToken: process.env.TURSO_TOKEN,
+      });
+      console.log('[DB] Connecté à Turso ✓');
+    } else {
+      // Fallback local SQLite si pas de Turso configuré
+      const Database = require('better-sqlite3');
+      const path = require('path');
+      const fs = require('fs');
+      const dataDir = path.join(__dirname, 'data');
+      if (!fs.existsSync(dataDir)) fs.mkdirSync(dataDir, { recursive: true });
+      const db = new Database(path.join(dataDir, 'viewers.db'));
+      db.pragma('journal_mode = WAL');
+      console.log('[DB] SQLite local (fallback) ✓');
+      return db;
+    }
   }
-  return db;
+  return client;
 }
 
-function initSchema() {
-  const d = getDB();
-  d.exec(`
-    CREATE TABLE IF NOT EXISTS viewers (
+// Wrapper pour exécuter des requêtes compatibles Turso et SQLite
+async function run(sql, params = []) {
+  const db = getDB();
+  if (db.execute) {
+    // Turso
+    await db.execute({ sql, args: params });
+  } else {
+    // SQLite
+    db.prepare(sql).run(...params);
+  }
+}
+
+async function all(sql, params = []) {
+  const db = getDB();
+  if (db.execute) {
+    const result = await db.execute({ sql, args: params });
+    return result.rows.map(row => {
+      const obj = {};
+      result.columns.forEach((col, i) => obj[col] = row[i]);
+      return obj;
+    });
+  } else {
+    return db.prepare(sql).all(...params);
+  }
+}
+
+async function get(sql, params = []) {
+  const rows = await all(sql, params);
+  return rows[0] || null;
+}
+
+// ─── Init Schema ──────────────────────────────────────────────────────────────
+
+async function initSchema() {
+  const tables = [
+    `CREATE TABLE IF NOT EXISTS viewers (
       id            INTEGER PRIMARY KEY AUTOINCREMENT,
-      username      TEXT    NOT NULL UNIQUE COLLATE NOCASE,
+      username      TEXT    NOT NULL UNIQUE,
       kick_user_id  TEXT,
       points        INTEGER NOT NULL DEFAULT 0,
       total_minutes INTEGER NOT NULL DEFAULT 0,
@@ -32,33 +77,29 @@ function initSchema() {
       last_seen     TEXT,
       first_seen    TEXT    NOT NULL DEFAULT (datetime('now')),
       created_at    TEXT    NOT NULL DEFAULT (datetime('now'))
-    );
-
-    CREATE TABLE IF NOT EXISTS points_log (
+    )`,
+    `CREATE TABLE IF NOT EXISTS points_log (
       id         INTEGER PRIMARY KEY AUTOINCREMENT,
       username   TEXT    NOT NULL,
       points     INTEGER NOT NULL,
       reason     TEXT    NOT NULL DEFAULT 'watch_time',
       created_at TEXT    NOT NULL DEFAULT (datetime('now'))
-    );
-
-    CREATE TABLE IF NOT EXISTS stream_sessions (
+    )`,
+    `CREATE TABLE IF NOT EXISTS stream_sessions (
       id           INTEGER PRIMARY KEY AUTOINCREMENT,
       started_at   TEXT NOT NULL DEFAULT (datetime('now')),
       ended_at     TEXT,
       peak_viewers INTEGER DEFAULT 0,
       duration_min INTEGER DEFAULT 0
-    );
-
-    CREATE TABLE IF NOT EXISTS custom_commands (
+    )`,
+    `CREATE TABLE IF NOT EXISTS custom_commands (
       id         INTEGER PRIMARY KEY AUTOINCREMENT,
-      trigger    TEXT NOT NULL UNIQUE COLLATE NOCASE,
+      trigger    TEXT NOT NULL UNIQUE,
       response   TEXT NOT NULL,
       enabled    INTEGER NOT NULL DEFAULT 1,
       created_at TEXT NOT NULL DEFAULT (datetime('now'))
-    );
-
-    CREATE TABLE IF NOT EXISTS objectives (
+    )`,
+    `CREATE TABLE IF NOT EXISTS objectives (
       id          INTEGER PRIMARY KEY AUTOINCREMENT,
       title       TEXT NOT NULL,
       description TEXT,
@@ -67,9 +108,8 @@ function initSchema() {
       active      INTEGER NOT NULL DEFAULT 1,
       achieved    INTEGER NOT NULL DEFAULT 0,
       created_at  TEXT NOT NULL DEFAULT (datetime('now'))
-    );
-
-    CREATE TABLE IF NOT EXISTS duels (
+    )`,
+    `CREATE TABLE IF NOT EXISTS duels (
       id          INTEGER PRIMARY KEY AUTOINCREMENT,
       challenger  TEXT NOT NULL,
       opponent    TEXT NOT NULL,
@@ -77,9 +117,8 @@ function initSchema() {
       status      TEXT NOT NULL DEFAULT 'pending',
       winner      TEXT,
       created_at  TEXT NOT NULL DEFAULT (datetime('now'))
-    );
-
-    CREATE TABLE IF NOT EXISTS giveaways (
+    )`,
+    `CREATE TABLE IF NOT EXISTS giveaways (
       id         INTEGER PRIMARY KEY AUTOINCREMENT,
       title      TEXT NOT NULL,
       prize      TEXT NOT NULL,
@@ -89,30 +128,41 @@ function initSchema() {
       entries    TEXT NOT NULL DEFAULT '[]',
       created_at TEXT NOT NULL DEFAULT (datetime('now')),
       ended_at   TEXT
-    );
+    )`,
+    `CREATE TABLE IF NOT EXISTS lobby (
+      id        INTEGER PRIMARY KEY AUTOINCREMENT,
+      username  TEXT NOT NULL UNIQUE,
+      joined_at TEXT NOT NULL DEFAULT (datetime('now'))
+    )`,
+    `CREATE TABLE IF NOT EXISTS panel_access (
+      id         INTEGER PRIMARY KEY AUTOINCREMENT,
+      username   TEXT NOT NULL UNIQUE,
+      status     TEXT NOT NULL DEFAULT 'pending',
+      role       TEXT NOT NULL DEFAULT 'viewer',
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+    )`,
+    `CREATE TABLE IF NOT EXISTS system_commands_state (
+      trigger  TEXT PRIMARY KEY,
+      enabled  INTEGER NOT NULL DEFAULT 1
+    )`,
+  ];
 
-    CREATE INDEX IF NOT EXISTS idx_viewers_points   ON viewers(points DESC);
-    CREATE INDEX IF NOT EXISTS idx_viewers_username ON viewers(username);
-    CREATE INDEX IF NOT EXISTS idx_log_username     ON points_log(username);
-    CREATE INDEX IF NOT EXISTS idx_log_created      ON points_log(created_at);
-  `);
-
-  // Ajouter les colonnes manquantes si upgrade depuis ancienne version
-  try { d.prepare(`ALTER TABLE viewers ADD COLUMN level TEXT NOT NULL DEFAULT 'Bronze'`).run(); } catch(e) {}
-  try { d.prepare(`ALTER TABLE custom_commands ADD COLUMN enabled INTEGER NOT NULL DEFAULT 1`).run(); } catch(e) {}
-
-  console.log('[DB] Base de données initialisée ✓');
+  for (const sql of tables) {
+    await run(sql);
+  }
+  console.log('[DB] Schema initialisé ✓');
 }
 
-// ─── Niveaux ─────────────────────────────────────────────────────────────────
+// ─── Niveaux ──────────────────────────────────────────────────────────────────
 
 const LEVELS = [
-  { name: 'Bronze',   min: 0,     emoji: '🥉' },
-  { name: 'Argent',   min: 500,   emoji: '🥈' },
-  { name: 'Or',       min: 1500,  emoji: '🥇' },
-  { name: 'Platine',  min: 3000,  emoji: '💎' },
-  { name: 'Diamant',  min: 6000,  emoji: '💠' },
-  { name: 'Légende',  min: 12000, emoji: '👑' },
+  { name: 'Bronze',  min: 0,     emoji: '🥉' },
+  { name: 'Argent',  min: 500,   emoji: '🥈' },
+  { name: 'Or',      min: 1500,  emoji: '🥇' },
+  { name: 'Platine', min: 3000,  emoji: '💎' },
+  { name: 'Diamant', min: 6000,  emoji: '💠' },
+  { name: 'Légende', min: 12000, emoji: '👑' },
 ];
 
 function getLevel(points) {
@@ -126,337 +176,307 @@ function getNextLevel(points) {
   return null;
 }
 
-// ─── Viewers ─────────────────────────────────────────────────────────────────
+// ─── Viewers ──────────────────────────────────────────────────────────────────
 
-function upsertViewer(username, kickUserId = null) {
-  const d = getDB();
-  d.prepare(`
+async function upsertViewer(username, kickUserId = null) {
+  await run(`
     INSERT INTO viewers (username, kick_user_id, last_seen)
     VALUES (?, ?, datetime('now'))
     ON CONFLICT(username) DO UPDATE SET
       last_seen    = datetime('now'),
-      kick_user_id = COALESCE(excluded.kick_user_id, kick_user_id)
-  `).run(username.toLowerCase(), kickUserId);
+      kick_user_id = COALESCE(?, kick_user_id)
+  `, [username.toLowerCase(), kickUserId, kickUserId]);
 }
 
-function addPoints(username, points, reason = 'watch_time') {
-  const d = getDB();
-  const tx = d.transaction(() => {
-    d.prepare(`
-      UPDATE viewers
-      SET points        = MAX(0, points + ?),
-          total_minutes = total_minutes + ?,
-          last_seen     = datetime('now')
-      WHERE username = ? COLLATE NOCASE
-    `).run(points, reason === 'watch_time' ? 5 : 0, username.toLowerCase());
+async function addPoints(username, points, reason = 'watch_time') {
+  await run(`
+    UPDATE viewers
+    SET points        = MAX(0, points + ?),
+        total_minutes = total_minutes + ?,
+        last_seen     = datetime('now')
+    WHERE username = ?
+  `, [points, reason === 'watch_time' ? 5 : 0, username.toLowerCase()]);
 
-    // Mettre à jour le niveau
-    const viewer = d.prepare(`SELECT points FROM viewers WHERE username = ? COLLATE NOCASE`).get(username.toLowerCase());
-    if (viewer) {
-      const level = getLevel(viewer.points);
-      d.prepare(`UPDATE viewers SET level = ? WHERE username = ? COLLATE NOCASE`).run(level.name, username.toLowerCase());
-    }
+  const viewer = await get(`SELECT points FROM viewers WHERE username = ?`, [username.toLowerCase()]);
+  if (viewer) {
+    const level = getLevel(viewer.points);
+    await run(`UPDATE viewers SET level = ? WHERE username = ?`, [level.name, username.toLowerCase()]);
+  }
 
-    d.prepare(`INSERT INTO points_log (username, points, reason) VALUES (?, ?, ?)`).run(username.toLowerCase(), points, reason);
-  });
-  tx();
+  await run(`INSERT INTO points_log (username, points, reason) VALUES (?, ?, ?)`,
+    [username.toLowerCase(), points, reason]);
 }
 
-function getViewer(username) {
-  return getDB().prepare(`SELECT * FROM viewers WHERE username = ? COLLATE NOCASE`).get(username.toLowerCase());
+async function getViewer(username) {
+  return get(`SELECT * FROM viewers WHERE username = ?`, [username.toLowerCase()]);
 }
 
-function getLeaderboard(limit = 10) {
-  return getDB().prepare(`
-    SELECT username, points, total_minutes, sessions, last_seen, level,
-      ROW_NUMBER() OVER (ORDER BY points DESC, username ASC) as rank
+async function getLeaderboard(limit = 10) {
+  const rows = await all(`
+    SELECT username, points, total_minutes, sessions, last_seen, level
     FROM viewers WHERE points > 0
     ORDER BY points DESC, username ASC
     LIMIT ?
-  `).all(limit);
+  `, [limit]);
+  return rows.map((v, i) => ({ ...v, rank: i + 1 }));
 }
 
-function getViewerRank(username) {
-  const r = getDB().prepare(`
-    SELECT rank FROM (
-      SELECT username, ROW_NUMBER() OVER (ORDER BY points DESC, username ASC) as rank
-      FROM viewers WHERE points > 0
-    ) WHERE username = ? COLLATE NOCASE
-  `).get(username.toLowerCase());
-  return r ? r.rank : null;
+async function getViewerRank(username) {
+  const all_viewers = await all(`SELECT username FROM viewers WHERE points > 0 ORDER BY points DESC, username ASC`);
+  const idx = all_viewers.findIndex(v => v.username === username.toLowerCase());
+  return idx >= 0 ? idx + 1 : null;
 }
 
-function getGlobalStats() {
-  return getDB().prepare(`
+async function getGlobalStats() {
+  return get(`
     SELECT
-      COUNT(*)         as total_viewers,
-      SUM(points)      as total_points_distributed,
+      COUNT(*) as total_viewers,
+      SUM(points) as total_points_distributed,
       SUM(total_minutes) as total_minutes_watched,
-      AVG(points)      as avg_points,
-      MAX(points)      as max_points,
+      AVG(points) as avg_points,
+      MAX(points) as max_points,
       (SELECT username FROM viewers ORDER BY points DESC LIMIT 1) as top_viewer
     FROM viewers WHERE points > 0
-  `).get();
+  `);
 }
 
-function getRecentLogs(limit = 50) {
-  return getDB().prepare(`
-    SELECT username, points, reason, created_at FROM points_log
-    ORDER BY created_at DESC LIMIT ?
-  `).all(limit);
+async function getRecentLogs(limit = 50) {
+  return all(`SELECT username, points, reason, created_at FROM points_log ORDER BY created_at DESC LIMIT ?`, [limit]);
 }
 
-function getActiveViewers(minutes = 120) {
-  return getDB().prepare(`
-    SELECT username FROM viewers
-    WHERE last_seen >= datetime('now', ?)
-    ORDER BY last_seen DESC
-  `).all(`-${minutes} minutes`);
+async function getActiveViewers(minutes = 120) {
+  return all(`SELECT username FROM viewers WHERE last_seen >= datetime('now', ?) ORDER BY last_seen DESC`, [`-${minutes} minutes`]);
 }
 
-function clearAllPoints() {
-  const d = getDB();
-  d.prepare(`UPDATE viewers SET points = 0, total_minutes = 0, level = 'Bronze'`).run();
-  d.prepare(`DELETE FROM points_log`).run();
+async function clearAllPoints() {
+  await run(`UPDATE viewers SET points = 0, total_minutes = 0, level = 'Bronze'`);
+  await run(`DELETE FROM points_log`);
 }
 
-// ─── Commandes personnalisées ─────────────────────────────────────────────────
+// ─── Commandes ────────────────────────────────────────────────────────────────
 
-function getCustomCommands() {
-  return getDB().prepare(`SELECT * FROM custom_commands ORDER BY trigger ASC`).all();
+async function getCustomCommands() {
+  return all(`SELECT * FROM custom_commands ORDER BY trigger ASC`);
 }
 
-function getCustomCommand(trigger) {
-  return getDB().prepare(`SELECT * FROM custom_commands WHERE trigger = ? COLLATE NOCASE AND enabled = 1`).get(trigger.toLowerCase());
+async function getCustomCommand(trigger) {
+  return get(`SELECT * FROM custom_commands WHERE trigger = ? AND enabled = 1`, [trigger.toLowerCase()]);
 }
 
-function setCustomCommand(trigger, response) {
-  getDB().prepare(`
+async function setCustomCommand(trigger, response) {
+  await run(`
     INSERT INTO custom_commands (trigger, response) VALUES (?, ?)
-    ON CONFLICT(trigger) DO UPDATE SET response = excluded.response
-  `).run(trigger.toLowerCase(), response);
+    ON CONFLICT(trigger) DO UPDATE SET response = ?
+  `, [trigger.toLowerCase(), response, response]);
 }
 
-function deleteCustomCommand(trigger) {
-  getDB().prepare(`DELETE FROM custom_commands WHERE trigger = ? COLLATE NOCASE`).run(trigger.toLowerCase());
+async function deleteCustomCommand(trigger) {
+  await run(`DELETE FROM custom_commands WHERE trigger = ?`, [trigger.toLowerCase()]);
 }
 
-function toggleCustomCommand(trigger, enabled) {
-  getDB().prepare(`UPDATE custom_commands SET enabled = ? WHERE trigger = ? COLLATE NOCASE`).run(enabled ? 1 : 0, trigger.toLowerCase());
+async function toggleCustomCommand(trigger, enabled) {
+  await run(`UPDATE custom_commands SET enabled = ? WHERE trigger = ?`, [enabled ? 1 : 0, trigger.toLowerCase()]);
 }
 
 // ─── Objectifs ────────────────────────────────────────────────────────────────
 
-function getObjectives() {
-  return getDB().prepare(`SELECT * FROM objectives ORDER BY active DESC, created_at DESC`).all();
+async function getObjectives() {
+  return all(`SELECT * FROM objectives ORDER BY active DESC, created_at DESC`);
 }
 
-function createObjective(title, description, target, reward) {
-  return getDB().prepare(`
-    INSERT INTO objectives (title, description, target, reward) VALUES (?, ?, ?, ?)
-  `).run(title, description, target, reward).lastInsertRowid;
+async function createObjective(title, description, target, reward) {
+  const result = await run(`INSERT INTO objectives (title, description, target, reward) VALUES (?, ?, ?, ?)`, [title, description, target, reward]);
+  return result;
 }
 
-function updateObjective(id, data) {
-  getDB().prepare(`
-    UPDATE objectives SET title=?, description=?, target=?, reward=?, active=? WHERE id=?
-  `).run(data.title, data.description, data.target, data.reward, data.active, id);
+async function deleteObjective(id) {
+  await run(`DELETE FROM objectives WHERE id = ?`, [id]);
 }
 
-function deleteObjective(id) {
-  getDB().prepare(`DELETE FROM objectives WHERE id=?`).run(id);
+async function achieveObjective(id) {
+  await run(`UPDATE objectives SET achieved = 1, active = 0 WHERE id = ?`, [id]);
 }
 
-function achieveObjective(id) {
-  getDB().prepare(`UPDATE objectives SET achieved=1, active=0 WHERE id=?`).run(id);
+// ─── Sessions ─────────────────────────────────────────────────────────────────
+
+async function startSession() {
+  const db = getDB();
+  if (db.execute) {
+    const r = await db.execute({ sql: `INSERT INTO stream_sessions (started_at) VALUES (datetime('now'))`, args: [] });
+    return Number(r.lastInsertRowid);
+  } else {
+    return db.prepare(`INSERT INTO stream_sessions (started_at) VALUES (datetime('now'))`).run().lastInsertRowid;
+  }
 }
 
-// ─── Sessions de stream ───────────────────────────────────────────────────────
-
-function startSession() {
-  return getDB().prepare(`INSERT INTO stream_sessions (started_at) VALUES (datetime('now'))`).run().lastInsertRowid;
+async function endSession(id, peakViewers, durationMin) {
+  await run(`UPDATE stream_sessions SET ended_at = datetime('now'), peak_viewers = ?, duration_min = ? WHERE id = ?`, [peakViewers, durationMin, id]);
 }
 
-function endSession(id, peakViewers, durationMin) {
-  getDB().prepare(`
-    UPDATE stream_sessions SET ended_at=datetime('now'), peak_viewers=?, duration_min=? WHERE id=?
-  `).run(peakViewers, durationMin, id);
+async function getStreamHistory(limit = 10) {
+  return all(`SELECT * FROM stream_sessions WHERE ended_at IS NOT NULL ORDER BY started_at DESC LIMIT ?`, [limit]);
 }
 
-function getStreamHistory(limit = 10) {
-  return getDB().prepare(`
-    SELECT * FROM stream_sessions WHERE ended_at IS NOT NULL ORDER BY started_at DESC LIMIT ?
-  `).all(limit);
+// ─── Duels ────────────────────────────────────────────────────────────────────
+
+async function createDuel(challenger, opponent, amount) {
+  const db = getDB();
+  if (db.execute) {
+    const r = await db.execute({ sql: `INSERT INTO duels (challenger, opponent, amount) VALUES (?, ?, ?)`, args: [challenger.toLowerCase(), opponent.toLowerCase(), amount] });
+    return Number(r.lastInsertRowid);
+  } else {
+    return db.prepare(`INSERT INTO duels (challenger, opponent, amount) VALUES (?, ?, ?)`).run(challenger.toLowerCase(), opponent.toLowerCase(), amount).lastInsertRowid;
+  }
 }
 
-// ─── Duels ───────────────────────────────────────────────────────────────────
-
-function createDuel(challenger, opponent, amount) {
-  return getDB().prepare(`
-    INSERT INTO duels (challenger, opponent, amount) VALUES (?, ?, ?)
-  `).run(challenger.toLowerCase(), opponent.toLowerCase(), amount).lastInsertRowid;
+async function getPendingDuel(opponent) {
+  return get(`SELECT * FROM duels WHERE opponent = ? AND status = 'pending' ORDER BY created_at DESC LIMIT 1`, [opponent.toLowerCase()]);
 }
 
-function getPendingDuel(opponent) {
-  return getDB().prepare(`
-    SELECT * FROM duels WHERE opponent = ? COLLATE NOCASE AND status = 'pending'
-    ORDER BY created_at DESC LIMIT 1
-  `).get(opponent.toLowerCase());
+async function resolveDuel(id, winner) {
+  await run(`UPDATE duels SET status = 'resolved', winner = ? WHERE id = ?`, [winner, id]);
 }
 
-function resolveDuel(id, winner) {
-  getDB().prepare(`UPDATE duels SET status='resolved', winner=? WHERE id=?`).run(winner, id);
+async function cancelDuel(id) {
+  await run(`UPDATE duels SET status = 'cancelled' WHERE id = ?`, [id]);
 }
 
-function cancelDuel(id) {
-  getDB().prepare(`UPDATE duels SET status='cancelled' WHERE id=?`).run(id);
+async function getRecentDuels(limit = 10) {
+  return all(`SELECT * FROM duels ORDER BY created_at DESC LIMIT ?`, [limit]);
 }
 
-function getRecentDuels(limit = 10) {
-  return getDB().prepare(`SELECT * FROM duels ORDER BY created_at DESC LIMIT ?`).all(limit);
+// ─── Giveaway ─────────────────────────────────────────────────────────────────
+
+async function createGiveaway(title, prize, cost = 0) {
+  const db = getDB();
+  if (db.execute) {
+    const r = await db.execute({ sql: `INSERT INTO giveaways (title, prize, cost) VALUES (?, ?, ?)`, args: [title, prize, cost] });
+    return Number(r.lastInsertRowid);
+  } else {
+    return db.prepare(`INSERT INTO giveaways (title, prize, cost) VALUES (?, ?, ?)`).run(title, prize, cost).lastInsertRowid;
+  }
 }
 
-// ─── Giveaways ────────────────────────────────────────────────────────────────
-
-function createGiveaway(title, prize, cost = 0) {
-  return getDB().prepare(`
-    INSERT INTO giveaways (title, prize, cost) VALUES (?, ?, ?)
-  `).run(title, prize, cost).lastInsertRowid;
+async function getActiveGiveaway() {
+  return get(`SELECT * FROM giveaways WHERE status = 'open' ORDER BY created_at DESC LIMIT 1`);
 }
 
-function getActiveGiveaway() {
-  return getDB().prepare(`SELECT * FROM giveaways WHERE status='open' ORDER BY created_at DESC LIMIT 1`).get();
-}
-
-function joinGiveaway(id, username) {
-  const g = getDB().prepare(`SELECT entries FROM giveaways WHERE id=?`).get(id);
+async function joinGiveaway(id, username) {
+  const g = await get(`SELECT entries FROM giveaways WHERE id = ?`, [id]);
   if (!g) return false;
   const entries = JSON.parse(g.entries);
   if (entries.includes(username.toLowerCase())) return false;
   entries.push(username.toLowerCase());
-  getDB().prepare(`UPDATE giveaways SET entries=? WHERE id=?`).run(JSON.stringify(entries), id);
+  await run(`UPDATE giveaways SET entries = ? WHERE id = ?`, [JSON.stringify(entries), id]);
   return true;
 }
 
-function closeGiveaway(id) {
-  const g = getDB().prepare(`SELECT * FROM giveaways WHERE id=?`).get(id);
+async function closeGiveaway(id) {
+  const g = await get(`SELECT * FROM giveaways WHERE id = ?`, [id]);
   if (!g) return null;
   const entries = JSON.parse(g.entries);
   if (!entries.length) return null;
   const winner = entries[Math.floor(Math.random() * entries.length)];
-  getDB().prepare(`UPDATE giveaways SET status='closed', winner=?, ended_at=datetime('now') WHERE id=?`).run(winner, id);
+  await run(`UPDATE giveaways SET status = 'closed', winner = ?, ended_at = datetime('now') WHERE id = ?`, [winner, id]);
   return winner;
 }
 
-function getGiveawayHistory(limit = 10) {
-  return getDB().prepare(`SELECT * FROM giveaways WHERE status='closed' ORDER BY ended_at DESC LIMIT ?`).all(limit);
+async function getGiveawayHistory(limit = 10) {
+  return all(`SELECT * FROM giveaways WHERE status = 'closed' ORDER BY ended_at DESC LIMIT ?`, [limit]);
 }
 
-module.exports = {
-  getDB, upsertViewer, addPoints, getViewer, getLeaderboard, getViewerRank,
-  getGlobalStats, getRecentLogs, getActiveViewers, clearAllPoints,
-  getLevel, getNextLevel, LEVELS,
-  getCustomCommands, getCustomCommand, setCustomCommand, deleteCustomCommand, toggleCustomCommand,
-  getObjectives, createObjective, updateObjective, deleteObjective, achieveObjective,
-  startSession, endSession, getStreamHistory,
-  createDuel, getPendingDuel, resolveDuel, cancelDuel, getRecentDuels,
-  createGiveaway, getActiveGiveaway, joinGiveaway, closeGiveaway, getGiveawayHistory,
-};
+// ─── Lobby ────────────────────────────────────────────────────────────────────
 
-// ─── Accès Panel ─────────────────────────────────────────────────────────────
-
-function initPanelAccess() {
-  try {
-    getDB().prepare(`CREATE TABLE IF NOT EXISTS panel_access (
-      id         INTEGER PRIMARY KEY AUTOINCREMENT,
-      username   TEXT NOT NULL UNIQUE COLLATE NOCASE,
-      status     TEXT NOT NULL DEFAULT 'pending',
-      role       TEXT NOT NULL DEFAULT 'viewer',
-      created_at TEXT NOT NULL DEFAULT (datetime('now')),
-      updated_at TEXT NOT NULL DEFAULT (datetime('now'))
-    )`).run();
-  } catch(e) {}
+async function getLobby() {
+  return all(`SELECT * FROM lobby ORDER BY joined_at ASC`);
 }
 
-function requestAccess(username) {
-  initPanelAccess();
+async function joinLobby(username) {
   try {
-    getDB().prepare(`
-      INSERT INTO panel_access (username) VALUES (?)
-      ON CONFLICT(username) DO UPDATE SET updated_at = datetime('now')
-      WHERE status = 'pending'
-    `).run(username.toLowerCase());
+    await run(`INSERT INTO lobby (username) VALUES (?)`, [username.toLowerCase()]);
     return true;
   } catch(e) { return false; }
 }
 
-function getAccessStatus(username) {
-  initPanelAccess();
-  return getDB().prepare(`SELECT * FROM panel_access WHERE username = ? COLLATE NOCASE`).get(username.toLowerCase());
+async function removeFromLobby(username) {
+  await run(`DELETE FROM lobby WHERE username = ?`, [username.toLowerCase()]);
 }
 
-function getAllAccessRequests() {
-  initPanelAccess();
-  return getDB().prepare(`SELECT * FROM panel_access ORDER BY created_at DESC`).all();
+async function clearLobby() {
+  await run(`DELETE FROM lobby`);
 }
 
-function approveAccess(username, role = 'viewer') {
-  initPanelAccess();
-  getDB().prepare(`UPDATE panel_access SET status='approved', role=?, updated_at=datetime('now') WHERE username=? COLLATE NOCASE`).run(role, username.toLowerCase());
+// ─── Accès Panel ─────────────────────────────────────────────────────────────
+
+async function initPanelAccess() {
+  // Déjà créé dans initSchema
 }
 
-function revokeAccess(username) {
-  initPanelAccess();
-  getDB().prepare(`UPDATE panel_access SET status='revoked', updated_at=datetime('now') WHERE username=? COLLATE NOCASE`).run(username.toLowerCase());
-}
-
-function deleteAccessRequest(username) {
-  initPanelAccess();
-  getDB().prepare(`DELETE FROM panel_access WHERE username=? COLLATE NOCASE`).run(username.toLowerCase());
-}
-
-module.exports = Object.assign(module.exports, {
-  initPanelAccess, requestAccess, getAccessStatus, getAllAccessRequests,
-  approveAccess, revokeAccess, deleteAccessRequest
-});
-
-// ─── Lobby ────────────────────────────────────────────────────────────────────
-
-function getLobby() {
+async function requestAccess(username) {
   try {
-    getDB().prepare(`CREATE TABLE IF NOT EXISTS lobby (
-      id         INTEGER PRIMARY KEY AUTOINCREMENT,
-      username   TEXT NOT NULL UNIQUE COLLATE NOCASE,
-      joined_at  TEXT NOT NULL DEFAULT (datetime('now'))
-    )`).run();
-  } catch(e) {}
-  return getDB().prepare(`SELECT * FROM lobby ORDER BY joined_at ASC`).all();
-}
-
-function joinLobby(username) {
-  try {
-    getDB().prepare(`CREATE TABLE IF NOT EXISTS lobby (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      username TEXT NOT NULL UNIQUE COLLATE NOCASE,
-      joined_at TEXT NOT NULL DEFAULT (datetime('now'))
-    )`).run();
-  } catch(e) {}
-  try {
-    getDB().prepare(`INSERT INTO lobby (username) VALUES (?)`).run(username.toLowerCase());
+    await run(`INSERT INTO panel_access (username) VALUES (?) ON CONFLICT(username) DO UPDATE SET updated_at = datetime('now') WHERE status = 'pending'`, [username.toLowerCase()]);
     return true;
-  } catch(e) { return false; } // déjà inscrit
+  } catch(e) { return false; }
 }
 
-function removeFromLobby(username) {
-  try {
-    getDB().prepare(`DELETE FROM lobby WHERE username = ? COLLATE NOCASE`).run(username.toLowerCase());
-  } catch(e) {}
+async function getAccessStatus(username) {
+  return get(`SELECT * FROM panel_access WHERE username = ?`, [username.toLowerCase()]);
 }
 
-function clearLobby() {
-  try { getDB().prepare(`DELETE FROM lobby`).run(); } catch(e) {}
+async function getAllAccessRequests() {
+  return all(`SELECT * FROM panel_access ORDER BY created_at DESC`);
 }
 
-module.exports = Object.assign(module.exports, {
-  getLobby, joinLobby, removeFromLobby, clearLobby
-});
+async function approveAccess(username, role = 'viewer') {
+  await run(`UPDATE panel_access SET status = 'approved', role = ?, updated_at = datetime('now') WHERE username = ?`, [role, username.toLowerCase()]);
+}
+
+async function revokeAccess(username) {
+  await run(`UPDATE panel_access SET status = 'revoked', updated_at = datetime('now') WHERE username = ?`, [username.toLowerCase()]);
+}
+
+async function deleteAccessRequest(username) {
+  await run(`DELETE FROM panel_access WHERE username = ?`, [username.toLowerCase()]);
+}
+
+// ─── System Commands ──────────────────────────────────────────────────────────
+
+async function initSystemCommandsState(commands) {
+  for (const cmd of commands) {
+    try {
+      await run(`INSERT OR IGNORE INTO system_commands_state (trigger, enabled) VALUES (?, 1)`, [cmd]);
+    } catch(e) {}
+  }
+}
+
+async function isSystemCmdEnabled(trigger) {
+  const r = await get(`SELECT enabled FROM system_commands_state WHERE trigger = ?`, [trigger]);
+  return r ? r.enabled === 1 : true;
+}
+
+// ─── Init ─────────────────────────────────────────────────────────────────────
+
+let initialized = false;
+async function ensureInit() {
+  if (!initialized) {
+    await initSchema();
+    initialized = true;
+  }
+}
+
+module.exports = {
+  ensureInit,
+  getDB,
+  upsertViewer, addPoints, getViewer, getLeaderboard, getViewerRank,
+  getGlobalStats, getRecentLogs, getActiveViewers, clearAllPoints,
+  getLevel, getNextLevel, LEVELS,
+  getCustomCommands, getCustomCommand, setCustomCommand, deleteCustomCommand, toggleCustomCommand,
+  getObjectives, createObjective, deleteObjective, achieveObjective,
+  startSession, endSession, getStreamHistory,
+  createDuel, getPendingDuel, resolveDuel, cancelDuel, getRecentDuels,
+  createGiveaway, getActiveGiveaway, joinGiveaway, closeGiveaway, getGiveawayHistory,
+  getLobby, joinLobby, removeFromLobby, clearLobby,
+  initPanelAccess, requestAccess, getAccessStatus, getAllAccessRequests,
+  approveAccess, revokeAccess, deleteAccessRequest,
+  initSystemCommandsState, isSystemCmdEnabled,
+};
