@@ -149,7 +149,14 @@ async function initSchema() {
   ];
 
   for (const sql of tables) {
-    await run(sql);
+    try {
+      await run(sql);
+    } catch(e) {
+      // Table déjà existante — ignorer
+      if (!e.message?.includes('already exists')) {
+        console.error('[DB] Erreur création table:', e.message);
+      }
+    }
   }
   console.log('[DB] Schema initialisé ✓');
 }
@@ -459,7 +466,11 @@ async function isSystemCmdEnabled(trigger) {
 let initialized = false;
 async function ensureInit() {
   if (!initialized) {
-    await initSchema();
+    try {
+      await initSchema();
+    } catch(e) {
+      console.error('[DB] Erreur init schema:', e.message);
+    }
     initialized = true;
   }
 }
