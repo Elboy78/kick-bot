@@ -45,8 +45,11 @@ label{font-size:12px;font-weight:500;color:var(--muted);display:block;margin-bot
     <div class="step active" id="step-1">
       <label>Ton pseudo Kick</label>
       <input class="input" id="username-input" placeholder="Ex: elboy78" autocomplete="off"
+        onkeydown="if(event.key==='Enter')document.getElementById('password-input').focus()">
+      <label style="margin-top:12px">Mot de passe</label>
+      <input class="input" id="password-input" type="password" placeholder="Mot de passe fourni par le streamer" autocomplete="off"
         onkeydown="if(event.key==='Enter')submitRequest()">
-      <button class="btn btn-primary" onclick="submitRequest()">Demander l'accès →</button>
+      <button class="btn btn-primary" onclick="submitRequest()">Se connecter →</button>
       <div class="msg" id="step1-msg"></div>
     </div>
 
@@ -106,13 +109,15 @@ function showMsg(id, msg, type) {
 
 async function submitRequest() {
   const username = document.getElementById('username-input').value.trim();
+  const password = document.getElementById('password-input').value.trim();
   if (!username || username.length < 2) return showMsg('step1-msg', 'Entre ton pseudo Kick', 'err');
+  if (!password) return showMsg('step1-msg', 'Entre le mot de passe', 'err');
 
   const btn = document.querySelector('#step-1 .btn');
-  btn.disabled = true; btn.textContent = 'Envoi…';
+  btn.disabled = true; btn.textContent = 'Connexion…';
 
   try {
-    const r = await fetch('/api/auth/request?username=' + encodeURIComponent(username));
+    const r = await fetch('/api/auth/request?username=' + encodeURIComponent(username) + '&password=' + encodeURIComponent(password));
     const d = await r.json();
 
     currentUsername = username;
@@ -120,6 +125,11 @@ async function submitRequest() {
     document.getElementById('display-username').textContent = username;
     document.getElementById('approved-username').textContent = username;
 
+    if (d.error === 'wrong_password') {
+      showMsg('step1-msg', 'Mot de passe incorrect', 'err');
+      btn.disabled = false; btn.textContent = 'Se connecter →';
+      return;
+    }
     if (d.status === 'approved') {
       showStep(3);
     } else if (d.status === 'revoked') {

@@ -1246,37 +1246,39 @@ async function deleteCmdPage(trigger) {
 // ── Live manuel ───────────────────────────────────────────────────────────────
 let forceLive = null; // null = auto, true = forcé ON, false = forcé OFF
 
-function toggleForceLive() {
+async function toggleForceLive() {
   const btn = document.getElementById('live-toggle-btn');
-  if (forceLive === true) {
-    forceLive = false;
-    btn.style.background = 'var(--red-dim)';
-    btn.style.color = 'var(--red)';
-    btn.style.borderColor = '#f8717144';
-    btn.textContent = '⚡ Forcé HORS LIGNE';
-    toast('Stream forcé HORS LIGNE — points désactivés', false);
-  } else if (forceLive === false) {
-    forceLive = null;
-    btn.style.background = 'var(--surface2)';
-    btn.style.color = 'var(--muted)';
-    btn.style.borderColor = 'var(--border2)';
-    btn.textContent = '⚡ Mode auto';
-    toast('Mode automatique rétabli');
-  } else {
-    forceLive = true;
-    btn.style.background = 'var(--accent-dim)';
-    btn.style.color = 'var(--accent)';
-    btn.style.borderColor = '#22c55e44';
-    btn.textContent = '⚡ Forcé EN LIGNE';
-    toast('Stream forcé EN LIGNE — points activés !');
-  }
-  // Mettre à jour le pill
+  let nextState;
+  if (forceLive === null)  nextState = 'on';
+  else if (forceLive === true) nextState = 'off';
+  else nextState = 'auto';
+
+  try {
+    await post('/api/admin/live/force', { status: nextState });
+  } catch(e) {}
+
+  forceLive = nextState === 'on' ? true : nextState === 'off' ? false : null;
+
   const pill = document.getElementById('live-pill');
   const txt  = document.getElementById('live-text');
-  if (pill && txt) {
-    if (forceLive === true)  { pill.className='live-pill on'; txt.textContent='● LIVE (forcé)'; }
-    if (forceLive === false) { pill.className='live-pill off'; txt.textContent='Hors ligne (forcé)'; }
-    if (forceLive === null)  loadLiveStatus();
+
+  if (forceLive === true) {
+    btn.style.cssText = 'width:100%;margin-top:8px;padding:7px;border-radius:8px;background:var(--accent-dim);color:var(--accent);border:1px solid #22c55e44;font-size:11px;font-weight:600;cursor:pointer';
+    btn.textContent = '⚡ Forcé EN LIGNE';
+    if(pill) pill.className='live-pill on';
+    if(txt)  txt.textContent='● LIVE (forcé)';
+    toast('Stream forcé EN LIGNE ✓');
+  } else if (forceLive === false) {
+    btn.style.cssText = 'width:100%;margin-top:8px;padding:7px;border-radius:8px;background:var(--red-dim);color:var(--red);border:1px solid #f8717144;font-size:11px;font-weight:600;cursor:pointer';
+    btn.textContent = '⚡ Forcé HORS LIGNE';
+    if(pill) pill.className='live-pill off';
+    if(txt)  txt.textContent='Hors ligne (forcé)';
+    toast('Stream forcé HORS LIGNE', false);
+  } else {
+    btn.style.cssText = 'width:100%;margin-top:8px;padding:7px;border-radius:8px;background:var(--surface2);color:var(--muted);border:1px solid var(--border2);font-size:11px;font-weight:600;cursor:pointer';
+    btn.textContent = '⚡ Mode auto';
+    toast('Mode automatique rétabli');
+    loadLiveStatus();
   }
 }
 

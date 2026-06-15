@@ -61,8 +61,24 @@ app.post('/api/admin/system-commands/toggle', requireAuth, (req, res) => {
   } catch(e) { res.status(500).json({ error: e.message }); }
 });
 
-// État live du stream
+// Forcer le statut live manuellement depuis le panel
+let forcedLiveStatus = null; // null=auto, true=forcé ON, false=forcé OFF
+
+app.post('/api/admin/live/force', requireAuth, (req, res) => {
+  const { status } = req.body; // 'on', 'off', ou 'auto'
+  forcedLiveStatus = status === 'on' ? true : status === 'off' ? false : null;
+  res.json({ success: true, forced: forcedLiveStatus });
+});
+
+app.get('/api/admin/live/status', requireAuth, (req, res) => {
+  res.json({ forced: forcedLiveStatus });
+});
+
 app.get('/api/live', async (req, res) => {
+  // Si statut forcé, retourner directement
+  if (forcedLiveStatus !== null) {
+    return res.json({ live: forcedLiveStatus, viewers: 0, title: '', forced: true });
+  }
   try {
     const axios = require('axios');
     const channel = process.env.KICK_CHANNEL || '';
@@ -89,13 +105,22 @@ app.post('/api/admin/giveaway/close',  requireAuth, (req, res) => { const g=db.g
 
 // Routes publiques (sans auth)
 app.get('/api/auth/request', (req, res) => {
-  const { username } = req.query;
+  const { username, password } = req.query;
   if (!username || username.trim().length < 2) return res.status(400).json({ error: 'Pseudo invalide' });
+
+  // Vérifier le mot de passe partagé
+  const PANEL_PASSWORD = process.env.PANEL_PASSWORD || '';
+  if (PANEL_PASSWORD && password !== PANEL_PASSWORD) {
+    return res.status(401).json({ error: 'wrong_password' });
+  }
+
   const status = db.getAccessStatus(username.trim());
   if (status?.status === 'approved') return res.json({ status: 'approved', role: status.role });
   if (status?.status === 'revoked')  return res.json({ status: 'revoked' });
   db.requestAccess(username.trim());
-  res.json({ status: status?.status || 'pending' });
+  // Si pas de validation manuelle requise, approuver directement
+  db.approveAccess(username.trim(), 'viewer');
+  res.json({ status: 'approved', role: 'viewer' });
 });
 
 app.get('/api/auth/check', (req, res) => {
