@@ -557,7 +557,7 @@ if (!CONFIG.token) {
 
 // Vérifier l'état live au démarrage
 (async () => {
-  console.log('[STREAM] Vérification de l'état du live au démarrage...');
+  console.log('[STREAM] Verification de l\'etat du live au demarrage...');
   const live = await checkLiveStatus();
   console.log(`[STREAM] État initial : ${live ? '🔴 EN LIVE' : '⚫ Hors ligne'}`);
 })();
