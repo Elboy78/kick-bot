@@ -13,6 +13,7 @@ function getDB() {
       client = createClient({
         url:       process.env.TURSO_URL,
         authToken: process.env.TURSO_TOKEN,
+        syncUrl:   undefined,
       });
       console.log('[DB] Connecté à Turso ✓');
     } else {
