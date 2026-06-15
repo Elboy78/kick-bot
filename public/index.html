@@ -1149,11 +1149,11 @@ async function loadSystemCommands() {
   try {
     const data = await get('/api/system-commands') || [];
     const stateMap = {};
-    data.forEach(r => stateMap[r.trigger] = r.enabled);
+    data.forEach(r => { stateMap[r.trigger] = r.enabled !== 0 && r.enabled !== false; });
     const el = document.getElementById('sys-cmd-list');
     if (!el) return;
     el.innerHTML = Object.entries(SYS_CMD_DESCS).map(([cmd, desc]) => {
-      const enabled = stateMap[cmd] !== undefined ? stateMap[cmd] : 1;
+      const enabled = stateMap[cmd] !== undefined ? stateMap[cmd] : true;
       return `<div style="display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--border)">
         <label class="toggle">
           <input type="checkbox" ${enabled ? 'checked' : ''} onchange="toggleSysCmd('${cmd}', this.checked)">
@@ -1163,7 +1163,7 @@ async function loadSystemCommands() {
         <span style="font-size:12px;color:var(--muted);flex:1">${desc}</span>
       </div>`;
     }).join('');
-  } catch(e) {}
+  } catch(e) { console.error('loadSystemCommands error:', e); }
 }
 
 async function toggleSysCmd(trigger, enabled) {

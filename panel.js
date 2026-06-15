@@ -97,8 +97,8 @@ app.get('/api/admin/access',           requireAuth, async (req,res) => { try { r
 app.post('/api/admin/access/approve',  requireAuth, async (req,res) => { try { await db.approveAccess(req.body.username,req.body.role||'viewer'); res.json({success:true}); } catch(e){res.status(500).json({error:e.message}); }});
 app.post('/api/admin/access/revoke',   requireAuth, async (req,res) => { try { await db.revokeAccess(req.body.username); res.json({success:true}); } catch(e){res.status(500).json({error:e.message}); }});
 app.delete('/api/admin/access/:username', requireAuth, async (req,res) => { try { await db.deleteAccessRequest(req.params.username); res.json({success:true}); } catch(e){res.status(500).json({error:e.message}); }});
-app.get('/api/system-commands', async (req,res) => { try { const rows = await db.getCustomCommands(); res.json({data:[]}); } catch(e){res.json({data:[]}); }});
-app.post('/api/admin/system-commands/toggle', requireAuth, async (req,res) => { try { res.json({success:true}); } catch(e){res.status(500).json({error:e.message}); }});
+app.get('/api/system-commands', async (req,res) => { try { res.json({data: await db.getAllSystemCommandsState()}); } catch(e){res.json({data:[]}); }});
+app.post('/api/admin/system-commands/toggle', requireAuth, async (req,res) => { try { const {trigger,enabled}=req.body; if(!trigger) return res.status(400).json({error:'trigger requis'}); await db.toggleSystemCommand(trigger, enabled); res.json({success:true}); } catch(e){res.status(500).json({error:e.message}); }});
 
 // Live force
 let forcedLiveStatus = null;

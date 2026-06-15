@@ -462,6 +462,14 @@ async function isSystemCmdEnabled(trigger) {
   return r ? r.enabled === 1 : true;
 }
 
+async function getAllSystemCommandsState() {
+  return all(`SELECT * FROM system_commands_state ORDER BY trigger ASC`);
+}
+
+async function toggleSystemCommand(trigger, enabled) {
+  await run(`INSERT OR REPLACE INTO system_commands_state (trigger, enabled) VALUES (?, ?)`, [trigger, enabled ? 1 : 0]);
+}
+
 // ─── Init ─────────────────────────────────────────────────────────────────────
 
 let initialized = false;
@@ -490,5 +498,5 @@ module.exports = {
   getLobby, joinLobby, removeFromLobby, clearLobby,
   initPanelAccess, requestAccess, getAccessStatus, getAllAccessRequests,
   approveAccess, revokeAccess, deleteAccessRequest,
-  initSystemCommandsState, isSystemCmdEnabled,
+  initSystemCommandsState, isSystemCmdEnabled, getAllSystemCommandsState, toggleSystemCommand,
 };
