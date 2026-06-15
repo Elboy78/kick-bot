@@ -13,9 +13,7 @@ app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
 function requireAuth(req, res, next) {
-  const key = req.headers['x-panel-key'] || req.query.key;
-  if (key !== SECRET) return res.status(401).json({ error: 'Clé invalide' });
-  next();
+  next(); // Auth désactivée — panel accessible sans clé
 }
 
 // ── Lecture ──────────────────────────────────────────────────────────────────

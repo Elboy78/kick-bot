@@ -628,10 +628,8 @@ label.label:first-child{margin-top:0}
 <div class="page" id="page-admin">
   <div class="grid-2">
     <div>
-      <div class="card">
-        <div class="card-header"><div class="card-title"><span class="icon">🔑</span>Authentification</div></div>
-        <label class="label">Clé secrète (PANEL_SECRET)</label>
-        <input type="password" class="input" id="admin-key" placeholder="••••••••••">
+      <div class="card" style="display:none">
+        <input type="hidden" id="admin-key" value="">
       </div>
 
       <div class="card">
