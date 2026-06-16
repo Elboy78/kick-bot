@@ -2,7 +2,7 @@
 <html lang="fr">
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Kick Loyalty — Panel</title>
+<title>Bot7uP — Panel</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
@@ -248,7 +248,7 @@ label.label:first-child{margin-top:0}
 <aside>
   <div class="sidebar-logo">
     <div class="logo-icon">K</div>
-    <div class="logo-text">Kick<span>Bot</span></div>
+    <div class="logo-text">Bot<span>7uP</span></div>
   </div>
 
   <div class="sidebar-section">Principal</div>
@@ -260,6 +260,7 @@ label.label:first-child{margin-top:0}
   <button class="nav-item" onclick="showPage('jeux')"><span class="icon">⚔️</span><span>Jeux</span></button>
   <button class="nav-item" onclick="showPage('objectifs')"><span class="icon">🎯</span><span>Objectifs</span></button>
   <button class="nav-item" onclick="showPage('dbd')"><span class="icon">🔪</span><span>DBD</span></button>
+  <button class="nav-item" onclick="showPage('moderation')"><span class="icon">🛡️</span><span>Modération</span></button>
 
   <div class="sidebar-section">Données</div>
   <button class="nav-item" onclick="showPage('historique')"><span class="icon">📅</span><span>Historique</span></button>
@@ -539,7 +540,14 @@ label.label:first-child{margin-top:0}
       </div>
 
       <div class="card">
-        <div class="card-header"><div class="card-title"><span class="icon">📌</span>Commandes système</div></div>
+        <div class="card-header">
+          <div class="card-title"><span class="icon">📌</span>Commandes système</div>
+          <label class="toggle" title="Tout activer / désactiver">
+            <input type="checkbox" id="all-cmds-toggle" checked onchange="toggleAllCommands(this.checked)">
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
+        <div style="font-size:11px;color:var(--muted);margin-bottom:12px">Le toggle à droite active/désactive toutes les commandes d'un coup</div>
         <div id="sys-cmd-list"><div class="empty"><p>Chargement…</p></div></div>
       </div>
     </div>
@@ -624,6 +632,68 @@ label.label:first-child{margin-top:0}
   </div>
 </div>
 
+<!-- ══════════ MODÉRATION ══════════ -->
+<div class="page" id="page-moderation">
+  <div class="grid-2">
+    <div>
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title"><span class="icon">🚫</span>Mots bannis (<span id="banned-count">0</span>)</div>
+        </div>
+        <div style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:10px 14px;margin-bottom:14px;font-size:12px;color:var(--muted)">
+          Quand un viewer écrit un mot de cette liste, le bot applique automatiquement l'action choisie.
+        </div>
+        <div id="banned-list"><div class="empty"><div class="empty-icon">🛡️</div><p>Aucun mot banni</p></div></div>
+      </div>
+    </div>
+    <div>
+      <div class="card" style="position:sticky;top:80px">
+        <div class="card-header"><div class="card-title"><span class="icon">➕</span>Ajouter un mot</div></div>
+
+        <label class="label">Mot ou expression à détecter</label>
+        <input class="input" id="ban-word" placeholder="Ex: insulte, spam, lien...">
+        <div style="font-size:11px;color:var(--muted2);margin-top:4px">Insensible à la casse — détecte le mot dans tout le message</div>
+
+        <label class="label" style="margin-top:14px">Action</label>
+        <select class="input" id="ban-action" onchange="updateDurationVisibility()">
+          <option value="timeout">⏱ Timeout (durée limitée)</option>
+          <option value="ban">🔨 Ban permanent</option>
+        </select>
+
+        <div id="duration-wrap">
+          <label class="label" style="margin-top:14px">Durée du timeout</label>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+            <div>
+              <input type="number" class="input" id="ban-duration" placeholder="300" value="300" min="1">
+              <div style="font-size:11px;color:var(--muted2);margin-top:4px">en secondes</div>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:6px;margin-top:2px">
+              <button class="btn btn-secondary btn-sm" onclick="setDuration(60)">1 min</button>
+              <button class="btn btn-secondary btn-sm" onclick="setDuration(300)">5 min</button>
+              <button class="btn btn-secondary btn-sm" onclick="setDuration(3600)">1h</button>
+              <button class="btn btn-secondary btn-sm" onclick="setDuration(86400)">24h</button>
+            </div>
+          </div>
+        </div>
+
+        <button class="btn btn-primary" style="width:100%;justify-content:center;margin-top:16px;padding:10px" onclick="addBannedWord()">
+          ➕ Ajouter le mot
+        </button>
+        <div id="ban-msg" style="margin-top:8px"></div>
+
+        <div class="divider"></div>
+        <div style="font-size:11px;color:var(--muted2);line-height:1.8">
+          <b style="color:var(--muted)">Exemples :</b><br>
+          <span style="color:var(--red)">insulte</span> → Ban permanent<br>
+          <span style="color:var(--warn)">spam</span> → Timeout 5 min<br>
+          <span style="color:var(--warn)">discord.gg</span> → Timeout 1h<br>
+          <span style="color:var(--red)">haine</span> → Ban permanent
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- ══════════ ADMIN ══════════ -->
 <div class="page" id="page-admin">
   <div class="grid-2">
@@ -691,7 +761,7 @@ label.label:first-child{margin-top:0}
 const API = '';
 const MEDALS = ['🥇','🥈','🥉'];
 let lbData = [], levels = [];
-const PAGE_TITLES = {dashboard:'Dashboard',classement:'Classement',lobby:'Lobby',jeux:'Jeux & Giveaway',objectifs:'Objectifs',historique:'Historique',commands:'Commandes',dbd:'Dead by Daylight',admin:'Administration'};
+const PAGE_TITLES = {dashboard:'Dashboard',classement:'Classement',lobby:'Lobby',jeux:'Jeux & Giveaway',objectifs:'Objectifs',historique:'Historique',commands:'Commandes',dbd:'Dead by Daylight',moderation:'Modération',admin:'Administration'};
 
 // ── Navigation ─────────────────────────────────────────────────────────────────
 function showPage(name) {
@@ -710,6 +780,7 @@ function showPage(name) {
   if(name==='admin') { loadCmds(); loadAdminLevels(); loadAccessRequests(); }
   if(name==='commands') { loadCommandsPage(); loadSystemCommands(); }
   if(name==='dbd') initDBD();
+  if(name==='moderation') loadBannedWords();
   if(name==='lobby') loadLobby();
 }
 
@@ -1576,6 +1647,90 @@ function renderDBDHistory() {
 function clearDBDHistory() {
   dbdHistory = [];
   renderDBDHistory();
+}
+
+// ── Modération ────────────────────────────────────────────────────────────────
+
+async function loadBannedWords() {
+  try {
+    const data = await get('/api/banned-words') || [];
+    document.getElementById('banned-count').textContent = data.length;
+    const el = document.getElementById('banned-list');
+    if (!data.length) { el.innerHTML = '<div class="empty"><div class="empty-icon">🛡️</div><p>Aucun mot banni</p></div>'; return; }
+    el.innerHTML = data.map(w => `
+      <div style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;margin-bottom:6px">
+        <label class="toggle">
+          <input type="checkbox" ${w.enabled ? 'checked' : ''} onchange="toggleBannedWord(${w.id}, this.checked)">
+          <span class="toggle-slider"></span>
+        </label>
+        <div style="flex:1;min-width:0">
+          <div style="font-weight:600;font-family:monospace;color:var(--red)">${esc(w.word)}</div>
+          <div style="font-size:11px;color:var(--muted);margin-top:2px">
+            ${w.action === 'ban' ? '🔨 Ban permanent' : '⏱ Timeout ' + fmtDuration(w.duration)}
+          </div>
+        </div>
+        <button class="btn btn-danger btn-sm" onclick="deleteBannedWord(${w.id})">✕</button>
+      </div>`).join('');
+  } catch(e) {}
+}
+
+function fmtDuration(s) {
+  if (s < 60) return s + 's';
+  if (s < 3600) return Math.floor(s/60) + ' min';
+  if (s < 86400) return Math.floor(s/3600) + 'h';
+  return Math.floor(s/86400) + 'j';
+}
+
+function updateDurationVisibility() {
+  const action = document.getElementById('ban-action').value;
+  document.getElementById('duration-wrap').style.display = action === 'ban' ? 'none' : 'block';
+}
+
+function setDuration(s) { document.getElementById('ban-duration').value = s; }
+
+async function addBannedWord() {
+  const word     = document.getElementById('ban-word').value.trim();
+  const action   = document.getElementById('ban-action').value;
+  const duration = parseInt(document.getElementById('ban-duration').value) || 300;
+  if (!word) return showInline('ban-msg', 'Entre un mot à bannir', false);
+  const r = await fetch('/api/admin/banned-words', {
+    method: 'POST', headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({ word, action, duration })
+  });
+  const json = await r.json();
+  if (!r.ok) return showInline('ban-msg', json.error || 'Erreur', false);
+  toast('Mot "' + word + '" ajouté ✓');
+  document.getElementById('ban-word').value = '';
+  loadBannedWords();
+}
+
+async function deleteBannedWord(id) {
+  if (!confirm('Supprimer ce mot banni ?')) return;
+  await fetch('/api/admin/banned-words/' + id, { method: 'DELETE' });
+  loadBannedWords();
+}
+
+async function toggleBannedWord(id, enabled) {
+  await fetch('/api/admin/banned-words/toggle', {
+    method: 'POST', headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({ id, enabled })
+  });
+  toast((enabled ? '✅' : '🔴') + ' Mot ' + (enabled ? 'activé' : 'désactivé'));
+  loadBannedWords();
+}
+
+// ── Toggle toutes les commandes ───────────────────────────────────────────────
+
+async function toggleAllCommands(enabled) {
+  const cmds = Object.keys(SYS_CMD_DESCS);
+  for (const cmd of cmds) {
+    await fetch('/api/admin/system-commands/toggle', {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ trigger: cmd, enabled })
+    });
+  }
+  toast(enabled ? '✅ Toutes les commandes activées' : '🔴 Toutes les commandes désactivées');
+  loadSystemCommands();
 }
 
 // ── Auth Panel ────────────────────────────────────────────────────────────────

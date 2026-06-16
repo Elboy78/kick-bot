@@ -142,6 +142,14 @@ async function handleChatMessage(payload) {
   await db.upsertViewer(username, kickId);
   console.log(`[CHAT] ${username}: ${content}`);
 
+  // Vérifier les mots bannis
+  const banned = await db.checkBannedWords(content);
+  if (banned) {
+    console.log(`[MODÉRATION] Mot banni détecté: "${banned.word}" de ${username} — Action: ${banned.action}`);
+    await moderateUser(username, banned.action, banned.duration, banned.word);
+    return;
+  }
+
   const parts = content.trim().split(' ');
   const cmd   = parts[0].toLowerCase();
 
@@ -279,6 +287,31 @@ async function cmdGiveawayInfo(username) {
   if (!g) return sendChat('Aucun giveaway en cours.');
   const entries = JSON.parse(g.entries).length;
   sendChat(`🎁 Giveaway : "${g.title}" — Lot : ${g.prize}${g.cost > 0 ? ` (${g.cost} pts)` : ' (gratuit)'} — ${entries} participant${entries>1?'s':''} — !participer`);
+}
+
+// ─── Modération ──────────────────────────────────────────────────────────────
+
+async function moderateUser(username, action, duration, word) {
+  if (!CONFIG.token) { console.log(`[MOD] Simulation: ${action} ${username} pour "${word}"`); return; }
+  try {
+    if (action === 'ban') {
+      await axios.post(
+        `https://kick.com/api/v2/channels/${CONFIG.channelId}/bans`,
+        { banned_username: username, permanent: true },
+        { headers: { 'Authorization': `Bearer ${CONFIG.token}`, 'Content-Type': 'application/json', 'Accept': 'application/json', 'User-Agent': 'Mozilla/5.0' } }
+      );
+      console.log(`[MOD] ${username} banni pour "${word}"`);
+    } else {
+      await axios.post(
+        `https://kick.com/api/v2/channels/${CONFIG.channelId}/bans`,
+        { banned_username: username, duration: duration || 300, permanent: false },
+        { headers: { 'Authorization': `Bearer ${CONFIG.token}`, 'Content-Type': 'application/json', 'Accept': 'application/json', 'User-Agent': 'Mozilla/5.0' } }
+      );
+      console.log(`[MOD] ${username} timeout ${duration}s pour "${word}"`);
+    }
+  } catch(err) {
+    console.error('[MOD] Erreur modération:', err.response?.data || err.message);
+  }
 }
 
 // ─── Envoi messages ───────────────────────────────────────────────────────────

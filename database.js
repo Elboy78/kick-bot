@@ -143,6 +143,14 @@ async function initSchema() {
       created_at TEXT NOT NULL DEFAULT (datetime('now')),
       updated_at TEXT NOT NULL DEFAULT (datetime('now'))
     )`,
+    `CREATE TABLE IF NOT EXISTS banned_words (
+      id         INTEGER PRIMARY KEY AUTOINCREMENT,
+      word       TEXT NOT NULL UNIQUE,
+      action     TEXT NOT NULL DEFAULT 'timeout',
+      duration   INTEGER NOT NULL DEFAULT 300,
+      enabled    INTEGER NOT NULL DEFAULT 1,
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    )`,
     `CREATE TABLE IF NOT EXISTS system_commands_state (
       trigger  TEXT PRIMARY KEY,
       enabled  INTEGER NOT NULL DEFAULT 1
@@ -462,6 +470,38 @@ async function isSystemCmdEnabled(trigger) {
   return r ? r.enabled === 1 : true;
 }
 
+// ─── Banned Words ─────────────────────────────────────────────────────────────
+
+async function getBannedWords() {
+  return all(`SELECT * FROM banned_words ORDER BY created_at DESC`);
+}
+
+async function addBannedWord(word, action, duration) {
+  try {
+    await run(`INSERT INTO banned_words (word, action, duration) VALUES (?, ?, ?)
+      ON CONFLICT(word) DO UPDATE SET action=?, duration=?`,
+      [word.toLowerCase(), action, duration, action, duration]);
+    return true;
+  } catch(e) { return false; }
+}
+
+async function deleteBannedWord(id) {
+  await run(`DELETE FROM banned_words WHERE id = ?`, [id]);
+}
+
+async function toggleBannedWord(id, enabled) {
+  await run(`UPDATE banned_words SET enabled = ? WHERE id = ?`, [enabled ? 1 : 0, id]);
+}
+
+async function checkBannedWords(message) {
+  const words = await all(`SELECT * FROM banned_words WHERE enabled = 1`);
+  const lower = message.toLowerCase();
+  for (const w of words) {
+    if (lower.includes(w.word.toLowerCase())) return w;
+  }
+  return null;
+}
+
 async function getAllSystemCommandsState() {
   return all(`SELECT * FROM system_commands_state ORDER BY trigger ASC`);
 }
@@ -499,4 +539,5 @@ module.exports = {
   initPanelAccess, requestAccess, getAccessStatus, getAllAccessRequests,
   approveAccess, revokeAccess, deleteAccessRequest,
   initSystemCommandsState, isSystemCmdEnabled, getAllSystemCommandsState, toggleSystemCommand,
+  getBannedWords, addBannedWord, deleteBannedWord, toggleBannedWord, checkBannedWords,
 };
