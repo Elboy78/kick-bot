@@ -3,242 +3,241 @@
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Bot7uP — Panel</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{
-  --bg:#09090b;
-  --surface:#111114;
-  --surface2:#18181c;
-  --surface3:#1e1e24;
-  --border:#ffffff0f;
-  --border2:#ffffff18;
-  --text:#f4f4f5;
-  --muted:#71717a;
-  --muted2:#52525b;
-  --accent:#22c55e;
-  --accent-dim:#22c55e18;
-  --accent2:#818cf8;
-  --accent2-dim:#818cf818;
+  --bg:#0a0a0d;
+  --s1:#111116;
+  --s2:#17171e;
+  --s3:#1e1e27;
+  --s4:#25252f;
+  --b1:#ffffff08;
+  --b2:#ffffff12;
+  --b3:#ffffff1e;
+  --text:#f0f0f8;
+  --muted:#9090a8;
+  --muted2:#5a5a72;
+  --green:#4ade80;
+  --green-d:#166534;
+  --green-bg:#4ade8012;
+  --purple:#a78bfa;
+  --purple-d:#5b21b6;
+  --purple-bg:#a78bfa12;
+  --blue:#60a5fa;
+  --blue-bg:#60a5fa12;
   --gold:#fbbf24;
-  --gold-dim:#fbbf2418;
+  --gold-bg:#fbbf2412;
   --red:#f87171;
-  --red-dim:#f8717118;
+  --red-bg:#f8717112;
   --cyan:#22d3ee;
-  --r:10px;--r2:14px;--r3:18px;
+  --r:8px;--r2:12px;--r3:16px;
+  --sidebar:240px;
 }
-body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--text);font-size:14px;min-height:100vh;-webkit-font-smoothing:antialiased}
+body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--text);font-size:13px;min-height:100vh;-webkit-font-smoothing:antialiased}
 
-/* ── Sidebar layout ── */
+/* ── Layout ── */
 .layout{display:flex;min-height:100vh}
-aside{width:220px;flex-shrink:0;background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column;position:fixed;top:0;left:0;height:100vh;z-index:50}
-.main-wrap{margin-left:220px;flex:1;display:flex;flex-direction:column;min-height:100vh}
+aside{width:var(--sidebar);flex-shrink:0;background:var(--s1);border-right:1px solid var(--b1);display:flex;flex-direction:column;position:fixed;top:0;left:0;height:100vh;z-index:50;overflow-y:auto}
+.main{margin-left:var(--sidebar);flex:1;display:flex;flex-direction:column}
 
-/* ── Sidebar ── */
-.sidebar-logo{padding:20px 20px 8px;display:flex;align-items:center;gap:10px}
-.logo-icon{width:34px;height:34px;background:var(--accent);border-radius:9px;display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:800;color:#000;flex-shrink:0}
-.logo-text{font-size:15px;font-weight:700;color:var(--text)}.logo-text span{color:var(--muted);font-weight:400}
-.sidebar-section{padding:8px 12px 4px;font-size:10px;font-weight:600;color:var(--muted2);letter-spacing:.8px;text-transform:uppercase;margin-top:8px}
-.nav-item{display:flex;align-items:center;gap:10px;padding:9px 12px;margin:1px 8px;border-radius:8px;cursor:pointer;color:var(--muted);font-size:13px;font-weight:500;transition:all .15s;border:none;background:none;width:calc(100% - 16px);text-align:left}
-.nav-item:hover{background:var(--surface2);color:var(--text)}
-.nav-item.active{background:var(--accent-dim);color:var(--accent)}
-.nav-item .icon{font-size:16px;width:20px;text-align:center;flex-shrink:0}
-.sidebar-footer{margin-top:auto;padding:16px;border-top:1px solid var(--border)}
-.live-pill{display:flex;align-items:center;gap:6px;padding:7px 12px;border-radius:8px;background:var(--red-dim);border:1px solid #f8717130;font-size:12px;font-weight:600;color:var(--red)}
-.live-dot{width:7px;height:7px;border-radius:50%;background:var(--red);animation:pulse 1.5s infinite}
-@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+/* ── Sidebar header ── */
+.sb-head{padding:16px;border-bottom:1px solid var(--b1)}
+.sb-logo{display:flex;align-items:center;gap:10px}
+.sb-icon{width:36px;height:36px;border-radius:10px;background:linear-gradient(135deg,#7c3aed,#4f46e5);display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:800;color:#fff;flex-shrink:0}
+.sb-name{font-size:15px;font-weight:700;color:var(--text)}.sb-name span{color:var(--muted);font-weight:400}
+.sb-tag{font-size:10px;color:var(--muted2);margin-top:1px}
 
-/* ── Top bar ── */
-topbar{display:flex;align-items:center;gap:12px;padding:14px 24px;background:var(--surface);border-bottom:1px solid var(--border);position:sticky;top:0;z-index:40}
-.page-title{font-size:16px;font-weight:700;color:var(--text)}
-.topbar-right{margin-left:auto;display:flex;align-items:center;gap:10px}
-.upd-text{font-size:11px;color:var(--muted2)}
-.ref-btn{background:var(--surface2);border:1px solid var(--border2);color:var(--muted);padding:6px 12px;border-radius:8px;cursor:pointer;font-size:12px;font-weight:500;transition:all .2s;display:flex;align-items:center;gap:5px}
-.ref-btn:hover{border-color:var(--accent);color:var(--accent)}
+/* ── Status card sidebar ── */
+.sb-status{margin:10px;background:var(--s2);border:1px solid var(--b2);border-radius:var(--r2);padding:10px 12px}
+.sb-status-row{display:flex;align-items:center;justify-content:space-between;margin-bottom:6px}
+.sb-status-label{font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.6px;color:var(--muted2)}
+.live-pill{display:inline-flex;align-items:center;gap:5px;font-size:10px;font-weight:700;padding:3px 8px;border-radius:20px;letter-spacing:.3px}
+.live-pill.on{background:var(--red-bg);color:var(--red);border:1px solid #f8717130}
+.live-pill.off{background:var(--s3);color:var(--muted2);border:1px solid var(--b1)}
+.live-dot{width:6px;height:6px;border-radius:50%;background:currentColor}
+.live-dot.blink{animation:blink 1.2s infinite}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.3}}
+.sb-stats{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:8px}
+.sb-stat{background:var(--s3);border-radius:6px;padding:6px 8px;text-align:center}
+.sb-stat .v{font-size:15px;font-weight:700;color:var(--text)}
+.sb-stat .l{font-size:9px;color:var(--muted2);margin-top:1px;text-transform:uppercase;letter-spacing:.4px}
 
-/* ── Pages ── */
-.content{padding:24px;flex:1}
+/* ── Nav ── */
+.sb-section{padding:8px 12px 4px;font-size:9px;font-weight:700;color:var(--muted2);letter-spacing:1px;text-transform:uppercase;margin-top:6px}
+.nav-item{display:flex;align-items:center;gap:9px;padding:8px 10px;margin:1px 8px;border-radius:var(--r);cursor:pointer;color:var(--muted);font-size:12px;font-weight:500;transition:all .12s;border:none;background:none;width:calc(100% - 16px);text-align:left;position:relative}
+.nav-item:hover{background:var(--s2);color:var(--text)}
+.nav-item.active{background:var(--purple-bg);color:var(--purple)}
+.nav-item.active::before{content:'';position:absolute;left:0;top:50%;transform:translateY(-50%);width:3px;height:16px;background:var(--purple);border-radius:0 2px 2px 0}
+.nav-item .ico{font-size:15px;width:18px;text-align:center;flex-shrink:0}
+.nav-badge{margin-left:auto;background:var(--red);color:#fff;font-size:9px;font-weight:700;padding:1px 5px;border-radius:10px;min-width:16px;text-align:center}
+
+/* ── Sidebar footer ── */
+.sb-footer{margin-top:auto;padding:10px;border-top:1px solid var(--b1);display:flex;flex-direction:column;gap:6px}
+.sb-btn{width:100%;padding:7px 10px;border-radius:var(--r);border:1px solid var(--b2);background:var(--s2);color:var(--muted);font-size:11px;font-weight:600;cursor:pointer;transition:all .15s;text-align:left;display:flex;align-items:center;gap:7px}
+.sb-btn:hover{border-color:var(--b3);color:var(--text)}
+.sb-btn.live-on{background:var(--green-bg);color:var(--green);border-color:#4ade8030}
+.sb-btn.live-off{background:var(--red-bg);color:var(--red);border-color:#f8717130}
+.sb-btn.logout{color:var(--muted2)}
+
+/* ── Topbar ── */
+topbar{display:flex;align-items:center;gap:12px;padding:12px 20px;background:var(--s1);border-bottom:1px solid var(--b1);position:sticky;top:0;z-index:40}
+.page-title{font-size:15px;font-weight:700;color:var(--text)}
+.tb-right{margin-left:auto;display:flex;align-items:center;gap:8px}
+.upd{font-size:10px;color:var(--muted2)}
+.ref-btn{background:var(--s2);border:1px solid var(--b2);color:var(--muted);padding:5px 11px;border-radius:var(--r);cursor:pointer;font-size:11px;font-weight:500;transition:all .15s}
+.ref-btn:hover{border-color:var(--purple);color:var(--purple)}
+
+/* ── Content ── */
+.content{padding:18px;flex:1}
 .page{display:none}.page.active{display:block}
 
+/* ── Grid ── */
+.g2{display:grid;grid-template-columns:1fr 360px;gap:16px}
+.g3{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+.g4{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
+.g-half{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+
 /* ── Stat cards ── */
-.stat-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:20px}
-.stat-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r2);padding:18px 20px;position:relative;overflow:hidden;transition:border .2s}
-.stat-card:hover{border-color:var(--border2)}
-.stat-card::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:var(--card-accent,var(--accent));opacity:.6}
-.stat-icon{font-size:20px;margin-bottom:10px}
-.stat-label{font-size:11px;color:var(--muted);font-weight:500;margin-bottom:6px;text-transform:uppercase;letter-spacing:.5px}
-.stat-value{font-size:26px;font-weight:700;color:var(--text);line-height:1}
-.stat-sub{font-size:11px;color:var(--muted);margin-top:5px}
+.stat-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:16px}
+.stat-card{background:var(--s1);border:1px solid var(--b1);border-radius:var(--r2);padding:14px 16px;position:relative;overflow:hidden;transition:border .15s}
+.stat-card:hover{border-color:var(--b2)}
+.stat-card .accent-bar{position:absolute;top:0;left:0;right:0;height:2px}
+.stat-card .s-icon{font-size:18px;margin-bottom:8px}
+.stat-card .s-label{font-size:10px;color:var(--muted2);font-weight:600;text-transform:uppercase;letter-spacing:.5px;margin-bottom:5px}
+.stat-card .s-val{font-size:22px;font-weight:700;line-height:1;color:var(--text)}
+.stat-card .s-sub{font-size:10px;color:var(--muted2);margin-top:4px}
 
 /* ── Cards ── */
-.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r2);padding:20px;margin-bottom:16px}
+.card{background:var(--s1);border:1px solid var(--b1);border-radius:var(--r2);padding:16px;margin-bottom:14px}
 .card:last-child{margin-bottom:0}
-.card-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px}
-.card-title{font-size:13px;font-weight:600;color:var(--text);display:flex;align-items:center;gap:8px}
-.card-title .icon{font-size:15px}
-.card-actions{display:flex;gap:8px}
-
-/* ── Grids ── */
-.grid-2{display:grid;grid-template-columns:1fr 380px;gap:16px}
-.grid-3{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
-.grid-half{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.card-hd{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px}
+.card-title{font-size:12px;font-weight:600;color:var(--text);display:flex;align-items:center;gap:7px}
+.card-actions{display:flex;gap:6px;align-items:center}
 
 /* ── Table ── */
-.table-wrap{overflow-x:auto}
+.tbl-wrap{overflow-x:auto}
 table{width:100%;border-collapse:collapse}
-thead tr{border-bottom:1px solid var(--border)}
-th{text-align:left;font-size:10px;color:var(--muted2);font-weight:600;padding:8px 12px;text-transform:uppercase;letter-spacing:.6px}
-td{padding:11px 12px;border-bottom:1px solid var(--border);font-size:13px}
+thead tr{border-bottom:1px solid var(--b2)}
+th{text-align:left;font-size:9px;color:var(--muted2);font-weight:700;padding:6px 10px;text-transform:uppercase;letter-spacing:.7px}
+td{padding:9px 10px;border-bottom:1px solid var(--b1);font-size:12px}
 tr:last-child td{border-bottom:none}
 tbody tr{transition:background .1s}
-tbody tr:hover td{background:var(--surface2)}
+tbody tr:hover td{background:var(--s2)}
 
 /* ── Inputs ── */
-.input{background:var(--surface2);border:1px solid var(--border2);border-radius:8px;padding:8px 12px;color:var(--text);font-size:13px;outline:none;transition:border .2s;font-family:inherit;width:100%}
-.input:focus{border-color:var(--accent2)}
-.input::placeholder{color:var(--muted2)}
-.input-sm{padding:6px 10px;font-size:12px}
-label.label{font-size:11px;font-weight:500;color:var(--muted);display:block;margin-bottom:6px;margin-top:12px}
-label.label:first-child{margin-top:0}
+.inp{background:var(--s2);border:1px solid var(--b2);border-radius:var(--r);padding:7px 11px;color:var(--text);font-size:12px;outline:none;transition:border .15s;font-family:inherit;width:100%}
+.inp:focus{border-color:var(--purple)}
+.inp::placeholder{color:var(--muted2)}
+.inp-sm{padding:5px 9px;font-size:11px}
+.lbl{font-size:10px;font-weight:600;color:var(--muted);display:block;margin-bottom:5px;margin-top:10px;text-transform:uppercase;letter-spacing:.4px}
+.lbl:first-child{margin-top:0}
+textarea.inp{resize:vertical;line-height:1.5}
 
 /* ── Buttons ── */
-.btn{padding:8px 16px;border-radius:8px;border:none;cursor:pointer;font-size:12px;font-weight:600;transition:all .15s;display:inline-flex;align-items:center;gap:6px;font-family:inherit}
+.btn{padding:7px 14px;border-radius:var(--r);border:none;cursor:pointer;font-size:11px;font-weight:600;transition:all .12s;display:inline-flex;align-items:center;gap:5px;font-family:inherit}
 .btn:active{transform:scale(.97)}
-.btn-primary{background:var(--accent);color:#000}
-.btn-primary:hover{background:#16a34a}
-.btn-secondary{background:var(--surface2);color:var(--text);border:1px solid var(--border2)}
-.btn-secondary:hover{border-color:var(--border2);background:var(--surface3)}
-.btn-danger{background:var(--red-dim);color:var(--red);border:1px solid #f8717130}
-.btn-danger:hover{background:#f8717125}
-.btn-purple{background:var(--accent2-dim);color:var(--accent2);border:1px solid #818cf830}
-.btn-purple:hover{background:#818cf825}
-.btn-gold{background:var(--gold-dim);color:var(--gold);border:1px solid #fbbf2430}
-.btn-sm{padding:5px 10px;font-size:11px;border-radius:6px}
+.btn-primary{background:var(--purple);color:#fff}.btn-primary:hover{background:#9061ea}
+.btn-green{background:var(--green-bg);color:var(--green);border:1px solid #4ade8030}.btn-green:hover{background:#4ade8020}
+.btn-red{background:var(--red-bg);color:var(--red);border:1px solid #f8717130}.btn-red:hover{background:#f8717120}
+.btn-ghost{background:var(--s2);color:var(--muted);border:1px solid var(--b2)}.btn-ghost:hover{color:var(--text);border-color:var(--b3)}
+.btn-gold{background:var(--gold-bg);color:var(--gold);border:1px solid #fbbf2430}.btn-gold:hover{background:#fbbf2420}
+.btn-sm{padding:4px 9px;font-size:10px;border-radius:6px}
 
-/* ── Badges niveaux ── */
-.badge{display:inline-flex;align-items:center;gap:4px;font-size:10px;font-weight:700;padding:3px 8px;border-radius:20px;letter-spacing:.2px}
-.lv-bronze{background:#cd7f3215;color:#cd7f32;border:1px solid #cd7f3230}
-.lv-argent{background:#a0aab415;color:#a0aab4;border:1px solid #a0aab430}
-.lv-or{background:#fbbf2415;color:#fbbf24;border:1px solid #fbbf2430}
-.lv-platine{background:#818cf815;color:#818cf8;border:1px solid #818cf830}
-.lv-diamant{background:#22d3ee15;color:#22d3ee;border:1px solid #22d3ee30}
-.lv-légende{background:#f4375015;color:#f43750;border:1px solid #f4375030}
+/* ── Badges ── */
+.badge{display:inline-flex;align-items:center;gap:3px;font-size:9px;font-weight:700;padding:2px 7px;border-radius:20px;letter-spacing:.2px}
+.lv-bronze{background:#cd7f3215;color:#cd7f32;border:1px solid #cd7f3228}
+.lv-argent{background:#a0aab415;color:#a0aab4;border:1px solid #a0aab428}
+.lv-or{background:var(--gold-bg);color:var(--gold);border:1px solid #fbbf2428}
+.lv-platine{background:var(--purple-bg);color:var(--purple);border:1px solid #a78bfa28}
+.lv-diamant{background:#22d3ee12;color:var(--cyan);border:1px solid #22d3ee28}
+.lv-légende{background:#f4375015;color:#f43750;border:1px solid #f4375028}
+
+/* ── Toggle ── */
+.toggle{position:relative;width:34px;height:18px;flex-shrink:0}
+.toggle input{opacity:0;width:0;height:0}
+.toggle-sl{position:absolute;inset:0;background:var(--s4);border:1px solid var(--b2);border-radius:18px;cursor:pointer;transition:all .2s}
+.toggle-sl::before{content:'';position:absolute;width:12px;height:12px;left:2px;top:2px;background:var(--muted2);border-radius:50%;transition:all .2s}
+.toggle input:checked+.toggle-sl{background:var(--purple-bg);border-color:var(--purple)}
+.toggle input:checked+.toggle-sl::before{transform:translateX(16px);background:var(--purple)}
 
 /* ── Progress bar ── */
-.pb{height:3px;background:var(--surface3);border-radius:2px;overflow:hidden;margin-top:5px}
-.pbf{height:100%;background:var(--accent);border-radius:2px;transition:width .8s cubic-bezier(.4,0,.2,1)}
+.pb{height:3px;background:var(--s3);border-radius:2px;margin-top:4px;overflow:hidden}
+.pbf{height:100%;background:var(--green);border-radius:2px;transition:width .6s}
 
 /* ── Rank ── */
-.rank-num{font-size:12px;font-weight:700;color:var(--muted2);width:32px;text-align:center}
-.rank-1{color:var(--gold);font-size:18px}
-.rank-2{color:#94a3b8;font-size:18px}
-.rank-3{color:#cd7f32;font-size:18px}
-
-/* ── Notifications ── */
-.toast{position:fixed;bottom:20px;right:20px;padding:12px 18px;border-radius:10px;font-size:13px;font-weight:500;z-index:9999;transform:translateY(80px);opacity:0;transition:all .3s;pointer-events:none;max-width:320px}
-.toast.show{transform:translateY(0);opacity:1}
-.toast.ok{background:#22c55e20;border:1px solid #22c55e40;color:var(--accent)}
-.toast.err{background:#f8717120;border:1px solid #f8717140;color:var(--red)}
+.rk{font-size:10px;font-weight:700;color:var(--muted2);width:28px;text-align:center}
+.rk-1{font-size:16px}.rk-2{font-size:16px}.rk-3{font-size:16px}
 
 /* ── Log items ── */
-.log-item{display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border)}
-.log-item:last-child{border-bottom:none}
-.log-user{font-weight:600;font-size:13px}
-.log-pts{font-size:12px;font-weight:700;padding:2px 8px;border-radius:6px}
-.log-pts.pos{background:var(--accent-dim);color:var(--accent)}
-.log-pts.neg{background:var(--red-dim);color:var(--red)}
-.log-time{font-size:10px;color:var(--muted2)}
-.log-reason{font-size:10px;color:var(--muted2);margin-top:1px}
+.log-row{display:flex;align-items:center;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--b1);font-size:11px}
+.log-row:last-child{border-bottom:none}
+.log-u{font-weight:600}
+.log-p{font-size:10px;font-weight:700;padding:2px 7px;border-radius:6px}
+.pos{background:var(--green-bg);color:var(--green)}
+.neg{background:var(--red-bg);color:var(--red)}
+.log-t{font-size:9px;color:var(--muted2)}
 
-/* ── Giveaway card ── */
-.gw-active{background:linear-gradient(135deg,#22c55e08,#818cf808);border:1px solid #22c55e25;border-radius:var(--r2);padding:18px}
-.gw-title{font-size:16px;font-weight:700;margin-bottom:4px}
-.gw-count{font-size:32px;font-weight:800;color:var(--accent);line-height:1.1}
-.cmd-pill{display:inline-flex;align-items:center;gap:4px;background:var(--surface3);border:1px solid var(--border2);border-radius:6px;padding:3px 8px;font-family:monospace;font-size:11px;color:var(--text)}
+/* ── Giveaway ── */
+.gw-box{background:linear-gradient(135deg,var(--purple-bg),var(--blue-bg));border:1px solid #a78bfa25;border-radius:var(--r2);padding:14px}
+.gw-count{font-size:28px;font-weight:800;color:var(--purple)}
 
-/* ── Objectifs ── */
-.obj-card{background:var(--surface2);border:1px solid var(--border);border-radius:var(--r);padding:14px;margin-bottom:10px}
-.obj-card:last-child{margin-bottom:0}
-.obj-title{font-weight:600;font-size:13px;margin-bottom:4px}
-.obj-reward{font-size:11px;color:var(--accent2);margin-top:4px}
-.obj-bar{height:5px;background:var(--surface3);border-radius:3px;overflow:hidden;margin-top:8px}
-.obj-bar-fill{height:100%;background:linear-gradient(90deg,var(--accent2),var(--accent));border-radius:3px;transition:width .8s}
-.obj-pct{font-size:10px;color:var(--muted2);margin-top:4px}
+/* ── Obj bar ── */
+.obj-card{background:var(--s2);border:1px solid var(--b1);border-radius:var(--r);padding:12px;margin-bottom:8px}
+.obj-bar{height:4px;background:var(--s3);border-radius:2px;overflow:hidden;margin-top:6px}
+.obj-bar-fill{height:100%;background:linear-gradient(90deg,var(--purple),var(--blue));border-radius:2px;transition:width .6s}
 
-/* ── Lobby ── */
-.player-row{display:flex;align-items:center;justify-content:space-between;padding:10px 12px;border-radius:8px;background:var(--surface2);margin-bottom:6px;border:1px solid var(--border)}
+/* ── Player row ── */
+.player-row{display:flex;align-items:center;justify-content:space-between;padding:8px 10px;border-radius:var(--r);background:var(--s2);border:1px solid var(--b1);margin-bottom:5px}
 .player-row:last-child{margin-bottom:0}
-.player-name{font-weight:600;font-size:13px}
-.player-time{font-size:10px;color:var(--muted2)}
 
-/* ── Wheel ── */
-.wheel-wrap{display:flex;flex-direction:column;align-items:center;gap:16px;padding:8px 0}
-#wheel-canvas{border-radius:50%;display:block}
-.wheel-result{font-size:18px;font-weight:700;color:var(--accent);min-height:28px;text-align:center}
-
-/* ── Command list ── */
-.cmd-row{display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border);font-size:12px}
-.cmd-row:last-child{border-bottom:none}
-.cmd-trigger{font-family:monospace;background:var(--surface2);padding:2px 8px;border-radius:5px;font-size:11px;color:var(--accent2)}
-.cmd-response{color:var(--muted);flex:1;margin:0 12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-
-/* ── History ── */
-.hist-row{display:flex;align-items:center;gap:16px;padding:12px 0;border-bottom:1px solid var(--border)}
-.hist-row:last-child{border-bottom:none}
-.hist-date{font-size:12px;color:var(--muted);min-width:130px}
-.hist-dur{font-size:13px;font-weight:600;color:var(--accent);min-width:70px}
-.hist-peak{font-size:12px;color:var(--muted)}
-
-/* ── Empty state ── */
-.empty{text-align:center;padding:32px 20px;color:var(--muted2)}
-.empty .empty-icon{font-size:32px;margin-bottom:10px;opacity:.4}
-.empty p{font-size:13px}
-
-/* ── Divider ── */
-.divider{border:none;border-top:1px solid var(--border);margin:16px 0}
-
-/* ── Viewer search result ── */
-.viewer-card{background:var(--surface2);border-radius:var(--r);padding:14px;margin-top:12px;display:none}
+/* ── Viewer card ── */
+.viewer-card{background:var(--s2);border-radius:var(--r);padding:12px;margin-top:10px;display:none}
 .viewer-card.show{display:block}
-.viewer-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px}
-.viewer-stat{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:10px 12px}
-.viewer-stat .vl{font-size:10px;color:var(--muted2);margin-bottom:4px}
-.viewer-stat .vv{font-size:16px;font-weight:700}
 
-/* ── Levels grid ── */
-.level-card{background:var(--surface2);border:1px solid var(--border);border-radius:var(--r);padding:14px;text-align:center;transition:border .2s}
-.level-card:hover{border-color:var(--border2)}
-.level-emoji{font-size:28px;margin-bottom:8px}
-.level-name{font-size:13px;font-weight:700;margin-bottom:4px}
-.level-pts{font-size:11px;color:var(--muted2)}
+/* ── Cmd row ── */
+.cmd-row{display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--b1);font-size:11px}
+.cmd-row:last-child{border-bottom:none}
+.cmd-pill{font-family:monospace;background:var(--s3);padding:2px 7px;border-radius:5px;font-size:10px;color:var(--purple);border:1px solid var(--b2)}
+
+/* ── DBD ── */
+@keyframes fadeUp{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+.dbd-perk{background:var(--s2);border:1px solid var(--b1);border-radius:var(--r);padding:12px;text-align:center;transition:border .15s}
+.dbd-perk.win{border-color:var(--purple);animation:fadeUp .3s ease both}
+
+/* ── Empty ── */
+.empty{text-align:center;padding:24px 16px;color:var(--muted2)}
+.empty .ei{font-size:28px;margin-bottom:8px;opacity:.3}
+.empty p{font-size:12px}
+
+/* ── Toast ── */
+.toast{position:fixed;bottom:18px;right:18px;padding:10px 16px;border-radius:var(--r2);font-size:12px;font-weight:500;z-index:9999;transform:translateY(70px);opacity:0;transition:all .25s;max-width:300px;pointer-events:none}
+.toast.show{transform:translateY(0);opacity:1}
+.toast.ok{background:#4ade8018;border:1px solid #4ade8035;color:var(--green)}
+.toast.err{background:var(--red-bg);border:1px solid #f8717135;color:var(--red)}
 
 /* ── Danger zone ── */
-.danger-zone{background:var(--red-dim);border:1px solid #f8717125;border-radius:var(--r);padding:14px}
-.danger-title{font-size:11px;font-weight:700;color:var(--red);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px}
+.danger{background:var(--red-bg);border:1px solid #f8717120;border-radius:var(--r2);padding:14px}
+.danger-title{font-size:9px;font-weight:700;color:var(--red);text-transform:uppercase;letter-spacing:.6px;margin-bottom:8px}
 
-/* ── Toggle switch ── */
-.toggle-wrap{display:flex;align-items:center;gap:8px}
-.toggle{position:relative;width:36px;height:20px;flex-shrink:0}
-.toggle input{opacity:0;width:0;height:0}
-.toggle-slider{position:absolute;inset:0;background:var(--surface3);border:1px solid var(--border2);border-radius:20px;cursor:pointer;transition:all .2s}
-.toggle-slider::before{content:'';position:absolute;width:14px;height:14px;left:2px;top:2px;background:var(--muted2);border-radius:50%;transition:all .2s}
-.toggle input:checked + .toggle-slider{background:var(--accent-dim);border-color:var(--accent)}
-.toggle input:checked + .toggle-slider::before{transform:translateX(16px);background:var(--accent)}
-/* ── Live pill states ── */
-.live-pill.on{background:var(--red-dim);border-color:#f8717130;color:var(--red)}
-.live-pill.on .live-dot{background:var(--red)}
-.live-pill.off{background:var(--surface3);border-color:var(--border2);color:var(--muted)}
-.live-pill.off .live-dot{background:var(--muted);animation:none}
+/* ── Hist row ── */
+.hist-row{display:flex;align-items:center;gap:14px;padding:10px 0;border-bottom:1px solid var(--b1)}
+.hist-row:last-child{border-bottom:none}
+
 /* ── Scrollbar ── */
-@keyframes fadeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
 ::-webkit-scrollbar{width:4px;height:4px}
 ::-webkit-scrollbar-track{background:transparent}
-::-webkit-scrollbar-thumb{background:var(--surface3);border-radius:2px}
+::-webkit-scrollbar-thumb{background:var(--s4);border-radius:2px}
+
+/* ── Access ── */
+.access-row{display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:var(--r);margin-bottom:5px}
+.access-pending{background:var(--gold-bg);border:1px solid #fbbf2425}
+.access-approved{background:var(--green-bg);border:1px solid #4ade8025}
+.access-revoked{background:var(--s2);border:1px solid var(--b1);opacity:.6}
 
 /* ── Responsive ── */
-@media(max-width:1100px){.grid-2{grid-template-columns:1fr}.stat-grid{grid-template-columns:repeat(2,1fr)}}
-@media(max-width:768px){aside{width:60px}.main-wrap{margin-left:60px}.nav-item span{display:none}.sidebar-logo .logo-text{display:none}.sidebar-section{display:none}.stat-grid{grid-template-columns:1fr 1fr}}
+@media(max-width:1100px){.g2{grid-template-columns:1fr}.stat-grid{grid-template-columns:1fr 1fr}}
+@media(max-width:768px){aside{width:54px}.main{margin-left:54px}.nav-item span,.sb-name,.sb-tag,.sb-section,.sb-stats,.sb-status{display:none}.stat-grid{grid-template-columns:1fr 1fr}}
 </style>
 </head>
 <body>
@@ -246,218 +245,185 @@ label.label:first-child{margin-top:0}
 
 <!-- ══════════════ SIDEBAR ══════════════ -->
 <aside>
-  <div class="sidebar-logo">
-    <div class="logo-icon">K</div>
-    <div class="logo-text">Bot<span>7uP</span></div>
+  <div class="sb-head">
+    <div class="sb-logo">
+      <div class="sb-icon">B7</div>
+      <div>
+        <div class="sb-name">Bot<span>7uP</span></div>
+        <div class="sb-tag">Panel de gestion</div>
+      </div>
+    </div>
   </div>
 
-  <div class="sidebar-section">Principal</div>
-  <button class="nav-item active" onclick="showPage('dashboard')"><span class="icon">📊</span><span>Dashboard</span></button>
-  <button class="nav-item" onclick="showPage('classement')"><span class="icon">🏆</span><span>Classement</span></button>
+  <div class="sb-status">
+    <div class="sb-status-row">
+      <span class="sb-status-label">Statut stream</span>
+      <div class="live-pill off" id="live-pill"><div class="live-dot" id="live-dot"></div><span id="live-text">Vérif…</span></div>
+    </div>
+    <div class="sb-stats">
+      <div class="sb-stat"><div class="v" id="sb-viewers">—</div><div class="l">Viewers</div></div>
+      <div class="sb-stat"><div class="v" id="sb-points">—</div><div class="l">Points</div></div>
+    </div>
+  </div>
 
-  <div class="sidebar-section">Outils</div>
-  <button class="nav-item" onclick="showPage('lobby')"><span class="icon">🎮</span><span>Lobby</span></button>
-  <button class="nav-item" onclick="showPage('jeux')"><span class="icon">⚔️</span><span>Jeux</span></button>
-  <button class="nav-item" onclick="showPage('objectifs')"><span class="icon">🎯</span><span>Objectifs</span></button>
-  <button class="nav-item" onclick="showPage('dbd')"><span class="icon">🔪</span><span>DBD</span></button>
-  <button class="nav-item" onclick="showPage('moderation')"><span class="icon">🛡️</span><span>Modération</span></button>
+  <div class="sb-section">Principal</div>
+  <button class="nav-item active" onclick="showPage('dashboard')"><span class="ico">📊</span><span>Dashboard</span></button>
+  <button class="nav-item" onclick="showPage('classement')"><span class="ico">🏆</span><span>Classement</span></button>
 
-  <div class="sidebar-section">Données</div>
-  <button class="nav-item" onclick="showPage('historique')"><span class="icon">📅</span><span>Historique</span></button>
-  <button class="nav-item" onclick="showPage('commands')"><span class="icon">💬</span><span>Commandes</span></button>
-  <button class="nav-item" onclick="showPage('admin')"><span class="icon">⚙️</span><span>Admin</span></button>
+  <div class="sb-section">Outils</div>
+  <button class="nav-item" onclick="showPage('lobby')"><span class="ico">🎮</span><span>Lobby</span></button>
+  <button class="nav-item" onclick="showPage('jeux')"><span class="ico">⚔️</span><span>Jeux</span></button>
+  <button class="nav-item" onclick="showPage('objectifs')"><span class="ico">🎯</span><span>Objectifs</span></button>
+  <button class="nav-item" onclick="showPage('dbd')"><span class="ico">🔪</span><span>DBD</span></button>
+  <button class="nav-item" onclick="showPage('moderation')"><span class="ico">🛡️</span><span>Modération</span></button>
 
-  <div class="sidebar-footer">
-    <div id="live-pill" class="live-pill off"><div class="live-dot"></div><span id="live-text">Vérification…</span></div>
-    <button onclick="logout()" style="width:100%;margin-top:8px;padding:7px;border-radius:8px;border:1px solid var(--border2);background:var(--surface2);color:var(--muted);font-size:11px;font-weight:600;cursor:pointer">🚪 Déconnexion</button>
-    <button id="live-toggle-btn" onclick="toggleForceLive()" style="width:100%;margin-top:8px;padding:7px;border-radius:8px;border:1px solid var(--border2);background:var(--surface2);color:var(--muted);font-size:11px;font-weight:600;cursor:pointer;transition:all .2s" title="Forcer l'état du live manuellement">
-      ⚡ Forcer Live OFF
-    </button>
+  <div class="sb-section">Configuration</div>
+  <button class="nav-item" onclick="showPage('commands')"><span class="ico">💬</span><span>Commandes</span></button>
+  <button class="nav-item" onclick="showPage('historique')"><span class="ico">📅</span><span>Historique</span></button>
+  <button class="nav-item" onclick="showPage('admin')"><span class="ico">⚙️</span><span>Admin</span></button>
+
+  <div class="sb-footer">
+    <button class="sb-btn" id="live-toggle-btn" onclick="toggleForceLive()">⚡ <span id="live-btn-text">Mode auto</span></button>
+    <button class="sb-btn logout" onclick="logout()">🚪 Déconnexion</button>
+    <div style="font-size:9px;color:var(--muted2);text-align:center;padding-top:4px" id="upd"></div>
   </div>
 </aside>
 
 <!-- ══════════════ MAIN ══════════════ -->
-<div class="main-wrap">
+<div class="main">
 <topbar>
   <div class="page-title" id="page-title">Dashboard</div>
-  <div class="topbar-right">
-    <span class="upd-text" id="upd"></span>
+  <div class="tb-right">
     <button class="ref-btn" onclick="loadAll()">↻ Actualiser</button>
   </div>
 </topbar>
 
 <div class="content">
 
-<!-- ══════════ DASHBOARD ══════════ -->
+<!-- ══════ DASHBOARD ══════ -->
 <div class="page active" id="page-dashboard">
   <div class="stat-grid">
-    <div class="stat-card" style="--card-accent:var(--accent)">
-      <div class="stat-icon">👥</div>
-      <div class="stat-label">Viewers enregistrés</div>
-      <div class="stat-value" id="s-viewers">—</div>
-      <div class="stat-sub">depuis le début</div>
-    </div>
-    <div class="stat-card" style="--card-accent:var(--accent2)">
-      <div class="stat-icon">⭐</div>
-      <div class="stat-label">Points distribués</div>
-      <div class="stat-value" id="s-points" style="color:var(--accent2)">—</div>
-      <div class="stat-sub">total cumulé</div>
-    </div>
-    <div class="stat-card" style="--card-accent:var(--cyan)">
-      <div class="stat-icon">⏱</div>
-      <div class="stat-label">Temps de visionnage</div>
-      <div class="stat-value" id="s-minutes" style="color:var(--cyan);font-size:20px">—</div>
-      <div class="stat-sub">cumulé tous viewers</div>
-    </div>
-    <div class="stat-card" style="--card-accent:var(--gold)">
-      <div class="stat-icon">👑</div>
-      <div class="stat-label">Top viewer</div>
-      <div class="stat-value" id="s-top" style="color:var(--gold);font-size:18px">—</div>
-      <div class="stat-sub" id="s-top-sub"></div>
-    </div>
+    <div class="stat-card"><div class="accent-bar" style="background:var(--green)"></div><div class="s-icon">👥</div><div class="s-label">Viewers enregistrés</div><div class="s-val" id="s-viewers">—</div><div class="s-sub">depuis le début</div></div>
+    <div class="stat-card"><div class="accent-bar" style="background:var(--purple)"></div><div class="s-icon">⭐</div><div class="s-label">Points distribués</div><div class="s-val" id="s-points" style="color:var(--purple)">—</div><div class="s-sub">total cumulé</div></div>
+    <div class="stat-card"><div class="accent-bar" style="background:var(--cyan)"></div><div class="s-icon">⏱</div><div class="s-label">Temps de visionnage</div><div class="s-val" id="s-minutes" style="color:var(--cyan);font-size:17px">—</div><div class="s-sub">cumulé tous viewers</div></div>
+    <div class="stat-card"><div class="accent-bar" style="background:var(--gold)"></div><div class="s-icon">👑</div><div class="s-label">Top viewer</div><div class="s-val" id="s-top" style="color:var(--gold);font-size:16px">—</div><div class="s-sub" id="s-top-sub"></div></div>
   </div>
-
-  <div class="grid-2">
+  <div class="g2">
     <div>
       <div class="card">
-        <div class="card-header">
-          <div class="card-title"><span class="icon">🏆</span>Top 10 viewers</div>
-        </div>
-        <div class="table-wrap">
-          <table>
-            <thead><tr><th>#</th><th>Viewer</th><th>Niveau</th><th>Points</th><th>Temps</th></tr></thead>
-            <tbody id="dash-lb"><tr><td colspan="5"><div class="empty"><div class="empty-icon">👥</div><p>Chargement…</p></div></td></tr></tbody>
-          </table>
-        </div>
+        <div class="card-hd"><div class="card-title">🏆 Top 10 viewers</div></div>
+        <div class="tbl-wrap"><table>
+          <thead><tr><th>#</th><th>Viewer</th><th>Niveau</th><th>Points</th><th>Temps</th></tr></thead>
+          <tbody id="dash-lb"><tr><td colspan="5"><div class="empty"><div class="ei">👥</div><p>Chargement…</p></div></td></tr></tbody>
+        </table></div>
       </div>
     </div>
     <div>
       <div class="card" id="gw-card">
-        <div class="card-header">
-          <div class="card-title"><span class="icon">🎁</span>Giveaway en cours</div>
-        </div>
-        <div id="gw-status"><div class="empty"><div class="empty-icon">🎁</div><p>Aucun giveaway actif</p></div></div>
+        <div class="card-hd"><div class="card-title">🎁 Giveaway en cours</div></div>
+        <div id="gw-status"><div class="empty"><div class="ei">🎁</div><p>Aucun giveaway actif</p></div></div>
       </div>
       <div class="card">
-        <div class="card-header">
-          <div class="card-title"><span class="icon">⚡</span>Activité récente</div>
-        </div>
-        <div style="max-height:280px;overflow-y:auto" id="dash-logs">
-          <div class="empty"><div class="empty-icon">📋</div><p>Chargement…</p></div>
-        </div>
+        <div class="card-hd"><div class="card-title">⚡ Activité récente</div></div>
+        <div style="max-height:260px;overflow-y:auto" id="dash-logs"><div class="empty"><p>Chargement…</p></div></div>
       </div>
     </div>
   </div>
 </div>
 
-<!-- ══════════ CLASSEMENT ══════════ -->
+<!-- ══════ CLASSEMENT ══════ -->
 <div class="page" id="page-classement">
   <div class="card">
-    <div class="card-header">
-      <div class="card-title"><span class="icon">🏆</span>Classement complet</div>
+    <div class="card-hd">
+      <div class="card-title">🏆 Classement complet</div>
       <div class="card-actions">
-        <input type="text" class="input input-sm" id="lb-search" placeholder="Filtrer…" oninput="filterLB()" style="width:160px">
-        <select class="input input-sm" id="lb-limit" onchange="loadLeaderboard()" style="width:90px">
-          <option value="10">Top 10</option><option value="25">Top 25</option>
-          <option value="50">Top 50</option><option value="100">Top 100</option>
+        <input type="text" class="inp inp-sm" id="lb-search" placeholder="Filtrer…" oninput="filterLB()" style="width:140px">
+        <select class="inp inp-sm" id="lb-limit" onchange="loadLeaderboard()" style="width:80px">
+          <option value="10">Top 10</option><option value="25">Top 25</option><option value="50">Top 50</option><option value="100">Top 100</option>
         </select>
       </div>
     </div>
-    <div class="table-wrap">
-      <table>
-        <thead><tr><th>#</th><th>Viewer</th><th>Niveau</th><th>Points</th><th>Temps regardé</th><th>Vu il y a</th></tr></thead>
-        <tbody id="lb-body"><tr><td colspan="6"><div class="empty"><p>Chargement…</p></div></td></tr></tbody>
-      </table>
-    </div>
+    <div class="tbl-wrap"><table>
+      <thead><tr><th>#</th><th>Viewer</th><th>Niveau</th><th>Points</th><th>Temps regardé</th><th>Vu il y a</th></tr></thead>
+      <tbody id="lb-body"><tr><td colspan="6"><div class="empty"><p>Chargement…</p></div></td></tr></tbody>
+    </table></div>
   </div>
-
   <div class="card">
-    <div class="card-header"><div class="card-title"><span class="icon">⭐</span>Grille des niveaux</div></div>
-    <div class="grid-3" id="levels-grid" style="gap:12px"></div>
+    <div class="card-hd"><div class="card-title">⭐ Grille des niveaux</div></div>
+    <div class="g3" id="levels-grid"></div>
   </div>
 </div>
 
-<!-- ══════════ LOBBY ══════════ -->
+<!-- ══════ LOBBY ══════ -->
 <div class="page" id="page-lobby">
-  <div class="grid-2">
+  <div class="g2">
     <div>
       <div class="card">
-        <div class="card-header">
-          <div class="card-title"><span class="icon">🎮</span>Lobby — <span id="lobby-count" style="color:var(--accent)">0</span> joueurs</div>
-          <div class="card-actions">
-            <button class="btn btn-danger btn-sm" onclick="clearLobby()">Vider</button>
-          </div>
+        <div class="card-hd">
+          <div class="card-title">🎮 Lobby — <span id="lobby-count" style="color:var(--green)">0</span> joueurs</div>
+          <div class="card-actions"><button class="btn btn-red btn-sm" onclick="clearLobby()">Vider</button></div>
         </div>
-        <div style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:10px 14px;margin-bottom:14px;font-size:12px;color:var(--muted)">
+        <div style="background:var(--s2);border:1px solid var(--b1);border-radius:var(--r);padding:8px 12px;margin-bottom:12px;font-size:11px;color:var(--muted)">
           Les viewers tapent <span class="cmd-pill">!lobby</span> dans le chat pour rejoindre
         </div>
-        <div id="lobby-list"><div class="empty"><div class="empty-icon">🎮</div><p>Aucun joueur inscrit</p></div></div>
-        <div id="lobby-toast" style="margin-top:10px"></div>
+        <div id="lobby-list"><div class="empty"><div class="ei">🎮</div><p>Aucun joueur inscrit</p></div></div>
       </div>
     </div>
     <div>
       <div class="card">
-        <div class="card-header"><div class="card-title"><span class="icon">🎡</span>Roue aléatoire</div></div>
-        <div class="wheel-wrap">
-          <canvas id="wheel-canvas" width="320" height="320"></canvas>
-          <button class="btn btn-primary" style="padding:10px 32px;font-size:14px" onclick="spinWheel()">🎲 Tourner la roue</button>
-          <div class="wheel-result" id="wheel-result"></div>
+        <div class="card-hd"><div class="card-title">🎡 Roue aléatoire</div></div>
+        <div style="display:flex;flex-direction:column;align-items:center;gap:14px;padding:4px 0">
+          <canvas id="wheel-canvas" width="300" height="300" style="border-radius:50%"></canvas>
+          <button class="btn btn-primary" style="padding:9px 28px;font-size:13px" onclick="spinWheel()">🎲 Tourner la roue</button>
+          <div id="wheel-result" style="font-size:16px;font-weight:700;color:var(--green);min-height:24px;text-align:center"></div>
         </div>
       </div>
     </div>
   </div>
 </div>
 
-<!-- ══════════ JEUX ══════════ -->
+<!-- ══════ JEUX ══════ -->
 <div class="page" id="page-jeux">
-  <div class="grid-2">
+  <div class="g2">
     <div>
       <div class="card">
-        <div class="card-header"><div class="card-title"><span class="icon">🎁</span>Giveaway</div></div>
-        <div id="gw-active-detail"><div class="empty"><div class="empty-icon">🎁</div><p>Aucun giveaway en cours</p></div></div>
-        <div class="divider"></div>
-        <div class="card-title" style="margin-bottom:12px;font-size:12px">Créer un giveaway</div>
-        <div class="grid-half" style="gap:10px">
-          <div><label class="label">Titre</label><input class="input" id="gw-title" placeholder="Ex: PC Gaming"></div>
-          <div><label class="label">Lot / récompense</label><input class="input" id="gw-prize" placeholder="Ex: 50€ Amazon"></div>
+        <div class="card-hd"><div class="card-title">🎁 Giveaway</div></div>
+        <div id="gw-active-detail"><div class="empty"><div class="ei">🎁</div><p>Aucun giveaway en cours</p></div></div>
+        <div style="margin-top:14px;padding-top:14px;border-top:1px solid var(--b1)">
+          <div class="card-title" style="margin-bottom:12px;font-size:11px">Créer un giveaway</div>
+          <div class="g-half"><div><label class="lbl">Titre</label><input class="inp" id="gw-title" placeholder="Ex: PC Gaming"></div><div><label class="lbl">Lot</label><input class="inp" id="gw-prize" placeholder="Ex: 50€ Amazon"></div></div>
+          <label class="lbl">Coût en pts (0 = gratuit)</label>
+          <input type="number" class="inp" id="gw-cost" placeholder="0" style="width:120px">
+          <div style="display:flex;gap:8px;margin-top:10px">
+            <button class="btn btn-green" onclick="startGiveaway()">🚀 Lancer</button>
+            <button class="btn btn-red" onclick="closeGiveaway()">🎲 Tirer au sort</button>
+          </div>
+          <div id="gw-msg" style="margin-top:8px"></div>
         </div>
-        <label class="label">Coût en pts (0 = gratuit)</label>
-        <input type="number" class="input" id="gw-cost" placeholder="0" style="width:120px">
-        <div style="display:flex;gap:8px;margin-top:12px">
-          <button class="btn btn-primary" onclick="startGiveaway()">🚀 Lancer</button>
-          <button class="btn btn-danger" onclick="closeGiveaway()">🎲 Tirer au sort</button>
-        </div>
-        <div id="gw-msg" style="margin-top:8px"></div>
       </div>
-
       <div class="card">
-        <div class="card-header"><div class="card-title"><span class="icon">📜</span>Historique giveaways</div></div>
-        <table>
-          <thead><tr><th>Titre</th><th>Lot</th><th>Gagnant</th><th>Participants</th></tr></thead>
-          <tbody id="gw-history"><tr><td colspan="4"><div class="empty"><p>Aucun historique</p></div></td></tr></tbody>
-        </table>
+        <div class="card-hd"><div class="card-title">📜 Historique giveaways</div></div>
+        <table><thead><tr><th>Titre</th><th>Lot</th><th>Gagnant</th><th>Participants</th></tr></thead>
+        <tbody id="gw-history"><tr><td colspan="4"><div class="empty"><p>Aucun historique</p></div></td></tr></tbody></table>
       </div>
     </div>
     <div>
       <div class="card">
-        <div class="card-header"><div class="card-title"><span class="icon">⚔️</span>Duels récents</div></div>
-        <div style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:10px 14px;margin-bottom:14px;font-size:12px;color:var(--muted)">
-          Chat → <span class="cmd-pill">!duel @pseudo montant</span> pour défier
+        <div class="card-hd"><div class="card-title">⚔️ Duels récents</div></div>
+        <div style="background:var(--s2);border:1px solid var(--b1);border-radius:var(--r);padding:8px 12px;margin-bottom:12px;font-size:11px;color:var(--muted)">
+          Chat → <span class="cmd-pill">!duel @pseudo montant</span>
         </div>
-        <table>
-          <thead><tr><th>Challenger</th><th>Opponent</th><th>Mise</th><th>Résultat</th></tr></thead>
-          <tbody id="duels-list"><tr><td colspan="4"><div class="empty"><p>Aucun duel</p></div></td></tr></tbody>
-        </table>
+        <table><thead><tr><th>Challenger</th><th>Opponent</th><th>Mise</th><th>Résultat</th></tr></thead>
+        <tbody id="duels-list"><tr><td colspan="4"><div class="empty"><p>Aucun duel</p></div></td></tr></tbody></table>
       </div>
-
       <div class="card">
-        <div class="card-header"><div class="card-title"><span class="icon">💬</span>Commandes disponibles</div></div>
-        <table style="font-size:12px">
+        <div class="card-hd"><div class="card-title">💬 Commandes disponibles</div></div>
+        <table style="font-size:11px">
           <thead><tr><th>Commande</th><th>Description</th></tr></thead>
           <tbody>
-            <tr><td><span class="cmd-pill">!points</span></td><td style="color:var(--muted)">Voir ses points et niveau</td></tr>
+            <tr><td><span class="cmd-pill">!points</span></td><td style="color:var(--muted)">Points et niveau</td></tr>
             <tr><td><span class="cmd-pill">!top</span></td><td style="color:var(--muted)">Top 5 classement</td></tr>
-            <tr><td><span class="cmd-pill">!rang</span></td><td style="color:var(--muted)">Son rang exact</td></tr>
+            <tr><td><span class="cmd-pill">!rang</span></td><td style="color:var(--muted)">Rang du viewer</td></tr>
             <tr><td><span class="cmd-pill">!niveau</span></td><td style="color:var(--muted)">Niveau et progression</td></tr>
             <tr><td><span class="cmd-pill">!lobby</span></td><td style="color:var(--muted)">Rejoindre le lobby</td></tr>
             <tr><td><span class="cmd-pill">!duel @x N</span></td><td style="color:var(--muted)">Défier pour N pts</td></tr>
@@ -472,296 +438,223 @@ label.label:first-child{margin-top:0}
   </div>
 </div>
 
-<!-- ══════════ OBJECTIFS ══════════ -->
+<!-- ══════ OBJECTIFS ══════ -->
 <div class="page" id="page-objectifs">
-  <div class="grid-2">
+  <div class="g2">
     <div>
-      <div class="card">
-        <div class="card-header"><div class="card-title"><span class="icon">🎯</span>Objectifs actifs</div></div>
-        <div id="obj-list"><div class="empty"><div class="empty-icon">🎯</div><p>Aucun objectif</p></div></div>
-      </div>
-      <div class="card">
-        <div class="card-header"><div class="card-title"><span class="icon">✅</span>Objectifs atteints</div></div>
-        <div id="obj-done-list"><div class="empty"><div class="empty-icon">✅</div><p>Aucun atteint</p></div></div>
-      </div>
+      <div class="card"><div class="card-hd"><div class="card-title">🎯 Objectifs actifs</div></div><div id="obj-list"><div class="empty"><div class="ei">🎯</div><p>Aucun objectif</p></div></div></div>
+      <div class="card"><div class="card-hd"><div class="card-title">✅ Objectifs atteints</div></div><div id="obj-done-list"><div class="empty"><p>Aucun atteint</p></div></div></div>
     </div>
     <div>
-      <div class="card">
-        <div class="card-header"><div class="card-title"><span class="icon">➕</span>Créer un objectif</div></div>
-        <label class="label">Titre</label>
-        <input class="input" id="obj-title" placeholder="Ex: 10 000 points distribués">
-        <label class="label">Description (optionnel)</label>
-        <input class="input" id="obj-desc" placeholder="Description…">
-        <label class="label">Objectif en points distribués</label>
-        <input type="number" class="input" id="obj-target" placeholder="Ex: 10000">
-        <label class="label">Récompense annoncée dans le chat</label>
-        <input class="input" id="obj-reward" placeholder="Ex: Game offert au top viewer !">
-        <button class="btn btn-purple" style="width:100%;margin-top:16px;justify-content:center" onclick="createObjective()">Créer l'objectif</button>
+      <div class="card" style="position:sticky;top:60px">
+        <div class="card-hd"><div class="card-title">➕ Créer un objectif</div></div>
+        <label class="lbl">Titre</label><input class="inp" id="obj-title" placeholder="Ex: 10 000 points distribués">
+        <label class="lbl">Description (optionnel)</label><input class="inp" id="obj-desc" placeholder="Description…">
+        <label class="lbl">Objectif (total points distribués)</label><input type="number" class="inp" id="obj-target" placeholder="Ex: 10000">
+        <label class="lbl">Récompense annoncée dans le chat</label><input class="inp" id="obj-reward" placeholder="Ex: Game offert !">
+        <button class="btn btn-primary" style="width:100%;justify-content:center;margin-top:14px;padding:9px" onclick="createObjective()">Créer</button>
         <div id="obj-msg" style="margin-top:8px"></div>
       </div>
     </div>
   </div>
 </div>
 
-<!-- ══════════ HISTORIQUE ══════════ -->
-<div class="page" id="page-historique">
-  <div class="grid-2">
-    <div>
-      <div class="card">
-        <div class="card-header"><div class="card-title"><span class="icon">📅</span>Sessions de stream</div></div>
-        <div id="hist-list"><div class="empty"><div class="empty-icon">📅</div><p>Chargement…</p></div></div>
-      </div>
-    </div>
-    <div>
-      <div class="card">
-        <div class="card-header"><div class="card-title"><span class="icon">📊</span>Logs de points</div></div>
-        <div style="max-height:500px;overflow-y:auto" id="full-logs">
-          <div class="empty"><div class="empty-icon">📊</div><p>Chargement…</p></div>
-        </div>
-      </div>
-    </div>
-  </div>
-</div>
-
-<!-- ══════════ COMMANDES ══════════ -->
-<div class="page" id="page-commands">
-  <div class="grid-2">
-    <div>
-      <div class="card">
-        <div class="card-header">
-          <div class="card-title"><span class="icon">💬</span>Commandes personnalisées (<span id="cmd-count">0</span>)</div>
-        </div>
-        <div style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:11px 14px;margin-bottom:16px;font-size:12px;color:var(--muted);line-height:1.7">
-          Ces commandes sont actives dans le <b style="color:var(--text)">chat Kick</b>. Quand un viewer tape le trigger, le bot répond automatiquement avec le message configuré.
-        </div>
-        <div id="cmd-page-list">
-          <div class="empty"><div class="empty-icon">💬</div><p>Aucune commande — ajoutez-en une à droite</p></div>
-        </div>
-      </div>
-
-      <div class="card">
-        <div class="card-header">
-          <div class="card-title"><span class="icon">📌</span>Commandes système</div>
-          <label class="toggle" title="Tout activer / désactiver">
-            <input type="checkbox" id="all-cmds-toggle" checked onchange="toggleAllCommands(this.checked)">
-            <span class="toggle-slider"></span>
-          </label>
-        </div>
-        <div style="font-size:11px;color:var(--muted);margin-bottom:12px">Le toggle à droite active/désactive toutes les commandes d'un coup</div>
-        <div id="sys-cmd-list"><div class="empty"><p>Chargement…</p></div></div>
-      </div>
-    </div>
-
-    <div>
-      <div class="card" style="position:sticky;top:80px">
-        <div class="card-header"><div class="card-title"><span class="icon">➕</span>Ajouter une commande</div></div>
-
-        <label class="label">Trigger (avec le !)</label>
-        <input class="input" id="cmd-page-trigger" placeholder="Ex: !discord" maxlength="30">
-        <div style="font-size:11px;color:var(--muted2);margin-top:4px">Commencez toujours par ! — ex: !discord, !youtube, !rs</div>
-
-        <label class="label" style="margin-top:14px">Réponse dans le chat</label>
-        <textarea class="input" id="cmd-page-response" placeholder="Ex: Rejoins notre Discord : discord.gg/xxx" rows="4" style="resize:vertical;line-height:1.6"></textarea>
-        <div style="font-size:11px;color:var(--muted2);margin-top:4px">Vous pouvez utiliser @{user} pour mentionner le viewer</div>
-
-        <button class="btn btn-primary" style="width:100%;justify-content:center;margin-top:16px;padding:10px" onclick="addCmdPage()">
-          ➕ Ajouter la commande
-        </button>
-        <div id="cmd-page-msg" style="margin-top:8px"></div>
-
-        <div class="divider"></div>
-
-        <div style="font-size:11px;color:var(--muted2);line-height:1.8">
-          <b style="color:var(--muted)">Exemples utiles :</b><br>
-          <span class="cmd-pill" style="margin:2px 0;display:inline-block">!discord</span> → Lien Discord<br>
-          <span class="cmd-pill" style="margin:2px 0;display:inline-block">!youtube</span> → Lien YouTube<br>
-          <span class="cmd-pill" style="margin:2px 0;display:inline-block">!twitter</span> → Lien Twitter/X<br>
-          <span class="cmd-pill" style="margin:2px 0;display:inline-block">!rs</span> → RS / pseudo jeu<br>
-          <span class="cmd-pill" style="margin:2px 0;display:inline-block">!config</span> → Config PC / setup
-        </div>
-      </div>
-    </div>
-  </div>
-</div>
-
-<!-- ══════════ DBD ══════════ -->
+<!-- ══════ DBD ══════ -->
 <div class="page" id="page-dbd">
-  <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
-
-    <!-- Survivants -->
+  <div class="g2" style="grid-template-columns:1fr 1fr">
     <div class="card">
-      <div class="card-header">
-        <div class="card-title"><span class="icon">🏃</span>Perks Survivant</div>
-        <button class="btn btn-primary btn-sm" onclick="spinDBD('survivor')">🎲 Lancer</button>
-      </div>
-      <div style="font-size:12px;color:var(--muted);margin-bottom:14px">4 perks aléatoires parmi tous les perks survivants</div>
-      <div id="dbd-survivor-result" style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
-        <div class="empty" style="grid-column:1/-1"><div class="empty-icon">🎴</div><p>Clique sur Lancer pour générer un build</p></div>
-      </div>
-      <div style="margin-top:16px;text-align:center">
-        <div id="dbd-survivor-spin" style="font-size:13px;color:var(--muted);min-height:20px"></div>
-      </div>
+      <div class="card-hd"><div class="card-title">🏃 Perks Survivant</div><button class="btn btn-green btn-sm" onclick="spinDBD('survivor')">🎲 Lancer</button></div>
+      <div style="font-size:11px;color:var(--muted);margin-bottom:12px">4 perks aléatoires parmi tous les perks survivants</div>
+      <div id="dbd-survivor-result" style="display:grid;grid-template-columns:1fr 1fr;gap:8px"><div class="empty" style="grid-column:1/-1"><div class="ei">🎴</div><p>Clique sur Lancer</p></div></div>
+      <div id="dbd-survivor-spin" style="text-align:center;font-size:11px;color:var(--muted);margin-top:12px;min-height:18px"></div>
     </div>
-
-    <!-- Tueurs -->
     <div class="card">
-      <div class="card-header">
-        <div class="card-title"><span class="icon">🔪</span>Perks Tueur</div>
-        <button class="btn btn-danger btn-sm" onclick="spinDBD('killer')">🎲 Lancer</button>
-      </div>
-      <div style="font-size:12px;color:var(--muted);margin-bottom:14px">4 perks aléatoires parmi tous les perks tueurs</div>
-      <div id="dbd-killer-result" style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
-        <div class="empty" style="grid-column:1/-1"><div class="empty-icon">🎴</div><p>Clique sur Lancer pour générer un build</p></div>
-      </div>
-      <div style="margin-top:16px;text-align:center">
-        <div id="dbd-killer-spin" style="font-size:13px;color:var(--muted);min-height:20px"></div>
-      </div>
+      <div class="card-hd"><div class="card-title">🔪 Perks Tueur</div><button class="btn btn-red btn-sm" onclick="spinDBD('killer')">🎲 Lancer</button></div>
+      <div style="font-size:11px;color:var(--muted);margin-bottom:12px">4 perks aléatoires parmi tous les perks tueurs</div>
+      <div id="dbd-killer-result" style="display:grid;grid-template-columns:1fr 1fr;gap:8px"><div class="empty" style="grid-column:1/-1"><div class="ei">🎴</div><p>Clique sur Lancer</p></div></div>
+      <div id="dbd-killer-spin" style="text-align:center;font-size:11px;color:var(--muted);margin-top:12px;min-height:18px"></div>
     </div>
-
   </div>
-
-  <!-- Historique des builds -->
-  <div class="card" style="margin-top:16px">
-    <div class="card-header">
-      <div class="card-title"><span class="icon">📋</span>Historique des builds</div>
-      <button class="btn btn-secondary btn-sm" onclick="clearDBDHistory()">Effacer</button>
-    </div>
-    <div id="dbd-history" style="max-height:200px;overflow-y:auto">
-      <div class="empty"><p>Aucun build généré</p></div>
-    </div>
+  <div class="card">
+    <div class="card-hd"><div class="card-title">📋 Historique des builds</div><button class="btn btn-ghost btn-sm" onclick="clearDBDHistory()">Effacer</button></div>
+    <div id="dbd-history" style="max-height:180px;overflow-y:auto"><div class="empty"><p>Aucun build</p></div></div>
   </div>
 </div>
 
-<!-- ══════════ MODÉRATION ══════════ -->
+<!-- ══════ MODÉRATION ══════ -->
 <div class="page" id="page-moderation">
-  <div class="grid-2">
+  <div class="g2">
     <div>
       <div class="card">
-        <div class="card-header">
-          <div class="card-title"><span class="icon">🚫</span>Mots bannis (<span id="banned-count">0</span>)</div>
+        <div class="card-hd">
+          <div class="card-title">🚫 Mots bannis (<span id="banned-count">0</span>)</div>
         </div>
-        <div style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:10px 14px;margin-bottom:14px;font-size:12px;color:var(--muted)">
+        <div style="background:var(--s2);border:1px solid var(--b1);border-radius:var(--r);padding:8px 12px;margin-bottom:12px;font-size:11px;color:var(--muted)">
           Quand un viewer écrit un mot de cette liste, le bot applique automatiquement l'action choisie.
         </div>
-        <div id="banned-list"><div class="empty"><div class="empty-icon">🛡️</div><p>Aucun mot banni</p></div></div>
+        <div id="banned-list"><div class="empty"><div class="ei">🛡️</div><p>Aucun mot banni</p></div></div>
       </div>
     </div>
     <div>
-      <div class="card" style="position:sticky;top:80px">
-        <div class="card-header"><div class="card-title"><span class="icon">➕</span>Ajouter un mot</div></div>
-
-        <label class="label">Mot ou expression à détecter</label>
-        <input class="input" id="ban-word" placeholder="Ex: insulte, spam, lien...">
-        <div style="font-size:11px;color:var(--muted2);margin-top:4px">Insensible à la casse — détecte le mot dans tout le message</div>
-
-        <label class="label" style="margin-top:14px">Action</label>
-        <select class="input" id="ban-action" onchange="updateDurationVisibility()">
+      <div class="card" style="position:sticky;top:60px">
+        <div class="card-hd"><div class="card-title">➕ Ajouter un mot</div></div>
+        <label class="lbl">Mot ou expression</label>
+        <input class="inp" id="ban-word" placeholder="Ex: insulte, spam, discord.gg…">
+        <div style="font-size:10px;color:var(--muted2);margin-top:3px">Insensible à la casse — détecte dans tout le message</div>
+        <label class="lbl">Action</label>
+        <select class="inp" id="ban-action" onchange="updateDurationVisibility()">
           <option value="timeout">⏱ Timeout (durée limitée)</option>
           <option value="ban">🔨 Ban permanent</option>
         </select>
-
         <div id="duration-wrap">
-          <label class="label" style="margin-top:14px">Durée du timeout</label>
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
-            <div>
-              <input type="number" class="input" id="ban-duration" placeholder="300" value="300" min="1">
-              <div style="font-size:11px;color:var(--muted2);margin-top:4px">en secondes</div>
-            </div>
-            <div style="display:flex;flex-direction:column;gap:6px;margin-top:2px">
-              <button class="btn btn-secondary btn-sm" onclick="setDuration(60)">1 min</button>
-              <button class="btn btn-secondary btn-sm" onclick="setDuration(300)">5 min</button>
-              <button class="btn btn-secondary btn-sm" onclick="setDuration(3600)">1h</button>
-              <button class="btn btn-secondary btn-sm" onclick="setDuration(86400)">24h</button>
+          <label class="lbl">Durée du timeout</label>
+          <div class="g-half">
+            <div><input type="number" class="inp" id="ban-duration" placeholder="300" value="300" min="1"><div style="font-size:10px;color:var(--muted2);margin-top:3px">en secondes</div></div>
+            <div style="display:flex;flex-direction:column;gap:5px">
+              <button class="btn btn-ghost btn-sm" onclick="setDuration(60)">1 min</button>
+              <button class="btn btn-ghost btn-sm" onclick="setDuration(300)">5 min</button>
+              <button class="btn btn-ghost btn-sm" onclick="setDuration(3600)">1h</button>
+              <button class="btn btn-ghost btn-sm" onclick="setDuration(86400)">24h</button>
             </div>
           </div>
         </div>
-
-        <button class="btn btn-primary" style="width:100%;justify-content:center;margin-top:16px;padding:10px" onclick="addBannedWord()">
-          ➕ Ajouter le mot
-        </button>
+        <button class="btn btn-primary" style="width:100%;justify-content:center;margin-top:14px;padding:9px" onclick="addBannedWord()">➕ Ajouter le mot</button>
         <div id="ban-msg" style="margin-top:8px"></div>
-
-        <div class="divider"></div>
-        <div style="font-size:11px;color:var(--muted2);line-height:1.8">
+        <div style="border-top:1px solid var(--b1);margin-top:14px;padding-top:14px;font-size:10px;color:var(--muted2);line-height:2">
           <b style="color:var(--muted)">Exemples :</b><br>
-          <span style="color:var(--red)">insulte</span> → Ban permanent<br>
-          <span style="color:var(--warn)">spam</span> → Timeout 5 min<br>
-          <span style="color:var(--warn)">discord.gg</span> → Timeout 1h<br>
-          <span style="color:var(--red)">haine</span> → Ban permanent
+          <span style="color:var(--red)">insulte</span> → Ban permanent &nbsp; <span style="color:var(--gold)">spam</span> → Timeout 5 min<br>
+          <span style="color:var(--gold)">discord.gg</span> → Timeout 1h &nbsp; <span style="color:var(--red)">haine</span> → Ban permanent
         </div>
       </div>
     </div>
   </div>
 </div>
 
-<!-- ══════════ ADMIN ══════════ -->
-<div class="page" id="page-admin">
-  <div class="grid-2">
+<!-- ══════ COMMANDES ══════ -->
+<div class="page" id="page-commands">
+  <div class="g2">
     <div>
-      <div class="card" style="display:none">
+      <div class="card">
+        <div class="card-hd">
+          <div class="card-title">💬 Commandes personnalisées (<span id="cmd-count">0</span>)</div>
+        </div>
+        <div style="background:var(--s2);border:1px solid var(--b1);border-radius:var(--r);padding:8px 12px;margin-bottom:12px;font-size:11px;color:var(--muted)">
+          Ces commandes sont actives dans le chat Kick. Les viewers tapent le trigger et le bot répond.
+        </div>
+        <div id="cmd-page-list"><div class="empty"><div class="ei">💬</div><p>Aucune commande — ajoutez-en une à droite</p></div></div>
+      </div>
+      <div class="card">
+        <div class="card-hd">
+          <div class="card-title">📌 Commandes système</div>
+          <div class="card-actions">
+            <span style="font-size:10px;color:var(--muted)">Tout</span>
+            <label class="toggle"><input type="checkbox" id="all-cmds-toggle" checked onchange="toggleAllCommands(this.checked)"><span class="toggle-sl"></span></label>
+          </div>
+        </div>
+        <div id="sys-cmd-list"><div class="empty"><p>Chargement…</p></div></div>
+      </div>
+    </div>
+    <div>
+      <div class="card" style="position:sticky;top:60px">
+        <div class="card-hd"><div class="card-title">➕ Ajouter une commande</div></div>
+        <label class="lbl">Trigger (avec le !)</label>
+        <input class="inp" id="cmd-page-trigger" placeholder="Ex: !discord" maxlength="30">
+        <div style="font-size:10px;color:var(--muted2);margin-top:3px">Commence toujours par ! — ex: !discord, !youtube, !rs</div>
+        <label class="lbl">Réponse dans le chat</label>
+        <textarea class="inp" id="cmd-page-response" placeholder="Ex: Rejoins notre Discord : discord.gg/xxx" rows="4"></textarea>
+        <div style="font-size:10px;color:var(--muted2);margin-top:3px">Utilise @{user} pour mentionner le viewer</div>
+        <button class="btn btn-primary" style="width:100%;justify-content:center;margin-top:14px;padding:9px" onclick="addCmdPage()">➕ Ajouter</button>
+        <div id="cmd-page-msg" style="margin-top:8px"></div>
+        <div style="border-top:1px solid var(--b1);margin-top:14px;padding-top:14px">
+          <div style="font-size:10px;color:var(--muted);font-weight:600;margin-bottom:8px">EXEMPLES UTILES</div>
+          <div style="display:flex;flex-wrap:wrap;gap:5px">
+            <span class="cmd-pill">!discord</span><span class="cmd-pill">!youtube</span><span class="cmd-pill">!twitter</span><span class="cmd-pill">!rs</span><span class="cmd-pill">!config</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════ HISTORIQUE ══════ -->
+<div class="page" id="page-historique">
+  <div class="g2">
+    <div>
+      <div class="card">
+        <div class="card-hd"><div class="card-title">📅 Sessions de stream</div></div>
+        <div id="hist-list"><div class="empty"><div class="ei">📅</div><p>Chargement…</p></div></div>
+      </div>
+    </div>
+    <div>
+      <div class="card">
+        <div class="card-hd"><div class="card-title">📊 Logs de points</div></div>
+        <div style="max-height:500px;overflow-y:auto" id="full-logs"><div class="empty"><p>Chargement…</p></div></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════ ADMIN ══════ -->
+<div class="page" id="page-admin">
+  <div class="g2">
+    <div>
+      <div class="card">
+        <div class="card-hd"><div class="card-title">👤 Gestion d'un viewer</div></div>
+        <div style="display:flex;gap:8px">
+          <input class="inp" id="admin-user" placeholder="Pseudo exact" onkeydown="if(event.key==='Enter')searchViewer()">
+          <button class="btn btn-ghost" onclick="searchViewer()">Chercher</button>
+        </div>
+        <div class="viewer-card" id="viewer-result"></div>
+        <div style="display:flex;gap:6px;margin-top:10px;align-items:center">
+          <input type="number" class="inp" id="admin-pts" placeholder="Pts" style="width:80px">
+          <button class="btn btn-green btn-sm" onclick="adminAdd()">+ Ajouter</button>
+          <button class="btn btn-red btn-sm" onclick="adminRemove()">− Retirer</button>
+          <button class="btn btn-ghost btn-sm" onclick="adminReset()">Reset</button>
+        </div>
+        <div id="admin-msg" style="margin-top:8px"></div>
         <input type="hidden" id="admin-key" value="">
       </div>
 
       <div class="card">
-        <div class="card-header"><div class="card-title"><span class="icon">👤</span>Gestion d'un viewer</div></div>
-        <div style="display:flex;gap:8px">
-          <input class="input" id="admin-user" placeholder="Pseudo exact" onkeydown="if(event.key==='Enter')searchViewer()">
-          <button class="btn btn-secondary" onclick="searchViewer()">Chercher</button>
-        </div>
-        <div class="viewer-card" id="viewer-result"></div>
-        <div style="display:flex;gap:8px;margin-top:12px;align-items:center">
-          <input type="number" class="input" id="admin-pts" placeholder="Pts" style="width:90px">
-          <button class="btn btn-primary btn-sm" onclick="adminAdd()">+ Ajouter</button>
-          <button class="btn btn-danger btn-sm" onclick="adminRemove()">− Retirer</button>
-          <button class="btn btn-secondary btn-sm" onclick="adminReset()">Reset</button>
-        </div>
-        <div id="admin-msg" style="margin-top:8px"></div>
-      </div>
-
-      <div class="card">
-        <div class="card-header"><div class="card-title"><span class="icon">💬</span>Commandes personnalisées</div></div>
-        <div id="cmds-list" style="margin-bottom:14px"></div>
-        <div style="display:flex;gap:8px">
-          <input class="input input-sm" id="cmd-trigger" placeholder="!commande" style="width:120px">
-          <input class="input input-sm" id="cmd-response" placeholder="Réponse dans le chat" style="flex:1">
-          <button class="btn btn-purple btn-sm" onclick="addCmd()">Ajouter</button>
+        <div class="card-hd"><div class="card-title">💬 Commandes perso (raccourci)</div></div>
+        <div id="cmds-list" style="margin-bottom:12px"></div>
+        <div style="display:flex;gap:6px">
+          <input class="inp inp-sm" id="cmd-trigger" placeholder="!commande" style="width:110px">
+          <input class="inp inp-sm" id="cmd-response" placeholder="Réponse" style="flex:1">
+          <button class="btn btn-primary btn-sm" onclick="addCmd()">+</button>
         </div>
         <div id="cmd-msg" style="margin-top:8px"></div>
       </div>
     </div>
     <div>
       <div class="card">
-        <div class="card-header"><div class="card-title"><span class="icon">⭐</span>Niveaux</div></div>
-        <div id="admin-levels"></div>
-      </div>
-
-      <div class="card" style="margin-bottom:16px">
-        <div class="card-header">
-          <div class="card-title"><span class="icon">🔐</span>Accès au panel</div>
-          <button class="btn btn-secondary btn-sm" onclick="loadAccessRequests()">Actualiser</button>
-        </div>
+        <div class="card-hd"><div class="card-title">🔐 Accès au panel</div><button class="btn btn-ghost btn-sm" onclick="loadAccessRequests()">↻</button></div>
         <div id="access-list"><div class="empty"><p>Chargement…</p></div></div>
       </div>
-      <div class="danger-zone">
+      <div class="card">
+        <div class="card-hd"><div class="card-title">⭐ Niveaux</div></div>
+        <div id="admin-levels"></div>
+      </div>
+      <div class="danger">
         <div class="danger-title">⚠ Zone dangereuse</div>
-        <p style="font-size:12px;color:var(--muted);margin-bottom:12px">Ces actions sont irréversibles. Assure-toi d'avoir entré ta clé secrète.</p>
-        <button class="btn btn-danger" style="width:100%;justify-content:center" onclick="clearAll()">🗑 Remettre TOUS les points à zéro</button>
+        <p style="font-size:11px;color:var(--muted);margin-bottom:10px">Action irréversible — remet tous les points à zéro.</p>
+        <button class="btn btn-red" style="width:100%;justify-content:center" onclick="clearAll()">🗑 Remettre TOUS les points à zéro</button>
       </div>
     </div>
   </div>
 </div>
 
 </div><!-- /content -->
-</div><!-- /main-wrap -->
+</div><!-- /main -->
 </div><!-- /layout -->
 
 <div class="toast" id="toast"></div>
-
 <script>
+
 const API = '';
 const MEDALS = ['🥇','🥈','🥉'];
 let lbData = [], levels = [];
-const PAGE_TITLES = {dashboard:'Dashboard',classement:'Classement',lobby:'Lobby',jeux:'Jeux & Giveaway',objectifs:'Objectifs',historique:'Historique',commands:'Commandes',dbd:'Dead by Daylight',moderation:'Modération',admin:'Administration'};
+const PAGE_TITLES = {dashboard:'Dashboard',classement:'Classement',lobby:'Lobby',jeux:'Jeux & Giveaway',objectifs:'Objectifs',dbd:'Dead by Daylight',moderation:'Modération',commands:'Commandes',historique:'Historique',admin:'Administration'};
 
 // ── Navigation ─────────────────────────────────────────────────────────────────
 function showPage(name) {
@@ -819,6 +712,11 @@ async function loadStats() {
     document.getElementById('s-minutes').textContent = fmtMin(d.total_minutes_watched||0);
     document.getElementById('s-top').textContent     = d.top_viewer || '—';
     document.getElementById('s-top-sub').textContent = d.max_points ? d.max_points.toLocaleString('fr')+' pts' : '';
+    // Sidebar stats
+    const sbv = document.getElementById('sb-viewers');
+    const sbp = document.getElementById('sb-points');
+    if(sbv) sbv.textContent = (d.total_viewers||0).toLocaleString('fr');
+    if(sbp) sbp.textContent = (d.total_points_distributed||0).toLocaleString('fr');
   } catch(e){}
 }
 
@@ -908,14 +806,15 @@ async function loadActiveGiveaway() {
     const g = await get('/api/giveaway/active');
     const html = g ? (() => {
       const n = JSON.parse(g.entries||'[]').length;
-      return `<div class="gw-active">
-        <div class="gw-title">${esc(g.title)}</div>
-        <div style="font-size:12px;color:var(--muted);margin-bottom:12px">Lot : <b style="color:var(--text)">${esc(g.prize)}</b> · ${g.cost>0?g.cost+' pts':'Gratuit'}</div>
+      return `<div class="gw-box">
+        <div style="font-size:14px;font-weight:700;margin-bottom:3px">${esc(g.title)}</div>
+        <div style="font-size:11px;color:var(--muted);margin-bottom:10px">Lot : <b style="color:var(--text)">${esc(g.prize)}</b> · ${g.cost>0?g.cost+' pts':'Gratuit'}</div>
         <div class="gw-count">${n}</div>
-        <div style="font-size:12px;color:var(--muted);margin-top:4px">participant${n>1?'s':''} · <span class="cmd-pill">!participer</span></div>
+        <div style="font-size:11px;color:var(--muted);margin-top:3px">participant${n>1?'s':''} · <span class="cmd-pill">!participer</span></div>
       </div>`;
-    })() : '<div class="empty"><div class="empty-icon">🎁</div><p>Aucun giveaway actif</p></div>';
-    ['gw-status','gw-active-detail'].forEach(id => { const el=document.getElementById(id); if(el) el.innerHTML=html; });
+    })() : '<div class="empty"><div class="ei">🎁</div><p>Aucun giveaway actif</p></div>';
+    const ids = ['gw-status','gw-active-detail'];
+  ids.forEach(id => { const el=document.getElementById(id); if(el) el.innerHTML=html; });
   } catch(e){}
 }
 
@@ -1203,14 +1102,15 @@ async function loadLiveStatus() {
     const d = await r.json();
     const pill = document.getElementById('live-pill');
     const txt  = document.getElementById('live-text');
+    const dot  = document.getElementById('live-dot');
     if (!pill || !txt) return;
     if (d.live) {
       pill.className = 'live-pill on';
-      pill.querySelector('.live-dot').style.background = '';
-      pill.querySelector('.live-dot').style.animation = '';
-      txt.textContent = '● LIVE' + (d.viewers ? ' · ' + d.viewers + ' viewers' : '');
+      if(dot) dot.className = 'live-dot blink';
+      txt.textContent = 'EN LIVE' + (d.viewers ? ' · ' + d.viewers : '');
     } else {
       pill.className = 'live-pill off';
+      if(dot) dot.className = 'live-dot';
       txt.textContent = 'Hors ligne';
     }
   } catch(e) {}
@@ -1316,7 +1216,7 @@ async function deleteCmdPage(trigger) {
 let forceLive = null; // null = auto, true = forcé ON, false = forcé OFF
 
 async function toggleForceLive() {
-  const btn = document.getElementById('live-toggle-btn');
+  const btn = document.getElementById('live-toggle-btn'); const btnTxt = document.getElementById('live-btn-text');
   let nextState;
   if (forceLive === null)  nextState = 'on';
   else if (forceLive === true) nextState = 'off';
@@ -1332,20 +1232,20 @@ async function toggleForceLive() {
   const txt  = document.getElementById('live-text');
 
   if (forceLive === true) {
-    btn.style.cssText = 'width:100%;margin-top:8px;padding:7px;border-radius:8px;background:var(--accent-dim);color:var(--accent);border:1px solid #22c55e44;font-size:11px;font-weight:600;cursor:pointer';
-    btn.textContent = '⚡ Forcé EN LIGNE';
+    btn.className = 'sb-btn live-on';
+    if(btnTxt) btnTxt.textContent = 'Forcé EN LIGNE'; else btn.textContent = '⚡ Forcé EN LIGNE';
     if(pill) pill.className='live-pill on';
     if(txt)  txt.textContent='● LIVE (forcé)';
     toast('Stream forcé EN LIGNE ✓');
   } else if (forceLive === false) {
-    btn.style.cssText = 'width:100%;margin-top:8px;padding:7px;border-radius:8px;background:var(--red-dim);color:var(--red);border:1px solid #f8717144;font-size:11px;font-weight:600;cursor:pointer';
-    btn.textContent = '⚡ Forcé HORS LIGNE';
+    btn.className = 'sb-btn live-off';
+    if(btnTxt) btnTxt.textContent = 'Forcé HORS LIGNE'; else btn.textContent = '⚡ Forcé HORS LIGNE';
     if(pill) pill.className='live-pill off';
     if(txt)  txt.textContent='Hors ligne (forcé)';
     toast('Stream forcé HORS LIGNE', false);
   } else {
-    btn.style.cssText = 'width:100%;margin-top:8px;padding:7px;border-radius:8px;background:var(--surface2);color:var(--muted);border:1px solid var(--border2);font-size:11px;font-weight:600;cursor:pointer';
-    btn.textContent = '⚡ Mode auto';
+    btn.className = 'sb-btn';
+    if(btnTxt) btnTxt.textContent = 'Mode auto'; else btn.textContent = '⚡ Mode auto';
     toast('Mode automatique rétabli');
     loadLiveStatus();
   }
@@ -1823,6 +1723,7 @@ checkPanelAuth().then(ok => { if (ok) { loadAll(); } });
 setInterval(loadAll,30000);
 setInterval(loadLiveStatus, 60000);
 setInterval(()=>{if(document.getElementById('page-lobby').classList.contains('active'))loadLobby();},10000);
+
 </script>
 </body>
 </html>
