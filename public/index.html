@@ -1436,11 +1436,19 @@ async function loadLiveStatus() {
     if (d.live) {
       pill.className = 'live-badge on';
       if(dot) dot.className = 'live-dot blink';
-      txt.textContent = 'EN LIVE' + (d.viewers ? ' · ' + d.viewers : '');
+      txt.textContent = 'EN LIVE' + (d.viewers ? ' · ' + d.viewers + ' viewers' : '');
     } else {
       pill.className = 'live-badge off';
       if(dot) dot.className = 'live-dot';
       txt.textContent = 'Hors ligne';
+    }
+    // Mettre à jour followers si disponible dans la réponse
+    if (d.followers) {
+      const fmt = d.followers >= 1000 ? (d.followers/1000).toFixed(1)+'k' : d.followers;
+      const el1 = document.getElementById('s-followers');
+      const el2 = document.getElementById('sb-followers');
+      if(el1) el1.textContent = fmt;
+      if(el2) el2.textContent = fmt;
     }
   } catch(e) {}
 }

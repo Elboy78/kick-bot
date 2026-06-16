@@ -139,6 +139,34 @@ app.post('/api/admin/banned-words',    requireAuth, async (req,res) => { try { c
 app.delete('/api/admin/banned-words/:id', requireAuth, async (req,res) => { try { await db.deleteBannedWord(req.params.id); res.json({success:true}); } catch(e){res.status(500).json({error:e.message}); }});
 app.post('/api/admin/banned-words/toggle', requireAuth, async (req,res) => { try { const {id,enabled}=req.body; await db.toggleBannedWord(id,enabled); res.json({success:true}); } catch(e){res.status(500).json({error:e.message}); }});
 
+// Fonction commune pour appeler l'API Kick
+async function fetchKickAPI(channel) {
+  const axios = require('axios');
+  const urls = [
+    `https://kick.com/api/v2/channels/${channel}`,
+    `https://kick.com/api/v1/channels/${channel}`,
+  ];
+  const uas = [
+    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120.0.0.0 Safari/537.36',
+    'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 Safari/605.1.15',
+    'Kick-Bot/1.0',
+  ];
+  for (const url of urls) {
+    for (const ua of uas) {
+      try {
+        const r = await axios.get(url, {
+          headers: { 'Accept':'application/json','User-Agent':ua,'Cache-Control':'no-cache' },
+          timeout: 6000,
+        });
+        if (r.data) return r.data;
+      } catch(e) {
+        if (e.response?.status !== 403 && e.response?.status !== 429) break;
+      }
+    }
+  }
+  return null;
+}
+
 // Bot settings
 app.get('/api/bot-settings',              async (req,res) => { try { res.json({data: await db.getAllSettings(), meta: db.DEFAULT_SETTINGS}); } catch(e){res.json({data:{},meta:{}}); }});
 app.post('/api/admin/bot-settings',       async (req,res) => { try { const {key,enabled}=req.body; if(!key) return res.status(400).json({error:'key requis'}); await db.setSetting(key,enabled); res.json({success:true}); } catch(e){res.status(500).json({error:e.message}); }});
@@ -146,12 +174,9 @@ app.post('/api/admin/bot-settings',       async (req,res) => { try { const {key,
 // Followers
 app.get('/api/followers', async (req, res) => {
   try {
-    const axios = require('axios');
-    const r = await axios.get(`https://kick.com/api/v2/channels/${process.env.KICK_CHANNEL}`, {
-      headers: { 'Accept': 'application/json', 'User-Agent': 'Mozilla/5.0' },
-      timeout: 6000,
-    });
-    const count = r.data?.followers_count || r.data?.followersCount || 0;
+    const data = await fetchKickAPI(process.env.KICK_CHANNEL||'');
+    if (!data) return res.json({ count: 0 });
+    const count = data?.followers_count || data?.followersCount || 0;
     res.json({ count });
   } catch(e) { res.json({ count: 0 }); }
 });
@@ -165,12 +190,14 @@ app.get('/api/admin/live/status', requireAuth, (req,res) => res.json({forced:for
 app.get('/api/live', async (req,res) => {
   if (forcedLiveStatus !== null) return res.json({live:forcedLiveStatus,viewers:0,forced:true});
   try {
-    const axios = require('axios');
-    const r = await axios.get(`https://kick.com/api/v2/channels/${process.env.KICK_CHANNEL||''}`, {
-      headers:{'Accept':'application/json','User-Agent':'Mozilla/5.0'},timeout:6000
+    const data = await fetchKickAPI(process.env.KICK_CHANNEL||'');
+    if (!data) return res.json({live:false,viewers:0,error:'api_blocked'});
+    const live = data?.livestream;
+    res.json({
+      live: !!(live?.is_live),
+      viewers: live?.viewer_count || 0,
+      followers: data?.followers_count || data?.followersCount || 0,
     });
-    const live = r.data?.livestream;
-    res.json({live:!!(live?.is_live),viewers:live?.viewer_count||0});
   } catch(e) { res.json({live:false,viewers:0}); }
 });
 

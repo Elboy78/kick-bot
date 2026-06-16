@@ -40,9 +40,8 @@ async function init() {
   await db.ensureInit();
   await db.initSystemCommandsState(SYSTEM_COMMANDS);
   await startAnnouncements();
-  // Vérifier followers toutes les 60 secondes
-  followerCheckInterval = setInterval(checkFollowers, 60000);
-  await checkFollowers();
+  // Vérifier live + followers toutes les 2 minutes
+  setInterval(checkLiveStatus, 120000);
   console.log('[BOT] Base de données prête ✓');
 
   if (!CONFIG.token) {
@@ -458,32 +457,6 @@ async function cmdFollowage(username, parts) {
 
 // ─── Announcements automatiques ───────────────────────────────────────────────
 
-// ─── Followers ───────────────────────────────────────────────────────────────
-
-async function checkFollowers() {
-  try {
-    const res = await axios.get(`https://kick.com/api/v2/channels/${CONFIG.channel}`, {
-      headers: { 'Accept': 'application/json', 'User-Agent': 'Mozilla/5.0' },
-      timeout: 8000,
-    });
-    const count = res.data?.followers_count || res.data?.followersCount || 0;
-    if (lastFollowerCount > 0 && count > lastFollowerCount) {
-      const newFollowers = count - lastFollowerCount;
-      console.log(`[FOLLOW] +${newFollowers} follower(s) ! Total: ${count}`);
-      if (isLive && await db.getSetting('follow_alerts')) {
-        const msg = newFollowers === 1
-          ? `Merci pour le follow ! On est maintenant ${count} followers !`
-          : `+${newFollowers} nouveaux followers ! On est maintenant ${count} !`;
-        await sendChat(msg);
-      }
-    }
-    if (count > 0) lastFollowerCount = count;
-    return count;
-  } catch(err) {
-    return lastFollowerCount;
-  }
-}
-
 async function startAnnouncements() {
   // Arrêter les anciens timers
   Object.values(announcementIntervals).forEach(t => clearInterval(t));
@@ -554,30 +527,84 @@ async function sendChat(message) {
 
 // ─── Live check ───────────────────────────────────────────────────────────────
 
-async function checkLiveStatus() {
-  const userAgents = [
-    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-    'curl/7.88.1',
+async function fetchKickChannel() {
+  // Essayer plusieurs endpoints et User-Agents
+  const urls = [
+    `https://kick.com/api/v2/channels/${CONFIG.channel}`,
+    `https://kick.com/api/v1/channels/${CONFIG.channel}`,
   ];
-  for (const ua of userAgents) {
-    try {
-      const res = await axios.get(`https://kick.com/api/v2/channels/${CONFIG.channel}`, {
-        headers: { 'Accept': 'application/json', 'User-Agent': ua },
-        timeout: 8000,
-      });
-      const live = res.data?.livestream;
-      const wasLive = isLive;
-      isLive = !!(live?.is_live);
-      if (isLive && !wasLive) { console.log('[STREAM] En live !'); if (!currentSessionId) startSession(); }
-      else if (!isLive && wasLive) { console.log('[STREAM] Stream terminé.'); }
-      if (isLive && live?.viewer_count > peakViewers) peakViewers = live.viewer_count;
-      console.log(`[STREAM] Etat initial : ${isLive ? 'EN LIVE' : 'Hors ligne'}`);
-      return isLive;
-    } catch(err) {
-      if (err.response?.status !== 403) break;
+  const uas = [
+    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120.0.0.0 Safari/537.36',
+    'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 Safari/605.1.15',
+    'Kick-Bot/1.0',
+  ];
+  for (const url of urls) {
+    for (const ua of uas) {
+      try {
+        const res = await axios.get(url, {
+          headers: {
+            'Accept': 'application/json',
+            'User-Agent': ua,
+            'Accept-Language': 'fr-FR,fr;q=0.9',
+            'Cache-Control': 'no-cache',
+          },
+          timeout: 8000,
+        });
+        if (res.data) return res.data;
+      } catch(err) {
+        if (err.response?.status !== 403 && err.response?.status !== 429) {
+          break;
+        }
+      }
     }
   }
-  console.log('[STREAM] API inaccessible — mode fallback');
+  return null;
+}
+
+async function checkLiveStatus() {
+  const data = await fetchKickChannel();
+  if (!data) {
+    console.log('[STREAM] API inaccessible (403) — statut conservé:', isLive ? 'LIVE' : 'OFF');
+    return isLive;
+  }
+
+  const live = data?.livestream;
+  const wasLive = isLive;
+  isLive = !!(live?.is_live);
+
+  if (isLive && !wasLive) {
+    console.log('[STREAM] Stream démarré !');
+    streamStartTime = Date.now();
+    if (!currentSessionId) startSession();
+    startAnnouncements();
+  } else if (!isLive && wasLive) {
+    console.log('[STREAM] Stream terminé.');
+    if (currentSessionId) {
+      const dur = sessionStart ? Math.floor((Date.now() - sessionStart) / 60000) : 0;
+      db.endSession(currentSessionId, peakViewers, dur);
+      currentSessionId = null;
+    }
+  }
+
+  if (isLive && live?.viewer_count > peakViewers) peakViewers = live.viewer_count;
+
+  // Mettre à jour followers
+  const fc = data?.followers_count || data?.followersCount || 0;
+  if (fc > 0 && fc !== lastFollowerCount) {
+    if (lastFollowerCount > 0 && fc > lastFollowerCount) {
+      const newF = fc - lastFollowerCount;
+      console.log(`[FOLLOW] +${newF} follower(s) ! Total: ${fc}`);
+      if (isLive && await db.getSetting('follow_alerts')) {
+        const msg = newF === 1
+          ? `Merci pour le follow ! On est maintenant ${fc} followers !`
+          : `+${newF} nouveaux followers ! On est maintenant ${fc} !`;
+        await sendChat(msg);
+      }
+    }
+    lastFollowerCount = fc;
+  }
+
+  console.log(`[STREAM] Statut: ${isLive ? 'EN LIVE' : 'Hors ligne'} | Followers: ${lastFollowerCount}`);
   return isLive;
 }
 
