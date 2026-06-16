@@ -143,6 +143,55 @@ async function initSchema() {
       created_at TEXT NOT NULL DEFAULT (datetime('now')),
       updated_at TEXT NOT NULL DEFAULT (datetime('now'))
     )`,
+    `CREATE TABLE IF NOT EXISTS quotes (
+      id         INTEGER PRIMARY KEY AUTOINCREMENT,
+      text       TEXT NOT NULL,
+      author     TEXT,
+      added_by   TEXT,
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    )`,
+    `CREATE TABLE IF NOT EXISTS counters (
+      id         INTEGER PRIMARY KEY AUTOINCREMENT,
+      name       TEXT NOT NULL UNIQUE,
+      value      INTEGER NOT NULL DEFAULT 0,
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    )`,
+    `CREATE TABLE IF NOT EXISTS timers (
+      id         INTEGER PRIMARY KEY AUTOINCREMENT,
+      name       TEXT NOT NULL UNIQUE,
+      message    TEXT NOT NULL,
+      interval_ms INTEGER NOT NULL DEFAULT 300000,
+      enabled    INTEGER NOT NULL DEFAULT 1,
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    )`,
+    `CREATE TABLE IF NOT EXISTS queue (
+      id         INTEGER PRIMARY KEY AUTOINCREMENT,
+      username   TEXT NOT NULL UNIQUE,
+      joined_at  TEXT NOT NULL DEFAULT (datetime('now'))
+    )`,
+    `CREATE TABLE IF NOT EXISTS polls (
+      id         INTEGER PRIMARY KEY AUTOINCREMENT,
+      question   TEXT NOT NULL,
+      options    TEXT NOT NULL DEFAULT '[]',
+      votes      TEXT NOT NULL DEFAULT '{}',
+      status     TEXT NOT NULL DEFAULT 'open',
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      ended_at   TEXT
+    )`,
+    `CREATE TABLE IF NOT EXISTS shoutouts (
+      id         INTEGER PRIMARY KEY AUTOINCREMENT,
+      username   TEXT NOT NULL,
+      message    TEXT,
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    )`,
+    `CREATE TABLE IF NOT EXISTS announcements (
+      id          INTEGER PRIMARY KEY AUTOINCREMENT,
+      message     TEXT NOT NULL,
+      interval_ms INTEGER NOT NULL DEFAULT 600000,
+      enabled     INTEGER NOT NULL DEFAULT 1,
+      last_sent   TEXT,
+      created_at  TEXT NOT NULL DEFAULT (datetime('now'))
+    )`,
     `CREATE TABLE IF NOT EXISTS banned_words (
       id         INTEGER PRIMARY KEY AUTOINCREMENT,
       word       TEXT NOT NULL UNIQUE,
@@ -470,6 +519,111 @@ async function isSystemCmdEnabled(trigger) {
   return r ? r.enabled === 1 : true;
 }
 
+// ─── Quotes ──────────────────────────────────────────────────────────────────
+
+async function getQuotes() { return all(`SELECT * FROM quotes ORDER BY created_at DESC`); }
+async function addQuote(text, author, addedBy) {
+  const db = getDB();
+  if (db.execute) {
+    const r = await db.execute({ sql: `INSERT INTO quotes (text, author, added_by) VALUES (?, ?, ?)`, args: [text, author || '', addedBy || ''] });
+    return Number(r.lastInsertRowid);
+  } else {
+    return db.prepare(`INSERT INTO quotes (text, author, added_by) VALUES (?, ?, ?)`).run(text, author || '', addedBy || '').lastInsertRowid;
+  }
+}
+async function getRandomQuote() {
+  return get(`SELECT * FROM quotes ORDER BY RANDOM() LIMIT 1`);
+}
+async function deleteQuote(id) { await run(`DELETE FROM quotes WHERE id = ?`, [id]); }
+
+// ─── Counters ─────────────────────────────────────────────────────────────────
+
+async function getCounters() { return all(`SELECT * FROM counters ORDER BY name ASC`); }
+async function getCounter(name) { return get(`SELECT * FROM counters WHERE name = ?`, [name.toLowerCase()]); }
+async function setCounter(name, value) {
+  await run(`INSERT INTO counters (name, value) VALUES (?, ?) ON CONFLICT(name) DO UPDATE SET value = ?`, [name.toLowerCase(), value, value]);
+}
+async function incrementCounter(name, by = 1) {
+  await run(`INSERT INTO counters (name, value) VALUES (?, ?) ON CONFLICT(name) DO UPDATE SET value = value + ?`, [name.toLowerCase(), by, by]);
+  return get(`SELECT * FROM counters WHERE name = ?`, [name.toLowerCase()]);
+}
+async function deleteCounter(name) { await run(`DELETE FROM counters WHERE name = ?`, [name.toLowerCase()]); }
+
+// ─── Timers ───────────────────────────────────────────────────────────────────
+
+async function getTimers() { return all(`SELECT * FROM timers ORDER BY name ASC`); }
+async function setTimer(name, message, interval_ms) {
+  await run(`INSERT INTO timers (name, message, interval_ms) VALUES (?, ?, ?) ON CONFLICT(name) DO UPDATE SET message = ?, interval_ms = ?`,
+    [name.toLowerCase(), message, interval_ms, message, interval_ms]);
+}
+async function toggleTimer(name, enabled) {
+  await run(`UPDATE timers SET enabled = ? WHERE name = ?`, [enabled ? 1 : 0, name.toLowerCase()]);
+}
+async function deleteTimer(name) { await run(`DELETE FROM timers WHERE name = ?`, [name.toLowerCase()]); }
+
+// ─── Queue ────────────────────────────────────────────────────────────────────
+
+async function getQueue() { return all(`SELECT * FROM queue ORDER BY joined_at ASC`); }
+async function joinQueue(username) {
+  try {
+    await run(`INSERT INTO queue (username) VALUES (?)`, [username.toLowerCase()]);
+    return true;
+  } catch(e) { return false; }
+}
+async function removeFromQueue(username) { await run(`DELETE FROM queue WHERE username = ?`, [username.toLowerCase()]); }
+async function clearQueue() { await run(`DELETE FROM queue`); }
+async function getQueuePosition(username) {
+  const q = await getQueue();
+  const idx = q.findIndex(v => v.username === username.toLowerCase());
+  return idx >= 0 ? idx + 1 : null;
+}
+
+// ─── Polls ────────────────────────────────────────────────────────────────────
+
+async function createPoll(question, options) {
+  const db = getDB();
+  const votes = {};
+  options.forEach((_, i) => votes[i] = 0);
+  if (db.execute) {
+    const r = await db.execute({ sql: `INSERT INTO polls (question, options, votes) VALUES (?, ?, ?)`, args: [question, JSON.stringify(options), JSON.stringify(votes)] });
+    return Number(r.lastInsertRowid);
+  } else {
+    return db.prepare(`INSERT INTO polls (question, options, votes) VALUES (?, ?, ?)`).run(question, JSON.stringify(options), JSON.stringify(votes)).lastInsertRowid;
+  }
+}
+async function getActivePoll() { return get(`SELECT * FROM polls WHERE status = 'open' ORDER BY created_at DESC LIMIT 1`); }
+async function votePoll(id, username, optionIndex) {
+  const p = await get(`SELECT * FROM polls WHERE id = ?`, [id]);
+  if (!p) return false;
+  const votes = JSON.parse(p.votes);
+  const options = JSON.parse(p.options);
+  if (optionIndex < 0 || optionIndex >= options.length) return false;
+  votes[optionIndex] = (votes[optionIndex] || 0) + 1;
+  await run(`UPDATE polls SET votes = ? WHERE id = ?`, [JSON.stringify(votes), id]);
+  return votes;
+}
+async function closePoll(id) {
+  await run(`UPDATE polls SET status = 'closed', ended_at = datetime('now') WHERE id = ?`, [id]);
+  return get(`SELECT * FROM polls WHERE id = ?`, [id]);
+}
+async function getPolls(limit = 10) { return all(`SELECT * FROM polls ORDER BY created_at DESC LIMIT ?`, [limit]); }
+
+// ─── Announcements ────────────────────────────────────────────────────────────
+
+async function getAnnouncements() { return all(`SELECT * FROM announcements ORDER BY created_at DESC`); }
+async function addAnnouncement(message, interval_ms) {
+  const db = getDB();
+  if (db.execute) {
+    const r = await db.execute({ sql: `INSERT INTO announcements (message, interval_ms) VALUES (?, ?)`, args: [message, interval_ms] });
+    return Number(r.lastInsertRowid);
+  } else {
+    return db.prepare(`INSERT INTO announcements (message, interval_ms) VALUES (?, ?)`).run(message, interval_ms).lastInsertRowid;
+  }
+}
+async function toggleAnnouncement(id, enabled) { await run(`UPDATE announcements SET enabled = ? WHERE id = ?`, [enabled ? 1 : 0, id]); }
+async function deleteAnnouncement(id) { await run(`DELETE FROM announcements WHERE id = ?`, [id]); }
+async function updateAnnouncementSent(id) { await run(`UPDATE announcements SET last_sent = datetime('now') WHERE id = ?`, [id]); }
+
 // ─── Banned Words ─────────────────────────────────────────────────────────────
 
 async function getBannedWords() {
@@ -540,4 +694,10 @@ module.exports = {
   approveAccess, revokeAccess, deleteAccessRequest,
   initSystemCommandsState, isSystemCmdEnabled, getAllSystemCommandsState, toggleSystemCommand,
   getBannedWords, addBannedWord, deleteBannedWord, toggleBannedWord, checkBannedWords,
+  getQuotes, addQuote, getRandomQuote, deleteQuote,
+  getCounters, getCounter, setCounter, incrementCounter, deleteCounter,
+  getTimers, setTimer, toggleTimer, deleteTimer,
+  getQueue, joinQueue, removeFromQueue, clearQueue, getQueuePosition,
+  createPoll, getActivePoll, votePoll, closePoll, getPolls,
+  getAnnouncements, addAnnouncement, toggleAnnouncement, deleteAnnouncement, updateAnnouncementSent,
 };

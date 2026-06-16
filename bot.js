@@ -18,7 +18,7 @@ const CONFIG = {
 };
 
 const PUSHER_URL = 'wss://ws-us2.pusher.com/app/32cbd69e4b950bf97679?protocol=7&client=js&version=7.4.0&flash=false';
-const SYSTEM_COMMANDS = ['!points','!top','!rang','!niveau','!aide','!duel','!accepter','!refuser','!participer','!giveaway','!lobby'];
+const SYSTEM_COMMANDS = ['!points','!top','!rang','!niveau','!aide','!duel','!accepter','!refuser','!participer','!giveaway','!lobby','!quote','!addquote','!mort','!death','!score','!queue','!join','!leave','!pos','!vote','!sondage','!so','!uptime','!dice','!des','!rps','!pfc'];
 
 let ws             = null;
 let reconnectDelay = 5000;
@@ -29,12 +29,15 @@ let currentSessionId = null;
 let sessionStart     = null;
 let peakViewers      = 0;
 const pendingDuelTimeouts = {};
+let announcementIntervals = {};
+let streamStartTime = null;
 
 // ─── Init ─────────────────────────────────────────────────────────────────────
 
 async function init() {
   await db.ensureInit();
   await db.initSystemCommandsState(SYSTEM_COMMANDS);
+  await startAnnouncements();
   console.log('[BOT] Base de données prête ✓');
 
   if (!CONFIG.token) {
@@ -110,7 +113,9 @@ function handleEvent(msg) {
       const wasLive = isLive; isLive = true;
       if (!wasLive) {
         console.log('[STREAM] Stream démarré — points activés !');
+        streamStartTime = Date.now();
         if (!currentSessionId) startSession();
+        startAnnouncements();
       }
       break;
     }
@@ -169,6 +174,25 @@ async function handleChatMessage(payload) {
       case '!participer':return cmdParticiper(username);
       case '!giveaway':  return cmdGiveawayInfo(username);
       case '!lobby':     return cmdLobby(username);
+      case '!quote':     return cmdQuote(username, parts);
+      case '!addquote':  return cmdAddQuote(username, parts);
+      case '!mort':
+      case '!death':     return cmdCounter(username, parts, 'morts');
+      case '!score':     return cmdCounter(username, parts, 'score');
+      case '!compteur':  return cmdCounterInfo(username, parts);
+      case '!queue':
+      case '!join':      return cmdJoinQueue(username);
+      case '!leave':     return cmdLeaveQueue(username);
+      case '!pos':       return cmdQueuePos(username);
+      case '!vote':      return cmdVote(username, parts);
+      case '!sondage':   return cmdPollInfo(username);
+      case '!so':        return cmdShoutout(username, parts);
+      case '!uptime':    return cmdUptime(username);
+      case '!dice':
+      case '!des':       return cmdDice(username, parts);
+      case '!rps':
+      case '!pfc':       return cmdRPS(username, parts);
+      case '!followage': return cmdFollowage(username, parts);
     }
     return;
   }
@@ -287,6 +311,161 @@ async function cmdGiveawayInfo(username) {
   if (!g) return sendChat('Aucun giveaway en cours.');
   const entries = JSON.parse(g.entries).length;
   sendChat(`🎁 Giveaway : "${g.title}" — Lot : ${g.prize}${g.cost > 0 ? ` (${g.cost} pts)` : ' (gratuit)'} — ${entries} participant${entries>1?'s':''} — !participer`);
+}
+
+// ─── Quote ───────────────────────────────────────────────────────────────────
+
+async function cmdQuote(username, parts) {
+  if (parts[1] && !isNaN(parts[1])) {
+    const quotes = await db.getQuotes();
+    const q = quotes[parseInt(parts[1]) - 1];
+    if (!q) return sendChat(`@${username} Citation #${parts[1]} introuvable.`);
+    sendChat(`💬 #${parts[1]} "${q.text}" ${q.author ? '— ' + q.author : ''}`);
+  } else {
+    const q = await db.getRandomQuote();
+    if (!q) return sendChat('Aucune citation enregistrée. Utilise !addquote pour en ajouter !');
+    sendChat(`💬 "${q.text}" ${q.author ? '— ' + q.author : ''}`);
+  }
+}
+
+async function cmdAddQuote(username, parts) {
+  const text = parts.slice(1).join(' ').trim();
+  if (!text) return sendChat(`@${username} Usage : !addquote texte de la citation`);
+  const id = await db.addQuote(text, username, username);
+  const quotes = await db.getQuotes();
+  sendChat(`@${username} Citation #${quotes.length} ajoutée ✓`);
+}
+
+// ─── Counters ────────────────────────────────────────────────────────────────
+
+async function cmdCounter(username, parts, defaultName) {
+  const name = parts[1] === '+1' || parts[1] === '-1' || !parts[1] ? defaultName : (isNaN(parts[1]) ? defaultName : defaultName);
+  const by = parts[1] === '-1' ? -1 : 1;
+  const counter = await db.incrementCounter(name, by);
+  const emojis = { morts: '💀', score: '🎯' };
+  sendChat(`${emojis[name] || '🔢'} ${name.charAt(0).toUpperCase() + name.slice(1)} : ${counter.value}`);
+}
+
+async function cmdCounterInfo(username, parts) {
+  const name = parts[1] || 'morts';
+  const counter = await db.getCounter(name);
+  if (!counter) return sendChat(`@${username} Compteur "${name}" non trouvé.`);
+  sendChat(`🔢 ${name} = ${counter.value}`);
+}
+
+// ─── Queue ────────────────────────────────────────────────────────────────────
+
+async function cmdJoinQueue(username) {
+  const joined = await db.joinQueue(username);
+  if (!joined) {
+    const pos = await db.getQueuePosition(username);
+    return sendChat(`@${username} Tu es déjà dans la file (#${pos}).`);
+  }
+  const q = await db.getQueue();
+  const pos = q.findIndex(v => v.username === username.toLowerCase()) + 1;
+  sendChat(`@${username} Tu rejoins la file ! Position : #${pos} (${q.length} total)`);
+}
+
+async function cmdLeaveQueue(username) {
+  await db.removeFromQueue(username);
+  sendChat(`@${username} Tu as quitté la file.`);
+}
+
+async function cmdQueuePos(username) {
+  const pos = await db.getQueuePosition(username);
+  if (!pos) return sendChat(`@${username} Tu n'es pas dans la file. Tape !queue pour rejoindre.`);
+  const q = await db.getQueue();
+  sendChat(`@${username} Tu es #${pos} sur ${q.length} dans la file.`);
+}
+
+// ─── Polls ────────────────────────────────────────────────────────────────────
+
+async function cmdVote(username, parts) {
+  const poll = await db.getActivePoll();
+  if (!poll) return sendChat(`@${username} Aucun sondage en cours.`);
+  const options = JSON.parse(poll.options);
+  const choice = parseInt(parts[1]);
+  if (isNaN(choice) || choice < 1 || choice > options.length) {
+    return sendChat(`@${username} Vote avec !vote 1 à ${options.length} — Sondage : ${poll.question} | ${options.map((o, i) => `${i+1}. ${o}`).join(' | ')}`);
+  }
+  await db.votePoll(poll.id, username, choice - 1);
+  sendChat(`@${username} Vote enregistré pour "${options[choice-1]}" ✓`);
+}
+
+async function cmdPollInfo(username) {
+  const poll = await db.getActivePoll();
+  if (!poll) return sendChat('Aucun sondage en cours.');
+  const options = JSON.parse(poll.options);
+  const votes = JSON.parse(poll.votes);
+  const total = Object.values(votes).reduce((a, b) => a + b, 0);
+  const results = options.map((o, i) => {
+    const pct = total > 0 ? Math.round((votes[i] || 0) / total * 100) : 0;
+    return `${i+1}. ${o} (${pct}%)`;
+  }).join(' | ');
+  sendChat(`📊 ${poll.question} → ${results} — !vote N pour voter`);
+}
+
+// ─── Shoutout ─────────────────────────────────────────────────────────────────
+
+async function cmdShoutout(username, parts) {
+  const target = parts[1]?.replace('@', '');
+  if (!target) return sendChat(`@${username} Usage : !so @pseudo`);
+  sendChat(`🎉 Shoutout à @${target} ! Allez suivre sa chaîne sur kick.com/${target} 👏`);
+}
+
+// ─── Uptime ───────────────────────────────────────────────────────────────────
+
+async function cmdUptime(username) {
+  if (!streamStartTime) return sendChat('Le stream n'est pas encore en ligne.');
+  const diff = Math.floor((Date.now() - streamStartTime) / 1000);
+  const h = Math.floor(diff / 3600);
+  const m = Math.floor((diff % 3600) / 60);
+  const s = diff % 60;
+  const time = h > 0 ? `${h}h ${m}min` : m > 0 ? `${m}min ${s}s` : `${s}s`;
+  sendChat(`⏱ Le stream est en ligne depuis ${time}`);
+}
+
+// ─── Dice / RPS ───────────────────────────────────────────────────────────────
+
+async function cmdDice(username, parts) {
+  const max = parseInt(parts[1]) || 6;
+  const roll = Math.floor(Math.random() * max) + 1;
+  sendChat(`🎲 @${username} lance un D${max} et obtient : ${roll} !`);
+}
+
+async function cmdRPS(username, parts) {
+  const choices = ['pierre', 'feuille', 'ciseaux'];
+  const emojis  = ['🪨', '📄', '✂️'];
+  const userChoice = parts[1]?.toLowerCase();
+  const userIdx = choices.indexOf(userChoice);
+  if (userIdx === -1) return sendChat(`@${username} Usage : !pfc pierre/feuille/ciseaux`);
+  const botIdx = Math.floor(Math.random() * 3);
+  const result = userIdx === botIdx ? 'Égalité' : (userIdx - botIdx + 3) % 3 === 1 ? `@${username} gagne` : 'Le bot gagne';
+  sendChat(`${emojis[userIdx]} vs ${emojis[botIdx]} — ${result} !`);
+}
+
+async function cmdFollowage(username, parts) {
+  const target = parts[1]?.replace('@', '') || username;
+  sendChat(`@${username} Je ne peux pas vérifier le followage sans l'API officielle Kick. Désolé !`);
+}
+
+// ─── Announcements automatiques ───────────────────────────────────────────────
+
+async function startAnnouncements() {
+  // Arrêter les anciens timers
+  Object.values(announcementIntervals).forEach(t => clearInterval(t));
+  announcementIntervals = {};
+
+  const announcements = await db.getAnnouncements();
+  for (const ann of announcements) {
+    if (!ann.enabled) continue;
+    announcementIntervals[ann.id] = setInterval(async () => {
+      if (!isLive) return;
+      await sendChat(ann.message);
+      await db.updateAnnouncementSent(ann.id);
+    }, ann.interval_ms);
+    console.log(`[ANN] Annonce #${ann.id} programmée toutes les ${ann.interval_ms/60000} min`);
+  }
 }
 
 // ─── Modération ──────────────────────────────────────────────────────────────

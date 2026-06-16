@@ -301,6 +301,7 @@ hr.div{border:none;border-top:1px solid var(--b1);margin:12px 0}
 
   <div class="sb-section">Config</div>
   <button class="nav-item" onclick="showPage('commands')"><span class="nav-ico-wrap">💬</span><span>Commandes</span></button>
+  <button class="nav-item" onclick="showPage('outils')"><span class="nav-ico-wrap">🛠️</span><span>Outils Chat</span></button>
   <button class="nav-item" onclick="showPage('historique')"><span class="nav-ico-wrap">📅</span><span>Historique</span></button>
   <button class="nav-item" onclick="showPage('admin')"><span class="nav-ico-wrap">⚙️</span><span>Admin</span></button>
   <button class="nav-item" onclick="showPage('settings')"><span class="nav-ico-wrap">🔧</span><span>Paramètres</span></button>
@@ -653,6 +654,113 @@ hr.div{border:none;border-top:1px solid var(--b1);margin:12px 0}
   </div>
 </div>
 
+<!-- ══ OUTILS CHAT ══ -->
+<div class="page" id="page-outils">
+  <div class="g2">
+    <div>
+
+      <!-- Citations -->
+      <div class="card">
+        <div class="chd">
+          <div class="ctitle">💬 Citations (<span id="quotes-count">0</span>)</div>
+          <div class="cactions"><span style="font-size:10px;color:var(--muted)">!quote · !addquote</span></div>
+        </div>
+        <div id="quotes-list"><div class="empty"><div class="ei">💬</div><p>Aucune citation</p></div></div>
+      </div>
+
+      <!-- Compteurs -->
+      <div class="card">
+        <div class="chd">
+          <div class="ctitle">🔢 Compteurs</div>
+          <div class="cactions"><span style="font-size:10px;color:var(--muted)">!mort · !score</span></div>
+        </div>
+        <div id="counters-list"><div class="empty"><div class="ei">🔢</div><p>Aucun compteur</p></div></div>
+        <div style="display:flex;gap:6px;margin-top:10px">
+          <input class="inp inp-sm" id="counter-name" placeholder="Nom (ex: morts)" style="flex:1">
+          <input type="number" class="inp inp-sm" id="counter-val" placeholder="0" style="width:60px">
+          <button class="btn btn-outline btn-sm" onclick="addCounter()">Créer</button>
+        </div>
+      </div>
+
+      <!-- Sondages -->
+      <div class="card">
+        <div class="chd">
+          <div class="ctitle">📊 Sondages</div>
+          <div class="cactions"><span style="font-size:10px;color:var(--muted)">!vote · !sondage</span></div>
+        </div>
+        <div id="poll-active"><div class="empty"><div class="ei">📊</div><p>Aucun sondage actif</p></div></div>
+        <hr class="div">
+        <label class="lbl">Question</label>
+        <input class="inp" id="poll-question" placeholder="Ex: Quel jeu ensuite ?">
+        <label class="lbl">Options (une par ligne, max 5)</label>
+        <textarea class="inp" id="poll-options" placeholder="Fortnite&#10;Minecraft&#10;Warzone" rows="4"></textarea>
+        <div style="display:flex;gap:6px;margin-top:10px">
+          <button class="btn btn-outline" onclick="createPoll()">🚀 Lancer le sondage</button>
+          <button class="btn btn-red" onclick="closePoll()">⛔ Fermer</button>
+        </div>
+        <div id="poll-msg" style="margin-top:7px"></div>
+      </div>
+
+    </div>
+    <div>
+
+      <!-- File d'attente -->
+      <div class="card">
+        <div class="chd">
+          <div class="ctitle">📋 File d'attente (<span id="queue-count">0</span>)</div>
+          <div class="cactions">
+            <span style="font-size:10px;color:var(--muted)">!queue · !leave</span>
+            <button class="btn btn-red btn-sm" onclick="clearQueue()">Vider</button>
+          </div>
+        </div>
+        <div id="queue-list"><div class="empty"><div class="ei">📋</div><p>File vide</p></div></div>
+      </div>
+
+      <!-- Annonces automatiques -->
+      <div class="card">
+        <div class="chd">
+          <div class="ctitle">📢 Annonces auto</div>
+        </div>
+        <div id="ann-list"><div class="empty"><div class="ei">📢</div><p>Aucune annonce</p></div></div>
+        <hr class="div">
+        <label class="lbl">Message</label>
+        <textarea class="inp" id="ann-message" placeholder="Ex: Rejoins notre Discord !" rows="2"></textarea>
+        <label class="lbl">Intervalle</label>
+        <div style="display:flex;gap:5px;margin-bottom:8px">
+          <button class="btn btn-ghost btn-sm" onclick="setAnnInterval(300000)">5 min</button>
+          <button class="btn btn-ghost btn-sm" onclick="setAnnInterval(600000)">10 min</button>
+          <button class="btn btn-ghost btn-sm" onclick="setAnnInterval(1800000)">30 min</button>
+          <button class="btn btn-ghost btn-sm" onclick="setAnnInterval(3600000)">1h</button>
+        </div>
+        <input type="hidden" id="ann-interval" value="600000">
+        <button class="btn btn-outline" style="width:100%;justify-content:center" onclick="addAnnouncement()">➕ Ajouter l'annonce</button>
+        <div id="ann-msg" style="margin-top:7px"></div>
+      </div>
+
+      <!-- Timers -->
+      <div class="card">
+        <div class="chd"><div class="ctitle">⏱ Timers programmés</div></div>
+        <div id="timers-list"><div class="empty"><div class="ei">⏱</div><p>Aucun timer</p></div></div>
+        <hr class="div">
+        <label class="lbl">Nom du timer</label>
+        <input class="inp" id="timer-name" placeholder="Ex: recap">
+        <label class="lbl">Message</label>
+        <input class="inp" id="timer-message" placeholder="Ex: N'oublie pas de follow !">
+        <label class="lbl">Intervalle</label>
+        <div style="display:flex;gap:5px;margin-bottom:6px">
+          <button class="btn btn-ghost btn-sm" onclick="setTimerInterval(300000)">5 min</button>
+          <button class="btn btn-ghost btn-sm" onclick="setTimerInterval(600000)">10 min</button>
+          <button class="btn btn-ghost btn-sm" onclick="setTimerInterval(1800000)">30 min</button>
+        </div>
+        <input type="hidden" id="timer-interval" value="300000">
+        <button class="btn btn-outline" style="width:100%;justify-content:center;margin-top:4px" onclick="addTimer()">➕ Ajouter</button>
+        <div id="timer-msg" style="margin-top:7px"></div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
 <!-- ══ SETTINGS ══ -->
 <div class="page" id="page-settings">
   <div class="g2">
@@ -862,7 +970,7 @@ hr.div{border:none;border-top:1px solid var(--b1);margin:12px 0}
 const API = '';
 const MEDALS = ['🥇','🥈','🥉'];
 let lbData = [], levels = [];
-const PAGE_TITLES = {dashboard:'Dashboard',classement:'Classement',lobby:'Lobby',jeux:'Jeux',objectifs:'Objectifs',dbd:'Dead by Daylight',moderation:'Modération',commands:'Commandes',historique:'Historique',admin:'Administration',settings:'Paramètres'};
+const PAGE_TITLES = {dashboard:'Dashboard',classement:'Classement',lobby:'Lobby',jeux:'Jeux',objectifs:'Objectifs',dbd:'Dead by Daylight',moderation:'Modération',commands:'Commandes',historique:'Historique',admin:'Administration',settings:'Paramètres',outils:'Outils Chat'};
 
 // ── Navigation ─────────────────────────────────────────────────────────────────
 function showPage(name) {
@@ -883,6 +991,7 @@ function showPage(name) {
   if(name==='dbd') initDBD();
   if(name==='moderation') loadBannedWords();
   if(name==='settings') initSettings();
+  if(name==='outils') loadOutils();
   if(name==='lobby') loadLobby();
 }
 
@@ -1774,6 +1883,244 @@ function renderDBDHistory() {
 function clearDBDHistory() {
   dbdHistory = [];
   renderDBDHistory();
+}
+
+// ── Outils Chat ───────────────────────────────────────────────────────────────
+
+let annInterval = 600000;
+let timerInterval = 300000;
+
+async function loadOutils() {
+  await Promise.all([loadQuotes(), loadCounters(), loadQueue(), loadPolls(), loadAnnouncements(), loadTimers()]);
+}
+
+// Citations
+async function loadQuotes() {
+  try {
+    const data = await get('/api/quotes') || [];
+    document.getElementById('quotes-count').textContent = data.length;
+    const el = document.getElementById('quotes-list');
+    if (!data.length) { el.innerHTML = '<div class="empty"><div class="ei">💬</div><p>Aucune citation — tape !addquote dans le chat</p></div>'; return; }
+    el.innerHTML = '<div style="max-height:200px;overflow-y:auto">' + data.map((q, i) => `
+      <div style="display:flex;align-items:flex-start;gap:8px;padding:7px 0;border-bottom:1px solid var(--b1);font-size:11px">
+        <span style="color:var(--muted2);flex-shrink:0">#${data.length - i}</span>
+        <span style="flex:1;color:var(--text)">"${esc(q.text)}"${q.author ? '<span style="color:var(--muted)"> — ' + esc(q.author) + '</span>' : ''}</span>
+        <button class="btn btn-red btn-sm" style="flex-shrink:0" onclick="deleteQuote(${q.id})">✕</button>
+      </div>`).join('') + '</div>';
+  } catch(e) {}
+}
+
+async function deleteQuote(id) {
+  await fetch('/api/admin/quotes/' + id, { method: 'DELETE' });
+  loadQuotes();
+}
+
+// Compteurs
+async function loadCounters() {
+  try {
+    const data = await get('/api/counters') || [];
+    const el = document.getElementById('counters-list');
+    if (!data.length) { el.innerHTML = '<div class="empty"><p>Aucun compteur</p></div>'; return; }
+    el.innerHTML = data.map(c => `
+      <div style="display:flex;align-items:center;gap:10px;padding:7px 0;border-bottom:1px solid var(--b1)">
+        <span class="cpill">${esc(c.name)}</span>
+        <span style="font-size:18px;font-weight:800;color:var(--green)">${c.value}</span>
+        <div style="display:flex;gap:4px;margin-left:auto">
+          <button class="btn btn-outline btn-xs" onclick="changeCounter('${esc(c.name)}',${c.value+1})">+</button>
+          <button class="btn btn-ghost btn-xs" onclick="changeCounter('${esc(c.name)}',${c.value-1})">-</button>
+          <button class="btn btn-ghost btn-xs" onclick="changeCounter('${esc(c.name)}',0)">Reset</button>
+          <button class="btn btn-red btn-xs" onclick="deleteCounter('${esc(c.name)}')">✕</button>
+        </div>
+      </div>`).join('');
+  } catch(e) {}
+}
+
+async function addCounter() {
+  const name = document.getElementById('counter-name').value.trim();
+  const val  = parseInt(document.getElementById('counter-val').value) || 0;
+  if (!name) return;
+  await fetch('/api/admin/counters', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({name, value: val}) });
+  document.getElementById('counter-name').value = '';
+  document.getElementById('counter-val').value = '';
+  loadCounters();
+}
+
+async function changeCounter(name, value) {
+  await fetch('/api/admin/counters', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({name, value}) });
+  loadCounters();
+}
+
+async function deleteCounter(name) {
+  await fetch('/api/admin/counters/' + encodeURIComponent(name), { method: 'DELETE' });
+  loadCounters();
+}
+
+// File d'attente
+async function loadQueue() {
+  try {
+    const data = await get('/api/queue') || [];
+    document.getElementById('queue-count').textContent = data.length;
+    const el = document.getElementById('queue-list');
+    if (!data.length) { el.innerHTML = '<div class="empty"><p>File vide — !queue pour rejoindre</p></div>'; return; }
+    el.innerHTML = '<div style="max-height:200px;overflow-y:auto">' + data.map((v, i) => `
+      <div style="display:flex;align-items:center;gap:10px;padding:6px 0;border-bottom:1px solid var(--b1);font-size:11px">
+        <span style="color:var(--green);font-weight:700;width:20px">#${i+1}</span>
+        <span style="font-weight:600;flex:1">${esc(v.username)}</span>
+        <span style="font-size:9px;color:var(--muted2)">${timeAgo(v.joined_at)}</span>
+        <button class="btn btn-red btn-xs" onclick="removeFromQueue('${esc(v.username)}')">✕</button>
+      </div>`).join('') + '</div>';
+  } catch(e) {}
+}
+
+async function removeFromQueue(username) {
+  await fetch('/api/admin/queue/remove', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({username}) });
+  loadQueue();
+}
+
+async function clearQueue() {
+  if (!confirm('Vider la file ?')) return;
+  await fetch('/api/admin/queue/clear', { method:'POST', headers:{'Content-Type':'application/json'}, body: '{}' });
+  toast('File vidée ✓');
+  loadQueue();
+}
+
+// Sondages
+async function loadPolls() {
+  try {
+    const poll = await get('/api/polls/active');
+    const el = document.getElementById('poll-active');
+    if (!poll) { el.innerHTML = '<div class="empty"><div class="ei">📊</div><p>Aucun sondage actif</p></div>'; return; }
+    const options = JSON.parse(poll.options);
+    const votes = JSON.parse(poll.votes);
+    const total = Object.values(votes).reduce((a, b) => a + b, 0);
+    el.innerHTML = `<div style="background:var(--s2);border:1px solid var(--b1);border-radius:var(--r);padding:12px">
+      <div style="font-weight:700;margin-bottom:10px">${esc(poll.question)}</div>
+      ${options.map((o, i) => {
+        const pct = total > 0 ? Math.round((votes[i]||0)/total*100) : 0;
+        return `<div style="margin-bottom:7px">
+          <div style="display:flex;justify-content:space-between;font-size:11px;margin-bottom:3px">
+            <span>${i+1}. ${esc(o)}</span><span style="color:var(--green);font-weight:700">${pct}% (${votes[i]||0})</span>
+          </div>
+          <div class="pb"><div class="pbf" style="width:${pct}%"></div></div>
+        </div>`;
+      }).join('')}
+      <div style="font-size:10px;color:var(--muted);margin-top:6px">${total} vote${total>1?'s':''} · !vote N pour voter</div>
+    </div>`;
+  } catch(e) {}
+}
+
+async function createPoll() {
+  const question = document.getElementById('poll-question').value.trim();
+  const optText  = document.getElementById('poll-options').value.trim();
+  if (!question || !optText) return showInline('poll-msg', 'Question et options requises', false);
+  const options = optText.split('
+').map(o => o.trim()).filter(Boolean).slice(0, 5);
+  if (options.length < 2) return showInline('poll-msg', 'Au moins 2 options', false);
+  const r = await fetch('/api/admin/polls', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({question, options}) });
+  const json = await r.json();
+  if (!r.ok) return showInline('poll-msg', json.error || 'Erreur', false);
+  toast('Sondage lancé ! !vote 1 à ' + options.length);
+  document.getElementById('poll-question').value = '';
+  document.getElementById('poll-options').value = '';
+  loadPolls();
+}
+
+async function closePoll() {
+  const r = await fetch('/api/admin/polls/close', { method:'POST', headers:{'Content-Type':'application/json'}, body: '{}' });
+  if (!r.ok) return showInline('poll-msg', 'Aucun sondage actif', false);
+  toast('Sondage fermé ✓');
+  loadPolls();
+}
+
+// Annonces
+async function loadAnnouncements() {
+  try {
+    const data = await get('/api/announcements') || [];
+    const el = document.getElementById('ann-list');
+    if (!data.length) { el.innerHTML = '<div class="empty"><p>Aucune annonce automatique</p></div>'; return; }
+    el.innerHTML = data.map(a => `
+      <div style="display:flex;align-items:center;gap:8px;padding:8px 10px;background:var(--s2);border:1px solid var(--b1);border-radius:var(--r);margin-bottom:5px;opacity:${a.enabled?1:.5}">
+        <label class="toggle"><input type="checkbox" ${a.enabled?'checked':''} onchange="toggleAnn(${a.id},this.checked)"><span class="tsl"></span></label>
+        <div style="flex:1;min-width:0">
+          <div style="font-size:11px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(a.message)}</div>
+          <div style="font-size:9px;color:var(--muted2)">Toutes les ${fmtMin(a.interval_ms/60000*60)}</div>
+        </div>
+        <button class="btn btn-red btn-xs" onclick="deleteAnn(${a.id})">✕</button>
+      </div>`).join('');
+  } catch(e) {}
+}
+
+function setAnnInterval(ms) {
+  annInterval = ms;
+  document.getElementById('ann-interval').value = ms;
+  toast('Intervalle : ' + fmtMin(ms/60000*60));
+}
+
+async function addAnnouncement() {
+  const message = document.getElementById('ann-message').value.trim();
+  const interval_ms = parseInt(document.getElementById('ann-interval').value) || 600000;
+  if (!message) return showInline('ann-msg', 'Message requis', false);
+  const r = await fetch('/api/admin/announcements', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({message, interval_ms}) });
+  if (!r.ok) return showInline('ann-msg', 'Erreur', false);
+  toast('Annonce ajoutée ✓');
+  document.getElementById('ann-message').value = '';
+  loadAnnouncements();
+}
+
+async function toggleAnn(id, enabled) {
+  await fetch('/api/admin/announcements/toggle', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({id, enabled}) });
+  loadAnnouncements();
+}
+
+async function deleteAnn(id) {
+  await fetch('/api/admin/announcements/' + id, { method: 'DELETE' });
+  loadAnnouncements();
+}
+
+// Timers
+async function loadTimers() {
+  try {
+    const data = await get('/api/timers') || [];
+    const el = document.getElementById('timers-list');
+    if (!data.length) { el.innerHTML = '<div class="empty"><p>Aucun timer</p></div>'; return; }
+    el.innerHTML = data.map(t => `
+      <div style="display:flex;align-items:center;gap:8px;padding:8px 10px;background:var(--s2);border:1px solid var(--b1);border-radius:var(--r);margin-bottom:5px;opacity:${t.enabled?1:.5}">
+        <label class="toggle"><input type="checkbox" ${t.enabled?'checked':''} onchange="toggleTimer('${esc(t.name)}',this.checked)"><span class="tsl"></span></label>
+        <span class="cpill">${esc(t.name)}</span>
+        <span style="font-size:10px;color:var(--muted);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(t.message)}</span>
+        <span style="font-size:9px;color:var(--muted2)">${fmtMin(t.interval_ms/60000*60)}</span>
+        <button class="btn btn-red btn-xs" onclick="deleteTimer('${esc(t.name)}')">✕</button>
+      </div>`).join('');
+  } catch(e) {}
+}
+
+function setTimerInterval(ms) {
+  timerInterval = ms;
+  document.getElementById('timer-interval').value = ms;
+  toast('Intervalle timer : ' + fmtMin(ms/60000*60));
+}
+
+async function addTimer() {
+  const name = document.getElementById('timer-name').value.trim();
+  const message = document.getElementById('timer-message').value.trim();
+  const interval_ms = parseInt(document.getElementById('timer-interval').value) || 300000;
+  if (!name || !message) return showInline('timer-msg', 'Nom et message requis', false);
+  const r = await fetch('/api/admin/timers', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({name, message, interval_ms}) });
+  if (!r.ok) return showInline('timer-msg', 'Erreur', false);
+  toast('Timer ' + name + ' créé ✓');
+  document.getElementById('timer-name').value = '';
+  document.getElementById('timer-message').value = '';
+  loadTimers();
+}
+
+async function toggleTimer(name, enabled) {
+  await fetch('/api/admin/timers/toggle', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({name, enabled}) });
+  loadTimers();
+}
+
+async function deleteTimer(name) {
+  await fetch('/api/admin/timers/' + encodeURIComponent(name), { method: 'DELETE' });
+  loadTimers();
 }
 
 // ── Settings ──────────────────────────────────────────────────────────────────
