@@ -312,16 +312,84 @@ hr.div{border:none;border-top:1px solid var(--b1);margin:12px 0}
 
 <!-- ══ DASHBOARD ══ -->
 <div class="page active" id="page-dashboard">
-  <div class="stat-grid">
-    <div class="scard" style="--card-color:var(--green)"><div class="si">👥</div><div class="sl">Viewers enregistrés</div><div class="sv" id="s-viewers">—</div><div class="ss">depuis le début</div></div>
-    <div class="scard" style="--card-color:var(--purple)"><div class="si">⭐</div><div class="sl">Points distribués</div><div class="sv" id="s-points" style="color:var(--green)">—</div><div class="ss">total cumulé</div></div>
-    <div class="scard" style="--card-color:var(--cyan)"><div class="si">⏱</div><div class="sl">Temps de visionnage</div><div class="sv" id="s-minutes" style="color:var(--cyan);font-size:16px">—</div><div class="ss">cumulé tous viewers</div></div>
-    <div class="scard" style="--card-color:var(--gold)"><div class="si">👑</div><div class="sl">Top viewer</div><div class="sv" id="s-top" style="color:var(--gold);font-size:14px">—</div><div class="ss" id="s-top-sub"></div></div>
+
+  <!-- Hero card -->
+  <div style="background:linear-gradient(135deg,#0d2818 0%,#0a1f2e 50%,#111827 100%);border:1px solid var(--green-brd);border-radius:var(--r3);padding:20px 24px;margin-bottom:16px;position:relative;overflow:hidden">
+    <div style="position:absolute;top:0;right:0;width:300px;height:100%;background:radial-gradient(ellipse at 80% 50%,#22c55e08,transparent);pointer-events:none"></div>
+    <div style="display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:12px">
+      <div>
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px">
+          <div style="width:40px;height:40px;border-radius:50%;background:var(--green);display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:800;color:#000;border:2px solid #4ade8060">F</div>
+          <div>
+            <div style="font-size:18px;font-weight:800;color:var(--text);letter-spacing:-.5px">Bienvenue, fack7up 👋</div>
+            <div style="font-size:11px;color:var(--muted);margin-top:1px">Panel de gestion Bot7uP</div>
+          </div>
+        </div>
+      </div>
+      <div id="hero-live-status" style="display:flex;align-items:center;gap:8px">
+        <div class="live-badge off" id="live-pill"><div class="live-dot" id="live-dot"></div><span id="live-text">Vérification…</span></div>
+      </div>
+    </div>
+
+    <!-- Stats rapides -->
+    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-top:16px">
+      <div style="background:#ffffff06;border:1px solid #ffffff0a;border-radius:var(--r);padding:12px 14px">
+        <div style="font-size:20px;font-weight:800;color:var(--green);letter-spacing:-.5px" id="s-viewers">—</div>
+        <div style="font-size:9px;color:var(--muted2);margin-top:3px;text-transform:uppercase;letter-spacing:.5px">Viewers enregistrés</div>
+      </div>
+      <div style="background:#ffffff06;border:1px solid #ffffff0a;border-radius:var(--r);padding:12px 14px">
+        <div style="font-size:20px;font-weight:800;color:var(--cyan);letter-spacing:-.5px" id="s-points">—</div>
+        <div style="font-size:9px;color:var(--muted2);margin-top:3px;text-transform:uppercase;letter-spacing:.5px">Points distribués</div>
+      </div>
+      <div style="background:#ffffff06;border:1px solid #ffffff0a;border-radius:var(--r);padding:12px 14px">
+        <div style="font-size:20px;font-weight:800;color:var(--gold);letter-spacing:-.5px" id="s-minutes">—</div>
+        <div style="font-size:9px;color:var(--muted2);margin-top:3px;text-transform:uppercase;letter-spacing:.5px">Temps regardé</div>
+      </div>
+      <div style="background:#ffffff06;border:1px solid #ffffff0a;border-radius:var(--r);padding:12px 14px">
+        <div style="font-size:16px;font-weight:800;color:var(--purple);letter-spacing:-.3px" id="s-top">—</div>
+        <div style="font-size:9px;color:var(--muted2);margin-top:3px;text-transform:uppercase;letter-spacing:.5px">Top viewer</div>
+      </div>
+    </div>
+
+    <!-- Boutons d'action rapide -->
+    <div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:14px">
+      <button class="btn btn-green" onclick="showPage('classement')" style="font-size:11px;padding:7px 14px">🏆 Voir le classement</button>
+      <button class="btn btn-outline" onclick="showPage('commands')" style="font-size:11px;padding:7px 14px">💬 Gérer les commandes</button>
+      <button class="btn btn-ghost" onclick="showPage('lobby')" style="font-size:11px;padding:7px 14px">🎮 Ouvrir le lobby</button>
+      <button class="btn btn-ghost" onclick="showPage('jeux')" style="font-size:11px;padding:7px 14px">⚔️ Jeux & Giveaway</button>
+      <button class="btn btn-gold" onclick="showPage('moderation')" style="font-size:11px;padding:7px 14px">🛡️ Modération</button>
+    </div>
   </div>
+
+  <!-- Dernières sessions + Top viewers -->
+  <div class="g2" style="margin-bottom:14px">
+    <div>
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+        <div style="font-size:12px;font-weight:700;color:var(--text);display:flex;align-items:center;gap:6px">⏱ Dernières sessions</div>
+        <button class="btn btn-ghost btn-sm" onclick="showPage('historique')">Voir tout →</button>
+      </div>
+      <div class="card" style="padding:0">
+        <div id="dash-sessions" style="padding:4px 0">
+          <div class="empty" style="padding:20px"><div class="ei">📅</div><p>Aucune session</p></div>
+        </div>
+      </div>
+    </div>
+    <div>
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+        <div style="font-size:12px;font-weight:700;color:var(--text);display:flex;align-items:center;gap:6px">🎁 Giveaway en cours</div>
+      </div>
+      <div class="card"><div id="gw-status"><div class="empty"><div class="ei">🎁</div><p>Aucun giveaway actif</p></div></div></div>
+    </div>
+  </div>
+
+  <!-- Top viewers + Activité -->
   <div class="g2">
     <div>
-      <div class="card">
-        <div class="chd"><div class="ctitle">🏆 Top 10 viewers</div></div>
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+        <div style="font-size:12px;font-weight:700;color:var(--text)">🏆 Top 10 viewers</div>
+        <button class="btn btn-ghost btn-sm" onclick="showPage('classement')">Voir tout →</button>
+      </div>
+      <div class="card" style="padding:0">
         <div class="tw"><table>
           <thead><tr><th>#</th><th>Viewer</th><th>Niveau</th><th>Points</th><th>Temps</th></tr></thead>
           <tbody id="dash-lb"><tr><td colspan="5"><div class="empty"><p>Chargement…</p></div></td></tr></tbody>
@@ -329,8 +397,12 @@ hr.div{border:none;border-top:1px solid var(--b1);margin:12px 0}
       </div>
     </div>
     <div>
-      <div class="card"><div class="chd"><div class="ctitle">🎁 Giveaway en cours</div></div><div id="gw-status"><div class="empty"><div class="ei">🎁</div><p>Aucun giveaway actif</p></div></div></div>
-      <div class="card"><div class="chd"><div class="ctitle">⚡ Activité récente</div></div><div style="max-height:240px;overflow-y:auto" id="dash-logs"><div class="empty"><p>Chargement…</p></div></div></div>
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+        <div style="font-size:12px;font-weight:700;color:var(--text)">⚡ Activité récente</div>
+      </div>
+      <div class="card" style="padding:0">
+        <div style="max-height:280px;overflow-y:auto;padding:4px 0" id="dash-logs"><div class="empty"><p>Chargement…</p></div></div>
+      </div>
     </div>
   </div>
 </div>
@@ -672,8 +744,26 @@ async function del(url) {
 // ── Load all ───────────────────────────────────────────────────────────────────
 async function loadAll() {
   loadLiveStatus();
-  await Promise.all([loadStats(), loadDashLB(), loadDashLogs(), loadLevels(), loadActiveGiveaway()]);
-  document.getElementById('upd').textContent = 'Mis à jour ' + new Date().toLocaleTimeString('fr-FR');
+  await Promise.all([loadStats(), loadDashLB(), loadDashLogs(), loadDashSessions(), loadLevels(), loadActiveGiveaway()]);
+  document.getElementById('upd').textContent = new Date().toLocaleTimeString('fr-FR');
+}
+
+async function loadDashSessions() {
+  try {
+    const data = await get('/api/history?limit=3') || [];
+    const el = document.getElementById('dash-sessions');
+    if (!el) return;
+    if (!data.length) { el.innerHTML = '<div class="empty" style="padding:16px"><div class="ei">📅</div><p>Aucune session</p></div>'; return; }
+    el.innerHTML = data.map(s => `
+      <div class="histrow" style="padding:8px 14px">
+        <div style="width:8px;height:8px;border-radius:50%;background:var(--green);flex-shrink:0"></div>
+        <div style="flex:1">
+          <div style="font-weight:600;font-size:11px">${new Date(s.started_at+'Z').toLocaleDateString('fr-FR',{day:'2-digit',month:'short',year:'numeric'})}</div>
+          <div style="font-size:10px;color:var(--muted)">${fmtMin(s.duration_min||0)}</div>
+        </div>
+        <div style="font-size:10px;color:var(--muted)">👥 ${s.peak_viewers} max</div>
+      </div>`).join('');
+  } catch(e) {}
 }
 
 async function loadStats() {
