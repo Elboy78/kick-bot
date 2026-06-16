@@ -43,44 +43,48 @@ aside{width:var(--sidebar);flex-shrink:0;background:var(--s1);border-right:1px s
 .main{margin-left:var(--sidebar);flex:1;display:flex;flex-direction:column;min-height:100vh}
 
 /* ══ SIDEBAR BRAND ══ */
-.sb-brand{padding:18px 16px 14px;display:flex;align-items:center;gap:10px;border-bottom:1px solid var(--b1)}
-.sb-logo-box{width:38px;height:38px;border-radius:10px;background:var(--green);display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:800;color:#000;flex-shrink:0;letter-spacing:-1px}
-.sb-brand-name{font-size:16px;font-weight:800;color:var(--text);letter-spacing:-.3px}
-.sb-brand-sub{font-size:10px;color:var(--muted2);margin-top:1px;font-weight:500}
+.sb-brand{padding:16px 14px 12px;display:flex;align-items:center;gap:10px;border-bottom:1px solid var(--b1)}
+.sb-logo-box{width:36px;height:36px;border-radius:10px;background:var(--green);display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:800;color:#000;flex-shrink:0;letter-spacing:-1px;box-shadow:0 0 12px #22c55e40}
+.sb-brand-name{font-size:15px;font-weight:800;color:var(--text);letter-spacing:-.3px}
+.sb-brand-sub{font-size:9px;color:var(--muted2);margin-top:1px;font-weight:500;letter-spacing:.3px}
 
 /* ══ SIDEBAR CHANNEL CARD ══ */
-.sb-channel{margin:10px;background:var(--s2);border:1px solid var(--b2);border-radius:var(--r2);overflow:hidden}
-.sb-ch-top{background:linear-gradient(135deg,#0d1f0e,#112214);padding:14px 12px 10px;display:flex;align-items:center;gap:10px}
-.sb-ch-avatar{width:42px;height:42px;border-radius:50%;background:var(--green);display:flex;align-items:center;justify-content:center;font-size:17px;font-weight:800;color:#000;flex-shrink:0;border:2px solid var(--green-brd)}
-.sb-ch-name{font-size:13px;font-weight:700;color:var(--text)}
-.sb-ch-tag{font-size:10px;color:var(--green);font-weight:600;margin-top:1px}
-.live-badge{display:inline-flex;align-items:center;gap:4px;font-size:9px;font-weight:700;padding:2px 7px;border-radius:20px;letter-spacing:.4px;margin-top:3px}
-.live-badge.on{background:var(--red-bg);color:var(--red);border:1px solid var(--red-brd)}
-.live-badge.off{background:var(--b1);color:var(--muted2);border:1px solid var(--b1)}
+.sb-channel{margin:8px 10px;background:linear-gradient(135deg,#0c1f10,#0d1a24);border:1px solid var(--green-brd);border-radius:var(--r2);overflow:hidden;position:relative}
+.sb-channel::before{content:'';position:absolute;top:-30px;right:-20px;width:80px;height:80px;background:radial-gradient(circle,#22c55e20,transparent 70%);pointer-events:none}
+.sb-ch-top{padding:12px;display:flex;align-items:center;gap:10px}
+.sb-ch-avatar{width:40px;height:40px;border-radius:50%;background:linear-gradient(135deg,var(--green),#16a34a);display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:800;color:#000;flex-shrink:0;border:2px solid #4ade8060;box-shadow:0 0 10px #22c55e30}
+.sb-ch-name{font-size:12px;font-weight:700;color:var(--text)}
+.sb-ch-tag{font-size:9px;color:var(--green);font-weight:600;margin-top:1px;letter-spacing:.2px}
+.live-badge{display:inline-flex;align-items:center;gap:4px;font-size:9px;font-weight:700;padding:2px 7px;border-radius:20px;letter-spacing:.3px;margin-top:4px;width:fit-content}
+.live-badge.on{background:#ef444420;color:var(--red);border:1px solid #ef444440}
+.live-badge.off{background:#ffffff08;color:var(--muted2);border:1px solid #ffffff10}
 .live-dot{width:5px;height:5px;border-radius:50%;background:currentColor;flex-shrink:0}
 .live-dot.blink{animation:pulse 1.2s infinite}
-@keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.4;transform:scale(.8)}}
-.sb-ch-stats{display:grid;grid-template-columns:1fr 1fr 1fr;gap:1px;background:var(--b1)}
-.sb-ch-stat{background:var(--s2);padding:8px 10px;text-align:center}
-.sb-ch-stat .v{font-size:14px;font-weight:700;color:var(--text)}
-.sb-ch-stat .l{font-size:9px;color:var(--muted2);margin-top:1px;text-transform:uppercase;letter-spacing:.4px}
+@keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.3;transform:scale(.7)}}
+.sb-ch-stats{display:grid;grid-template-columns:1fr 1fr 1fr;border-top:1px solid #22c55e20}
+.sb-ch-stat{padding:7px 8px;text-align:center;position:relative}
+.sb-ch-stat:not(:last-child)::after{content:'';position:absolute;right:0;top:20%;height:60%;width:1px;background:#22c55e20}
+.sb-ch-stat .v{font-size:13px;font-weight:800;color:var(--text);letter-spacing:-.3px}
+.sb-ch-stat .l{font-size:8px;color:var(--muted2);margin-top:2px;text-transform:uppercase;letter-spacing:.5px}
 
 /* ══ SIDEBAR NAV ══ */
-.sb-section{padding:10px 14px 4px;font-size:9px;font-weight:700;color:var(--muted2);letter-spacing:1.2px;text-transform:uppercase}
-.nav-item{display:flex;align-items:center;gap:9px;padding:7px 10px;margin:1px 8px;border-radius:var(--r);cursor:pointer;color:var(--muted);font-size:12px;font-weight:500;transition:all .1s;border:none;background:none;width:calc(100% - 16px);text-align:left;position:relative;letter-spacing:-.1px}
+.sb-section{padding:10px 12px 3px;font-size:8px;font-weight:700;color:var(--muted2);letter-spacing:1.5px;text-transform:uppercase;display:flex;align-items:center;gap:6px}
+.sb-section::after{content:'';flex:1;height:1px;background:var(--b1);margin-left:4px}
+.nav-item{display:flex;align-items:center;gap:9px;padding:7px 10px;margin:1px 8px;border-radius:var(--r);cursor:pointer;color:var(--muted);font-size:12px;font-weight:500;transition:all .15s;border:none;background:none;width:calc(100% - 16px);text-align:left;position:relative;letter-spacing:-.1px}
 .nav-item:hover{background:var(--s3);color:var(--text)}
-.nav-item.active{background:var(--green-bg);color:var(--green);font-weight:600;border:1px solid var(--green-brd)}
-.nav-item .ico{font-size:14px;width:16px;text-align:center;flex-shrink:0;opacity:.8}
-.nav-item.active .ico{opacity:1}
+.nav-item:hover .nav-ico-wrap{background:var(--s4)}
+.nav-item.active{background:var(--green-bg);color:var(--green);font-weight:600}
+.nav-item.active .nav-ico-wrap{background:#22c55e20;color:var(--green)}
+.nav-ico-wrap{width:26px;height:26px;border-radius:7px;background:var(--s3);display:flex;align-items:center;justify-content:center;font-size:13px;flex-shrink:0;transition:all .15s}
 
 /* ══ SIDEBAR FOOTER ══ */
 .sb-footer{margin-top:auto;padding:10px;border-top:1px solid var(--b1)}
-.sb-action-btn{width:100%;padding:8px 12px;border-radius:var(--r);border:1px solid var(--b2);background:var(--s2);color:var(--muted);font-size:11px;font-weight:600;cursor:pointer;transition:all .15s;text-align:left;display:flex;align-items:center;gap:8px;margin-bottom:5px;font-family:inherit}
-.sb-action-btn:hover{background:var(--s3);color:var(--text);border-color:var(--b3)}
+.sb-action-btn{width:100%;padding:8px 11px;border-radius:var(--r);border:1px solid var(--b1);background:transparent;color:var(--muted);font-size:11px;font-weight:600;cursor:pointer;transition:all .15s;text-align:left;display:flex;align-items:center;gap:8px;margin-bottom:4px;font-family:inherit}
+.sb-action-btn:hover{background:var(--s2);color:var(--text);border-color:var(--b2)}
 .sb-action-btn.live-auto{color:var(--muted)}
 .sb-action-btn.live-on{background:var(--green-bg);color:var(--green);border-color:var(--green-brd)}
 .sb-action-btn.live-off{background:var(--red-bg);color:var(--red);border-color:var(--red-brd)}
-.sb-upd{font-size:9px;color:var(--muted2);text-align:center;padding:4px 0}
+.sb-upd{font-size:9px;color:var(--muted2);text-align:center;padding:3px 0;letter-spacing:.3px}
 
 /* ══ TOPBAR ══ */
 topbar{display:flex;align-items:center;gap:12px;padding:11px 20px;background:var(--s1);border-bottom:1px solid var(--b1);position:sticky;top:0;z-index:40}
@@ -275,20 +279,20 @@ hr.div{border:none;border-top:1px solid var(--b1);margin:12px 0}
   </div>
 
   <div class="sb-section">Principal</div>
-  <button class="nav-item active" onclick="showPage('dashboard')"><span class="ico">📊</span><span>Dashboard</span></button>
-  <button class="nav-item" onclick="showPage('classement')"><span class="ico">🏆</span><span>Classement</span></button>
+  <button class="nav-item active" onclick="showPage('dashboard')"><span class="nav-ico-wrap">📊</span><span>Dashboard</span></button>
+  <button class="nav-item" onclick="showPage('classement')"><span class="nav-ico-wrap">🏆</span><span>Classement</span></button>
 
   <div class="sb-section">Outils</div>
-  <button class="nav-item" onclick="showPage('lobby')"><span class="ico">🎮</span><span>Lobby</span></button>
-  <button class="nav-item" onclick="showPage('jeux')"><span class="ico">⚔️</span><span>Jeux</span></button>
-  <button class="nav-item" onclick="showPage('objectifs')"><span class="ico">🎯</span><span>Objectifs</span></button>
-  <button class="nav-item" onclick="showPage('dbd')"><span class="ico">🔪</span><span>DBD</span></button>
-  <button class="nav-item" onclick="showPage('moderation')"><span class="ico">🛡️</span><span>Modération</span></button>
+  <button class="nav-item" onclick="showPage('lobby')"><span class="nav-ico-wrap">🎮</span><span>Lobby</span></button>
+  <button class="nav-item" onclick="showPage('jeux')"><span class="nav-ico-wrap">⚔️</span><span>Jeux</span></button>
+  <button class="nav-item" onclick="showPage('objectifs')"><span class="nav-ico-wrap">🎯</span><span>Objectifs</span></button>
+  <button class="nav-item" onclick="showPage('dbd')"><span class="nav-ico-wrap">🔪</span><span>DBD</span></button>
+  <button class="nav-item" onclick="showPage('moderation')"><span class="nav-ico-wrap">🛡️</span><span>Modération</span></button>
 
-  <div class="sb-section">Configuration</div>
-  <button class="nav-item" onclick="showPage('commands')"><span class="ico">💬</span><span>Commandes</span></button>
-  <button class="nav-item" onclick="showPage('historique')"><span class="ico">📅</span><span>Historique</span></button>
-  <button class="nav-item" onclick="showPage('admin')"><span class="ico">⚙️</span><span>Admin</span></button>
+  <div class="sb-section">Config</div>
+  <button class="nav-item" onclick="showPage('commands')"><span class="nav-ico-wrap">💬</span><span>Commandes</span></button>
+  <button class="nav-item" onclick="showPage('historique')"><span class="nav-ico-wrap">📅</span><span>Historique</span></button>
+  <button class="nav-item" onclick="showPage('admin')"><span class="nav-ico-wrap">⚙️</span><span>Admin</span></button>
 
   <div class="sb-footer">
     <button class="sb-action-btn live-auto" id="live-toggle-btn" onclick="toggleForceLive()">
