@@ -200,6 +200,11 @@ async function initSchema() {
       enabled    INTEGER NOT NULL DEFAULT 1,
       created_at TEXT NOT NULL DEFAULT (datetime('now'))
     )`,
+    `CREATE TABLE IF NOT EXISTS bot_settings (
+      key        TEXT PRIMARY KEY,
+      value      TEXT NOT NULL DEFAULT '1',
+      updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+    )`,
     `CREATE TABLE IF NOT EXISTS system_commands_state (
       trigger  TEXT PRIMARY KEY,
       enabled  INTEGER NOT NULL DEFAULT 1
@@ -504,6 +509,44 @@ async function deleteAccessRequest(username) {
   await run(`DELETE FROM panel_access WHERE username = ?`, [username.toLowerCase()]);
 }
 
+// ─── Bot Settings ─────────────────────────────────────────────────────────────
+
+const DEFAULT_SETTINGS = {
+  'follow_alerts':      { label: 'Alertes nouveaux followers', desc: 'Le bot annonce les nouveaux followers dans le chat', category: 'Chat' },
+  'points_enabled':     { label: 'Système de points', desc: 'Distribue des points aux viewers pendant le live', category: 'Points' },
+  'duel_enabled':       { label: 'Duels entre viewers', desc: 'Permet aux viewers de se défier avec !duel', category: 'Jeux' },
+  'giveaway_enabled':   { label: 'Giveaways', desc: 'Permet de lancer des giveaways avec !participer', category: 'Jeux' },
+  'lobby_enabled':      { label: 'Lobby de jeu', desc: 'Permet aux viewers de rejoindre le lobby avec !lobby', category: 'Jeux' },
+  'poll_enabled':       { label: 'Sondages', desc: 'Permet aux viewers de voter avec !vote', category: 'Chat' },
+  'queue_enabled':      { label: 'File d attente', desc: 'Permet aux viewers de rejoindre la file avec !queue', category: 'Chat' },
+  'quote_enabled':      { label: 'Citations', desc: 'Commandes !quote et !addquote', category: 'Chat' },
+  'dice_enabled':       { label: 'Jeux de hasard', desc: 'Commandes !dice, !pfc, !rps', category: 'Jeux' },
+  'shoutout_enabled':   { label: 'Shoutout automatique', desc: 'Commande !so pour faire un shoutout', category: 'Chat' },
+  'announcements_enabled': { label: 'Annonces automatiques', desc: 'Messages automatiques pendant le live', category: 'Chat' },
+  'moderation_enabled': { label: 'Modération automatique', desc: 'Ban/timeout sur mots bannis', category: 'Modération' },
+  'uptime_enabled':     { label: 'Commande uptime', desc: 'Permet aux viewers de voir la duree du stream avec !uptime', category: 'Chat' },
+};
+
+async function getAllSettings() {
+  const rows = await all(`SELECT * FROM bot_settings`);
+  const result = {};
+  // Valeurs par défaut
+  for (const key of Object.keys(DEFAULT_SETTINGS)) result[key] = true;
+  // Valeurs en base
+  rows.forEach(r => { result[r.key] = r.value === '1'; });
+  return result;
+}
+
+async function getSetting(key) {
+  const r = await get(`SELECT value FROM bot_settings WHERE key = ?`, [key]);
+  return r ? r.value === '1' : true; // true par défaut
+}
+
+async function setSetting(key, enabled) {
+  await run(`INSERT INTO bot_settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = ?, updated_at = datetime('now')`,
+    [key, enabled ? '1' : '0', enabled ? '1' : '0']);
+}
+
 // ─── System Commands ──────────────────────────────────────────────────────────
 
 async function initSystemCommandsState(commands) {
@@ -693,6 +736,7 @@ module.exports = {
   initPanelAccess, requestAccess, getAccessStatus, getAllAccessRequests,
   approveAccess, revokeAccess, deleteAccessRequest,
   initSystemCommandsState, isSystemCmdEnabled, getAllSystemCommandsState, toggleSystemCommand,
+  getAllSettings, getSetting, setSetting, DEFAULT_SETTINGS,
   getBannedWords, addBannedWord, deleteBannedWord, toggleBannedWord, checkBannedWords,
   getQuotes, addQuote, getRandomQuote, deleteQuote,
   getCounters, getCounter, setCounter, incrementCounter, deleteCounter,

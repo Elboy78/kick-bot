@@ -282,9 +282,9 @@ hr.div{border:none;border-top:1px solid var(--b1);margin:12px 0}
       </div>
     </div>
     <div class="sb-ch-stats">
+      <div class="sb-ch-stat"><div class="v" id="sb-followers">—</div><div class="l">Followers</div></div>
       <div class="sb-ch-stat"><div class="v" id="sb-viewers">—</div><div class="l">Viewers</div></div>
       <div class="sb-ch-stat"><div class="v" id="sb-points">—</div><div class="l">Points</div></div>
-      <div class="sb-ch-stat"><div class="v" id="sb-top">—</div><div class="l">Top</div></div>
     </div>
   </div>
 
@@ -693,7 +693,9 @@ hr.div{border:none;border-top:1px solid var(--b1);margin:12px 0}
         <label class="lbl">Question</label>
         <input class="inp" id="poll-question" placeholder="Ex: Quel jeu ensuite ?">
         <label class="lbl">Options (une par ligne, max 5)</label>
-        <textarea class="inp" id="poll-options" placeholder="Fortnite&#10;Minecraft&#10;Warzone" rows="4"></textarea>
+        <textarea class="inp" id="poll-options" placeholder="Fortnite
+Minecraft
+Warzone" rows="4"></textarea>
         <div style="display:flex;gap:6px;margin-top:10px">
           <button class="btn btn-outline" onclick="createPoll()">🚀 Lancer le sondage</button>
           <button class="btn btn-red" onclick="closePoll()">⛔ Fermer</button>
@@ -855,37 +857,14 @@ hr.div{border:none;border-top:1px solid var(--b1);margin:12px 0}
     </div>
 
     <div>
-      <!-- Bot -->
+      <!-- Fonctionnalités bot -->
       <div class="card">
-        <div class="chd"><div class="ctitle">🤖 Configuration du bot</div></div>
-        <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--b1)">
-          <div>
-            <div style="font-size:12px;font-weight:600;color:var(--text)">Points par intervalle</div>
-            <div style="font-size:10px;color:var(--muted);margin-top:2px">Points gagnés toutes les 5 minutes</div>
-          </div>
-          <div style="display:flex;align-items:center;gap:6px">
-            <input type="number" class="inp inp-sm" id="pts-interval" value="10" min="1" max="100" style="width:60px;text-align:center">
-            <span style="font-size:10px;color:var(--muted)">pts</span>
-          </div>
+        <div class="chd">
+          <div class="ctitle">🤖 Fonctionnalités du bot</div>
+          <button class="btn btn-ghost btn-sm" onclick="loadBotFeatures()">↻</button>
         </div>
-        <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--b1)">
-          <div>
-            <div style="font-size:12px;font-weight:600;color:var(--text)">Intervalle de distribution</div>
-            <div style="font-size:10px;color:var(--muted);margin-top:2px">Fréquence de distribution des points</div>
-          </div>
-          <div style="display:flex;gap:5px">
-            <button class="btn btn-ghost btn-sm" onclick="setInterval_pts(300000)">5 min</button>
-            <button class="btn btn-ghost btn-sm" onclick="setInterval_pts(600000)">10 min</button>
-            <button class="btn btn-ghost btn-sm" onclick="setInterval_pts(900000)">15 min</button>
-          </div>
-        </div>
-        <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 0">
-          <div>
-            <div style="font-size:12px;font-weight:600;color:var(--text)">Préfixe des commandes</div>
-            <div style="font-size:10px;color:var(--muted);margin-top:2px">Caractère déclencheur des commandes</div>
-          </div>
-          <input type="text" class="inp inp-sm" value="!" style="width:50px;text-align:center" maxlength="2">
-        </div>
+        <div style="font-size:10px;color:var(--muted);margin-bottom:10px">Active ou désactive chaque fonctionnalité en un clic — prend effet immédiatement.</div>
+        <div id="bot-features-list"><div class="empty"><p>Chargement…</p></div></div>
       </div>
 
       <!-- Infos version -->
@@ -1018,8 +997,22 @@ async function del(url) {
 // ── Load all ───────────────────────────────────────────────────────────────────
 async function loadAll() {
   loadLiveStatus();
+  loadFollowers();
   await Promise.all([loadStats(), loadDashLB(), loadDashLogs(), loadDashSessions(), loadLevels(), loadActiveGiveaway()]);
   document.getElementById('upd').textContent = new Date().toLocaleTimeString('fr-FR');
+}
+
+async function loadFollowers() {
+  try {
+    const r = await fetch('/api/followers');
+    const d = await r.json();
+    const count = d.count || 0;
+    const fmt = count >= 1000 ? (count/1000).toFixed(1) + 'k' : count;
+    const el1 = document.getElementById('s-followers');
+    const el2 = document.getElementById('sb-followers');
+    if (el1) el1.textContent = fmt;
+    if (el2) el2.textContent = fmt;
+  } catch(e) {}
 }
 
 async function loadDashSessions() {
@@ -2013,8 +2006,7 @@ async function createPoll() {
   const question = document.getElementById('poll-question').value.trim();
   const optText  = document.getElementById('poll-options').value.trim();
   if (!question || !optText) return showInline('poll-msg', 'Question et options requises', false);
-  const options = optText.split('
-').map(o => o.trim()).filter(Boolean).slice(0, 5);
+  const options = optText.split(/\r?\n/).map(o => o.trim()).filter(Boolean).slice(0, 5);
   if (options.length < 2) return showInline('poll-msg', 'Au moins 2 options', false);
   const r = await fetch('/api/admin/polls', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({question, options}) });
   const json = await r.json();
@@ -2135,13 +2127,61 @@ let currentTheme = localStorage.getItem('bot7up_theme') || 'dark';
 let currentAccent = localStorage.getItem('bot7up_accent') || '#22c55e';
 
 function initSettings() {
-  // Langue
   const ls = document.getElementById('lang-select');
   if(ls) ls.value = currentLang;
-  // Thème boutons
   updateThemeButtons();
-  // Accent
   applyAccent(currentAccent, false);
+  loadBotFeatures();
+}
+
+async function loadBotFeatures() {
+  try {
+    const r = await fetch('/api/bot-settings');
+    const json = await r.json();
+    const settings = json.data || {};
+    const meta = json.meta || {};
+    const el = document.getElementById('bot-features-list');
+    if (!el) return;
+
+    // Grouper par catégorie
+    const categories = {};
+    for (const [key, info] of Object.entries(meta)) {
+      if (!categories[info.category]) categories[info.category] = [];
+      categories[info.category].push({ key, ...info, enabled: settings[key] !== false });
+    }
+
+    const catIcons = { 'Chat':'💬', 'Points':'⭐', 'Jeux':'🎮', 'Modération':'🛡️' };
+
+    el.innerHTML = Object.entries(categories).map(([cat, items]) => `
+      <div style="margin-bottom:12px">
+        <div style="font-size:9px;font-weight:700;color:var(--muted2);text-transform:uppercase;letter-spacing:1px;margin-bottom:7px">${catIcons[cat]||''} ${cat}</div>
+        ${items.map(item => `
+          <div style="display:flex;align-items:center;gap:10px;padding:8px 10px;background:var(--s2);border:1px solid var(--b1);border-radius:var(--r);margin-bottom:4px;transition:opacity .2s;opacity:${item.enabled?1:.55}">
+            <label class="toggle" style="flex-shrink:0">
+              <input type="checkbox" ${item.enabled?'checked':''} onchange="toggleBotFeature('${item.key}',this.checked)">
+              <span class="tsl"></span>
+            </label>
+            <div style="flex:1;min-width:0">
+              <div style="font-size:12px;font-weight:600;color:var(--text)">${item.label}</div>
+              <div style="font-size:10px;color:var(--muted);margin-top:1px">${item.desc}</div>
+            </div>
+            <div style="width:6px;height:6px;border-radius:50%;background:${item.enabled?'var(--green)':'var(--muted2)'};flex-shrink:0"></div>
+          </div>`).join('')}
+      </div>`).join('');
+  } catch(e) { console.error('loadBotFeatures error:', e); }
+}
+
+async function toggleBotFeature(key, enabled) {
+  try {
+    const r = await fetch('/api/admin/bot-settings', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({key, enabled})
+    });
+    if (!r.ok) { toast('Erreur lors de la sauvegarde', false); return; }
+    toast(enabled ? '✅ Fonctionnalité activée' : '🔴 Fonctionnalité désactivée');
+    loadBotFeatures();
+  } catch(e) { toast('Erreur réseau', false); }
 }
 
 function setTheme(t) {

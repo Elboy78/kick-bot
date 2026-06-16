@@ -31,6 +31,8 @@ let peakViewers      = 0;
 const pendingDuelTimeouts = {};
 let announcementIntervals = {};
 let streamStartTime = null;
+let lastFollowerCount = 0;
+let followerCheckInterval = null;
 
 // ─── Init ─────────────────────────────────────────────────────────────────────
 
@@ -38,6 +40,9 @@ async function init() {
   await db.ensureInit();
   await db.initSystemCommandsState(SYSTEM_COMMANDS);
   await startAnnouncements();
+  // Vérifier followers toutes les 60 secondes
+  followerCheckInterval = setInterval(checkFollowers, 60000);
+  await checkFollowers();
   console.log('[BOT] Base de données prête ✓');
 
   if (!CONFIG.token) {
@@ -148,11 +153,13 @@ async function handleChatMessage(payload) {
   console.log(`[CHAT] ${username}: ${content}`);
 
   // Vérifier les mots bannis
-  const banned = await db.checkBannedWords(content);
-  if (banned) {
-    console.log(`[MODÉRATION] Mot banni détecté: "${banned.word}" de ${username} — Action: ${banned.action}`);
-    await moderateUser(username, banned.action, banned.duration, banned.word);
-    return;
+  if (await db.getSetting('moderation_enabled')) {
+    const banned = await db.checkBannedWords(content);
+    if (banned) {
+      console.log(`[MODÉRATION] Mot banni: "${banned.word}" de ${username}`);
+      await moderateUser(username, banned.action, banned.duration, banned.word);
+      return;
+    }
   }
 
   const parts = content.trim().split(' ');
@@ -168,30 +175,30 @@ async function handleChatMessage(payload) {
       case '!rang':      return cmdRang(username);
       case '!niveau':    return cmdNiveau(username);
       case '!aide':      return cmdAide(username);
-      case '!duel':      return cmdDuel(username, parts);
+      case '!duel':      return (await db.getSetting('duel_enabled')) ? cmdDuel(username, parts) : null;
       case '!accepter':  return cmdAccepter(username);
       case '!refuser':   return cmdRefuser(username);
-      case '!participer':return cmdParticiper(username);
-      case '!giveaway':  return cmdGiveawayInfo(username);
-      case '!lobby':     return cmdLobby(username);
-      case '!quote':     return cmdQuote(username, parts);
-      case '!addquote':  return cmdAddQuote(username, parts);
+      case '!participer':return (await db.getSetting('giveaway_enabled')) ? cmdParticiper(username) : null;
+      case '!giveaway':  return (await db.getSetting('giveaway_enabled')) ? cmdGiveawayInfo(username) : null;
+      case '!lobby':     return (await db.getSetting('lobby_enabled')) ? cmdLobby(username) : null;
+      case '!quote':     return (await db.getSetting('quote_enabled')) ? cmdQuote(username, parts) : null;
+      case '!addquote':  return (await db.getSetting('quote_enabled')) ? cmdAddQuote(username, parts) : null;
       case '!mort':
       case '!death':     return cmdCounter(username, parts, 'morts');
       case '!score':     return cmdCounter(username, parts, 'score');
       case '!compteur':  return cmdCounterInfo(username, parts);
       case '!queue':
-      case '!join':      return cmdJoinQueue(username);
-      case '!leave':     return cmdLeaveQueue(username);
-      case '!pos':       return cmdQueuePos(username);
-      case '!vote':      return cmdVote(username, parts);
-      case '!sondage':   return cmdPollInfo(username);
-      case '!so':        return cmdShoutout(username, parts);
-      case '!uptime':    return cmdUptime(username);
+      case '!join':      return (await db.getSetting('queue_enabled')) ? cmdJoinQueue(username) : null;
+      case '!leave':     return (await db.getSetting('queue_enabled')) ? cmdLeaveQueue(username) : null;
+      case '!pos':       return (await db.getSetting('queue_enabled')) ? cmdQueuePos(username) : null;
+      case '!vote':      return (await db.getSetting('poll_enabled')) ? cmdVote(username, parts) : null;
+      case '!sondage':   return (await db.getSetting('poll_enabled')) ? cmdPollInfo(username) : null;
+      case '!so':        return (await db.getSetting('shoutout_enabled')) ? cmdShoutout(username, parts) : null;
+      case '!uptime':    return (await db.getSetting('uptime_enabled')) ? cmdUptime(username) : null;
       case '!dice':
-      case '!des':       return cmdDice(username, parts);
+      case '!des':       return (await db.getSetting('dice_enabled')) ? cmdDice(username, parts) : null;
       case '!rps':
-      case '!pfc':       return cmdRPS(username, parts);
+      case '!pfc':       return (await db.getSetting('dice_enabled')) ? cmdRPS(username, parts) : null;
       case '!followage': return cmdFollowage(username, parts);
     }
     return;
@@ -416,7 +423,7 @@ async function cmdShoutout(username, parts) {
 // ─── Uptime ───────────────────────────────────────────────────────────────────
 
 async function cmdUptime(username) {
-  if (!streamStartTime) return sendChat('Le stream n'est pas encore en ligne.');
+  if (!streamStartTime) return sendChat('Stream hors ligne actuellement.');
   const diff = Math.floor((Date.now() - streamStartTime) / 1000);
   const h = Math.floor(diff / 3600);
   const m = Math.floor((diff % 3600) / 60);
@@ -451,6 +458,32 @@ async function cmdFollowage(username, parts) {
 
 // ─── Announcements automatiques ───────────────────────────────────────────────
 
+// ─── Followers ───────────────────────────────────────────────────────────────
+
+async function checkFollowers() {
+  try {
+    const res = await axios.get(`https://kick.com/api/v2/channels/${CONFIG.channel}`, {
+      headers: { 'Accept': 'application/json', 'User-Agent': 'Mozilla/5.0' },
+      timeout: 8000,
+    });
+    const count = res.data?.followers_count || res.data?.followersCount || 0;
+    if (lastFollowerCount > 0 && count > lastFollowerCount) {
+      const newFollowers = count - lastFollowerCount;
+      console.log(`[FOLLOW] +${newFollowers} follower(s) ! Total: ${count}`);
+      if (isLive && await db.getSetting('follow_alerts')) {
+        const msg = newFollowers === 1
+          ? `Merci pour le follow ! On est maintenant ${count} followers !`
+          : `+${newFollowers} nouveaux followers ! On est maintenant ${count} !`;
+        await sendChat(msg);
+      }
+    }
+    if (count > 0) lastFollowerCount = count;
+    return count;
+  } catch(err) {
+    return lastFollowerCount;
+  }
+}
+
 async function startAnnouncements() {
   // Arrêter les anciens timers
   Object.values(announcementIntervals).forEach(t => clearInterval(t));
@@ -461,6 +494,7 @@ async function startAnnouncements() {
     if (!ann.enabled) continue;
     announcementIntervals[ann.id] = setInterval(async () => {
       if (!isLive) return;
+      if (!await db.getSetting('announcements_enabled')) return;
       await sendChat(ann.message);
       await db.updateAnnouncementSent(ann.id);
     }, ann.interval_ms);
@@ -558,6 +592,7 @@ function startPointsTracker() {
 
 async function distributePoints() {
   if (!isLive) { console.log('[POINTS] Hors ligne — pas de points.'); return; }
+  if (!await db.getSetting('points_enabled')) { console.log('[POINTS] Désactivé.'); return; }
   const viewers = await db.getActiveViewers(120);
   if (!viewers.length) { console.log('[POINTS] Aucun viewer actif.'); return; }
   for (const v of viewers) await db.addPoints(v.username, CONFIG.pointsAmount, 'watch_time');

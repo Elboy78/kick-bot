@@ -139,6 +139,23 @@ app.post('/api/admin/banned-words',    requireAuth, async (req,res) => { try { c
 app.delete('/api/admin/banned-words/:id', requireAuth, async (req,res) => { try { await db.deleteBannedWord(req.params.id); res.json({success:true}); } catch(e){res.status(500).json({error:e.message}); }});
 app.post('/api/admin/banned-words/toggle', requireAuth, async (req,res) => { try { const {id,enabled}=req.body; await db.toggleBannedWord(id,enabled); res.json({success:true}); } catch(e){res.status(500).json({error:e.message}); }});
 
+// Bot settings
+app.get('/api/bot-settings',              async (req,res) => { try { res.json({data: await db.getAllSettings(), meta: db.DEFAULT_SETTINGS}); } catch(e){res.json({data:{},meta:{}}); }});
+app.post('/api/admin/bot-settings',       async (req,res) => { try { const {key,enabled}=req.body; if(!key) return res.status(400).json({error:'key requis'}); await db.setSetting(key,enabled); res.json({success:true}); } catch(e){res.status(500).json({error:e.message}); }});
+
+// Followers
+app.get('/api/followers', async (req, res) => {
+  try {
+    const axios = require('axios');
+    const r = await axios.get(`https://kick.com/api/v2/channels/${process.env.KICK_CHANNEL}`, {
+      headers: { 'Accept': 'application/json', 'User-Agent': 'Mozilla/5.0' },
+      timeout: 6000,
+    });
+    const count = r.data?.followers_count || r.data?.followersCount || 0;
+    res.json({ count });
+  } catch(e) { res.json({ count: 0 }); }
+});
+
 // Live force
 let forcedLiveStatus = null;
 app.post('/api/admin/live/force', requireAuth, (req,res) => { const {status}=req.body; forcedLiveStatus=status==='on'?true:status==='off'?false:null; res.json({success:true,forced:forcedLiveStatus}); });
