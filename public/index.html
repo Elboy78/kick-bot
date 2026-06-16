@@ -233,6 +233,16 @@ textarea.inp{resize:vertical;line-height:1.5}
 .histrow{display:flex;align-items:center;gap:12px;padding:8px 0;border-bottom:1px solid var(--b1);font-size:11px}
 .histrow:last-child{border-bottom:none}
 
+/* ══ LIGHT MODE ══ */
+body.light{
+  --bg:#f1f5f9;--s1:#ffffff;--s2:#f8fafc;--s3:#f1f5f9;--s4:#e2e8f0;
+  --b1:#e2e8f025;--b2:#cbd5e140;--b3:#94a3b860;
+  --text:#0f172a;--muted:#475569;--muted2:#94a3b8;
+}
+body.light aside{box-shadow:2px 0 12px #0000000a}
+body.light .sb-channel{background:linear-gradient(135deg,#dcfce7,#dbeafe)}
+body.light topbar{box-shadow:0 1px 6px #0000000a}
+
 /* ══ SCROLLBAR ══ */
 ::-webkit-scrollbar{width:3px;height:3px}
 ::-webkit-scrollbar-track{background:transparent}
@@ -293,6 +303,7 @@ hr.div{border:none;border-top:1px solid var(--b1);margin:12px 0}
   <button class="nav-item" onclick="showPage('commands')"><span class="nav-ico-wrap">💬</span><span>Commandes</span></button>
   <button class="nav-item" onclick="showPage('historique')"><span class="nav-ico-wrap">📅</span><span>Historique</span></button>
   <button class="nav-item" onclick="showPage('admin')"><span class="nav-ico-wrap">⚙️</span><span>Admin</span></button>
+  <button class="nav-item" onclick="showPage('settings')"><span class="nav-ico-wrap">🔧</span><span>Paramètres</span></button>
 
   <div class="sb-footer">
     <button class="sb-action-btn live-auto" id="live-toggle-btn" onclick="toggleForceLive()">
@@ -642,6 +653,155 @@ hr.div{border:none;border-top:1px solid var(--b1);margin:12px 0}
   </div>
 </div>
 
+<!-- ══ SETTINGS ══ -->
+<div class="page" id="page-settings">
+  <div class="g2">
+    <div>
+      <!-- Apparence -->
+      <div class="card">
+        <div class="chd"><div class="ctitle">🎨 Apparence</div></div>
+
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--b1)">
+          <div>
+            <div style="font-size:12px;font-weight:600;color:var(--text)">Mode d'affichage</div>
+            <div style="font-size:10px;color:var(--muted);margin-top:2px">Choisir entre le thème sombre et clair</div>
+          </div>
+          <div style="display:flex;gap:6px">
+            <button class="btn btn-sm" id="theme-dark" onclick="setTheme('dark')" style="background:var(--green);color:#000;font-weight:700">🌙 Dark</button>
+            <button class="btn btn-ghost btn-sm" id="theme-light" onclick="setTheme('light')">☀️ Light</button>
+          </div>
+        </div>
+
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--b1)">
+          <div>
+            <div style="font-size:12px;font-weight:600;color:var(--text)">Couleur d'accent</div>
+            <div style="font-size:10px;color:var(--muted);margin-top:2px">Couleur principale de l'interface</div>
+          </div>
+          <div style="display:flex;gap:6px;align-items:center">
+            <button onclick="setAccent('#22c55e')" style="width:22px;height:22px;border-radius:50%;background:#22c55e;border:2px solid #fff2;cursor:pointer" title="Vert"></button>
+            <button onclick="setAccent('#3b82f6')" style="width:22px;height:22px;border-radius:50%;background:#3b82f6;border:2px solid #fff2;cursor:pointer" title="Bleu"></button>
+            <button onclick="setAccent('#8b5cf6')" style="width:22px;height:22px;border-radius:50%;background:#8b5cf6;border:2px solid #fff2;cursor:pointer" title="Violet"></button>
+            <button onclick="setAccent('#f59e0b')" style="width:22px;height:22px;border-radius:50%;background:#f59e0b;border:2px solid #fff2;cursor:pointer" title="Or"></button>
+            <button onclick="setAccent('#ef4444')" style="width:22px;height:22px;border-radius:50%;background:#ef4444;border:2px solid #fff2;cursor:pointer" title="Rouge"></button>
+            <button onclick="setAccent('#06b6d4')" style="width:22px;height:22px;border-radius:50%;background:#06b6d4;border:2px solid #fff2;cursor:pointer" title="Cyan"></button>
+          </div>
+        </div>
+
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 0">
+          <div>
+            <div style="font-size:12px;font-weight:600;color:var(--text)">Taille de la police</div>
+            <div style="font-size:10px;color:var(--muted);margin-top:2px">Ajuster la lisibilité du texte</div>
+          </div>
+          <div style="display:flex;gap:6px">
+            <button class="btn btn-ghost btn-sm" onclick="setFontSize(12)">S</button>
+            <button class="btn btn-ghost btn-sm" id="fs-active" onclick="setFontSize(13)" style="border-color:var(--green);color:var(--green)">M</button>
+            <button class="btn btn-ghost btn-sm" onclick="setFontSize(15)">L</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Langue -->
+      <div class="card">
+        <div class="chd"><div class="ctitle">🌍 Langue</div></div>
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--b1)">
+          <div>
+            <div style="font-size:12px;font-weight:600;color:var(--text)">Langue de l'interface</div>
+            <div style="font-size:10px;color:var(--muted);margin-top:2px">Langue d'affichage du panel</div>
+          </div>
+          <select class="inp" style="width:140px" onchange="setLanguage(this.value)" id="lang-select">
+            <option value="fr">🇫🇷 Français</option>
+            <option value="en">🇬🇧 English</option>
+            <option value="es">🇪🇸 Español</option>
+          </select>
+        </div>
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 0">
+          <div>
+            <div style="font-size:12px;font-weight:600;color:var(--text)">Langue du bot dans le chat</div>
+            <div style="font-size:10px;color:var(--muted);margin-top:2px">Langue des réponses du bot</div>
+          </div>
+          <select class="inp" style="width:140px" id="bot-lang-select">
+            <option value="fr">🇫🇷 Français</option>
+            <option value="en">🇬🇧 English</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- Notifications -->
+      <div class="card">
+        <div class="chd"><div class="ctitle">🔔 Notifications</div></div>
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--b1)">
+          <div>
+            <div style="font-size:12px;font-weight:600;color:var(--text)">Notifications navigateur</div>
+            <div style="font-size:10px;color:var(--muted);margin-top:2px">Alertes quand quelqu'un rejoint le lobby</div>
+          </div>
+          <label class="toggle"><input type="checkbox" id="notif-toggle" onchange="toggleNotifs(this.checked)"><span class="tsl"></span></label>
+        </div>
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 0">
+          <div>
+            <div style="font-size:12px;font-weight:600;color:var(--text)">Son lors d'une commande</div>
+            <div style="font-size:10px;color:var(--muted);margin-top:2px">Bip quand un viewer tape une commande</div>
+          </div>
+          <label class="toggle"><input type="checkbox" id="sound-toggle"><span class="tsl"></span></label>
+        </div>
+      </div>
+    </div>
+
+    <div>
+      <!-- Bot -->
+      <div class="card">
+        <div class="chd"><div class="ctitle">🤖 Configuration du bot</div></div>
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--b1)">
+          <div>
+            <div style="font-size:12px;font-weight:600;color:var(--text)">Points par intervalle</div>
+            <div style="font-size:10px;color:var(--muted);margin-top:2px">Points gagnés toutes les 5 minutes</div>
+          </div>
+          <div style="display:flex;align-items:center;gap:6px">
+            <input type="number" class="inp inp-sm" id="pts-interval" value="10" min="1" max="100" style="width:60px;text-align:center">
+            <span style="font-size:10px;color:var(--muted)">pts</span>
+          </div>
+        </div>
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--b1)">
+          <div>
+            <div style="font-size:12px;font-weight:600;color:var(--text)">Intervalle de distribution</div>
+            <div style="font-size:10px;color:var(--muted);margin-top:2px">Fréquence de distribution des points</div>
+          </div>
+          <div style="display:flex;gap:5px">
+            <button class="btn btn-ghost btn-sm" onclick="setInterval_pts(300000)">5 min</button>
+            <button class="btn btn-ghost btn-sm" onclick="setInterval_pts(600000)">10 min</button>
+            <button class="btn btn-ghost btn-sm" onclick="setInterval_pts(900000)">15 min</button>
+          </div>
+        </div>
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 0">
+          <div>
+            <div style="font-size:12px;font-weight:600;color:var(--text)">Préfixe des commandes</div>
+            <div style="font-size:10px;color:var(--muted);margin-top:2px">Caractère déclencheur des commandes</div>
+          </div>
+          <input type="text" class="inp inp-sm" value="!" style="width:50px;text-align:center" maxlength="2">
+        </div>
+      </div>
+
+      <!-- Infos version -->
+      <div class="card">
+        <div class="chd"><div class="ctitle">ℹ️ À propos</div></div>
+        <div style="display:flex;flex-direction:column;gap:8px">
+          <div style="display:flex;justify-content:space-between;font-size:11px"><span style="color:var(--muted)">Version</span><span style="font-weight:600;color:var(--green)">Bot7uP v2.0</span></div>
+          <div style="display:flex;justify-content:space-between;font-size:11px"><span style="color:var(--muted)">Base de données</span><span style="font-weight:600">Turso (LibSQL)</span></div>
+          <div style="display:flex;justify-content:space-between;font-size:11px"><span style="color:var(--muted)">Hébergement</span><span style="font-weight:600">Render.com</span></div>
+          <div style="display:flex;justify-content:space-between;font-size:11px"><span style="color:var(--muted)">Chaîne</span><span style="font-weight:600;color:var(--green)">fack7up</span></div>
+          <div style="display:flex;justify-content:space-between;font-size:11px"><span style="color:var(--muted)">ID Chatroom</span><span style="font-weight:600">596440</span></div>
+        </div>
+      </div>
+
+      <!-- Reset settings -->
+      <div class="danger">
+        <div class="danger-t">⚠ Réinitialisation</div>
+        <p style="font-size:10px;color:var(--muted);margin-bottom:8px">Remet les préférences d'affichage aux valeurs par défaut.</p>
+        <button class="btn btn-red" style="width:100%;justify-content:center" onclick="resetSettings()">🔄 Réinitialiser les paramètres</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- ══ ADMIN ══ -->
 <div class="page" id="page-admin">
   <div class="g2">
@@ -702,7 +862,7 @@ hr.div{border:none;border-top:1px solid var(--b1);margin:12px 0}
 const API = '';
 const MEDALS = ['🥇','🥈','🥉'];
 let lbData = [], levels = [];
-const PAGE_TITLES = {dashboard:'Dashboard',classement:'Classement',lobby:'Lobby',jeux:'Jeux',objectifs:'Objectifs',dbd:'Dead by Daylight',moderation:'Modération',commands:'Commandes',historique:'Historique',admin:'Administration'};
+const PAGE_TITLES = {dashboard:'Dashboard',classement:'Classement',lobby:'Lobby',jeux:'Jeux',objectifs:'Objectifs',dbd:'Dead by Daylight',moderation:'Modération',commands:'Commandes',historique:'Historique',admin:'Administration',settings:'Paramètres'};
 
 // ── Navigation ─────────────────────────────────────────────────────────────────
 function showPage(name) {
@@ -722,6 +882,7 @@ function showPage(name) {
   if(name==='commands') { loadCommandsPage(); loadSystemCommands(); }
   if(name==='dbd') initDBD();
   if(name==='moderation') loadBannedWords();
+  if(name==='settings') initSettings();
   if(name==='lobby') loadLobby();
 }
 
@@ -1615,6 +1776,126 @@ function clearDBDHistory() {
   renderDBDHistory();
 }
 
+// ── Settings ──────────────────────────────────────────────────────────────────
+
+const TRANSLATIONS = {
+  fr: { dashboard:'Dashboard', classement:'Classement', lobby:'Lobby', jeux:'Jeux', objectifs:'Objectifs', dbd:'Dead by Daylight', moderation:'Modération', commands:'Commandes', historique:'Historique', admin:'Administration', settings:'Paramètres' },
+  en: { dashboard:'Dashboard', classement:'Leaderboard', lobby:'Lobby', jeux:'Games', objectifs:'Goals', dbd:'Dead by Daylight', moderation:'Moderation', commands:'Commands', historique:'History', admin:'Admin', settings:'Settings' },
+  es: { dashboard:'Panel', classement:'Clasificación', lobby:'Sala', jeux:'Juegos', objectifs:'Objetivos', dbd:'Dead by Daylight', moderation:'Moderación', commands:'Comandos', historique:'Historial', admin:'Admin', settings:'Ajustes' },
+};
+let currentLang = localStorage.getItem('bot7up_lang') || 'fr';
+let currentTheme = localStorage.getItem('bot7up_theme') || 'dark';
+let currentAccent = localStorage.getItem('bot7up_accent') || '#22c55e';
+
+function initSettings() {
+  // Langue
+  const ls = document.getElementById('lang-select');
+  if(ls) ls.value = currentLang;
+  // Thème boutons
+  updateThemeButtons();
+  // Accent
+  applyAccent(currentAccent, false);
+}
+
+function setTheme(t) {
+  currentTheme = t;
+  localStorage.setItem('bot7up_theme', t);
+  if(t === 'light') document.body.classList.add('light');
+  else document.body.classList.remove('light');
+  updateThemeButtons();
+  toast(t === 'dark' ? '🌙 Mode sombre activé' : '☀️ Mode clair activé');
+}
+
+function updateThemeButtons() {
+  const d = document.getElementById('theme-dark');
+  const l = document.getElementById('theme-light');
+  if(!d || !l) return;
+  if(currentTheme === 'dark') {
+    d.style.background = 'var(--green)'; d.style.color = '#000';
+    l.style.background = ''; l.style.color = '';
+  } else {
+    l.style.background = 'var(--green)'; l.style.color = '#000';
+    d.style.background = ''; d.style.color = '';
+  }
+}
+
+function setAccent(color) {
+  currentAccent = color;
+  localStorage.setItem('bot7up_accent', color);
+  applyAccent(color, true);
+}
+
+function applyAccent(color, notify) {
+  // Calculer variantes
+  const hex = color.replace('#','');
+  const r = parseInt(hex.slice(0,2),16), g = parseInt(hex.slice(2,4),16), b = parseInt(hex.slice(4,6),16);
+  document.documentElement.style.setProperty('--green', color);
+  document.documentElement.style.setProperty('--green-l', color);
+  document.documentElement.style.setProperty('--green-bg', color+'15');
+  document.documentElement.style.setProperty('--green-brd', color+'35');
+  if(notify) toast('🎨 Couleur mise à jour');
+}
+
+function setFontSize(size) {
+  document.body.style.fontSize = size + 'px';
+  localStorage.setItem('bot7up_fontsize', size);
+  document.querySelectorAll('.btn-sm[onclick*="setFontSize"]').forEach(b => {
+    b.style.borderColor = ''; b.style.color = '';
+  });
+  toast('Police : ' + size + 'px');
+}
+
+function setLanguage(lang) {
+  currentLang = lang;
+  localStorage.setItem('bot7up_lang', lang);
+  const t = TRANSLATIONS[lang] || TRANSLATIONS.fr;
+  // Mettre à jour les noms dans la nav
+  document.querySelectorAll('.nav-item').forEach(btn => {
+    const onclick = btn.getAttribute('onclick') || '';
+    const match = onclick.match(/showPage\('([^']+)'\)/);
+    if(match && t[match[1]]) {
+      const span = btn.querySelector('span:last-child');
+      if(span) span.textContent = t[match[1]];
+    }
+  });
+  toast('🌍 Langue : ' + {fr:'Français',en:'English',es:'Español'}[lang]);
+}
+
+function setInterval_pts(ms) { toast('Intervalle: ' + ms/60000 + ' min (modifier POINTS_INTERVAL_MS dans Render)'); }
+
+function toggleNotifs(enabled) {
+  if(enabled && Notification.permission !== 'granted') {
+    Notification.requestPermission().then(p => {
+      if(p === 'granted') toast('🔔 Notifications activées');
+      else { document.getElementById('notif-toggle').checked = false; toast('Notifications refusées', false); }
+    });
+  }
+  localStorage.setItem('bot7up_notifs', enabled ? '1' : '0');
+}
+
+function resetSettings() {
+  if(!confirm('Réinitialiser tous les paramètres ?')) return;
+  ['bot7up_lang','bot7up_theme','bot7up_accent','bot7up_fontsize','bot7up_notifs'].forEach(k => localStorage.removeItem(k));
+  currentLang = 'fr'; currentTheme = 'dark'; currentAccent = '#22c55e';
+  document.body.classList.remove('light');
+  document.body.style.fontSize = '';
+  document.documentElement.style.removeProperty('--green');
+  document.documentElement.style.removeProperty('--green-l');
+  document.documentElement.style.removeProperty('--green-bg');
+  document.documentElement.style.removeProperty('--green-brd');
+  initSettings();
+  toast('🔄 Paramètres réinitialisés');
+}
+
+// Appliquer les préférences sauvegardées au chargement
+function applyStoredPrefs() {
+  if(currentTheme === 'light') document.body.classList.add('light');
+  if(currentAccent !== '#22c55e') applyAccent(currentAccent, false);
+  const fs = localStorage.getItem('bot7up_fontsize');
+  if(fs) document.body.style.fontSize = fs + 'px';
+  if(currentLang !== 'fr') setLanguage(currentLang);
+}
+
 // ── Modération ────────────────────────────────────────────────────────────────
 
 async function loadBannedWords() {
@@ -1785,6 +2066,7 @@ function logout() {
 }
 
 // Vérifier auth puis charger
+applyStoredPrefs();
 checkPanelAuth().then(ok => { if (ok) { loadAll(); } });
 setInterval(loadAll,30000);
 setInterval(loadLiveStatus, 60000);
