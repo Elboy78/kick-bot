@@ -122,12 +122,38 @@ body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--t
       <div class="msg" id="step1b-msg"></div>
     </div>
 
-    <!-- ── ÉTAPE 2 : Vérification Kick en cours ── -->
+    <!-- ── ÉTAPE 2 : Spinner (unused) ── -->
     <div class="step" id="step-2">
       <div class="s-icon">🔄</div>
-      <div class="s-title">Vérification en cours…</div>
-      <div class="s-sub">On récupère ton identité depuis Kick.<br>Ne ferme pas cette fenêtre.</div>
+      <div class="s-title">Connexion…</div>
       <div class="spinner"></div>
+    </div>
+
+    <!-- ── ÉTAPE 2b : Guidage connexion Kick ── -->
+    <div class="step" id="step-2b">
+      <div style="background:linear-gradient(135deg,#0c1f10,#0d1a24);border:1px solid #22c55e30;border-radius:10px;padding:14px;margin-bottom:16px">
+        <div style="font-size:12px;font-weight:700;color:#22c55e;margin-bottom:10px">📋 Étapes à suivre</div>
+        <div style="display:flex;flex-direction:column;gap:8px">
+          <div style="display:flex;align-items:flex-start;gap:8px;font-size:11px;color:#8b95b0">
+            <span style="background:#22c55e;color:#000;border-radius:50%;width:18px;height:18px;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:10px;flex-shrink:0">1</span>
+            Dans la popup Kick qui vient de s'ouvrir, <b style="color:#e8edf5">connecte-toi</b> avec ton compte
+          </div>
+          <div style="display:flex;align-items:flex-start;gap:8px;font-size:11px;color:#8b95b0">
+            <span style="background:#22c55e;color:#000;border-radius:50%;width:18px;height:18px;display:flex;align-items:center;justify-content:function:center;font-weight:700;font-size:10px;flex-shrink:0">2</span>
+            Une fois connecté, <b style="color:#e8edf5">clique sur ton avatar</b> en haut à droite pour voir ton pseudo
+          </div>
+          <div style="display:flex;align-items:flex-start;gap:8px;font-size:11px;color:#8b95b0">
+            <span style="background:#22c55e;color:#000;border-radius:50%;width:18px;height:18px;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:10px;flex-shrink:0">3</span>
+            Reviens ici et <b style="color:#e8edf5">entre ton pseudo</b> ci-dessous pour confirmer
+          </div>
+        </div>
+      </div>
+      <label class="lbl">Ton pseudo Kick (confirmé après connexion)</label>
+      <input class="inp" id="kick-confirm-user" placeholder="Ex: elboy78" autocomplete="off" onkeydown="if(event.key==='Enter')confirmKickLogin()">
+      <button class="btn-primary" onclick="confirmKickLogin()">Confirmer mon identité →</button>
+      <button class="btn-back" onclick="if(kickPopup&&!kickPopup.closed)kickPopup.close();showStep('step-1')">← Annuler</button>
+      <div class="msg" id="step2b-msg"></div>
+      <div style="font-size:10px;color:#4a5370;text-align:center;margin-top:10px">La popup Kick est ouverte — connecte-toi dedans puis reviens ici</div>
     </div>
 
     <!-- ── ÉTAPE 3 : Compte vérifié, entrer mot de passe ── -->
@@ -210,118 +236,44 @@ function showMsg(id, msg, type) {
 // ── Connexion Kick via popup ──────────────────────────────────────────────────
 
 function connectKick() {
-  showStep('step-2');
-
   // Ouvrir kick.com dans un popup
-  const w = 520, h = 620;
-  const left = (screen.width - w) / 2;
-  const top  = (screen.height - h) / 2;
+  const w = 500, h = 600;
+  const left = Math.round((screen.width - w) / 2);
+  const top  = Math.round((screen.height - h) / 2);
   kickPopup = window.open(
-    'https://kick.com/login',
+    'https://kick.com',
     'kick_login',
     `width=${w},height=${h},left=${left},top=${top},resizable=yes,scrollbars=yes`
   );
 
   if (!kickPopup) {
-    showStep('step-1');
-    showMsg('step1-msg', 'Popup bloqué — autorise les popups pour ce site', 'err');
+    showMsg('step1-msg', 'Popup bloquée — autorise les popups dans ton navigateur puis réessaie', 'err');
     return;
   }
 
-  // Vérifier toutes les 500ms si l'utilisateur est connecté
-  let attempts = 0;
-  const maxAttempts = 120; // 60 secondes max
+  // Passer à l'étape de vérification manuelle guidée
+  showStep('step-2b');
 
-  const checker = setInterval(async () => {
-    attempts++;
-
-    // Popup fermée manuellement
-    if (kickPopup.closed && attempts > 3) {
-      clearInterval(checker);
-      showStep('step-1');
-      showMsg('step1-msg', 'Connexion annulée', 'warn');
-      return;
+  // Surveiller si la popup est fermée
+  const closed = setInterval(() => {
+    if (kickPopup && kickPopup.closed) {
+      clearInterval(closed);
     }
-
-    if (attempts > maxAttempts) {
-      clearInterval(checker);
-      showStep('step-1');
-      showMsg('step1-msg', 'Délai dépassé — réessaie', 'err');
-      if (kickPopup && !kickPopup.closed) kickPopup.close();
-      return;
-    }
-
-    // Essayer de lire les cookies de la popup (possible si même domaine)
-    try {
-      // Tenter d'accéder à l'URL de la popup
-      const popupUrl = kickPopup.location?.href || '';
-
-      // Si on est redirigé vers la page d'accueil = connecté
-      if (popupUrl && (popupUrl.includes('kick.com') && !popupUrl.includes('/login'))) {
-        clearInterval(checker);
-
-        // Récupérer l'identité via l'API Kick depuis le navigateur
-        try {
-          // Injecter du JS dans la popup pour récupérer l'utilisateur
-          const userInfo = kickPopup.eval(`
-            (async () => {
-              try {
-                const r = await fetch('https://kick.com/api/v1/user', {credentials: 'include'});
-                const d = await r.json();
-                return JSON.stringify({username: d.username || d.streamer?.username, id: d.id});
-              } catch(e) { return null; }
-            })()
-          `);
-
-          const result = await userInfo;
-          if (result) {
-            const data = JSON.parse(result);
-            if (data.username) {
-              kickPopup.close();
-              verifiedUsername = data.username;
-              document.getElementById('kick-avatar').textContent = data.username[0].toUpperCase();
-              document.getElementById('kick-username-display').textContent = data.username;
-              showStep('step-3');
-              return;
-            }
-          }
-        } catch(e) {
-          // Si l'injection échoue, essayer via cookie
-          await tryGetUserFromCookie();
-        }
-      }
-    } catch(e) {
-      // Cross-origin — normale tant que sur kick.com/login
-    }
-  }, 500);
+  }, 1000);
 }
 
-async function tryGetUserFromCookie() {
-  // Demander à la popup d'appeler l'API et nous retourner le résultat
-  try {
-    if (!kickPopup || kickPopup.closed) return false;
-
-    kickPopup.document.body.innerHTML += `
-      <script>
-        fetch('https://kick.com/api/v1/user', {credentials: 'include'})
-          .then(r => r.json())
-          .then(d => { window.opener.postMessage({type:'kick_user',username:d.username||d.streamer_channel?.slug,id:d.id}, '*'); })
-          .catch(() => {});
-      <\/script>`;
-    return true;
-  } catch(e) { return false; }
-}
-
-// Écouter le message de la popup
-window.addEventListener('message', (event) => {
-  if (event.data?.type === 'kick_user' && event.data.username) {
-    if (kickPopup && !kickPopup.closed) kickPopup.close();
-    verifiedUsername = event.data.username;
-    document.getElementById('kick-avatar').textContent = event.data.username[0].toUpperCase();
-    document.getElementById('kick-username-display').textContent = event.data.username;
-    showStep('step-3');
+function confirmKickLogin() {
+  const username = document.getElementById('kick-confirm-user').value.trim();
+  if (!username || username.length < 2) {
+    showMsg('step2b-msg', 'Entre ton pseudo Kick', 'err');
+    return;
   }
-});
+  if (kickPopup && !kickPopup.closed) kickPopup.close();
+  verifiedUsername = username;
+  document.getElementById('kick-avatar').textContent = username[0].toUpperCase();
+  document.getElementById('kick-username-display').textContent = username;
+  showStep('step-3');
+}
 
 // ── Soumission avec mot de passe ──────────────────────────────────────────────
 
