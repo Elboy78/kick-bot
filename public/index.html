@@ -1003,16 +1003,8 @@ async function loadAll() {
 }
 
 async function loadFollowers() {
-  try {
-    const r = await fetch('/api/followers');
-    const d = await r.json();
-    const count = d.count || 0;
-    const fmt = count >= 1000 ? (count/1000).toFixed(1) + 'k' : count;
-    const el1 = document.getElementById('s-followers');
-    const el2 = document.getElementById('sb-followers');
-    if (el1) el1.textContent = fmt;
-    if (el2) el2.textContent = fmt;
-  } catch(e) {}
+  // Les followers sont maintenant chargés dans loadLiveStatus directement
+  // Cette fonction reste pour compatibilité
 }
 
 async function loadDashSessions() {
@@ -1427,30 +1419,60 @@ const SYS_CMD_DESCS = {'!points':'Affiche les points et le niveau','!top':'Top 5
 
 async function loadLiveStatus() {
   try {
-    const r = await fetch('/api/live');
+    // Appel direct depuis le navigateur — Kick ne bloque pas les navigateurs
+    const r = await fetch('https://kick.com/api/v2/channels/fack7up');
     const d = await r.json();
+
+    const live      = !!d.livestream;
+    const viewers   = d.livestream?.viewer_count ?? 0;
+    const followers = d.followersCount ?? d.followers_count ?? 0;
+
+    // Mettre à jour le pill live
     const pill = document.getElementById('live-pill');
     const txt  = document.getElementById('live-text');
     const dot  = document.getElementById('live-dot');
-    if (!pill || !txt) return;
-    if (d.live) {
-      pill.className = 'live-badge on';
-      if(dot) dot.className = 'live-dot blink';
-      txt.textContent = 'EN LIVE' + (d.viewers ? ' · ' + d.viewers + ' viewers' : '');
-    } else {
-      pill.className = 'live-badge off';
-      if(dot) dot.className = 'live-dot';
-      txt.textContent = 'Hors ligne';
+    if (pill && txt) {
+      if (live) {
+        pill.className = 'live-badge on';
+        if(dot) dot.className = 'live-dot blink';
+        txt.textContent = 'EN LIVE' + (viewers ? ' · ' + viewers + ' viewers' : '');
+      } else {
+        pill.className = 'live-badge off';
+        if(dot) dot.className = 'live-dot';
+        txt.textContent = 'Hors ligne';
+      }
     }
-    // Mettre à jour followers si disponible dans la réponse
-    if (d.followers) {
-      const fmt = d.followers >= 1000 ? (d.followers/1000).toFixed(1)+'k' : d.followers;
-      const el1 = document.getElementById('s-followers');
-      const el2 = document.getElementById('sb-followers');
-      if(el1) el1.textContent = fmt;
-      if(el2) el2.textContent = fmt;
+
+    // Mettre à jour followers partout
+    if (followers > 0) {
+      const fmt = followers >= 1000 ? (followers/1000).toFixed(1)+'k' : followers;
+      ['s-followers','sb-followers'].forEach(id => {
+        const el = document.getElementById(id);
+        if(el) el.textContent = fmt;
+      });
     }
-  } catch(e) {}
+
+    // Envoyer l'état au serveur pour que le bot sache si le stream est live
+    fetch('/api/live/update', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ live, viewers, followers })
+    }).catch(() => {});
+
+  } catch(e) {
+    // Fallback vers l'API serveur si l'appel direct échoue
+    try {
+      const r2 = await fetch('/api/live');
+      const d2 = await r2.json();
+      const pill = document.getElementById('live-pill');
+      const txt  = document.getElementById('live-text');
+      const dot  = document.getElementById('live-dot');
+      if(pill && txt) {
+        if(d2.live) { pill.className='live-badge on'; if(dot) dot.className='live-dot blink'; txt.textContent='EN LIVE'; }
+        else { pill.className='live-badge off'; if(dot) dot.className='live-dot'; txt.textContent='Hors ligne'; }
+      }
+    } catch(e2) {}
+  }
 }
 
 async function loadSystemCommands() {

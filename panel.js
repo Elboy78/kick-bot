@@ -181,6 +181,15 @@ app.get('/api/followers', async (req, res) => {
   } catch(e) { res.json({ count: 0 }); }
 });
 
+// Recevoir l'état live depuis le navigateur (qui peut appeler Kick sans être bloqué)
+let liveFromBrowser = { live: false, viewers: 0, followers: 0, updatedAt: null };
+
+app.post('/api/live/update', (req, res) => {
+  const { live, viewers, followers } = req.body;
+  liveFromBrowser = { live: !!live, viewers: viewers||0, followers: followers||0, updatedAt: Date.now() };
+  res.json({ success: true });
+});
+
 // Live force
 let forcedLiveStatus = null;
 app.post('/api/admin/live/force', requireAuth, (req,res) => { const {status}=req.body; forcedLiveStatus=status==='on'?true:status==='off'?false:null; res.json({success:true,forced:forcedLiveStatus}); });
@@ -189,16 +198,24 @@ app.get('/api/admin/live/status', requireAuth, (req,res) => res.json({forced:for
 // Live status
 app.get('/api/live', async (req,res) => {
   if (forcedLiveStatus !== null) return res.json({live:forcedLiveStatus,viewers:0,forced:true});
+
+  // Utiliser les données du navigateur si fraîches (< 2 min)
+  if (liveFromBrowser.updatedAt && Date.now() - liveFromBrowser.updatedAt < 120000) {
+    return res.json({ ...liveFromBrowser, source: 'browser' });
+  }
+
+  // Sinon essayer l'API serveur
   try {
     const data = await fetchKickAPI(process.env.KICK_CHANNEL||'');
-    if (!data) return res.json({live:false,viewers:0,error:'api_blocked'});
+    if (!data) return res.json({ live: false, viewers: 0, error: 'api_blocked' });
     const live = data?.livestream;
     res.json({
       live: !!(live?.is_live),
       viewers: live?.viewer_count || 0,
       followers: data?.followers_count || data?.followersCount || 0,
+      source: 'server',
     });
-  } catch(e) { res.json({live:false,viewers:0}); }
+  } catch(e) { res.json({ live: false, viewers: 0 }); }
 });
 
 app.get('/login', (req,res) => res.sendFile(path.join(__dirname,'public','login.html')));
