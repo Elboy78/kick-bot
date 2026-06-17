@@ -589,8 +589,44 @@ async function sendChat(message) {
 
 // ─── Live check ───────────────────────────────────────────────────────────────
 
+async function fetchKickChannelOfficial() {
+  try {
+    const { token, official } = await getActiveToken();
+    if (!token || !official) return null;
+
+    const res = await axios.get(
+      `https://api.kick.com/public/v1/channels`,
+      {
+        params: { slug: CONFIG.channel },
+        headers: { 'Authorization': `Bearer ${token}`, 'Accept': 'application/json' },
+        timeout: 8000,
+      }
+    );
+    const channel = res.data?.data?.[0];
+    if (!channel) return null;
+
+    // Normaliser au même format que l'ancienne fonction interne
+    return {
+      livestream: channel.stream?.is_live ? {
+        is_live: true,
+        viewer_count: channel.stream.viewer_count || 0,
+      } : null,
+      followers_count: channel.followers_count || 0,
+    };
+  } catch(err) {
+    if (err.response?.status) {
+      console.log(`[STREAM] API officielle erreur ${err.response.status}`);
+    }
+    return null;
+  }
+}
+
 async function fetchKickChannel() {
-  // Essayer plusieurs endpoints et User-Agents
+  // Essayer l'API officielle Kick en premier (pas bloquée par Cloudflare)
+  const official = await fetchKickChannelOfficial();
+  if (official) return official;
+
+  // Repli sur l'ancienne API interne (souvent bloquée par Cloudflare depuis Render)
   const urls = [
     `https://kick.com/api/v2/channels/${CONFIG.channel}`,
     `https://kick.com/api/v1/channels/${CONFIG.channel}`,
@@ -626,7 +662,7 @@ async function fetchKickChannel() {
 async function checkLiveStatus() {
   const data = await fetchKickChannel();
   if (!data) {
-    console.log('[STREAM] API inaccessible (403) — statut conservé:', isLive ? 'LIVE' : 'OFF');
+    console.log('[STREAM] Impossible de vérifier le statut live (API officielle et interne indisponibles) — statut conservé:', isLive ? 'LIVE' : 'OFF');
     return isLive;
   }
 
