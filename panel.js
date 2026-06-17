@@ -2,10 +2,15 @@ require('dotenv').config();
 const express = require('express');
 const cors    = require('cors');
 const path    = require('path');
+const http    = require('http');
+const { Server } = require('socket.io');
+const axios   = require('axios');
 const db      = require('./database');
 
 const app    = express();
 const PORT   = parseInt(process.env.PANEL_PORT || '3000');
+const server = http.createServer(app);
+const io     = new Server(server, { cors: { origin: '*' } });
 
 app.use(cors());
 app.use(express.json());
@@ -218,10 +223,112 @@ app.get('/api/live', async (req,res) => {
   } catch(e) { res.json({ live: false, viewers: 0 }); }
 });
 
+// ════════════════════════════════════════════════════════════════════
+// TTS — Text To Speech pour les dons
+// ════════════════════════════════════════════════════════════════════
+
+const TTS_MIN_DONATION   = parseFloat(process.env.TTS_MIN_DONATION || '0');
+const TTS_MAX_TEXT_LEN   = parseInt(process.env.TTS_MAX_TEXT_LENGTH || '180');
+const TTS_WEBHOOK_SECRET = process.env.TTS_WEBHOOK_SECRET || '';
+const TTS_VOICE_ID       = process.env.ELEVENLABS_VOICE_ID || '';
+const TTS_API_KEY        = process.env.ELEVENLABS_API_KEY || '';
+
+async function generateTTSAudio(text) {
+  if (!TTS_API_KEY || !TTS_VOICE_ID) return null;
+  try {
+    const r = await axios.post(
+      `https://api.elevenlabs.io/v1/text-to-speech/${TTS_VOICE_ID}`,
+      { text, model_id: 'eleven_multilingual_v2', voice_settings: { stability: 0.5, similarity_boost: 0.75 } },
+      { headers: { 'xi-api-key': TTS_API_KEY, 'Content-Type': 'application/json' }, responseType: 'arraybuffer', timeout: 20000 }
+    );
+    return Buffer.from(r.data).toString('base64');
+  } catch(e) {
+    console.error('[TTS] Erreur ElevenLabs:', e.response?.status || e.message);
+    return null;
+  }
+}
+
+// Webhook appelé par la plateforme de dons (StreamElements, Tipeee, etc.)
+app.post('/webhook/donation', async (req, res) => {
+  try {
+    // Vérification du secret si configuré
+    if (TTS_WEBHOOK_SECRET && req.headers['x-webhook-secret'] !== TTS_WEBHOOK_SECRET) {
+      return res.status(401).json({ error: 'unauthorized' });
+    }
+
+    const username = String(req.body.username || req.body.from || 'Anonyme');
+    const amount   = parseFloat(req.body.amount || 0);
+    let message    = String(req.body.message || '').trim();
+
+    if (!await db.getSetting('tts_enabled')) {
+      return res.json({ ignored: true, reason: 'tts_disabled' });
+    }
+    if (amount < TTS_MIN_DONATION) {
+      return res.json({ ignored: true, reason: 'amount_too_low' });
+    }
+    if (!message) {
+      return res.json({ ignored: true, reason: 'empty_message' });
+    }
+    if (await db.isTTSBlacklisted(message)) {
+      await db.addTTSHistory(username, message, amount, 'blocked');
+      io.emit('tts-update');
+      return res.json({ ignored: true, reason: 'blacklisted' });
+    }
+
+    message = message.slice(0, TTS_MAX_TEXT_LEN);
+    await db.addTTSHistory(username, message, amount, 'played');
+
+    const audioBase64 = await generateTTSAudio(message);
+    io.emit('play-tts', { username, message, amount, audio: audioBase64 });
+    io.emit('tts-update');
+
+    res.json({ success: true });
+  } catch(e) {
+    console.error('[TTS] Webhook error:', e.message);
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// Test manuel depuis le panel
+app.post('/api/tts/test', async (req, res) => {
+  try {
+    const message = String(req.body.message || '').trim().slice(0, TTS_MAX_TEXT_LEN);
+    if (!message) return res.status(400).json({ error: 'message requis' });
+    if (await db.isTTSBlacklisted(message)) return res.status(400).json({ error: 'Message bloqué par la blacklist' });
+
+    await db.addTTSHistory('Test Panel', message, 0, 'test');
+    const audioBase64 = await generateTTSAudio(message);
+    io.emit('play-tts', { username: 'Test Panel', message, amount: 0, audio: audioBase64 });
+    io.emit('tts-update');
+    res.json({ success: true });
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+app.get('/api/tts/history',        async (req,res) => { try { res.json({data: await db.getTTSHistory(30)}); } catch(e){res.json({data:[]}); }});
+app.post('/api/admin/tts/clear-history', async (req,res) => { try { await db.clearTTSHistory(); res.json({success:true}); } catch(e){res.status(500).json({error:e.message}); }});
+
+app.get('/api/tts/blacklist',                  async (req,res) => { try { res.json({data: await db.getTTSBlacklist()}); } catch(e){res.json({data:[]}); }});
+app.post('/api/admin/tts/blacklist',           async (req,res) => { try { const {word}=req.body; if(!word) return res.status(400).json({error:'word requis'}); const ok=await db.addTTSBlacklistWord(word); res.json({success:ok}); } catch(e){res.status(500).json({error:e.message}); }});
+app.delete('/api/admin/tts/blacklist/:id',     async (req,res) => { try { await db.deleteTTSBlacklistWord(req.params.id); res.json({success:true}); } catch(e){res.status(500).json({error:e.message}); }});
+
+app.get('/api/tts/config', (req, res) => {
+  res.json({
+    configured: !!(TTS_API_KEY && TTS_VOICE_ID),
+    minDonation: TTS_MIN_DONATION,
+    maxTextLength: TTS_MAX_TEXT_LEN,
+  });
+});
+
+app.get('/overlay', (req,res) => res.sendFile(path.join(__dirname,'public','overlay.html')));
+
+io.on('connection', (socket) => {
+  console.log('[TTS] Overlay connecté:', socket.id);
+});
+
 app.get('/login', (req,res) => res.sendFile(path.join(__dirname,'public','login.html')));
 app.get('*', (req,res) => res.sendFile(path.join(__dirname,'public','index.html')));
 
-app.listen(PORT, () => {
+server.listen(PORT, () => {
   console.log(`╔════════════════════════════════════════╗`);
   console.log(`║  Panel Web → http://localhost:${PORT}      ║`);
   console.log(`╚════════════════════════════════════════╝`);

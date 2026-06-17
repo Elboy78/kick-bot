@@ -15,7 +15,8 @@
     "axios": "^1.6.7",
     "cors": "^2.8.5",
     "dotenv": "^16.4.4",
-    "@libsql/client": "^0.5.6"
+    "@libsql/client": "^0.5.6",
+    "socket.io": "^4.7.5"
   },
   "engines": {
     "node": "20.x"

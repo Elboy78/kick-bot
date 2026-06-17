@@ -200,6 +200,19 @@ async function initSchema() {
       enabled    INTEGER NOT NULL DEFAULT 1,
       created_at TEXT NOT NULL DEFAULT (datetime('now'))
     )`,
+    `CREATE TABLE IF NOT EXISTS tts_blacklist (
+      id         INTEGER PRIMARY KEY AUTOINCREMENT,
+      word       TEXT NOT NULL UNIQUE,
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    )`,
+    `CREATE TABLE IF NOT EXISTS tts_history (
+      id          INTEGER PRIMARY KEY AUTOINCREMENT,
+      username    TEXT,
+      message     TEXT NOT NULL,
+      amount      REAL DEFAULT 0,
+      status      TEXT NOT NULL DEFAULT 'played',
+      created_at  TEXT NOT NULL DEFAULT (datetime('now'))
+    )`,
     `CREATE TABLE IF NOT EXISTS bot_settings (
       key        TEXT PRIMARY KEY,
       value      TEXT NOT NULL DEFAULT '1',
@@ -509,6 +522,32 @@ async function deleteAccessRequest(username) {
   await run(`DELETE FROM panel_access WHERE username = ?`, [username.toLowerCase()]);
 }
 
+// ─── TTS (Text-To-Speech dons) ─────────────────────────────────────────────────
+
+async function getTTSBlacklist() { return all(`SELECT * FROM tts_blacklist ORDER BY word ASC`); }
+async function addTTSBlacklistWord(word) {
+  try { await run(`INSERT INTO tts_blacklist (word) VALUES (?)`, [word.toLowerCase().trim()]); return true; }
+  catch(e) { return false; }
+}
+async function deleteTTSBlacklistWord(id) { await run(`DELETE FROM tts_blacklist WHERE id = ?`, [id]); }
+async function isTTSBlacklisted(text) {
+  const words = await getTTSBlacklist();
+  const lower = text.toLowerCase();
+  return words.some(w => lower.includes(w.word));
+}
+
+async function getTTSHistory(limit = 30) { return all(`SELECT * FROM tts_history ORDER BY created_at DESC LIMIT ?`, [limit]); }
+async function addTTSHistory(username, message, amount, status) {
+  const db = getDB();
+  if (db.execute) {
+    const r = await db.execute({ sql: `INSERT INTO tts_history (username, message, amount, status) VALUES (?, ?, ?, ?)`, args: [username||'', message, amount||0, status||'played'] });
+    return Number(r.lastInsertRowid);
+  } else {
+    return db.prepare(`INSERT INTO tts_history (username, message, amount, status) VALUES (?, ?, ?, ?)`).run(username||'', message, amount||0, status||'played').lastInsertRowid;
+  }
+}
+async function clearTTSHistory() { await run(`DELETE FROM tts_history`); }
+
 // ─── Bot Settings ─────────────────────────────────────────────────────────────
 
 const DEFAULT_SETTINGS = {
@@ -525,6 +564,7 @@ const DEFAULT_SETTINGS = {
   'announcements_enabled': { label: 'Annonces automatiques', desc: 'Messages automatiques pendant le live', category: 'Chat' },
   'moderation_enabled': { label: 'Modération automatique', desc: 'Ban/timeout sur mots bannis', category: 'Modération' },
   'uptime_enabled':     { label: 'Commande uptime', desc: 'Permet aux viewers de voir la duree du stream avec !uptime', category: 'Chat' },
+  'tts_enabled':        { label: 'TTS Donations', desc: 'Lit les messages de dons à voix haute sur l overlay', category: 'TTS' },
 };
 
 async function getAllSettings() {
@@ -744,4 +784,6 @@ module.exports = {
   getQueue, joinQueue, removeFromQueue, clearQueue, getQueuePosition,
   createPoll, getActivePoll, votePoll, closePoll, getPolls,
   getAnnouncements, addAnnouncement, toggleAnnouncement, deleteAnnouncement, updateAnnouncementSent,
+  getTTSBlacklist, addTTSBlacklistWord, deleteTTSBlacklistWord, isTTSBlacklisted,
+  getTTSHistory, addTTSHistory, clearTTSHistory,
 };

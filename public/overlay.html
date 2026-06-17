@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<title>Bot7uP — TTS Overlay</title>
+<style>
+  *{margin:0;padding:0;box-sizing:border-box}
+  html,body{background:transparent;width:100%;height:100%;overflow:hidden;font-family:Inter,Arial,sans-serif}
+  #tts-card{
+    position:fixed;bottom:30px;left:50%;transform:translateX(-50%) translateY(20px);
+    background:linear-gradient(145deg,rgba(18,24,45,.95),rgba(11,16,32,.92));
+    border:1px solid rgba(40,255,102,.4);border-radius:18px;padding:16px 22px;
+    min-width:320px;max-width:560px;box-shadow:0 20px 60px rgba(0,0,0,.5);
+    opacity:0;transition:all .35s ease;backdrop-filter:blur(10px);
+  }
+  #tts-card.show{opacity:1;transform:translateX(-50%) translateY(0)}
+  #tts-top{display:flex;align-items:center;gap:10px;margin-bottom:8px}
+  #tts-icon{width:30px;height:30px;border-radius:50%;background:linear-gradient(135deg,#28ff66,#0a9e3f);display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0}
+  #tts-user{font-size:14px;font-weight:800;color:#fff}
+  #tts-amount{font-size:11px;font-weight:700;color:#28ff66;margin-left:auto}
+  #tts-msg{font-size:13px;color:#d8d8e8;line-height:1.4}
+</style>
+</head>
+<body>
+
+<div id="tts-card">
+  <div id="tts-top">
+    <div id="tts-icon">🔊</div>
+    <div id="tts-user">—</div>
+    <div id="tts-amount"></div>
+  </div>
+  <div id="tts-msg"></div>
+</div>
+
+<script src="/socket.io/socket.io.js"></script>
+<script>
+const socket = io();
+const card = document.getElementById('tts-card');
+let queue = [];
+let playing = false;
+
+socket.on('play-tts', data => {
+  queue.push(data);
+  if (!playing) processQueue();
+});
+
+function processQueue() {
+  if (!queue.length) { playing = false; return; }
+  playing = true;
+  const data = queue.shift();
+  showCard(data);
+
+  if (data.audio) {
+    const audio = new Audio('data:audio/mpeg;base64,' + data.audio);
+    audio.onended = () => { hideCard(); setTimeout(processQueue, 500); };
+    audio.onerror = () => { hideCard(); setTimeout(processQueue, 500); };
+    audio.play().catch(() => { hideCard(); setTimeout(processQueue, 500); });
+  } else {
+    // Pas d'audio (clé API non configurée) — affiche juste le message quelques secondes
+    setTimeout(() => { hideCard(); setTimeout(processQueue, 500); }, 4000);
+  }
+}
+
+function showCard(data) {
+  document.getElementById('tts-user').textContent = data.username || 'Anonyme';
+  document.getElementById('tts-amount').textContent = data.amount > 0 ? data.amount.toFixed(2) + ' €' : '';
+  document.getElementById('tts-msg').textContent = data.message || '';
+  card.classList.add('show');
+}
+
+function hideCard() {
+  card.classList.remove('show');
+}
+</script>
+</body>
+</html>
