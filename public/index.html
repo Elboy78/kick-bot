@@ -240,6 +240,17 @@ hr.div{border:none;border-top:1px solid var(--b1);margin:12px 0}
 ::-webkit-scrollbar-thumb{background:var(--s4);border-radius:2px}
 body.light{--bg:#f1f5f9;--s1:#ffffff;--s2:#f8fafc;--s3:#f1f5f9;--s4:#e2e8f0;--b1:#e2e8f025;--b2:#cbd5e140;--b3:#94a3b860;--text:#0f172a;--muted:#475569;--muted2:#94a3b8}
 
+/* ══ INFO CARD ══ */
+.info-card{background:linear-gradient(145deg,rgba(18,24,45,.85),rgba(11,16,32,.75));border:1px solid rgba(255,255,255,.08);border-radius:24px;padding:24px;color:white;backdrop-filter:blur(20px);box-shadow:0 20px 60px rgba(0,0,0,.35)}
+.info-card h3{margin:0 0 20px;font-size:18px;font-weight:700}
+.info-row-ic{display:flex;justify-content:space-between;align-items:center;padding:12px 0;border-bottom:1px solid rgba(255,255,255,.05)}
+.info-row-ic:last-child{border-bottom:none}
+.info-row-ic span:first-child{color:#a1a1aa;font-size:12px}
+.info-row-ic span:last-child{font-weight:600;font-size:12px}
+.ic-online{color:#22c55e;font-weight:700}
+.ic-live-badge{background:rgba(255,0,60,.12);border:1px solid rgba(255,0,60,.35);color:#ff3b5f;padding:4px 10px;border-radius:999px;font-size:11px;font-weight:800}
+.ic-offline-badge{background:rgba(100,100,120,.12);border:1px solid rgba(100,100,120,.25);color:#a1a1aa;padding:4px 10px;border-radius:999px;font-size:11px;font-weight:600}
+
 /* ══ CHART PLACEHOLDER ══ */
 .chart-wrap{background:linear-gradient(180deg,var(--purple-bg) 0%,transparent 100%);border:1px solid var(--purple-brd);border-radius:var(--r2);height:180px;display:flex;align-items:flex-end;padding:12px;gap:4px;overflow:hidden;position:relative}
 .chart-bar{flex:1;background:linear-gradient(180deg,var(--purple),#7c3aed80);border-radius:4px 4px 0 0;transition:height .6s;min-height:4px;cursor:pointer;position:relative}
@@ -408,16 +419,17 @@ body.light{--bg:#f1f5f9;--s1:#ffffff;--s2:#f8fafc;--s3:#f1f5f9;--s4:#e2e8f0;--b1
     </div>
 
     <!-- Informations -->
-    <div class="card">
-      <div class="chd"><div class="ctitle">Informations</div></div>
-      <div>
-        <div class="info-row"><span class="info-key">🔤 Préfixe</span><span class="info-val">!</span></div>
-        <div class="info-row"><span class="info-key">📺 Chaîne</span><span class="info-val">#fack7up</span></div>
-        <div class="info-row"><span class="info-key">🌐 Plateforme</span><span class="info-val">Kick</span></div>
-        <div class="info-row"><span class="info-key">🌍 Langue</span><span class="info-val">🇫🇷 Français</span></div>
-        <div class="info-row"><span class="info-key">🔧 Version</span><span class="info-val">v2.1.0</span></div>
-        <div class="info-row"><span class="info-key">💾 Base de données</span><span class="info-val">Turso</span></div>
-      </div>
+    <div class="info-card">
+      <h3>Informations</h3>
+      <div class="info-row-ic"><span>ⓘ Statut</span><span class="ic-online">● En ligne</span></div>
+      <div class="info-row-ic"><span>💬 Chaîne</span><span>fack7up</span></div>
+      <div class="info-row-ic"><span>👥 Viewers</span><span id="ic-viewers">—</span></div>
+      <div class="info-row-ic"><span>⭐ Followers</span><span id="ic-followers">—</span></div>
+      <div class="info-row-ic"><span>📡 Statut live</span><span id="ic-live-badge" class="ic-offline-badge">Hors ligne</span></div>
+      <div class="info-row-ic"><span>⏱ Uptime</span><span id="ic-uptime">—</span></div>
+      <div class="info-row-ic"><span>🎵 Préfixe</span><span>!</span></div>
+      <div class="info-row-ic"><span>🌍 Langage</span><span>🇫🇷 Français</span></div>
+      <div class="info-row-ic"><span>🔄 Version</span><span>v2.1.0</span></div>
     </div>
   </div>
 </div>
@@ -579,8 +591,7 @@ async function loadAll() {
 }
 
 async function loadFollowers() {
-  // Les followers sont maintenant chargés dans loadLiveStatus directement
-  // Cette fonction reste pour compatibilité
+  // Chargés dans loadLiveStatus
 }
 
 async function loadDashEvents() {
@@ -1072,7 +1083,34 @@ async function loadLiveStatus() {
 
     // Mettre à jour viewers sidebar
     const sbv = document.getElementById('sb-viewers');
-    if(sbv) sbv.textContent = viewers > 0 ? viewers : (live ? '—' : '0');
+    if(sbv) sbv.textContent = live ? (viewers || '0') : '—';
+
+    // Mettre à jour info-card
+    const icv = document.getElementById('ic-viewers');
+    const icf = document.getElementById('ic-followers');
+    const icb = document.getElementById('ic-live-badge');
+    const icu = document.getElementById('ic-uptime');
+    if(icv) icv.textContent = live ? (viewers || '0') : '—';
+    if(icf && followers > 0) icf.textContent = followers >= 1000 ? (followers/1000).toFixed(1)+'k' : followers;
+    if(icb) {
+      if(live) {
+        icb.className = 'ic-live-badge';
+        icb.textContent = 'EN LIVE' + (viewers ? ' - ' + viewers + ' viewers' : '');
+      } else {
+        icb.className = 'ic-offline-badge';
+        icb.textContent = 'Hors ligne';
+      }
+    }
+    // Uptime
+    if(icu && live) {
+      if(!window._streamStart) window._streamStart = Date.now();
+      const diff = Math.floor((Date.now() - window._streamStart) / 1000);
+      const h = Math.floor(diff/3600), m = Math.floor((diff%3600)/60), s = diff%60;
+      icu.textContent = h > 0 ? h+'h '+m+'m '+s+'s' : m > 0 ? m+'m '+s+'s' : s+'s';
+    } else if(icu && !live) {
+      window._streamStart = null;
+      icu.textContent = '—';
+    }
 
     // Envoyer l'état au serveur pour que le bot sache si le stream est live
     fetch('/api/live/update', {
