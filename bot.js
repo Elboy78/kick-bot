@@ -271,10 +271,9 @@ async function cmdAide(username) {
 
 async function cmdLobby(username) {
   const already = (await db.getLobby()).find(v => v.username === username.toLowerCase());
-  if (already) return sendChat(`@${username} Tu es déjà dans le lobby !`);
+  if (already) return; // déjà dans le lobby, on ne répond rien
   await db.joinLobby(username);
-  const count = (await db.getLobby()).length;
-  sendChat(`@${username} Tu rejoins le lobby ! (${count} joueur${count>1?'s':''} inscrit${count>1?'s':''})`);
+  // Ajout silencieux — pas de message dans le chat, visible directement dans le panel
 }
 
 async function cmdDuel(challenger, parts) {

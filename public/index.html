@@ -446,9 +446,9 @@ hr.div{border:none;border-top:1px solid var(--brd);margin:12px 0}
   <!-- ══ LOBBY ══ -->
   <div class="page" id="page-lobby">
     <div class="header"><div><h1>Lobby</h1><p>File de jeu en direct</p></div></div>
-    <div class="g2">
-      <div><div class="panel"><h3>🎮 Lobby — <span id="lobby-count" style="color:#28ff66">0</span> joueurs <button class="btnx btn-red btn-sm" onclick="clearLobby()">Vider</button></h3><div style="background:#0f1428;border:1px solid #171d35;border-radius:8px;padding:7px 10px;margin-bottom:10px;font-size:10px;color:#a1a1aa">Les viewers tapent <span class="cpill">!lobby</span> pour rejoindre</div><div id="lobby-list"><div class="empty"><div class="ei">🎮</div><p>Aucun joueur</p></div></div></div></div>
-      <div><div class="panel"><h3>🎡 Roue aléatoire</h3><div style="display:flex;flex-direction:column;align-items:center;gap:12px;padding:4px 0"><canvas id="wheel-canvas" width="260" height="260" style="border-radius:50%"></canvas><button class="btnx btn-primary" style="padding:8px 24px" onclick="spinWheel()">🎲 Tourner la roue</button><div id="wheel-result" style="font-size:14px;font-weight:700;color:#8b35ff;min-height:22px;text-align:center"></div></div></div></div>
+    <div class="g2" style="grid-template-columns:300px 1fr">
+      <div><div class="panel"><h3>🎮 Lobby — <span id="lobby-count" style="color:#28ff66">0</span> joueurs <button class="btnx btn-red btn-sm" onclick="clearLobby()">Vider</button></h3><div style="background:#0f1428;border:1px solid #171d35;border-radius:8px;padding:7px 10px;margin-bottom:10px;font-size:10px;color:#a1a1aa">Les viewers tapent <span class="cpill">!lobby</span> pour rejoindre</div><div id="lobby-list" style="max-height:420px;overflow-y:auto"><div class="empty"><div class="ei">🎮</div><p>Aucun joueur</p></div></div></div></div>
+      <div><div class="panel"><h3>🎡 Roue aléatoire</h3><div style="display:flex;flex-direction:column;align-items:center;gap:18px;padding:10px 0"><canvas id="wheel-canvas" width="480" height="480" style="border-radius:50%;max-width:100%;height:auto"></canvas><button class="btnx btn-primary" style="padding:12px 32px;font-size:14px" onclick="spinWheel()">🎲 Tourner la roue</button><div id="wheel-result" style="font-size:18px;font-weight:700;color:#8b35ff;min-height:28px;text-align:center"></div></div></div></div>
     </div>
   </div>
 
