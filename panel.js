@@ -51,6 +51,10 @@ app.get('/api/viewer/:u',      waitDB,      async (req,res) => { try { const v=a
 app.get('/api/stats',          waitDB,          async (req,res) => { try { res.json({data: await db.getGlobalStats()}); } catch(e){res.json({data:{}}); }});
 app.get('/api/logs',           waitDB,           async (req,res) => { try { res.json({data: await db.getRecentLogs(Math.min(parseInt(req.query.limit||50),500))}); } catch(e){res.json({data:[]}); }});
 app.get('/api/active',         async (req,res) => { try { res.json({data: await db.getActiveViewers(parseInt(req.query.minutes||10))}); } catch(e){res.json({data:[]}); }});
+app.get('/api/analytics/commands',  async (req,res) => { try { res.json({data: await db.getCommandUsageStats(7)}); } catch(e) { res.json({data:[]}); }});
+app.get('/api/analytics/chat-week', async (req,res) => { try { res.json({data: await db.getChatActivityWeek()}); } catch(e) { res.json({data:[]}); }});
+app.get('/api/analytics/sessions-viewers', async (req,res) => { try { res.json({data: await db.getSessionsWithAvgViewers(14)}); } catch(e) { res.json({data:[]}); }});
+
 app.get('/api/levels', async (req,res) => { try { res.json({data: await db.getLevels()}); } catch(e) { res.json({data:[]}); }});
 
 app.post('/api/admin/levels', async (req, res) => {

@@ -166,6 +166,7 @@ async function handleChatMessage(payload) {
   if (!username || !content) return;
 
   await db.upsertViewer(username, kickId);
+  await db.logChatActivity(username);
   console.log(`[CHAT] ${username}: ${content}`);
 
   // Vérifier les mots bannis
@@ -185,6 +186,7 @@ async function handleChatMessage(payload) {
   if (SYSTEM_COMMANDS.includes(cmd)) {
     const enabled = await db.isSystemCmdEnabled(cmd);
     if (!enabled) return;
+    db.logCommandUsage(cmd, username).catch(()=>{});
     switch(cmd) {
       case '!points':    return cmdPoints(username);
       case '!top':       return cmdTop(username);
@@ -223,6 +225,7 @@ async function handleChatMessage(payload) {
   // Commandes personnalisées
   const custom = await db.getCustomCommand(cmd);
   if (custom) {
+    db.logCommandUsage(cmd, username).catch(()=>{});
     const response = custom.response.replace(/@\{user\}/gi, '@' + username);
     return sendChat(response);
   }
@@ -698,6 +701,9 @@ async function checkLiveStatus() {
   }
 
   if (isLive && live?.viewer_count > peakViewers) peakViewers = live.viewer_count;
+  if (isLive && currentSessionId && typeof live?.viewer_count === 'number') {
+    db.recordViewerSample(currentSessionId, live.viewer_count).catch(()=>{});
+  }
 
   // Mettre à jour followers
   const fc = data?.followers_count || data?.followersCount || 0;
@@ -755,7 +761,7 @@ async function distributePoints() {
   const windowMinutes = Math.ceil(CONFIG.intervalMs / 60000) + 1;
   const viewers = await db.getActiveViewers(windowMinutes);
   if (!viewers.length) { console.log('[POINTS] Aucun viewer actif dans le chat.'); return; }
-  for (const v of viewers) await db.addPoints(v.username, CONFIG.pointsAmount, 'watch_time');
+  for (const v of viewers) await db.addPoints(v.username, CONFIG.pointsAmount, 'watch_time', Math.round(CONFIG.intervalMs / 60000));
   console.log(`[POINTS] +${CONFIG.pointsAmount} pts → ${viewers.length} viewer(s) actif(s) dans le chat ✓`);
   checkObjectives();
 }

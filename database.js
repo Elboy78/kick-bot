@@ -87,11 +87,14 @@ async function initSchema() {
       created_at TEXT    NOT NULL DEFAULT (datetime('now'))
     )`,
     `CREATE TABLE IF NOT EXISTS stream_sessions (
-      id           INTEGER PRIMARY KEY AUTOINCREMENT,
-      started_at   TEXT NOT NULL DEFAULT (datetime('now')),
-      ended_at     TEXT,
-      peak_viewers INTEGER DEFAULT 0,
-      duration_min INTEGER DEFAULT 0
+      id            INTEGER PRIMARY KEY AUTOINCREMENT,
+      started_at    TEXT NOT NULL DEFAULT (datetime('now')),
+      ended_at      TEXT,
+      peak_viewers  INTEGER DEFAULT 0,
+      avg_viewers   INTEGER DEFAULT 0,
+      viewer_sum    INTEGER DEFAULT 0,
+      viewer_samples INTEGER DEFAULT 0,
+      duration_min  INTEGER DEFAULT 0
     )`,
     `CREATE TABLE IF NOT EXISTS custom_commands (
       id         INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -199,6 +202,17 @@ async function initSchema() {
       duration   INTEGER NOT NULL DEFAULT 300,
       enabled    INTEGER NOT NULL DEFAULT 1,
       created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    )`,
+    `CREATE TABLE IF NOT EXISTS command_usage (
+      id         INTEGER PRIMARY KEY AUTOINCREMENT,
+      trigger    TEXT NOT NULL,
+      username   TEXT,
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    )`,
+    `CREATE TABLE IF NOT EXISTS chat_activity_daily (
+      date            TEXT PRIMARY KEY,
+      message_count   INTEGER NOT NULL DEFAULT 0,
+      unique_chatters TEXT NOT NULL DEFAULT '[]'
     )`,
     `CREATE TABLE IF NOT EXISTS level_config (
       id         INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -331,14 +345,14 @@ async function upsertViewer(username, kickUserId = null) {
   `, [username.toLowerCase(), kickUserId, kickUserId]);
 }
 
-async function addPoints(username, points, reason = 'watch_time') {
+async function addPoints(username, points, reason = 'watch_time', minutesWatched = 0) {
   await run(`
     UPDATE viewers
     SET points        = MAX(0, points + ?),
         total_minutes = total_minutes + ?,
         last_seen     = datetime('now')
     WHERE username = ?
-  `, [points, reason === 'watch_time' ? 5 : 0, username.toLowerCase()]);
+  `, [points, minutesWatched, username.toLowerCase()]);
 
   const viewer = await get(`SELECT points FROM viewers WHERE username = ?`, [username.toLowerCase()]);
   if (viewer) {
@@ -452,12 +466,74 @@ async function startSession() {
   }
 }
 
+async function recordViewerSample(id, viewerCount) {
+  await run(`UPDATE stream_sessions SET viewer_sum = viewer_sum + ?, viewer_samples = viewer_samples + 1 WHERE id = ?`, [viewerCount, id]);
+}
+
 async function endSession(id, peakViewers, durationMin) {
-  await run(`UPDATE stream_sessions SET ended_at = datetime('now'), peak_viewers = ?, duration_min = ? WHERE id = ?`, [peakViewers, durationMin, id]);
+  const row = await get(`SELECT viewer_sum, viewer_samples FROM stream_sessions WHERE id = ?`, [id]);
+  const avgViewers = row && row.viewer_samples > 0 ? Math.round(row.viewer_sum / row.viewer_samples) : peakViewers;
+  await run(`UPDATE stream_sessions SET ended_at = datetime('now'), peak_viewers = ?, avg_viewers = ?, duration_min = ? WHERE id = ?`, [peakViewers, avgViewers, durationMin, id]);
 }
 
 async function getStreamHistory(limit = 10) {
   return all(`SELECT * FROM stream_sessions WHERE ended_at IS NOT NULL ORDER BY started_at DESC LIMIT ?`, [limit]);
+}
+
+// ─── Analytics : usage des commandes & activité du chat ────────────────────────
+
+async function logCommandUsage(trigger, username) {
+  await run(`INSERT INTO command_usage (trigger, username) VALUES (?, ?)`, [trigger.toLowerCase(), (username||'').toLowerCase()]);
+}
+
+async function getCommandUsageStats(days = 7) {
+  const rows = await all(
+    `SELECT trigger, COUNT(*) as count FROM command_usage
+     WHERE created_at >= datetime('now', ?)
+     GROUP BY trigger ORDER BY count DESC LIMIT 10`,
+    [`-${days} days`]
+  );
+  const total = rows.reduce((sum, r) => sum + r.count, 0);
+  return rows.map(r => ({ trigger: r.trigger, count: r.count, pct: total > 0 ? Math.round((r.count / total) * 100) : 0 }));
+}
+
+async function logChatActivity(username) {
+  const today = new Date().toISOString().slice(0, 10);
+  const row = await get(`SELECT * FROM chat_activity_daily WHERE date = ?`, [today]);
+  if (!row) {
+    await run(`INSERT INTO chat_activity_daily (date, message_count, unique_chatters) VALUES (?, 1, ?)`,
+      [today, JSON.stringify([username.toLowerCase()])]);
+  } else {
+    let chatters = [];
+    try { chatters = JSON.parse(row.unique_chatters); } catch(e) {}
+    const lower = username.toLowerCase();
+    if (!chatters.includes(lower)) chatters.push(lower);
+    await run(`UPDATE chat_activity_daily SET message_count = message_count + 1, unique_chatters = ? WHERE date = ?`,
+      [JSON.stringify(chatters), today]);
+  }
+}
+
+async function getChatActivityWeek() {
+  const rows = await all(`SELECT * FROM chat_activity_daily WHERE date >= date('now', '-6 days') ORDER BY date ASC`);
+  const map = {};
+  rows.forEach(r => {
+    let chatters = [];
+    try { chatters = JSON.parse(r.unique_chatters); } catch(e) {}
+    map[r.date] = { messageCount: r.message_count, uniqueChatters: chatters.length };
+  });
+  // Compléter les 7 derniers jours même sans données (0 par défaut)
+  const result = [];
+  for (let i = 6; i >= 0; i--) {
+    const d = new Date();
+    d.setDate(d.getDate() - i);
+    const dateStr = d.toISOString().slice(0, 10);
+    result.push({ date: dateStr, messageCount: map[dateStr]?.messageCount || 0, uniqueChatters: map[dateStr]?.uniqueChatters || 0 });
+  }
+  return result;
+}
+
+async function getSessionsWithAvgViewers(limit = 14) {
+  return all(`SELECT id, started_at, avg_viewers, peak_viewers, duration_min FROM stream_sessions WHERE ended_at IS NOT NULL ORDER BY started_at DESC LIMIT ?`, [limit]);
 }
 
 // ─── Duels ────────────────────────────────────────────────────────────────────
@@ -905,7 +981,8 @@ module.exports = {
   getLevel, getNextLevel, getLevels, addLevel, updateLevel, deleteLevel,
   getCustomCommands, getCustomCommand, setCustomCommand, deleteCustomCommand, toggleCustomCommand,
   getObjectives, createObjective, deleteObjective, achieveObjective,
-  startSession, endSession, getStreamHistory,
+  startSession, endSession, getStreamHistory, recordViewerSample, getSessionsWithAvgViewers,
+  logCommandUsage, getCommandUsageStats, logChatActivity, getChatActivityWeek,
   createDuel, getPendingDuel, resolveDuel, cancelDuel, getRecentDuels,
   createGiveaway, getActiveGiveaway, joinGiveaway, closeGiveaway, getGiveawayHistory,
   getLobby, joinLobby, removeFromLobby, clearLobby,

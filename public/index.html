@@ -61,7 +61,7 @@ body.light{
 .header-right{display:flex;align-items:center;gap:10px}
 .btn{background:var(--card);border:1px solid var(--brd3);color:var(--text);padding:10px 18px;border-radius:10px;cursor:pointer;font-size:11px;font-weight:600;font-family:inherit;transition:all .15s;display:inline-flex;align-items:center;gap:6px}
 .btn:hover{border-color:var(--accent-brd)}
-.btn-connected{background:rgba(40,255,102,.1);border:1px solid rgba(40,255,102,.3);color:var(--accent);font-weight:700}
+.btn-connected{background:rgba(40,255,102,.15);border:1px solid rgba(40,255,102,.5);color:#28ff66;font-weight:700}
 
 /* ══ STAT CARDS ══ */
 .cards{display:grid;grid-template-columns:repeat(5,1fr);gap:15px;margin-bottom:20px}
@@ -86,7 +86,7 @@ body.light{
 .panel h3 .see-all:hover{color:var(--accent-l)}
 
 /* ══ CHART ══ */
-.chart{height:220px;margin-top:10px;background:linear-gradient(180deg,transparent,#32106c40);border-bottom:1px solid #242b44;position:relative;display:flex;align-items:flex-end;gap:5px;padding:10px}
+.chart{height:220px;margin-top:10px;background:linear-gradient(180deg,transparent,rgba(40,255,102,.08));border-bottom:1px solid var(--brd2);position:relative;display:flex;align-items:flex-end;gap:5px;padding:10px}
 .chart-bar{flex:1;background:linear-gradient(180deg,var(--accent),var(--accent-bg));border-radius:4px 4px 0 0;min-height:4px;transition:height .6s;position:relative}
 .chart-bar:hover{filter:brightness(1.3)}
 .chart-labels{display:flex;justify-content:space-between;margin-top:8px}
@@ -316,17 +316,12 @@ hr.div{border:none;border-top:1px solid var(--brd);margin:12px 0}
 
     <section class="grid">
       <div class="panel">
-        <h3>Activité du chat</h3>
-        <div class="chart" id="activity-chart">
-          <div class="chart-bar" style="height:30%"></div>
-          <div class="chart-bar" style="height:45%"></div>
-          <div class="chart-bar" style="height:35%"></div>
-          <div class="chart-bar" style="height:60%"></div>
-          <div class="chart-bar" style="height:80%"></div>
-          <div class="chart-bar" style="height:55%"></div>
-          <div class="chart-bar" style="height:70%"></div>
+        <h3>Activité du chat <span style="font-size:9px;color:var(--muted2);font-weight:400">7 derniers jours</span></h3>
+        <div class="chart" id="activity-chart" style="flex-direction:column;justify-content:flex-end;padding:10px 4px 0">
+          <div id="activity-bars" style="display:flex;align-items:flex-end;gap:5px;flex:1;width:100%"></div>
         </div>
-        <div class="chart-labels"><span id="chart-stat-viewers">— viewers</span><span id="chart-stat-minutes">— min</span></div>
+        <div id="activity-day-labels" style="display:flex;justify-content:space-between;padding:0 4px;margin-top:6px"></div>
+        <div class="chart-labels"><span id="chart-stat-viewers">— messages cette semaine</span><span id="chart-stat-minutes">— jour le plus actif</span></div>
       </div>
 
       <div class="panel">
@@ -356,7 +351,15 @@ hr.div{border:none;border-top:1px solid var(--brd);margin:12px 0}
       <div class="panel">
         <h3>Utilisation des commandes</h3>
         <div class="donut-wrap">
-          <div class="donut" id="cmd-donut"><div><b id="donut-total">0</b><small>Total</small></div></div>
+          <div style="position:relative;width:220px;height:220px;margin:15px auto">
+            <svg viewBox="0 0 200 200" width="220" height="220" id="cmd-donut-svg-wrap">
+              <g id="cmd-donut-svg"></g>
+            </svg>
+            <div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center">
+              <b id="donut-total" style="font-size:28px">0</b>
+              <small style="font-size:10px;color:var(--muted)">Total</small>
+            </div>
+          </div>
           <div class="donut-legend" id="donut-legend"></div>
         </div>
       </div>
@@ -626,6 +629,12 @@ Option 3" rows="4"></textarea><div style="display:flex;gap:6px;margin-top:10px">
   <!-- ══ HISTORIQUE ══ -->
   <div class="page" id="page-historique">
     <div class="header"><div><h1>Historique</h1><p>Sessions et activité du bot</p></div></div>
+    <div class="panel" style="margin-bottom:14px">
+      <h3>📈 Moyenne de viewers par live</h3>
+      <div style="font-size:10px;color:var(--muted);margin-bottom:10px">Moyenne de viewers connectés sur chaque session de stream — pour voir si l'audience est en hausse.</div>
+      <div id="viewers-trend-chart" style="height:200px;display:flex;align-items:flex-end;gap:6px;padding:10px 4px 0"></div>
+      <div id="viewers-trend-labels" style="display:flex;justify-content:space-between;padding:0 4px;margin-top:6px"></div>
+    </div>
     <div class="g2">
       <div><div class="panel"><h3>📅 Sessions de stream</h3><div id="hist-list"><div class="empty"><div class="ei">📅</div><p>Chargement…</p></div></div></div></div>
       <div><div class="panel"><h3>📊 Logs de points</h3><div style="max-height:480px;overflow-y:auto" id="full-logs"><div class="empty"><p>Chargement…</p></div></div></div></div>
@@ -742,7 +751,7 @@ function showPage(name) {
   if(name==='config-classement') loadConfigClassement();
   if(name==='jeux') { loadDuels(); loadGiveaways(); loadActiveGiveaway(); }
   if(name==='objectifs') loadObjectives();
-  if(name==='historique') { loadHistory(); loadFullLogs(); }
+  if(name==='historique') { loadHistory(); loadFullLogs(); loadViewersTrend(); }
   if(name==='admin') { loadCmds(); loadAdminLevels(); loadAccessRequests(); }
   if(name==='commands') { loadCommandsPage(); loadSystemCommands(); }
   if(name==='dbd') initDBD();
@@ -777,7 +786,7 @@ async function del(url) {
 async function loadAll() {
   loadLiveStatus();
   checkBotTokenStatus();
-  await Promise.all([loadStats(), loadDashLB(), loadDashLogs(), loadCmdUsage(), loadLevels(), loadActiveGiveaway()]);
+  await Promise.all([loadStats(), loadDashLB(), loadDashLogs(), loadCmdUsage(), loadLevels(), loadActiveGiveaway(), loadChatActivityWeek()]);
   const el = document.getElementById('upd');
   if(el) el.textContent = new Date().toLocaleTimeString('fr-FR');
 }
@@ -846,36 +855,109 @@ async function loadDashLogs() {
   } catch(e){}
 }
 
+const CMD_COLORS = ['#28ff66','#1267ff','#ff8500','#ff1f6b','#8b35ff','#06b6d4','#facc15','#f97316'];
+
 async function loadCmdUsage() {
   try {
-    const cmds = await get('/api/commands') || [];
+    const stats = await get('/api/analytics/commands') || [];
     const el = document.getElementById('cmd-usage-list');
     if (!el) return;
-    const sys = ['!points','!top','!rang','!niveau','!lobby'];
-    const allCmds = [...sys, ...cmds.slice(0,3).map(c => c.trigger)].slice(0,6);
-    if (!allCmds.length) { el.innerHTML = '<div class="empty"><p>Aucune commande</p></div>'; return; }
-    el.innerHTML = allCmds.map((cmd, i) => {
-      const pct = Math.max(12, 100 - i * 15);
-      return `<div class="cmd-row">
-        <div class="cmd-row-top"><span style="font-family:monospace;color:#8b35ff;font-weight:600;font-size:11px">${esc(cmd)}</span><span style="font-size:10px;color:#a1a1aa">${pct}%</span></div>
-        <div class="bar"><span style="width:${pct}%"></span></div>
-      </div>`;
-    }).join('');
 
-    // Donut chart
-    const total = allCmds.length;
-    const donutTotal = document.getElementById('donut-total');
-    if (donutTotal) donutTotal.textContent = total;
-    const colors = ['#8b35ff','#1267ff','#17c95f','#ff8500','#ff1f6b','#06b6d4'];
-    const legend = document.getElementById('donut-legend');
-    if (legend) {
-      legend.innerHTML = allCmds.slice(0,4).map((cmd, i) => `
-        <div class="donut-legend-row">
-          <div class="donut-legend-dot" style="background:${colors[i]}"></div>
-          <span style="font-family:monospace;color:#8b35ff">${esc(cmd)}</span>
+    if (!stats.length) {
+      el.innerHTML = '<div class="empty"><p>Aucune commande utilisée pour le moment</p></div>';
+    } else {
+      el.innerHTML = stats.map((s, i) => `
+        <div class="cmd-row">
+          <div class="cmd-row-top">
+            <span style="font-family:monospace;color:${CMD_COLORS[i%CMD_COLORS.length]};font-weight:600;font-size:11px">${esc(s.trigger)}</span>
+            <span style="font-size:10px;color:var(--muted)">${s.pct}% · ${s.count} fois</span>
+          </div>
+          <div class="bar"><span style="width:${s.pct}%;background:${CMD_COLORS[i%CMD_COLORS.length]}"></span></div>
         </div>`).join('');
     }
+
+    renderCmdDonut(stats);
   } catch(e){}
+}
+
+function renderCmdDonut(stats) {
+  const total = stats.reduce((sum, s) => sum + s.count, 0);
+  const donutTotal = document.getElementById('donut-total');
+  if (donutTotal) donutTotal.textContent = total;
+
+  const svgWrap = document.getElementById('cmd-donut-svg');
+  const legend = document.getElementById('donut-legend');
+  if (!svgWrap) return;
+
+  if (!total) {
+    svgWrap.innerHTML = '<circle cx="100" cy="100" r="80" fill="none" stroke="var(--brd)" stroke-width="28"/>';
+    if (legend) legend.innerHTML = '<div style="font-size:10px;color:var(--muted2)">Aucune donnée</div>';
+    return;
+  }
+
+  const top = stats.slice(0, 6);
+  const r = 80, cx = 100, cy = 100, circumference = 2 * Math.PI * r;
+  let offset = 0;
+  let paths = '';
+  top.forEach((s, i) => {
+    const frac = s.count / total;
+    const dash = frac * circumference;
+    paths += `<circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="${CMD_COLORS[i%CMD_COLORS.length]}" stroke-width="28"
+      stroke-dasharray="${dash} ${circumference-dash}" stroke-dashoffset="${-offset}" transform="rotate(-90 ${cx} ${cy})"
+      style="transition:stroke-dasharray .6s ease, stroke-dashoffset .6s ease"/>`;
+    offset += dash;
+  });
+  svgWrap.innerHTML = paths;
+
+  if (legend) {
+    legend.innerHTML = top.map((s, i) => `
+      <div class="donut-legend-row">
+        <div class="donut-legend-dot" style="background:${CMD_COLORS[i%CMD_COLORS.length]}"></div>
+        <span style="font-family:monospace;color:${CMD_COLORS[i%CMD_COLORS.length]}">${esc(s.trigger)}</span>
+        <span style="color:var(--muted2);margin-left:auto;font-size:9px">${s.pct}%</span>
+      </div>`).join('');
+  }
+}
+
+const DAY_NAMES_FR = ['Dim','Lun','Mar','Mer','Jeu','Ven','Sam'];
+
+async function loadChatActivityWeek() {
+  try {
+    const days = await get('/api/analytics/chat-week') || [];
+    const barsEl = document.getElementById('activity-bars');
+    const labelsEl = document.getElementById('activity-day-labels');
+    if (!barsEl || !labelsEl) return;
+
+    const maxCount = Math.max(1, ...days.map(d => d.messageCount));
+    const totalMessages = days.reduce((sum, d) => sum + d.messageCount, 0);
+    let busiest = days[0] || null;
+    days.forEach(d => { if (d.messageCount > (busiest?.messageCount || 0)) busiest = d; });
+
+    barsEl.innerHTML = days.map(d => {
+      const heightPct = Math.max(4, Math.round((d.messageCount / maxCount) * 100));
+      const isBusiest = busiest && d.date === busiest.date && d.messageCount > 0;
+      return `<div class="chart-bar" title="${d.messageCount} messages, ${d.uniqueChatters} viewers différents"
+        style="height:${heightPct}%;${isBusiest ? 'filter:brightness(1.4)' : ''}"></div>`;
+    }).join('');
+
+    labelsEl.innerHTML = days.map(d => {
+      const dt = new Date(d.date + 'T00:00:00');
+      const dayName = DAY_NAMES_FR[dt.getDay()];
+      const dateLabel = dt.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit' });
+      return `<div style="text-align:center;flex:1"><div style="font-size:9px;font-weight:700;color:var(--text)">${dayName}</div><div style="font-size:8px;color:var(--muted2)">${dateLabel}</div></div>`;
+    }).join('');
+
+    const statViewers = document.getElementById('chart-stat-viewers');
+    const statMinutes = document.getElementById('chart-stat-minutes');
+    if (statViewers) statViewers.textContent = totalMessages.toLocaleString('fr') + ' messages cette semaine';
+    if (statMinutes && busiest && busiest.messageCount > 0) {
+      const dt = new Date(busiest.date + 'T00:00:00');
+      const label = DAY_NAMES_FR[dt.getDay()] + ' ' + dt.toLocaleDateString('fr-FR', { day:'2-digit', month:'2-digit' });
+      statMinutes.textContent = `Pic: ${label} (${busiest.messageCount} msg, ${busiest.uniqueChatters} viewers)`;
+    } else if (statMinutes) {
+      statMinutes.textContent = 'Aucune activité encore';
+    }
+  } catch(e) {}
 }
 
 async function loadLeaderboard() {
@@ -1032,6 +1114,40 @@ async function deleteObj(id) {
 }
 
 // ── Historique ─────────────────────────────────────────────────────────────────
+async function loadViewersTrend() {
+  try {
+    const sessions = await get('/api/analytics/sessions-viewers') || [];
+    const chartEl = document.getElementById('viewers-trend-chart');
+    const labelsEl = document.getElementById('viewers-trend-labels');
+    if (!chartEl || !labelsEl) return;
+
+    if (!sessions.length) {
+      chartEl.innerHTML = '<div class="empty" style="width:100%"><div class="ei">📈</div><p>Aucune session terminée pour le moment</p></div>';
+      labelsEl.innerHTML = '';
+      return;
+    }
+
+    // Du plus ancien au plus récent pour lire la tendance de gauche à droite
+    const ordered = [...sessions].reverse();
+    const maxAvg = Math.max(1, ...ordered.map(s => s.avg_viewers || 0));
+
+    chartEl.innerHTML = ordered.map((s, i) => {
+      const heightPct = Math.max(4, Math.round(((s.avg_viewers || 0) / maxAvg) * 100));
+      const prevAvg = i > 0 ? (ordered[i-1].avg_viewers || 0) : null;
+      const isUp = prevAvg !== null && s.avg_viewers > prevAvg;
+      const color = isUp ? 'var(--accent)' : (prevAvg !== null && s.avg_viewers < prevAvg ? '#ff3b5f' : 'var(--accent)');
+      return `<div class="chart-bar" title="${s.avg_viewers || 0} viewers en moyenne, pic à ${s.peak_viewers || 0}"
+        style="height:${heightPct}%;background:linear-gradient(180deg,${color},${color}30)"></div>`;
+    }).join('');
+
+    labelsEl.innerHTML = ordered.map(s => {
+      const dt = new Date(s.started_at + 'Z');
+      const dateLabel = dt.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit' });
+      return `<div style="text-align:center;flex:1"><div style="font-size:8px;color:var(--muted2)">${dateLabel}</div><div style="font-size:9px;font-weight:700;color:var(--text);margin-top:2px">${s.avg_viewers || 0}</div></div>`;
+    }).join('');
+  } catch(e) {}
+}
+
 async function loadHistory() {
   try {
     const data=await get('/api/history')||[];
