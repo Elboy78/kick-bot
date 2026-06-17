@@ -225,22 +225,44 @@ app.get('/api/live', async (req,res) => {
 });
 
 // ════════════════════════════════════════════════════════════════════
-// TTS — Text To Speech pour les dons
+// TTS — Text To Speech pour les dons (100% configurable depuis le panel)
 // ════════════════════════════════════════════════════════════════════
 
-const TTS_MIN_DONATION   = parseFloat(process.env.TTS_MIN_DONATION || '0');
-const TTS_MAX_TEXT_LEN   = parseInt(process.env.TTS_MAX_TEXT_LENGTH || '180');
-const TTS_WEBHOOK_SECRET = process.env.TTS_WEBHOOK_SECRET || '';
-const TTS_VOICE_ID       = process.env.ELEVENLABS_VOICE_ID || '';
-const TTS_API_KEY        = process.env.ELEVENLABS_API_KEY || '';
+// Valeurs de secours si rien n'est configuré en DB ni en env (premier démarrage)
+const TTS_DEFAULTS = {
+  api_key: process.env.ELEVENLABS_API_KEY || '',
+  voice_id: process.env.ELEVENLABS_VOICE_ID || '',
+  min_donation: process.env.TTS_MIN_DONATION || '0',
+  max_text_length: process.env.TTS_MAX_TEXT_LENGTH || '180',
+  webhook_secret: process.env.TTS_WEBHOOK_SECRET || '',
+  stability: '0.5',
+  similarity_boost: '0.75',
+  volume: '1',
+};
+
+async function getTTSSettings() {
+  const stored = await db.getTTSConfig();
+  const merged = { ...TTS_DEFAULTS, ...stored };
+  return {
+    apiKey:          merged.api_key,
+    voiceId:         merged.voice_id,
+    minDonation:     parseFloat(merged.min_donation) || 0,
+    maxTextLength:   parseInt(merged.max_text_length) || 180,
+    webhookSecret:   merged.webhook_secret,
+    stability:       parseFloat(merged.stability),
+    similarityBoost: parseFloat(merged.similarity_boost),
+    volume:          parseFloat(merged.volume),
+  };
+}
 
 async function generateTTSAudio(text) {
-  if (!TTS_API_KEY || !TTS_VOICE_ID) return null;
+  const cfg = await getTTSSettings();
+  if (!cfg.apiKey || !cfg.voiceId) return null;
   try {
     const r = await axios.post(
-      `https://api.elevenlabs.io/v1/text-to-speech/${TTS_VOICE_ID}`,
-      { text, model_id: 'eleven_multilingual_v2', voice_settings: { stability: 0.5, similarity_boost: 0.75 } },
-      { headers: { 'xi-api-key': TTS_API_KEY, 'Content-Type': 'application/json' }, responseType: 'arraybuffer', timeout: 20000 }
+      `https://api.elevenlabs.io/v1/text-to-speech/${cfg.voiceId}`,
+      { text, model_id: 'eleven_multilingual_v2', voice_settings: { stability: cfg.stability, similarity_boost: cfg.similarityBoost } },
+      { headers: { 'xi-api-key': cfg.apiKey, 'Content-Type': 'application/json' }, responseType: 'arraybuffer', timeout: 20000 }
     );
     return Buffer.from(r.data).toString('base64');
   } catch(e) {
@@ -252,8 +274,10 @@ async function generateTTSAudio(text) {
 // Webhook appelé par la plateforme de dons (StreamElements, Tipeee, etc.)
 app.post('/webhook/donation', async (req, res) => {
   try {
+    const cfg = await getTTSSettings();
+
     // Vérification du secret si configuré
-    if (TTS_WEBHOOK_SECRET && req.headers['x-webhook-secret'] !== TTS_WEBHOOK_SECRET) {
+    if (cfg.webhookSecret && req.headers['x-webhook-secret'] !== cfg.webhookSecret) {
       return res.status(401).json({ error: 'unauthorized' });
     }
 
@@ -264,7 +288,7 @@ app.post('/webhook/donation', async (req, res) => {
     if (!await db.getSetting('tts_enabled')) {
       return res.json({ ignored: true, reason: 'tts_disabled' });
     }
-    if (amount < TTS_MIN_DONATION) {
+    if (amount < cfg.minDonation) {
       return res.json({ ignored: true, reason: 'amount_too_low' });
     }
     if (!message) {
@@ -276,11 +300,11 @@ app.post('/webhook/donation', async (req, res) => {
       return res.json({ ignored: true, reason: 'blacklisted' });
     }
 
-    message = message.slice(0, TTS_MAX_TEXT_LEN);
+    message = message.slice(0, cfg.maxTextLength);
     await db.addTTSHistory(username, message, amount, 'played');
 
     const audioBase64 = await generateTTSAudio(message);
-    io.emit('play-tts', { username, message, amount, audio: audioBase64 });
+    io.emit('play-tts', { username, message, amount, audio: audioBase64, volume: cfg.volume });
     io.emit('tts-update');
 
     res.json({ success: true });
@@ -293,15 +317,16 @@ app.post('/webhook/donation', async (req, res) => {
 // Test manuel depuis le panel
 app.post('/api/tts/test', async (req, res) => {
   try {
-    const message = String(req.body.message || '').trim().slice(0, TTS_MAX_TEXT_LEN);
+    const cfg = await getTTSSettings();
+    const message = String(req.body.message || '').trim().slice(0, cfg.maxTextLength);
     if (!message) return res.status(400).json({ error: 'message requis' });
     if (await db.isTTSBlacklisted(message)) return res.status(400).json({ error: 'Message bloqué par la blacklist' });
 
     await db.addTTSHistory('Test Panel', message, 0, 'test');
     const audioBase64 = await generateTTSAudio(message);
-    io.emit('play-tts', { username: 'Test Panel', message, amount: 0, audio: audioBase64 });
+    io.emit('play-tts', { username: 'Test Panel', message, amount: 0, audio: audioBase64, volume: cfg.volume });
     io.emit('tts-update');
-    res.json({ success: true });
+    res.json({ success: true, audioGenerated: !!audioBase64 });
   } catch(e) { res.status(500).json({ error: e.message }); }
 });
 
@@ -311,6 +336,77 @@ app.post('/api/admin/tts/clear-history', async (req,res) => { try { await db.cle
 app.get('/api/tts/blacklist',                  async (req,res) => { try { res.json({data: await db.getTTSBlacklist()}); } catch(e){res.json({data:[]}); }});
 app.post('/api/admin/tts/blacklist',           async (req,res) => { try { const {word}=req.body; if(!word) return res.status(400).json({error:'word requis'}); const ok=await db.addTTSBlacklistWord(word); res.json({success:ok}); } catch(e){res.status(500).json({error:e.message}); }});
 app.delete('/api/admin/tts/blacklist/:id',     async (req,res) => { try { await db.deleteTTSBlacklistWord(req.params.id); res.json({success:true}); } catch(e){res.status(500).json({error:e.message}); }});
+
+// Récupérer la config complète (clé API masquée pour l'affichage)
+app.get('/api/tts/settings', async (req, res) => {
+  try {
+    const cfg = await getTTSSettings();
+    res.json({
+      apiKeySet: !!cfg.apiKey,
+      apiKeyMasked: cfg.apiKey ? cfg.apiKey.slice(0,4) + '••••••••' + cfg.apiKey.slice(-4) : '',
+      voiceId: cfg.voiceId,
+      minDonation: cfg.minDonation,
+      maxTextLength: cfg.maxTextLength,
+      webhookSecretSet: !!cfg.webhookSecret,
+      stability: cfg.stability,
+      similarityBoost: cfg.similarityBoost,
+      volume: cfg.volume,
+      configured: !!(cfg.apiKey && cfg.voiceId),
+    });
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+// Mettre à jour un ou plusieurs réglages TTS depuis le panel
+app.post('/api/admin/tts/settings', async (req, res) => {
+  try {
+    const allowed = ['api_key','voice_id','min_donation','max_text_length','webhook_secret','stability','similarity_boost','volume'];
+    const updates = {};
+    for (const key of allowed) {
+      if (req.body[key] !== undefined && req.body[key] !== '') updates[key] = req.body[key];
+    }
+    await db.setTTSConfigBulk(updates);
+    res.json({ success: true });
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+// Lister les voix disponibles sur le compte ElevenLabs connecté
+app.get('/api/tts/voices', async (req, res) => {
+  try {
+    const cfg = await getTTSSettings();
+    if (!cfg.apiKey) return res.json({ data: [], error: 'no_api_key' });
+    const r = await axios.get('https://api.elevenlabs.io/v1/voices', {
+      headers: { 'xi-api-key': cfg.apiKey },
+      timeout: 10000,
+    });
+    const voices = (r.data?.voices || []).map(v => ({ id: v.voice_id, name: v.name, category: v.category }));
+    res.json({ data: voices });
+  } catch(e) {
+    res.json({ data: [], error: e.response?.status === 401 ? 'invalid_api_key' : e.message });
+  }
+});
+
+// Tester la clé API ElevenLabs (vérifie le quota restant)
+app.get('/api/tts/quota', async (req, res) => {
+  try {
+    const cfg = await getTTSSettings();
+    if (!cfg.apiKey) return res.json({ valid: false });
+    const r = await axios.get('https://api.elevenlabs.io/v1/user/subscription', {
+      headers: { 'xi-api-key': cfg.apiKey },
+      timeout: 10000,
+    });
+    res.json({
+      valid: true,
+      characterCount: r.data.character_count,
+      characterLimit: r.data.character_limit,
+      tier: r.data.tier,
+    });
+  } catch(e) {
+    res.json({ valid: false, error: e.response?.status === 401 ? 'invalid_api_key' : e.message });
+  }
+});
+
+app.get('/overlay', (req,res) => res.sendFile(path.join(__dirname,'public','overlay.html')));
+
 
 // ════════════════════════════════════════════════════════════════════
 // OAuth Kick officiel (id.kick.com) — refresh automatique du token
@@ -369,15 +465,6 @@ app.get('/api/bot-status', async (req, res) => {
   } catch(e) { res.json({ tokenExpired: false }); }
 });
 
-app.get('/api/tts/config', (req, res) => {
-  res.json({
-    configured: !!(TTS_API_KEY && TTS_VOICE_ID),
-    minDonation: TTS_MIN_DONATION,
-    maxTextLength: TTS_MAX_TEXT_LEN,
-  });
-});
-
-app.get('/overlay', (req,res) => res.sendFile(path.join(__dirname,'public','overlay.html')));
 
 io.on('connection', (socket) => {
   console.log('[TTS] Overlay connecté:', socket.id);

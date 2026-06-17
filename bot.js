@@ -532,30 +532,40 @@ async function sendChat(message) {
   if (!token) { console.log(`[BOT → CHAT] ${message}`); return; }
 
   try {
+    let response;
     if (official) {
       // API officielle Kick — endpoint public
-      await axios.post(
+      response = await axios.post(
         `https://api.kick.com/public/v1/chat`,
         { content: message, type: 'bot', broadcaster_user_id: parseInt(CONFIG.channelId) },
-        { headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' } }
+        { headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          'Accept-Language': 'en-US',
+        }}
       );
     } else {
       // Ancien endpoint interne (token manuel, fallback legacy)
-      await axios.post(
+      response = await axios.post(
         `https://kick.com/api/v2/messages/send/${CONFIG.channelId}`,
         { content: message, type: 'message' },
         { headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',
           'Accept': 'application/json',
+          'Accept-Language': 'en-US',
           'User-Agent': 'Mozilla/5.0',
         }}
       );
     }
+    console.log(`[BOT] Message envoyé (${response.status}) via ${official ? 'OAuth officiel' : 'token manuel'}`);
     db.setBotStatus('token_expired', '0').catch(()=>{});
   } catch(err) {
     const status = err.response?.status;
-    console.error('[BOT] Erreur envoi:', err.response?.data || err.message);
+    const body   = err.response?.data;
+    console.error(`[BOT] Erreur envoi (${status || 'réseau'}):`, typeof body === 'string' ? body : JSON.stringify(body) || err.message);
+
     if (status === 401) {
       if (official) {
         // L'OAuth officiel se rafraîchit normalement tout seul — un 401 ici
@@ -567,6 +577,9 @@ async function sendChat(message) {
         CONFIG.token = '';
         db.setBotStatus('token_expired', '1').catch(()=>{});
       }
+    } else if (status === 403) {
+      console.warn(`[AUTH] 403 Forbidden — ${official ? 'le scope chat:write est probablement manquant sur ton app Kick, ou le compte connecté n\u2019est pas modérateur/streamer du salon' : 'le compte du bot n\u2019est probablement pas modérateur de la chaîne'}`);
+      db.setBotStatus('last_403_at', Date.now().toString()).catch(()=>{});
     }
   }
 }

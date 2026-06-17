@@ -475,6 +475,48 @@ Option 3" rows="4"></textarea><div style="display:flex;gap:6px;margin-top:10px">
     <div class="g2">
       <div>
         <div class="panel" style="margin-bottom:14px">
+          <h3>🔑 Clé API ElevenLabs <span id="tts-quota-badge" style="font-size:9px;font-weight:700;padding:3px 9px;border-radius:20px"></span></h3>
+          <div style="background:var(--card2);border:1px solid var(--brd);border-radius:8px;padding:7px 10px;margin-bottom:10px;font-size:10px;color:var(--muted)">
+            Récupère ta clé sur <span class="cpill">elevenlabs.io</span> → Profile → API Keys.
+          </div>
+          <label class="lbl">Clé API</label>
+          <div style="display:flex;gap:6px">
+            <input class="inp" id="tts-api-key" type="password" placeholder="sk_••••••••••••••••">
+            <button class="btnx btn-ghost btn-sm" onclick="toggleApiKeyVisibility()" style="flex-shrink:0">👁</button>
+          </div>
+          <div id="tts-api-key-current" style="font-size:10px;color:var(--muted2);margin-top:4px"></div>
+          <button class="btnx btn-outline" style="width:100%;justify-content:center;margin-top:10px" onclick="saveTTSApiKey()">💾 Enregistrer la clé</button>
+          <div id="tts-quota-info" style="margin-top:10px;display:none">
+            <div class="pb" style="height:6px"><div class="pbf" id="tts-quota-bar" style="width:0%"></div></div>
+            <div style="display:flex;justify-content:space-between;font-size:9px;color:var(--muted2);margin-top:4px">
+              <span id="tts-quota-used">—</span><span id="tts-quota-total">—</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="panel" style="margin-bottom:14px">
+          <h3>🎙️ Voix &amp; réglages</h3>
+          <label class="lbl">Voix utilisée</label>
+          <div style="display:flex;gap:6px">
+            <select class="inp" id="tts-voice-select" style="flex:1"><option value="">— Sélectionner une voix —</option></select>
+            <button class="btnx btn-ghost btn-sm" onclick="loadTTSVoices()" style="flex-shrink:0">↻</button>
+          </div>
+          <button class="btnx btn-purple btn-sm" style="width:100%;justify-content:center;margin-top:8px" onclick="previewVoice()">▶️ Écouter un aperçu</button>
+
+          <label class="lbl">Stabilité <span id="tts-stability-val" style="color:var(--accent)">50%</span></label>
+          <input type="range" id="tts-stability" min="0" max="100" value="50" style="width:100%" oninput="document.getElementById('tts-stability-val').textContent=this.value+'%'">
+
+          <label class="lbl">Similarité vocale <span id="tts-similarity-val" style="color:var(--accent)">75%</span></label>
+          <input type="range" id="tts-similarity" min="0" max="100" value="75" style="width:100%" oninput="document.getElementById('tts-similarity-val').textContent=this.value+'%'">
+
+          <label class="lbl">Volume overlay <span id="tts-volume-val" style="color:var(--accent)">100%</span></label>
+          <input type="range" id="tts-volume" min="0" max="100" value="100" style="width:100%" oninput="document.getElementById('tts-volume-val').textContent=this.value+'%'">
+
+          <button class="btnx btn-outline" style="width:100%;justify-content:center;margin-top:12px" onclick="saveTTSVoiceSettings()">💾 Enregistrer les réglages voix</button>
+          <div id="tts-voice-msg" style="margin-top:7px"></div>
+        </div>
+
+        <div class="panel">
           <h3>🔊 Tester le TTS</h3>
           <div style="background:var(--card2);border:1px solid var(--brd);border-radius:8px;padding:7px 10px;margin-bottom:10px;font-size:10px;color:var(--muted)">
             Ajoute l'URL <span class="cpill">/overlay</span> comme source navigateur dans OBS pour afficher les dons à l'écran avec lecture vocale.
@@ -484,24 +526,29 @@ Option 3" rows="4"></textarea><div style="display:flex;gap:6px;margin-top:10px">
           <button class="btnx btn-outline" style="width:100%;justify-content:center;margin-top:10px" onclick="testTTS()">🔊 Envoyer sur l'overlay</button>
           <div id="tts-test-msg" style="margin-top:7px"></div>
         </div>
-
-        <div class="panel">
-          <h3>📜 Historique des dons lus <button class="btnx btn-ghost btn-sm" onclick="clearTTSHistory()">Effacer</button></h3>
-          <div id="tts-history-list"><div class="empty"><div class="ei">🔊</div><p>Aucun don lu pour le moment</p></div></div>
-        </div>
       </div>
 
       <div>
         <div class="panel" style="margin-bottom:14px">
-          <h3>⚙️ Configuration</h3>
-          <ul class="info">
-            <li><span>Statut ElevenLabs</span><span id="tts-config-status">—</span></li>
-            <li><span>Don minimum</span><span id="tts-config-min">—</span></li>
-            <li><span>Longueur max</span><span id="tts-config-maxlen">—</span></li>
-          </ul>
-          <div style="font-size:10px;color:var(--muted);margin-top:10px;line-height:1.6">
-            La clé API ElevenLabs et le seuil de don se configurent via les variables d'environnement <span class="cpill">ELEVENLABS_API_KEY</span>, <span class="cpill">ELEVENLABS_VOICE_ID</span> et <span class="cpill">TTS_MIN_DONATION</span> sur Render.
+          <h3>⚙️ Seuils &amp; limites</h3>
+          <label class="lbl">Don minimum pour déclencher le TTS</label>
+          <div style="display:flex;align-items:center;gap:8px">
+            <input type="number" class="inp" id="tts-min-donation" placeholder="0" min="0" step="0.5" style="width:100px">
+            <span style="font-size:11px;color:var(--muted)">€</span>
           </div>
+
+          <label class="lbl">Longueur maximale du message</label>
+          <div style="display:flex;align-items:center;gap:8px">
+            <input type="number" class="inp" id="tts-max-length" placeholder="180" min="20" max="500" style="width:100px">
+            <span style="font-size:11px;color:var(--muted)">caractères</span>
+          </div>
+
+          <label class="lbl">Secret du webhook (optionnel)</label>
+          <input class="inp" id="tts-webhook-secret" type="password" placeholder="Laisser vide = pas de vérification">
+          <div style="font-size:9px;color:var(--muted2);margin-top:3px">Si défini, ta plateforme de dons doit envoyer ce secret dans le header <span class="cpill" style="font-size:8px">x-webhook-secret</span>.</div>
+
+          <button class="btnx btn-outline" style="width:100%;justify-content:center;margin-top:12px" onclick="saveTTSLimits()">💾 Enregistrer</button>
+          <div id="tts-limits-msg" style="margin-top:7px"></div>
         </div>
 
         <div class="panel" style="margin-bottom:14px">
@@ -513,11 +560,16 @@ Option 3" rows="4"></textarea><div style="display:flex;gap:6px;margin-top:10px">
           </div>
         </div>
 
-        <div class="panel">
+        <div class="panel" style="margin-bottom:14px">
           <h3>🔗 Webhook de dons</h3>
           <div style="font-size:10px;color:var(--muted);margin-bottom:8px;line-height:1.6">Configure ta plateforme de dons pour envoyer une requête POST vers :</div>
           <div class="cpill" style="display:block;padding:8px 10px;font-size:10px;word-break:break-all">/webhook/donation</div>
           <div style="font-size:10px;color:var(--muted);margin-top:8px;line-height:1.6">Avec un JSON contenant <span class="cpill">username</span>, <span class="cpill">amount</span> et <span class="cpill">message</span>.</div>
+        </div>
+
+        <div class="panel">
+          <h3>📜 Historique des dons lus <button class="btnx btn-ghost btn-sm" onclick="clearTTSHistory()">Effacer</button></h3>
+          <div id="tts-history-list"><div class="empty"><div class="ei">🔊</div><p>Aucun don lu pour le moment</p></div></div>
         </div>
       </div>
     </div>
@@ -1973,18 +2025,150 @@ function copyDetectedToken() {
 // ── TTS ───────────────────────────────────────────────────────────────────────
 
 async function loadTTS() {
-  await Promise.all([loadTTSConfig(), loadTTSHistory(), loadTTSBlacklist()]);
+  await Promise.all([loadTTSSettings(), loadTTSHistory(), loadTTSBlacklist(), loadTTSVoices()]);
 }
 
-async function loadTTSConfig() {
+let ttsApiKeyVisible = false;
+
+function toggleApiKeyVisibility() {
+  const inp = document.getElementById('tts-api-key');
+  ttsApiKeyVisible = !ttsApiKeyVisible;
+  inp.type = ttsApiKeyVisible ? 'text' : 'password';
+}
+
+async function loadTTSSettings() {
   try {
-    const r = await fetch('/api/tts/config');
+    const r = await fetch('/api/tts/settings');
     const d = await r.json();
-    const setEl = (id, val) => { const el = document.getElementById(id); if(el) el.textContent = val; };
-    setEl('tts-config-status', d.configured ? '✅ Configuré' : '⚠️ Non configuré');
-    setEl('tts-config-min', (d.minDonation||0) + ' €');
-    setEl('tts-config-maxlen', (d.maxTextLength||180) + ' caractères');
+
+    const setVal = (id, val) => { const el = document.getElementById(id); if(el) el.value = val; };
+
+    document.getElementById('tts-api-key-current').textContent = d.apiKeySet ? '🔑 Clé actuelle : ' + d.apiKeyMasked : '⚠️ Aucune clé configurée';
+    setVal('tts-min-donation', d.minDonation || 0);
+    setVal('tts-max-length', d.maxTextLength || 180);
+
+    const stab = Math.round((d.stability ?? 0.5) * 100);
+    const sim  = Math.round((d.similarityBoost ?? 0.75) * 100);
+    const vol  = Math.round((d.volume ?? 1) * 100);
+    setVal('tts-stability', stab);
+    setVal('tts-similarity', sim);
+    setVal('tts-volume', vol);
+    document.getElementById('tts-stability-val').textContent = stab + '%';
+    document.getElementById('tts-similarity-val').textContent = sim + '%';
+    document.getElementById('tts-volume-val').textContent = vol + '%';
+
+    if (d.webhookSecretSet) document.getElementById('tts-webhook-secret').placeholder = '••••••••• (déjà défini)';
+
+    // Mémoriser la voix sélectionnée pour le menu déroulant une fois chargé
+    window._ttsSelectedVoiceId = d.voiceId || '';
+
+    loadTTSQuota();
   } catch(e) {}
+}
+
+async function loadTTSVoices() {
+  try {
+    const r = await fetch('/api/tts/voices');
+    const d = await r.json();
+    const select = document.getElementById('tts-voice-select');
+    if (!select) return;
+
+    if (d.error === 'no_api_key') {
+      select.innerHTML = '<option value="">— Enregistre ta clé API d\u2019abord —</option>';
+      return;
+    }
+    if (d.error === 'invalid_api_key') {
+      select.innerHTML = '<option value="">— Clé API invalide —</option>';
+      return;
+    }
+    if (!d.data?.length) {
+      select.innerHTML = '<option value="">— Aucune voix trouvée —</option>';
+      return;
+    }
+
+    select.innerHTML = d.data.map(v => `<option value="${v.id}">${esc(v.name)}${v.category ? ' (' + v.category + ')' : ''}</option>`).join('');
+    if (window._ttsSelectedVoiceId) select.value = window._ttsSelectedVoiceId;
+  } catch(e) {}
+}
+
+async function loadTTSQuota() {
+  try {
+    const r = await fetch('/api/tts/quota');
+    const d = await r.json();
+    const badge = document.getElementById('tts-quota-badge');
+    const info  = document.getElementById('tts-quota-info');
+
+    if (!d.valid) {
+      if (badge) { badge.textContent = ''; }
+      if (info) info.style.display = 'none';
+      return;
+    }
+
+    if (badge) {
+      badge.textContent = '🟢 Connecté';
+      badge.style.background = 'var(--accent-bg)';
+      badge.style.color = 'var(--accent)';
+      badge.style.border = '1px solid var(--accent-brd)';
+    }
+
+    if (info && d.characterLimit) {
+      info.style.display = 'block';
+      const pct = Math.min(100, Math.round((d.characterCount / d.characterLimit) * 100));
+      document.getElementById('tts-quota-bar').style.width = pct + '%';
+      document.getElementById('tts-quota-used').textContent = d.characterCount.toLocaleString('fr') + ' utilisés';
+      document.getElementById('tts-quota-total').textContent = d.characterLimit.toLocaleString('fr') + ' (' + d.tier + ')';
+    }
+  } catch(e) {}
+}
+
+async function saveTTSApiKey() {
+  const apiKey = document.getElementById('tts-api-key').value.trim();
+  if (!apiKey) return toast('Entre une clé API', false);
+  const r = await fetch('/api/admin/tts/settings', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ api_key: apiKey }) });
+  if (!r.ok) return toast('Erreur lors de l\u2019enregistrement', false);
+  toast('🔑 Clé API enregistrée ✓');
+  document.getElementById('tts-api-key').value = '';
+  loadTTSSettings();
+  loadTTSVoices();
+}
+
+async function saveTTSVoiceSettings() {
+  const voiceId = document.getElementById('tts-voice-select').value;
+  const stability = (parseInt(document.getElementById('tts-stability').value) / 100).toFixed(2);
+  const similarity = (parseInt(document.getElementById('tts-similarity').value) / 100).toFixed(2);
+  const volume = (parseInt(document.getElementById('tts-volume').value) / 100).toFixed(2);
+
+  if (!voiceId) return showInline('tts-voice-msg', 'Sélectionne une voix', false);
+
+  const r = await fetch('/api/admin/tts/settings', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({ voice_id: voiceId, stability, similarity_boost: similarity, volume })
+  });
+  if (!r.ok) return showInline('tts-voice-msg', 'Erreur', false);
+  toast('🎙️ Réglages voix enregistrés ✓');
+}
+
+async function previewVoice() {
+  const message = "Bonjour, ceci est un aperçu de ma voix sur le stream.";
+  const voiceId = document.getElementById('tts-voice-select').value;
+  if (!voiceId) return toast('Sélectionne une voix d\u2019abord', false);
+  await saveTTSVoiceSettings();
+  await testTTS(message);
+}
+
+async function saveTTSLimits() {
+  const minDonation = document.getElementById('tts-min-donation').value || '0';
+  const maxLength = document.getElementById('tts-max-length').value || '180';
+  const webhookSecret = document.getElementById('tts-webhook-secret').value.trim();
+
+  const payload = { min_donation: minDonation, max_text_length: maxLength };
+  if (webhookSecret) payload.webhook_secret = webhookSecret;
+
+  const r = await fetch('/api/admin/tts/settings', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload) });
+  if (!r.ok) return showInline('tts-limits-msg', 'Erreur', false);
+  toast('⚙️ Seuils enregistrés ✓');
+  document.getElementById('tts-webhook-secret').value = '';
+  loadTTSSettings();
 }
 
 async function loadTTSHistory() {
@@ -2049,14 +2233,14 @@ async function deleteTTSBlacklistWord(id) {
   loadTTSBlacklist();
 }
 
-async function testTTS() {
-  const message = document.getElementById('tts-test-message').value.trim();
+async function testTTS(overrideMessage) {
+  const message = overrideMessage || document.getElementById('tts-test-message').value.trim();
   if (!message) return showInline('tts-test-msg', 'Entre un message à tester', false);
   const r = await fetch('/api/tts/test', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({message}) });
   const json = await r.json();
   if (!r.ok) return showInline('tts-test-msg', json.error || 'Erreur', false);
-  toast('🔊 Message envoyé sur l\u2019overlay');
-  document.getElementById('tts-test-message').value = '';
+  toast(json.audioGenerated ? '🔊 Message envoyé avec audio' : '🔊 Envoyé (sans audio — vérifie la clé API)');
+  if (!overrideMessage) document.getElementById('tts-test-message').value = '';
   loadTTSHistory();
 }
 

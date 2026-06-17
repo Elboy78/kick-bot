@@ -52,6 +52,7 @@ function processQueue() {
 
   if (data.audio) {
     const audio = new Audio('data:audio/mpeg;base64,' + data.audio);
+    audio.volume = (data.volume !== undefined && data.volume !== null) ? Math.max(0, Math.min(1, data.volume)) : 1;
     audio.onended = () => { hideCard(); setTimeout(processQueue, 500); };
     audio.onerror = () => { hideCard(); setTimeout(processQueue, 500); };
     audio.play().catch(() => { hideCard(); setTimeout(processQueue, 500); });

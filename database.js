@@ -200,6 +200,11 @@ async function initSchema() {
       enabled    INTEGER NOT NULL DEFAULT 1,
       created_at TEXT NOT NULL DEFAULT (datetime('now'))
     )`,
+    `CREATE TABLE IF NOT EXISTS tts_config (
+      key        TEXT PRIMARY KEY,
+      value      TEXT NOT NULL DEFAULT '',
+      updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+    )`,
     `CREATE TABLE IF NOT EXISTS oauth_tokens (
       provider     TEXT PRIMARY KEY,
       access_token  TEXT NOT NULL,
@@ -534,6 +539,27 @@ async function deleteAccessRequest(username) {
   await run(`DELETE FROM panel_access WHERE username = ?`, [username.toLowerCase()]);
 }
 
+// ─── TTS Config (réglages pilotables depuis le panel) ──────────────────────────
+
+async function getTTSConfig() {
+  const rows = await all(`SELECT * FROM tts_config`);
+  const result = {};
+  rows.forEach(r => { result[r.key] = r.value; });
+  return result;
+}
+async function setTTSConfigValue(key, value) {
+  await run(
+    `INSERT INTO tts_config (key, value, updated_at) VALUES (?, ?, datetime('now'))
+     ON CONFLICT(key) DO UPDATE SET value = ?, updated_at = datetime('now')`,
+    [key, String(value), String(value)]
+  );
+}
+async function setTTSConfigBulk(obj) {
+  for (const [key, value] of Object.entries(obj)) {
+    await setTTSConfigValue(key, value);
+  }
+}
+
 // ─── OAuth Tokens (Kick officiel) ──────────────────────────────────────────────
 
 async function saveOAuthToken(provider, accessToken, refreshToken, expiresAt) {
@@ -832,6 +858,7 @@ module.exports = {
   getAnnouncements, addAnnouncement, toggleAnnouncement, deleteAnnouncement, updateAnnouncementSent,
   getTTSBlacklist, addTTSBlacklistWord, deleteTTSBlacklistWord, isTTSBlacklisted,
   getTTSHistory, addTTSHistory, clearTTSHistory,
+  getTTSConfig, setTTSConfigValue, setTTSConfigBulk,
   setBotStatus, getBotStatus, getAllBotStatus,
   saveOAuthToken, getOAuthToken, deleteOAuthToken,
 };
