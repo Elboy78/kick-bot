@@ -244,6 +244,7 @@ hr.div{border:none;border-top:1px solid var(--brd);margin:12px 0}
   <nav class="menu">
     <a class="active" onclick="showPage('dashboard')">🏠 Dashboard</a>
     <a onclick="showPage('classement')">🏆 Classement</a>
+    <a onclick="showPage('config-classement')">🎚️ Config Classement</a>
 
     <div class="menu-section">Outils</div>
     <a onclick="showPage('commands')">⚙️ Commandes</a>
@@ -368,6 +369,7 @@ hr.div{border:none;border-top:1px solid var(--brd);margin:12px 0}
           <li><span>Viewers</span><span id="ic-viewers">—</span></li>
           <li><span>Followers</span><span id="ic-followers">—</span></li>
           <li><span>Statut live</span><span id="ic-live-badge" class="ic-offline-badge">Hors ligne</span></li>
+          <li><span>Vu par le bot</span><span id="ic-bot-live-status">—</span></li>
           <li><span>Uptime</span><span id="ic-uptime">—</span></li>
           <li><span>Préfixe</span><span>!</span></li>
           <li><span>Langue</span><span>🇫🇷 Français</span></li>
@@ -390,6 +392,52 @@ hr.div{border:none;border-top:1px solid var(--brd);margin:12px 0}
       <div class="tw"><table><thead><tr><th>#</th><th>Viewer</th><th>Niveau</th><th>Points</th><th>Temps regardé</th><th>Vu il y a</th></tr></thead><tbody id="lb-body"><tr><td colspan="6"><div class="empty"><p>Chargement…</p></div></td></tr></tbody></table></div>
     </div>
     <div class="panel"><h3>⭐ Niveaux</h3><div class="g3" id="levels-grid"></div></div>
+  </div>
+
+  <!-- ══ CONFIG CLASSEMENT ══ -->
+  <div class="page" id="page-config-classement">
+    <div class="header"><div><h1>Configuration du classement</h1><p>Points, intervalle de distribution et niveaux</p></div></div>
+    <div class="g2">
+      <div>
+        <div class="panel" style="margin-bottom:14px">
+          <h3>⭐ Système de points</h3>
+          <div style="font-size:10px;color:var(--muted);margin-bottom:10px;line-height:1.6">
+            Chaque viewer ayant écrit dans le chat reçoit ce montant à intervalle régulier, uniquement pendant que le live est actif. La distribution s'arrête immédiatement hors-ligne et reprend automatiquement au prochain live.
+          </div>
+          <label class="lbl">Points par intervalle</label>
+          <input type="number" class="inp" id="cfg-points-amount" placeholder="10" min="1">
+          <label class="lbl">Intervalle de distribution</label>
+          <div style="display:flex;align-items:center;gap:8px">
+            <input type="number" class="inp" id="cfg-points-interval" placeholder="5" min="1" style="width:100px">
+            <span style="font-size:11px;color:var(--muted)">minutes</span>
+          </div>
+          <button class="btnx btn-outline" style="width:100%;justify-content:center;margin-top:12px" onclick="saveConfigPoints()">💾 Enregistrer</button>
+          <div id="cfg-points-msg" style="margin-top:7px"></div>
+        </div>
+
+        <div class="panel">
+          <h3>➕ Ajouter un niveau</h3>
+          <label class="lbl">Nom du niveau</label>
+          <input class="inp" id="cfg-level-name" placeholder="Ex: Mythique">
+          <label class="lbl">Points minimum requis</label>
+          <input type="number" class="inp" id="cfg-level-min" placeholder="Ex: 20000" min="0">
+          <label class="lbl">Emoji</label>
+          <input class="inp" id="cfg-level-emoji" placeholder="🔥" maxlength="4">
+          <button class="btnx btn-primary" style="width:100%;justify-content:center;margin-top:12px" onclick="addConfigLevel()">➕ Ajouter le niveau</button>
+          <div id="cfg-level-msg" style="margin-top:7px"></div>
+        </div>
+      </div>
+
+      <div>
+        <div class="panel">
+          <h3>🎚️ Niveaux existants (<span id="cfg-levels-count">0</span>)</h3>
+          <div style="font-size:10px;color:var(--muted);margin-bottom:10px;line-height:1.6">
+            Le niveau d'un viewer est recalculé automatiquement à chaque gain de points selon ces seuils.
+          </div>
+          <div id="cfg-levels-list"><div class="empty"><p>Chargement…</p></div></div>
+        </div>
+      </div>
+    </div>
   </div>
 
   <!-- ══ LOBBY ══ -->
@@ -691,6 +739,7 @@ function showPage(name) {
     if(t.getAttribute('onclick') === "showPage('"+name+"')") t.classList.add('active');
   });
   if(name==='classement') loadLeaderboard();
+  if(name==='config-classement') loadConfigClassement();
   if(name==='jeux') { loadDuels(); loadGiveaways(); loadActiveGiveaway(); }
   if(name==='objectifs') loadObjectives();
   if(name==='historique') { loadHistory(); loadFullLogs(); }
@@ -870,11 +919,10 @@ function filterLB() {
 }
 
 function renderLevelsGrid() {
-  const emojis=['🥉','🥈','🥇','💎','💠','👑'];
-  document.getElementById('levels-grid').innerHTML = levels.map((l,i) => `
+  document.getElementById('levels-grid').innerHTML = levels.map(l => `
     <div class="level-card">
-      <div class="level-emoji">${emojis[i]||'⭐'}</div>
-      <div class="level-name">${l.name}</div>
+      <div class="level-emoji">${l.emoji || '⭐'}</div>
+      <div class="level-name">${esc(l.name)}</div>
       <div class="level-pts">${l.min.toLocaleString('fr')} pts min</div>
     </div>`).join('');
 }
@@ -1053,7 +1101,7 @@ async function addCmd(){const t=document.getElementById('cmd-trigger').value.tri
 async function deleteCmd(t){await del('/api/admin/commands/'+encodeURIComponent(t));loadCmds();}
 
 function loadAdminLevels(){renderAdminLevels();}
-function renderAdminLevels(){const el=document.getElementById('admin-levels');if(!el||!levels.length)return;const em=['🥉','🥈','🥇','💎','💠','👑'];el.innerHTML=levels.map((l,i)=>`<div style="display:flex;justify-content:space-between;align-items:center;padding:9px 0;border-bottom:1px solid var(--brd)"><span>${em[i]||'⭐'} <b style="margin-left:4px">${l.name}</b></span><span style="color:var(--muted2);font-size:12px">${l.min.toLocaleString('fr')} pts</span></div>`).join('');}
+function renderAdminLevels(){const el=document.getElementById('admin-levels');if(!el||!levels.length)return;el.innerHTML=levels.map(l=>`<div style="display:flex;justify-content:space-between;align-items:center;padding:9px 0;border-bottom:1px solid var(--brd)"><span>${l.emoji||'⭐'} <b style="margin-left:4px">${esc(l.name)}</b></span><span style="color:var(--muted2);font-size:12px">${l.min.toLocaleString('fr')} pts</span></div>`).join('');}
 
 // ── Lobby ──────────────────────────────────────────────────────────────────────
 let lobbyData=[], wheelSpinning=false, wheelAngle=0;
@@ -1145,9 +1193,10 @@ function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').
 
 function lvBadge(level){
   const cls={Bronze:'lv-bronze',Argent:'lv-argent',Or:'lv-or',Platine:'lv-platine',Diamant:'lv-diamant','Légende':'lv-légende'};
-  const em={Bronze:'🥉',Argent:'🥈',Or:'🥇',Platine:'💎',Diamant:'💠','Légende':'👑'};
   const l=level||'Bronze';
-  return `<span class="badge ${cls[l]||'lv-bronze'}">${em[l]||'🥉'} ${l}</span>`;
+  const found = (levels||[]).find(lv => lv.name === l);
+  const em = found ? found.emoji : ({Bronze:'🥉',Argent:'🥈',Or:'🥇',Platine:'💎',Diamant:'💠','Légende':'👑'}[l] || '⭐');
+  return `<span class="badge ${cls[l]||'lv-bronze'}">${em} ${esc(l)}</span>`;
 }
 
 function fmtReason(r){return{watch_time:'⏱ Temps de stream',duel_win:'⚔️ Duel gagné',duel_loss:'⚔️ Duel perdu',admin_add:'➕ Ajout admin',admin_remove:'➖ Retrait admin',admin_manual:'⚙️ Admin',giveaway_entry:'🎁 Giveaway'}[r]||r;}
@@ -1967,6 +2016,20 @@ async function checkBotTokenStatus() {
         badge.style.border = '1px solid var(--accent-brd)';
       }
     }
+
+    const botLiveEl = document.getElementById('ic-bot-live-status');
+    if (botLiveEl) {
+      if (!d.lastLiveCheckAt) {
+        botLiveEl.textContent = '— jamais vérifié';
+        botLiveEl.style.color = 'var(--muted2)';
+      } else {
+        const secAgo = Math.floor((Date.now() - d.lastLiveCheckAt) / 1000);
+        const ago = secAgo < 60 ? secAgo + 's' : Math.floor(secAgo/60) + 'min';
+        const sourceLabel = { official: 'API officielle', failed: 'échec' }[d.lastLiveCheckSource] || d.lastLiveCheckSource || '?';
+        botLiveEl.textContent = (d.isLive ? '🔴 LIVE' : '⚫ Hors ligne') + ` (${sourceLabel}, il y a ${ago})`;
+        botLiveEl.style.color = d.isLive ? 'var(--accent)' : 'var(--muted)';
+      }
+    }
   } catch(e) {}
 }
 
@@ -2310,6 +2373,114 @@ async function savePointsConfig() {
   const json = await r.json();
   if (!r.ok) return showInline('points-config-msg', json.error || 'Erreur', false);
   toast('⭐ Système de points mis à jour ✓ (effectif sous 2 min)');
+}
+
+// ── Config Classement (page dédiée) ─────────────────────────────────────────────
+
+async function loadConfigClassement() {
+  await Promise.all([loadConfigPoints(), loadConfigLevels()]);
+}
+
+async function loadConfigPoints() {
+  try {
+    const r = await fetch('/api/points/config');
+    const d = await r.json();
+    const amountEl = document.getElementById('cfg-points-amount');
+    const intervalEl = document.getElementById('cfg-points-interval');
+    if (amountEl) amountEl.value = d.pointsAmount || 10;
+    if (intervalEl) intervalEl.value = d.intervalMinutes || 5;
+  } catch(e) {}
+}
+
+async function saveConfigPoints() {
+  const pointsAmount = document.getElementById('cfg-points-amount').value;
+  const intervalMinutes = document.getElementById('cfg-points-interval').value;
+  const r = await fetch('/api/admin/points/config', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ pointsAmount, intervalMinutes })
+  });
+  const json = await r.json();
+  if (!r.ok) return showInline('cfg-points-msg', json.error || 'Erreur', false);
+  toast('⭐ Système de points mis à jour ✓ (effectif sous 2 min)');
+  loadPointsConfig(); // garde l'ancienne carte settings en phase si elle existe
+}
+
+async function loadConfigLevels() {
+  try {
+    levels = await get('/api/levels') || [];
+    const countEl = document.getElementById('cfg-levels-count');
+    if (countEl) countEl.textContent = levels.length;
+    const el = document.getElementById('cfg-levels-list');
+    if (!el) return;
+    if (!levels.length) { el.innerHTML = '<div class="empty"><p>Aucun niveau configuré</p></div>'; return; }
+
+    el.innerHTML = levels.map(l => `
+      <div style="display:flex;align-items:center;gap:8px;padding:9px 10px;background:var(--card2);border:1px solid var(--brd);border-radius:10px;margin-bottom:6px">
+        <span style="font-size:18px">${l.emoji}</span>
+        <div style="flex:1;min-width:0">
+          <input class="inp inp-sm" value="${esc(l.name)}" id="lvl-name-${l.id}" style="margin-bottom:4px">
+          <div style="display:flex;gap:6px;align-items:center">
+            <input type="number" class="inp inp-sm" value="${l.min}" id="lvl-min-${l.id}" style="width:90px">
+            <input class="inp inp-sm" value="${l.emoji}" id="lvl-emoji-${l.id}" maxlength="4" style="width:48px;text-align:center">
+            <span style="font-size:9px;color:var(--muted2)">pts min</span>
+          </div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:4px">
+          <button class="btnx btn-outline btn-xs" onclick="saveConfigLevel(${l.id})">💾</button>
+          <button class="btnx btn-red btn-xs" onclick="deleteConfigLevel(${l.id})">✕</button>
+        </div>
+      </div>`).join('');
+
+    // Renderer aussi la grille classique de la page Classement pour rester synchro
+    renderLevelsGrid();
+    renderAdminLevels();
+  } catch(e) {}
+}
+
+async function addConfigLevel() {
+  const name = document.getElementById('cfg-level-name').value.trim();
+  const min = document.getElementById('cfg-level-min').value;
+  const emoji = document.getElementById('cfg-level-emoji').value.trim() || '⭐';
+
+  if (!name) return showInline('cfg-level-msg', 'Entre un nom de niveau', false);
+  if (min === '' || isNaN(parseInt(min))) return showInline('cfg-level-msg', 'Entre un seuil de points valide', false);
+
+  const r = await fetch('/api/admin/levels', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name, min, emoji })
+  });
+  const json = await r.json();
+  if (!r.ok) return showInline('cfg-level-msg', json.error || 'Erreur', false);
+
+  toast('🎚️ Niveau ajouté ✓');
+  document.getElementById('cfg-level-name').value = '';
+  document.getElementById('cfg-level-min').value = '';
+  document.getElementById('cfg-level-emoji').value = '';
+  loadConfigLevels();
+}
+
+async function saveConfigLevel(id) {
+  const name = document.getElementById('lvl-name-' + id).value.trim();
+  const min = document.getElementById('lvl-min-' + id).value;
+  const emoji = document.getElementById('lvl-emoji-' + id).value.trim() || '⭐';
+
+  if (!name || min === '' || isNaN(parseInt(min))) return toast('Champs invalides', false);
+
+  const r = await fetch('/api/admin/levels/' + id, {
+    method: 'PUT', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name, min, emoji })
+  });
+  if (!r.ok) return toast('Erreur lors de la mise à jour', false);
+  toast('✅ Niveau mis à jour');
+  loadConfigLevels();
+}
+
+async function deleteConfigLevel(id) {
+  if (!confirm('Supprimer ce niveau ? Les viewers ayant ce niveau seront recalculés au prochain gain de points.')) return;
+  const r = await fetch('/api/admin/levels/' + id, { method: 'DELETE' });
+  if (!r.ok) return toast('Erreur lors de la suppression', false);
+  toast('🗑️ Niveau supprimé');
+  loadConfigLevels();
 }
 
 async function loadBotFeatures() {

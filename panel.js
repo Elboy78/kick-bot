@@ -51,7 +51,30 @@ app.get('/api/viewer/:u',      waitDB,      async (req,res) => { try { const v=a
 app.get('/api/stats',          waitDB,          async (req,res) => { try { res.json({data: await db.getGlobalStats()}); } catch(e){res.json({data:{}}); }});
 app.get('/api/logs',           waitDB,           async (req,res) => { try { res.json({data: await db.getRecentLogs(Math.min(parseInt(req.query.limit||50),500))}); } catch(e){res.json({data:[]}); }});
 app.get('/api/active',         async (req,res) => { try { res.json({data: await db.getActiveViewers(parseInt(req.query.minutes||10))}); } catch(e){res.json({data:[]}); }});
-app.get('/api/levels',         (req,res) => res.json({data: db.LEVELS}));
+app.get('/api/levels', async (req,res) => { try { res.json({data: await db.getLevels()}); } catch(e) { res.json({data:[]}); }});
+
+app.post('/api/admin/levels', async (req, res) => {
+  try {
+    const { name, min, emoji } = req.body;
+    if (!name || min === undefined) return res.status(400).json({ error: 'name et min requis' });
+    await db.addLevel(name, parseInt(min), emoji || '⭐');
+    res.json({ success: true });
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+app.put('/api/admin/levels/:id', async (req, res) => {
+  try {
+    const { name, min, emoji } = req.body;
+    if (!name || min === undefined) return res.status(400).json({ error: 'name et min requis' });
+    await db.updateLevel(req.params.id, name, parseInt(min), emoji || '⭐');
+    res.json({ success: true });
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+app.delete('/api/admin/levels/:id', async (req, res) => {
+  try { await db.deleteLevel(req.params.id); res.json({ success: true }); }
+  catch(e) { res.status(500).json({ error: e.message }); }
+});
 app.get('/api/commands',       waitDB,       async (req,res) => { try { res.json({data: await db.getCustomCommands()}); } catch(e){res.json({data:[]}); }});
 app.get('/api/objectives',     waitDB,     async (req,res) => { try { res.json({data: await db.getObjectives()}); } catch(e){res.json({data:[]}); }});
 app.get('/api/history',        async (req,res) => { try { res.json({data: await db.getStreamHistory(parseInt(req.query.limit||20))}); } catch(e){res.json({data:[]}); }});
@@ -500,6 +523,9 @@ app.get('/api/bot-status', async (req, res) => {
       tokenExpired: status.token_expired?.value === '1',
       botStartedAt: status.bot_started_at?.value || null,
       lastUpdate: status.token_expired?.updated_at || null,
+      isLive: status.is_live?.value === '1',
+      lastLiveCheckAt: status.last_live_check_at?.value ? parseInt(status.last_live_check_at.value) : null,
+      lastLiveCheckSource: status.last_live_check_source?.value || null,
     });
   } catch(e) { res.json({ tokenExpired: false }); }
 });

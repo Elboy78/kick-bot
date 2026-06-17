@@ -234,7 +234,7 @@ async function cmdPoints(username) {
   const v = await db.getViewer(username);
   if (!v) return sendChat(`@${username} Tu n'as pas encore de points. Regarde le stream pour en gagner !`);
   const rank  = await db.getViewerRank(username);
-  const level = db.getLevel(v.points);
+  const level = await db.getLevel(v.points);
   sendChat(`@${username} ${level.emoji} ${level.name} — ${v.points} pts (rang #${rank||'?'}) — ${formatMin(v.total_minutes)} regardées`);
 }
 
@@ -255,8 +255,8 @@ async function cmdRang(username) {
 async function cmdNiveau(username) {
   const v = await db.getViewer(username);
   if (!v) return sendChat(`@${username} Tu n'as pas encore de points !`);
-  const level = db.getLevel(v.points);
-  const next  = db.getNextLevel(v.points);
+  const level = await db.getLevel(v.points);
+  const next  = await db.getNextLevel(v.points);
   if (!next) return sendChat(`@${username} ${level.emoji} Niveau maximum : ${level.name} ! 👑`);
   sendChat(`@${username} ${level.emoji} Niveau ${level.name} — encore ${next.min - v.points} pts pour ${next.emoji} ${next.name}`);
 }
@@ -592,7 +592,10 @@ async function sendChat(message) {
 async function fetchKickChannelOfficial() {
   try {
     const { token, official } = await getActiveToken();
-    if (!token || !official) return null;
+    if (!token || !official) {
+      console.log('[STREAM] OAuth officiel non disponible pour checkLiveStatus (token absent ou legacy)');
+      return null;
+    }
 
     const res = await axios.get(
       `https://api.kick.com/public/v1/channels`,
@@ -603,20 +606,24 @@ async function fetchKickChannelOfficial() {
       }
     );
     const channel = res.data?.data?.[0];
-    if (!channel) return null;
+    if (!channel) {
+      console.log(`[STREAM] API officielle: aucune chaîne trouvée pour le slug "${CONFIG.channel}"`);
+      return null;
+    }
 
-    // Normaliser au même format que l'ancienne fonction interne
+    const isLiveNow = !!(channel.stream && channel.stream.is_live);
+    console.log(`[STREAM] API officielle OK — is_live=${isLiveNow} viewer_count=${channel.stream?.viewer_count ?? 'n/a'}`);
+
     return {
-      livestream: channel.stream?.is_live ? {
+      livestream: isLiveNow ? {
         is_live: true,
         viewer_count: channel.stream.viewer_count || 0,
       } : null,
       followers_count: channel.followers_count || 0,
+      _source: 'official',
     };
   } catch(err) {
-    if (err.response?.status) {
-      console.log(`[STREAM] API officielle erreur ${err.response.status}`);
-    }
+    console.log(`[STREAM] API officielle erreur: ${err.response?.status || err.message}`);
     return null;
   }
 }
@@ -661,14 +668,20 @@ async function fetchKickChannel() {
 
 async function checkLiveStatus() {
   const data = await fetchKickChannel();
+  db.setBotStatus('last_live_check_at', Date.now().toString()).catch(()=>{});
+
   if (!data) {
     console.log('[STREAM] Impossible de vérifier le statut live (API officielle et interne indisponibles) — statut conservé:', isLive ? 'LIVE' : 'OFF');
+    db.setBotStatus('last_live_check_source', 'failed').catch(()=>{});
+    db.setBotStatus('is_live', isLive ? '1' : '0').catch(()=>{});
     return isLive;
   }
 
   const live = data?.livestream;
   const wasLive = isLive;
   isLive = !!(live?.is_live);
+  db.setBotStatus('is_live', isLive ? '1' : '0').catch(()=>{});
+  db.setBotStatus('last_live_check_source', data._source || 'unknown').catch(()=>{});
 
   if (isLive && !wasLive) {
     console.log('[STREAM] Stream démarré !');

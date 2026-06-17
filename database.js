@@ -200,6 +200,13 @@ async function initSchema() {
       enabled    INTEGER NOT NULL DEFAULT 1,
       created_at TEXT NOT NULL DEFAULT (datetime('now'))
     )`,
+    `CREATE TABLE IF NOT EXISTS level_config (
+      id         INTEGER PRIMARY KEY AUTOINCREMENT,
+      name       TEXT NOT NULL,
+      min_points INTEGER NOT NULL DEFAULT 0,
+      emoji      TEXT NOT NULL DEFAULT '⭐',
+      sort_order INTEGER NOT NULL DEFAULT 0
+    )`,
     `CREATE TABLE IF NOT EXISTS points_config (
       key        TEXT PRIMARY KEY,
       value      TEXT NOT NULL DEFAULT '',
@@ -261,7 +268,7 @@ async function initSchema() {
 
 // ─── Niveaux ──────────────────────────────────────────────────────────────────
 
-const LEVELS = [
+const DEFAULT_LEVELS = [
   { name: 'Bronze',  min: 0,     emoji: '🥉' },
   { name: 'Argent',  min: 500,   emoji: '🥈' },
   { name: 'Or',      min: 1500,  emoji: '🥇' },
@@ -270,14 +277,45 @@ const LEVELS = [
   { name: 'Légende', min: 12000, emoji: '👑' },
 ];
 
-function getLevel(points) {
-  let level = LEVELS[0];
-  for (const l of LEVELS) { if (points >= l.min) level = l; }
+async function ensureLevelsSeeded() {
+  const count = await get(`SELECT COUNT(*) as c FROM level_config`);
+  if (count?.c > 0) return;
+  for (let i = 0; i < DEFAULT_LEVELS.length; i++) {
+    const l = DEFAULT_LEVELS[i];
+    await run(`INSERT INTO level_config (name, min_points, emoji, sort_order) VALUES (?, ?, ?, ?)`, [l.name, l.min, l.emoji, i]);
+  }
+}
+
+async function getLevels() {
+  await ensureLevelsSeeded();
+  const rows = await all(`SELECT * FROM level_config ORDER BY min_points ASC`);
+  return rows.map(r => ({ id: r.id, name: r.name, min: r.min_points, emoji: r.emoji }));
+}
+
+async function addLevel(name, min, emoji) {
+  const maxOrder = await get(`SELECT MAX(sort_order) as m FROM level_config`);
+  await run(`INSERT INTO level_config (name, min_points, emoji, sort_order) VALUES (?, ?, ?, ?)`,
+    [name, min, emoji || '⭐', (maxOrder?.m ?? -1) + 1]);
+}
+
+async function updateLevel(id, name, min, emoji) {
+  await run(`UPDATE level_config SET name = ?, min_points = ?, emoji = ? WHERE id = ?`, [name, min, emoji, id]);
+}
+
+async function deleteLevel(id) {
+  await run(`DELETE FROM level_config WHERE id = ?`, [id]);
+}
+
+async function getLevel(points) {
+  const levels = await getLevels();
+  let level = levels[0] || DEFAULT_LEVELS[0];
+  for (const l of levels) { if (points >= l.min) level = l; }
   return level;
 }
 
-function getNextLevel(points) {
-  for (const l of LEVELS) { if (points < l.min) return l; }
+async function getNextLevel(points) {
+  const levels = await getLevels();
+  for (const l of levels) { if (points < l.min) return l; }
   return null;
 }
 
@@ -304,7 +342,7 @@ async function addPoints(username, points, reason = 'watch_time') {
 
   const viewer = await get(`SELECT points FROM viewers WHERE username = ?`, [username.toLowerCase()]);
   if (viewer) {
-    const level = getLevel(viewer.points);
+    const level = await getLevel(viewer.points);
     await run(`UPDATE viewers SET level = ? WHERE username = ?`, [level.name, username.toLowerCase()]);
   }
 
@@ -864,7 +902,7 @@ module.exports = {
   getDB,
   upsertViewer, addPoints, getViewer, getLeaderboard, getViewerRank,
   getGlobalStats, getRecentLogs, getActiveViewers, clearAllPoints,
-  getLevel, getNextLevel, LEVELS,
+  getLevel, getNextLevel, getLevels, addLevel, updateLevel, deleteLevel,
   getCustomCommands, getCustomCommand, setCustomCommand, deleteCustomCommand, toggleCustomCommand,
   getObjectives, createObjective, deleteObjective, achieveObjective,
   startSession, endSession, getStreamHistory,
