@@ -282,6 +282,13 @@ async function initSchema() {
 
 // ─── Niveaux ──────────────────────────────────────────────────────────────────
 
+// Renvoie la date du jour (YYYY-MM-DD) en heure de Paris, peu importe le fuseau
+// du serveur (Render tourne en UTC, ce qui décale "aujourd'hui" autour de minuit).
+function todayParis() {
+  const formatter = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Paris', year: 'numeric', month: '2-digit', day: '2-digit' });
+  return formatter.format(new Date()); // format en-CA => YYYY-MM-DD
+}
+
 const DEFAULT_LEVELS = [
   { name: 'Bronze',  min: 0,     emoji: '🥉' },
   { name: 'Argent',  min: 500,   emoji: '🥈' },
@@ -498,7 +505,7 @@ async function getCommandUsageStats(days = 7) {
 }
 
 async function logChatActivity(username) {
-  const today = new Date().toISOString().slice(0, 10);
+  const today = todayParis();
   const row = await get(`SELECT * FROM chat_activity_daily WHERE date = ?`, [today]);
   if (!row) {
     await run(`INSERT INTO chat_activity_daily (date, message_count, unique_chatters) VALUES (?, 1, ?)`,
@@ -521,12 +528,13 @@ async function getChatActivityWeek() {
     try { chatters = JSON.parse(r.unique_chatters); } catch(e) {}
     map[r.date] = { messageCount: r.message_count, uniqueChatters: chatters.length };
   });
-  // Compléter les 7 derniers jours même sans données (0 par défaut)
+  // Compléter les 7 derniers jours (en heure de Paris) même sans données (0 par défaut)
+  const todayStr = todayParis(); // YYYY-MM-DD en heure de Paris
+  const [ty, tm, td] = todayStr.split('-').map(Number);
+  const todayUTCMidnight = Date.UTC(ty, tm - 1, td); // ancre neutre, juste pour décaler par jour
   const result = [];
   for (let i = 6; i >= 0; i--) {
-    const d = new Date();
-    d.setDate(d.getDate() - i);
-    const dateStr = d.toISOString().slice(0, 10);
+    const dateStr = new Date(todayUTCMidnight - i * 86400000).toISOString().slice(0, 10);
     result.push({ date: dateStr, messageCount: map[dateStr]?.messageCount || 0, uniqueChatters: map[dateStr]?.uniqueChatters || 0 });
   }
   return result;
