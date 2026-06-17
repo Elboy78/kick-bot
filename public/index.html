@@ -8,9 +8,9 @@
 <style>
 *{margin:0;padding:0;box-sizing:border-box;font-family:Inter,Arial,sans-serif}
 :root{
-  --bg:var(--bg);--bg2:var(--bg2);--side:var(--side);--card:var(--card);--card2:var(--card2);--brd:var(--brd);--brd2:var(--brd2);--brd3:var(--brd3);
-  --text:#ffffff;--muted:var(--muted);--muted2:var(--muted2);
-  --accent:var(--accent);--accent-l:#5cff8e;--accent-bg:rgba(40,255,102,.1);--accent-brd:rgba(40,255,102,.3);
+  --bg:#050814;--bg2:#10142b;--side:#07091a;--card:#0c1024;--card2:#0f1428;--brd:#171d35;--brd2:#20233a;--brd3:#222943;
+  --text:#ffffff;--muted:#a1a1aa;--muted2:#4a4d68;
+  --accent:#28ff66;--accent-l:#5cff8e;--accent-bg:rgba(40,255,102,.1);--accent-brd:rgba(40,255,102,.3);
   --accent-grad1:#17c95f;--accent-grad2:#098b3b;
 }
 body{background:var(--bg);color:var(--text);display:flex;min-height:100vh;font-size:13px;transition:background .25s,color .25s}
@@ -26,7 +26,7 @@ body.light{
 .logo span{color:var(--accent)}
 .menu{display:flex;flex-direction:column}
 .menu a{display:flex;align-items:center;gap:10px;color:#d8d8e8;text-decoration:none;padding:12px 16px;border-radius:12px;margin:3px 0;font-size:13px;font-weight:500;border:none;background:transparent;width:100%;text-align:left;font-family:inherit;cursor:pointer}
-.menu a.active,.menu a:hover{background:linear-gradient(90deg,#6b22ff,#27125c);color:var(--text)}
+.menu a.active,.menu a:hover{background:linear-gradient(90deg,var(--accent-grad1),var(--accent-grad2));color:#000;font-weight:700}
 .menu-section{font-size:9px;font-weight:700;color:var(--muted2);text-transform:uppercase;letter-spacing:1px;margin:14px 16px 4px}
 
 .bot-status{margin-top:20px;border:1px solid #ff0055;border-radius:15px;padding:16px;font-size:11px}
@@ -282,6 +282,15 @@ hr.div{border:none;border-top:1px solid var(--brd);margin:12px 0}
 </aside>
 
 <main class="main">
+
+  <div id="token-alert-banner" style="display:none;background:linear-gradient(135deg,rgba(255,59,95,.15),rgba(255,59,95,.05));border:1px solid rgba(255,59,95,.4);border-radius:12px;padding:12px 16px;margin-bottom:18px;display:none;align-items:center;gap:12px">
+    <span style="font-size:20px">⚠️</span>
+    <div style="flex:1">
+      <div style="font-size:12px;font-weight:700;color:#ff3b5f">Le token Kick a expiré — le bot ne répond plus dans le chat</div>
+      <div style="font-size:10px;color:var(--muted);margin-top:1px">Renouvelle-le en quelques secondes dans Paramètres → Token Kick</div>
+    </div>
+    <button class="btnx btn-red btn-sm" onclick="showPage('settings')">Renouveler maintenant</button>
+  </div>
 
   <!-- ══ DASHBOARD ══ -->
   <div class="page active" id="page-dashboard">
@@ -549,6 +558,24 @@ Option 3" rows="4"></textarea><div style="display:flex;gap:6px;margin-top:10px">
       </div>
       <div>
         <div class="panel" style="margin-bottom:14px"><h3>🌍 Langue</h3><label class="lbl">Langue de l'interface</label><select class="inp" onchange="setLanguage(this.value)" id="lang-select"><option value="fr">🇫🇷 Français</option><option value="en">🇬🇧 English</option><option value="es">🇪🇸 Español</option></select></div>
+
+        <div class="panel" style="margin-bottom:14px" id="token-card">
+          <h3>🔑 Token Kick <span id="token-status-badge" style="font-size:9px;font-weight:700;padding:3px 9px;border-radius:20px"></span></h3>
+          <div style="font-size:10px;color:var(--muted);margin-bottom:10px;line-height:1.6">
+            Le token Kick expire régulièrement. Quand le bot ne répond plus dans le chat, viens ici pour le renouveler en quelques secondes.
+          </div>
+          <button class="btnx btn-outline" style="width:100%;justify-content:center" onclick="detectKickToken()">🔍 Détecter mon token Kick</button>
+          <div id="token-detect-result" style="margin-top:10px;display:none">
+            <label class="lbl">Token détecté</label>
+            <div style="display:flex;gap:6px">
+              <input class="inp inp-sm" id="token-detected-value" readonly style="flex:1;font-family:monospace;font-size:10px">
+              <button class="btnx btn-green btn-sm" onclick="copyDetectedToken()">📋 Copier</button>
+            </div>
+            <div style="font-size:9px;color:var(--muted2);margin-top:6px">Tu dois être connecté à Kick avec le compte du bot dans cet onglet pour que ça fonctionne.</div>
+          </div>
+          <button class="btnx btn-ghost" style="width:100%;justify-content:center;margin-top:8px" onclick="window.open('https://dashboard.render.com','_blank')">🔗 Ouvrir Render → Environment</button>
+          <div id="token-msg" style="margin-top:7px"></div>
+        </div>
         <div class="panel" style="margin-bottom:14px"><h3>ℹ️ À propos</h3><ul class="info"><li><span>Version</span><span style="color:#8b35ff;font-weight:700">Bot7uP v2.1.0</span></li><li><span>Base de données</span><span>Turso (LibSQL)</span></li><li><span>Hébergement</span><span>Render.com</span></li><li><span>Chaîne</span><span>fack7up</span></li></ul></div>
         <div class="danger"><div class="danger-t">⚠ Réinitialisation</div><p style="font-size:10px;color:#a1a1aa;margin-bottom:8px">Remet les préférences aux valeurs par défaut.</p><button class="btnx btn-red" style="width:100%;justify-content:center" onclick="resetSettings()">🔄 Réinitialiser</button></div>
       </div>
@@ -613,6 +640,7 @@ async function del(url) {
 // ── Load all ───────────────────────────────────────────────────────────────────
 async function loadAll() {
   loadLiveStatus();
+  checkBotTokenStatus();
   await Promise.all([loadStats(), loadDashLB(), loadDashLogs(), loadCmdUsage(), loadLevels(), loadActiveGiveaway()]);
   const el = document.getElementById('upd');
   if(el) el.textContent = new Date().toLocaleTimeString('fr-FR');
@@ -1813,6 +1841,83 @@ async function toggleTimer(name, enabled) {
 async function deleteTimer(name) {
   await fetch('/api/admin/timers/' + encodeURIComponent(name), { method: 'DELETE' });
   loadTimers();
+}
+
+// ── Token Kick ────────────────────────────────────────────────────────────────
+
+let lastDetectedToken = '';
+
+async function checkBotTokenStatus() {
+  try {
+    const r = await fetch('/api/bot-status');
+    const d = await r.json();
+    const banner = document.getElementById('token-alert-banner');
+    const badge  = document.getElementById('token-status-badge');
+
+    if (d.tokenExpired) {
+      if (banner) banner.style.display = 'flex';
+      if (badge) {
+        badge.textContent = '🔴 Expiré';
+        badge.style.background = 'rgba(255,59,95,.15)';
+        badge.style.color = '#ff3b5f';
+        badge.style.border = '1px solid rgba(255,59,95,.35)';
+      }
+    } else {
+      if (banner) banner.style.display = 'none';
+      if (badge) {
+        badge.textContent = '🟢 Actif';
+        badge.style.background = 'var(--accent-bg)';
+        badge.style.color = 'var(--accent)';
+        badge.style.border = '1px solid var(--accent-brd)';
+      }
+    }
+  } catch(e) {}
+}
+
+async function detectKickToken() {
+  const btn = event?.target;
+  const resultBox = document.getElementById('token-detect-result');
+  const msgBox = document.getElementById('token-msg');
+  if (btn) { btn.disabled = true; btn.textContent = '🔍 Recherche en cours…'; }
+
+  try {
+    // Le navigateur de l'utilisateur n'est pas bloqué par Kick (contrairement au serveur Render)
+    const r = await fetch('https://kick.com/api/v1/user', { credentials: 'include' });
+    if (!r.ok) throw new Error('not_logged_in');
+    const data = await r.json();
+
+    // Essayer de récupérer le token depuis le cookie kick_session si exposé
+    const cookieMatch = document.cookie.match(/(?:^|;\s*)kick_session=([^;]+)/);
+    let token = cookieMatch ? decodeURIComponent(cookieMatch[1]) : null;
+
+    if (!token && data?.token) token = data.token;
+
+    if (!token) {
+      showInline('token-msg', 'Token non accessible directement (cookie httpOnly). Utilise la méthode manuelle ci-dessous via F12.', false);
+      if (btn) { btn.disabled = false; btn.textContent = '🔍 Détecter mon token Kick'; }
+      return;
+    }
+
+    lastDetectedToken = token;
+    document.getElementById('token-detected-value').value = token;
+    resultBox.style.display = 'block';
+    toast('✅ Token détecté — clique sur Copier');
+  } catch(e) {
+    showInline('token-msg', 'Connecte-toi d\u2019abord sur kick.com avec le compte du bot dans cet onglet, puis réessaie.', false);
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = '🔍 Détecter mon token Kick'; }
+  }
+}
+
+function copyDetectedToken() {
+  const input = document.getElementById('token-detected-value');
+  input.select();
+  navigator.clipboard?.writeText(input.value).then(() => {
+    toast('📋 Token copié — colle-le dans Render → KICK_TOKEN');
+  }).catch(() => {
+    document.execCommand('copy');
+    toast('📋 Token copié');
+  });
 }
 
 // ── TTS ───────────────────────────────────────────────────────────────────────

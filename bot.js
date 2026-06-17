@@ -46,6 +46,11 @@ async function init() {
 
   if (!CONFIG.token) {
     console.warn('[AUTH] Aucun token — le bot ne peut pas envoyer de messages');
+    db.setBotStatus('token_expired', '1').catch(()=>{});
+  } else {
+    // Nouveau démarrage avec un token présent — on suppose qu'il est valide jusqu'à preuve du contraire
+    db.setBotStatus('token_expired', '0').catch(()=>{});
+    db.setBotStatus('bot_started_at', Date.now().toString()).catch(()=>{});
   }
 
   // Vérifier état live initial
@@ -521,6 +526,7 @@ async function sendChat(message) {
     if (status === 401) {
       console.warn('[AUTH] Token expiré — mets à jour KICK_TOKEN dans Render');
       CONFIG.token = '';
+      db.setBotStatus('token_expired', '1').catch(()=>{});
     }
   }
 }

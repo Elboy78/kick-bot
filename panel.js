@@ -311,6 +311,18 @@ app.get('/api/tts/blacklist',                  async (req,res) => { try { res.js
 app.post('/api/admin/tts/blacklist',           async (req,res) => { try { const {word}=req.body; if(!word) return res.status(400).json({error:'word requis'}); const ok=await db.addTTSBlacklistWord(word); res.json({success:ok}); } catch(e){res.status(500).json({error:e.message}); }});
 app.delete('/api/admin/tts/blacklist/:id',     async (req,res) => { try { await db.deleteTTSBlacklistWord(req.params.id); res.json({success:true}); } catch(e){res.status(500).json({error:e.message}); }});
 
+// Statut du token Kick (écrit par bot.js, lu par le panel)
+app.get('/api/bot-status', async (req, res) => {
+  try {
+    const status = await db.getAllBotStatus();
+    res.json({
+      tokenExpired: status.token_expired?.value === '1',
+      botStartedAt: status.bot_started_at?.value || null,
+      lastUpdate: status.token_expired?.updated_at || null,
+    });
+  } catch(e) { res.json({ tokenExpired: false }); }
+});
+
 app.get('/api/tts/config', (req, res) => {
   res.json({
     configured: !!(TTS_API_KEY && TTS_VOICE_ID),

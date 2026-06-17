@@ -200,6 +200,11 @@ async function initSchema() {
       enabled    INTEGER NOT NULL DEFAULT 1,
       created_at TEXT NOT NULL DEFAULT (datetime('now'))
     )`,
+    `CREATE TABLE IF NOT EXISTS bot_status (
+      key        TEXT PRIMARY KEY,
+      value      TEXT NOT NULL DEFAULT '',
+      updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+    )`,
     `CREATE TABLE IF NOT EXISTS tts_blacklist (
       id         INTEGER PRIMARY KEY AUTOINCREMENT,
       word       TEXT NOT NULL UNIQUE,
@@ -522,6 +527,23 @@ async function deleteAccessRequest(username) {
   await run(`DELETE FROM panel_access WHERE username = ?`, [username.toLowerCase()]);
 }
 
+// ─── Bot Status (état partagé entre bot.js et panel.js) ───────────────────────
+
+async function setBotStatus(key, value) {
+  await run(`INSERT INTO bot_status (key, value, updated_at) VALUES (?, ?, datetime('now')) ON CONFLICT(key) DO UPDATE SET value = ?, updated_at = datetime('now')`,
+    [key, String(value), String(value)]);
+}
+async function getBotStatus(key) {
+  const r = await get(`SELECT value, updated_at FROM bot_status WHERE key = ?`, [key]);
+  return r || null;
+}
+async function getAllBotStatus() {
+  const rows = await all(`SELECT * FROM bot_status`);
+  const result = {};
+  rows.forEach(r => { result[r.key] = { value: r.value, updated_at: r.updated_at }; });
+  return result;
+}
+
 // ─── TTS (Text-To-Speech dons) ─────────────────────────────────────────────────
 
 async function getTTSBlacklist() { return all(`SELECT * FROM tts_blacklist ORDER BY word ASC`); }
@@ -786,4 +808,5 @@ module.exports = {
   getAnnouncements, addAnnouncement, toggleAnnouncement, deleteAnnouncement, updateAnnouncementSent,
   getTTSBlacklist, addTTSBlacklistWord, deleteTTSBlacklistWord, isTTSBlacklisted,
   getTTSHistory, addTTSHistory, clearTTSHistory,
+  setBotStatus, getBotStatus, getAllBotStatus,
 };
