@@ -200,6 +200,13 @@ async function initSchema() {
       enabled    INTEGER NOT NULL DEFAULT 1,
       created_at TEXT NOT NULL DEFAULT (datetime('now'))
     )`,
+    `CREATE TABLE IF NOT EXISTS oauth_tokens (
+      provider     TEXT PRIMARY KEY,
+      access_token  TEXT NOT NULL,
+      refresh_token TEXT NOT NULL,
+      expires_at    INTEGER NOT NULL,
+      updated_at    TEXT NOT NULL DEFAULT (datetime('now'))
+    )`,
     `CREATE TABLE IF NOT EXISTS bot_status (
       key        TEXT PRIMARY KEY,
       value      TEXT NOT NULL DEFAULT '',
@@ -527,6 +534,23 @@ async function deleteAccessRequest(username) {
   await run(`DELETE FROM panel_access WHERE username = ?`, [username.toLowerCase()]);
 }
 
+// ─── OAuth Tokens (Kick officiel) ──────────────────────────────────────────────
+
+async function saveOAuthToken(provider, accessToken, refreshToken, expiresAt) {
+  await run(
+    `INSERT INTO oauth_tokens (provider, access_token, refresh_token, expires_at, updated_at)
+     VALUES (?, ?, ?, ?, datetime('now'))
+     ON CONFLICT(provider) DO UPDATE SET access_token = ?, refresh_token = ?, expires_at = ?, updated_at = datetime('now')`,
+    [provider, accessToken, refreshToken, expiresAt, accessToken, refreshToken, expiresAt]
+  );
+}
+async function getOAuthToken(provider) {
+  return get(`SELECT * FROM oauth_tokens WHERE provider = ?`, [provider]);
+}
+async function deleteOAuthToken(provider) {
+  await run(`DELETE FROM oauth_tokens WHERE provider = ?`, [provider]);
+}
+
 // ─── Bot Status (état partagé entre bot.js et panel.js) ───────────────────────
 
 async function setBotStatus(key, value) {
@@ -809,4 +833,5 @@ module.exports = {
   getTTSBlacklist, addTTSBlacklistWord, deleteTTSBlacklistWord, isTTSBlacklisted,
   getTTSHistory, addTTSHistory, clearTTSHistory,
   setBotStatus, getBotStatus, getAllBotStatus,
+  saveOAuthToken, getOAuthToken, deleteOAuthToken,
 };

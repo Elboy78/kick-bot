@@ -6,6 +6,7 @@ const http    = require('http');
 const { Server } = require('socket.io');
 const axios   = require('axios');
 const db      = require('./database');
+const kickOAuth = require('./kick-oauth');
 
 const app    = express();
 const PORT   = parseInt(process.env.PANEL_PORT || '3000');
@@ -310,6 +311,51 @@ app.post('/api/admin/tts/clear-history', async (req,res) => { try { await db.cle
 app.get('/api/tts/blacklist',                  async (req,res) => { try { res.json({data: await db.getTTSBlacklist()}); } catch(e){res.json({data:[]}); }});
 app.post('/api/admin/tts/blacklist',           async (req,res) => { try { const {word}=req.body; if(!word) return res.status(400).json({error:'word requis'}); const ok=await db.addTTSBlacklistWord(word); res.json({success:ok}); } catch(e){res.status(500).json({error:e.message}); }});
 app.delete('/api/admin/tts/blacklist/:id',     async (req,res) => { try { await db.deleteTTSBlacklistWord(req.params.id); res.json({success:true}); } catch(e){res.status(500).json({error:e.message}); }});
+
+// ════════════════════════════════════════════════════════════════════
+// OAuth Kick officiel (id.kick.com) — refresh automatique du token
+// ════════════════════════════════════════════════════════════════════
+
+app.get('/auth/login', (req, res) => {
+  if (!kickOAuth.isConfigured()) {
+    return res.status(400).send('KICK_CLIENT_ID, KICK_CLIENT_SECRET ou KICK_REDIRECT_URI manquant dans les variables Render.');
+  }
+  const url = kickOAuth.getAuthorizationUrl();
+  res.redirect(url);
+});
+
+app.get('/auth/callback', async (req, res) => {
+  try {
+    const { code, state, error } = req.query;
+    if (error) return res.status(400).send(`Erreur Kick: ${error}`);
+    if (!code || !state) return res.status(400).send('Code ou state manquant.');
+
+    await kickOAuth.exchangeCodeForToken(code, state);
+    res.send(`
+      <html><body style="font-family:sans-serif;background:#050814;color:#fff;display:flex;align-items:center;justify-content:center;height:100vh;margin:0">
+        <div style="text-align:center">
+          <h2 style="color:#28ff66">✅ Compte Kick connecté avec succès</h2>
+          <p>Le token se rafraîchira automatiquement désormais. Tu peux fermer cette page.</p>
+          <script>setTimeout(()=>window.close(), 3000)</script>
+        </div>
+      </body></html>
+    `);
+  } catch (e) {
+    res.status(500).send(`Erreur: ${e.message}`);
+  }
+});
+
+app.get('/api/oauth/status', async (req, res) => {
+  try {
+    const connected = await kickOAuth.isConnected();
+    res.json({ configured: kickOAuth.isConfigured(), connected });
+  } catch (e) { res.json({ configured: false, connected: false }); }
+});
+
+app.post('/api/admin/oauth/disconnect', async (req, res) => {
+  try { await kickOAuth.disconnect(); res.json({ success: true }); }
+  catch (e) { res.status(500).json({ error: e.message }); }
+});
 
 // Statut du token Kick (écrit par bot.js, lu par le panel)
 app.get('/api/bot-status', async (req, res) => {

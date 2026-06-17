@@ -560,20 +560,40 @@ Option 3" rows="4"></textarea><div style="display:flex;gap:6px;margin-top:10px">
         <div class="panel" style="margin-bottom:14px"><h3>🌍 Langue</h3><label class="lbl">Langue de l'interface</label><select class="inp" onchange="setLanguage(this.value)" id="lang-select"><option value="fr">🇫🇷 Français</option><option value="en">🇬🇧 English</option><option value="es">🇪🇸 Español</option></select></div>
 
         <div class="panel" style="margin-bottom:14px" id="token-card">
-          <h3>🔑 Token Kick <span id="token-status-badge" style="font-size:9px;font-weight:700;padding:3px 9px;border-radius:20px"></span></h3>
-          <div style="font-size:10px;color:var(--muted);margin-bottom:10px;line-height:1.6">
-            Le token Kick expire régulièrement. Quand le bot ne répond plus dans le chat, viens ici pour le renouveler en quelques secondes.
+          <h3>🔑 Connexion Kick <span id="token-status-badge" style="font-size:9px;font-weight:700;padding:3px 9px;border-radius:20px"></span></h3>
+
+          <div id="oauth-connected-block" style="display:none">
+            <div style="background:var(--accent-bg);border:1px solid var(--accent-brd);border-radius:8px;padding:10px 12px;margin-bottom:10px;font-size:11px;color:var(--accent);font-weight:600">
+              ✅ Compte officiel connecté — le token se rafraîchit automatiquement, plus rien à faire.
+            </div>
+            <button class="btnx btn-ghost" style="width:100%;justify-content:center" onclick="disconnectOAuth()">🔌 Déconnecter le compte</button>
           </div>
-          <button class="btnx btn-outline" style="width:100%;justify-content:center" onclick="detectKickToken()">🔍 Détecter mon token Kick</button>
+
+          <div id="oauth-disconnected-block" style="display:none">
+            <div style="font-size:10px;color:var(--muted);margin-bottom:10px;line-height:1.6">
+              Connecte le compte du bot une seule fois via l'authentification officielle Kick — le token se renouvellera ensuite automatiquement, sans plus jamais avoir à le faire à la main.
+            </div>
+            <button class="btnx btn-outline" style="width:100%;justify-content:center" onclick="window.location.href='/auth/login'">🔗 Connecter le compte Kick</button>
+          </div>
+
+          <div id="oauth-not-configured-block" style="display:none">
+            <div style="font-size:10px;color:var(--muted);margin-bottom:10px;line-height:1.6">
+              Pour activer le refresh automatique, crée une application sur <span class="cpill">dev.kick.com</span> et ajoute <span class="cpill">KICK_CLIENT_ID</span>, <span class="cpill">KICK_CLIENT_SECRET</span> et <span class="cpill">KICK_REDIRECT_URI</span> dans les variables Render.
+            </div>
+          </div>
+
+          <hr class="div">
+
+          <div style="font-size:9px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px">Méthode manuelle (dépannage)</div>
+          <button class="btnx btn-ghost btn-sm" style="width:100%;justify-content:center" onclick="detectKickToken()">🔍 Détecter mon token Kick</button>
           <div id="token-detect-result" style="margin-top:10px;display:none">
             <label class="lbl">Token détecté</label>
             <div style="display:flex;gap:6px">
               <input class="inp inp-sm" id="token-detected-value" readonly style="flex:1;font-family:monospace;font-size:10px">
               <button class="btnx btn-green btn-sm" onclick="copyDetectedToken()">📋 Copier</button>
             </div>
-            <div style="font-size:9px;color:var(--muted2);margin-top:6px">Tu dois être connecté à Kick avec le compte du bot dans cet onglet pour que ça fonctionne.</div>
           </div>
-          <button class="btnx btn-ghost" style="width:100%;justify-content:center;margin-top:8px" onclick="window.open('https://dashboard.render.com','_blank')">🔗 Ouvrir Render → Environment</button>
+          <button class="btnx btn-ghost btn-sm" style="width:100%;justify-content:center;margin-top:6px" onclick="window.open('https://dashboard.render.com','_blank')">🔗 Ouvrir Render → Environment</button>
           <div id="token-msg" style="margin-top:7px"></div>
         </div>
         <div class="panel" style="margin-bottom:14px"><h3>ℹ️ À propos</h3><ul class="info"><li><span>Version</span><span style="color:#8b35ff;font-weight:700">Bot7uP v2.1.0</span></li><li><span>Base de données</span><span>Turso (LibSQL)</span></li><li><span>Hébergement</span><span>Render.com</span></li><li><span>Chaîne</span><span>fack7up</span></li></ul></div>
@@ -1874,6 +1894,36 @@ async function checkBotTokenStatus() {
   } catch(e) {}
 }
 
+async function loadOAuthStatus() {
+  try {
+    const r = await fetch('/api/oauth/status');
+    const d = await r.json();
+    const connectedBlock    = document.getElementById('oauth-connected-block');
+    const disconnectedBlock = document.getElementById('oauth-disconnected-block');
+    const notConfiguredBlock = document.getElementById('oauth-not-configured-block');
+    if (!connectedBlock) return;
+
+    connectedBlock.style.display = 'none';
+    disconnectedBlock.style.display = 'none';
+    notConfiguredBlock.style.display = 'none';
+
+    if (!d.configured) {
+      notConfiguredBlock.style.display = 'block';
+    } else if (d.connected) {
+      connectedBlock.style.display = 'block';
+    } else {
+      disconnectedBlock.style.display = 'block';
+    }
+  } catch(e) {}
+}
+
+async function disconnectOAuth() {
+  if (!confirm('Déconnecter le compte Kick officiel ? Le bot repassera sur le token manuel si configuré.')) return;
+  await fetch('/api/admin/oauth/disconnect', { method:'POST', headers:{'Content-Type':'application/json'}, body:'{}' });
+  toast('Compte Kick déconnecté');
+  loadOAuthStatus();
+}
+
 async function detectKickToken() {
   const btn = event?.target;
   const resultBox = document.getElementById('token-detect-result');
@@ -2027,6 +2077,7 @@ function initSettings() {
   updateThemeButtons();
   applyAccent(currentAccent, false);
   loadBotFeatures();
+  loadOAuthStatus();
 }
 
 async function loadBotFeatures() {

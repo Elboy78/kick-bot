@@ -6,6 +6,7 @@ require('dotenv').config();
 const WebSocket = require('ws');
 const axios    = require('axios');
 const db       = require('./database');
+const kickOAuth = require('./kick-oauth');
 
 const CONFIG = {
   channel:      process.env.KICK_CHANNEL       || 'votre_chaine',
@@ -44,11 +45,19 @@ async function init() {
   setInterval(checkLiveStatus, 120000);
   console.log('[BOT] Base de données prête ✓');
 
-  if (!CONFIG.token) {
+  const oauthConfigured = kickOAuth.isConfigured();
+  const oauthConnected  = oauthConfigured && await kickOAuth.isConnected();
+
+  if (oauthConnected) {
+    console.log('[AUTH] OAuth Kick officiel actif — refresh automatique activé ✓');
+    db.setBotStatus('token_expired', '0').catch(()=>{});
+    db.setBotStatus('bot_started_at', Date.now().toString()).catch(()=>{});
+  } else if (!CONFIG.token) {
     console.warn('[AUTH] Aucun token — le bot ne peut pas envoyer de messages');
+    if (oauthConfigured) console.warn('[AUTH] OAuth configuré mais pas encore connecté — va sur /auth/login');
     db.setBotStatus('token_expired', '1').catch(()=>{});
   } else {
-    // Nouveau démarrage avec un token présent — on suppose qu'il est valide jusqu'à preuve du contraire
+    // Token manuel legacy présent — on suppose qu'il est valide jusqu'à preuve du contraire
     db.setBotStatus('token_expired', '0').catch(()=>{});
     db.setBotStatus('bot_started_at', Date.now().toString()).catch(()=>{});
   }
@@ -483,20 +492,21 @@ async function startAnnouncements() {
 // ─── Modération ──────────────────────────────────────────────────────────────
 
 async function moderateUser(username, action, duration, word) {
-  if (!CONFIG.token) { console.log(`[MOD] Simulation: ${action} ${username} pour "${word}"`); return; }
+  const { token } = await getActiveToken();
+  if (!token) { console.log(`[MOD] Simulation: ${action} ${username} pour "${word}"`); return; }
   try {
     if (action === 'ban') {
       await axios.post(
         `https://kick.com/api/v2/channels/${CONFIG.channelId}/bans`,
         { banned_username: username, permanent: true },
-        { headers: { 'Authorization': `Bearer ${CONFIG.token}`, 'Content-Type': 'application/json', 'Accept': 'application/json', 'User-Agent': 'Mozilla/5.0' } }
+        { headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json', 'Accept': 'application/json', 'User-Agent': 'Mozilla/5.0' } }
       );
       console.log(`[MOD] ${username} banni pour "${word}"`);
     } else {
       await axios.post(
         `https://kick.com/api/v2/channels/${CONFIG.channelId}/bans`,
         { banned_username: username, duration: duration || 300, permanent: false },
-        { headers: { 'Authorization': `Bearer ${CONFIG.token}`, 'Content-Type': 'application/json', 'Accept': 'application/json', 'User-Agent': 'Mozilla/5.0' } }
+        { headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json', 'Accept': 'application/json', 'User-Agent': 'Mozilla/5.0' } }
       );
       console.log(`[MOD] ${username} timeout ${duration}s pour "${word}"`);
     }
@@ -505,28 +515,58 @@ async function moderateUser(username, action, duration, word) {
   }
 }
 
+// ─── Token actif (OAuth officiel en priorité, sinon token manuel legacy) ──────
+
+async function getActiveToken() {
+  if (kickOAuth.isConfigured()) {
+    const oauthToken = await kickOAuth.getValidAccessToken();
+    if (oauthToken) return { token: oauthToken, official: true };
+  }
+  return { token: CONFIG.token, official: false };
+}
+
 // ─── Envoi messages ───────────────────────────────────────────────────────────
 
 async function sendChat(message) {
-  if (!CONFIG.token) { console.log(`[BOT → CHAT] ${message}`); return; }
+  const { token, official } = await getActiveToken();
+  if (!token) { console.log(`[BOT → CHAT] ${message}`); return; }
+
   try {
-    await axios.post(
-      `https://kick.com/api/v2/messages/send/${CONFIG.channelId}`,
-      { content: message, type: 'message' },
-      { headers: {
-        'Authorization': `Bearer ${CONFIG.token}`,
-        'Content-Type': 'application/json',
-        'Accept': 'application/json',
-        'User-Agent': 'Mozilla/5.0',
-      }}
-    );
+    if (official) {
+      // API officielle Kick — endpoint public
+      await axios.post(
+        `https://api.kick.com/public/v1/chat`,
+        { content: message, type: 'bot', broadcaster_user_id: parseInt(CONFIG.channelId) },
+        { headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' } }
+      );
+    } else {
+      // Ancien endpoint interne (token manuel, fallback legacy)
+      await axios.post(
+        `https://kick.com/api/v2/messages/send/${CONFIG.channelId}`,
+        { content: message, type: 'message' },
+        { headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          'User-Agent': 'Mozilla/5.0',
+        }}
+      );
+    }
+    db.setBotStatus('token_expired', '0').catch(()=>{});
   } catch(err) {
     const status = err.response?.status;
     console.error('[BOT] Erreur envoi:', err.response?.data || err.message);
     if (status === 401) {
-      console.warn('[AUTH] Token expiré — mets à jour KICK_TOKEN dans Render');
-      CONFIG.token = '';
-      db.setBotStatus('token_expired', '1').catch(()=>{});
+      if (official) {
+        // L'OAuth officiel se rafraîchit normalement tout seul — un 401 ici
+        // signifie un vrai problème (déconnexion, scope manquant, etc.)
+        console.warn('[AUTH] Token OAuth invalide malgré refresh — reconnecte-toi via /auth/login');
+        db.setBotStatus('token_expired', '1').catch(()=>{});
+      } else {
+        console.warn('[AUTH] Token manuel expiré — mets à jour KICK_TOKEN dans Render, ou connecte le compte officiel via /auth/login');
+        CONFIG.token = '';
+        db.setBotStatus('token_expired', '1').catch(()=>{});
+      }
     }
   }
 }
