@@ -453,6 +453,45 @@ app.post('/api/admin/oauth/disconnect', async (req, res) => {
   catch (e) { res.status(500).json({ error: e.message }); }
 });
 
+// ════════════════════════════════════════════════════════════════════
+// Config système de points (montant + intervalle, pilotable depuis le panel)
+// ════════════════════════════════════════════════════════════════════
+
+const POINTS_DEFAULTS = {
+  points_amount:    process.env.POINTS_PER_INTERVAL || '10',
+  interval_minutes: process.env.POINTS_INTERVAL_MS ? String(parseInt(process.env.POINTS_INTERVAL_MS) / 60000) : '5',
+};
+
+app.get('/api/points/config', async (req, res) => {
+  try {
+    const stored = await db.getPointsConfig();
+    const merged = { ...POINTS_DEFAULTS, ...stored };
+    res.json({
+      pointsAmount: parseInt(merged.points_amount),
+      intervalMinutes: parseInt(merged.interval_minutes),
+    });
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+app.post('/api/admin/points/config', async (req, res) => {
+  try {
+    const { pointsAmount, intervalMinutes } = req.body;
+    const updates = {};
+    if (pointsAmount !== undefined && pointsAmount !== '') {
+      const n = parseInt(pointsAmount);
+      if (isNaN(n) || n < 1) return res.status(400).json({ error: 'Montant de points invalide' });
+      updates.points_amount = n;
+    }
+    if (intervalMinutes !== undefined && intervalMinutes !== '') {
+      const n = parseInt(intervalMinutes);
+      if (isNaN(n) || n < 1) return res.status(400).json({ error: 'Intervalle invalide' });
+      updates.interval_minutes = n;
+    }
+    await db.setPointsConfigBulk(updates);
+    res.json({ success: true });
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
 // Statut du token Kick (écrit par bot.js, lu par le panel)
 app.get('/api/bot-status', async (req, res) => {
   try {

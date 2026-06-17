@@ -606,6 +606,21 @@ Option 3" rows="4"></textarea><div style="display:flex;gap:6px;margin-top:10px">
     <div class="g2">
       <div>
         <div class="panel" style="margin-bottom:14px"><h3>🎨 Apparence</h3><div style="display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid #1b2037"><div><div style="font-size:12px;font-weight:600">Mode d'affichage</div><div style="font-size:10px;color:#a1a1aa;margin-top:2px">Thème sombre ou clair</div></div><div style="display:flex;gap:6px"><button class="btnx btn-sm" id="theme-dark" onclick="setTheme('dark')" style="background:var(--accent);color:#000">🌙 Dark</button><button class="btnx btn-ghost btn-sm" id="theme-light" onclick="setTheme('light')">☀️ Light</button></div></div><div style="display:flex;align-items:center;justify-content:space-between;padding:10px 0"><div style="font-size:12px;font-weight:600">Couleur d'accent</div><div style="display:flex;gap:6px"><button onclick="setAccent('#8b35ff')" style="width:22px;height:22px;border-radius:50%;background:#8b35ff;border:2px solid #fff2;cursor:pointer"></button><button onclick="setAccent('#28ff66')" style="width:22px;height:22px;border-radius:50%;background:#28ff66;border:2px solid #fff2;cursor:pointer"></button><button onclick="setAccent('#1874ff')" style="width:22px;height:22px;border-radius:50%;background:#1874ff;border:2px solid #fff2;cursor:pointer"></button><button onclick="setAccent('#ff8500')" style="width:22px;height:22px;border-radius:50%;background:#ff8500;border:2px solid #fff2;cursor:pointer"></button><button onclick="setAccent('#ff1f6b')" style="width:22px;height:22px;border-radius:50%;background:#ff1f6b;border:2px solid #fff2;cursor:pointer"></button></div></div></div>
+        <div class="panel" style="margin-bottom:14px">
+          <h3>⭐ Système de points</h3>
+          <div style="font-size:10px;color:var(--muted);margin-bottom:10px;line-height:1.6">
+            Chaque viewer ayant écrit dans le chat reçoit ce montant à intervalle régulier, uniquement pendant que le live est actif.
+          </div>
+          <label class="lbl">Points par intervalle</label>
+          <input type="number" class="inp" id="points-amount" placeholder="10" min="1">
+          <label class="lbl">Intervalle de distribution</label>
+          <div style="display:flex;align-items:center;gap:8px">
+            <input type="number" class="inp" id="points-interval" placeholder="5" min="1" style="width:100px">
+            <span style="font-size:11px;color:var(--muted)">minutes</span>
+          </div>
+          <button class="btnx btn-outline" style="width:100%;justify-content:center;margin-top:12px" onclick="savePointsConfig()">💾 Enregistrer</button>
+          <div id="points-config-msg" style="margin-top:7px"></div>
+        </div>
         <div class="panel"><h3>🤖 Fonctionnalités du bot <button class="btnx btn-ghost btn-sm" onclick="loadBotFeatures()">↻</button></h3><div style="font-size:10px;color:#a1a1aa;margin-bottom:10px">Active ou désactive chaque fonctionnalité en un clic.</div><div id="bot-features-list"><div class="empty"><p>Chargement…</p></div></div></div>
       </div>
       <div>
@@ -2262,6 +2277,30 @@ function initSettings() {
   applyAccent(currentAccent, false);
   loadBotFeatures();
   loadOAuthStatus();
+  loadPointsConfig();
+}
+
+async function loadPointsConfig() {
+  try {
+    const r = await fetch('/api/points/config');
+    const d = await r.json();
+    const amountEl = document.getElementById('points-amount');
+    const intervalEl = document.getElementById('points-interval');
+    if (amountEl) amountEl.value = d.pointsAmount || 10;
+    if (intervalEl) intervalEl.value = d.intervalMinutes || 5;
+  } catch(e) {}
+}
+
+async function savePointsConfig() {
+  const pointsAmount = document.getElementById('points-amount').value;
+  const intervalMinutes = document.getElementById('points-interval').value;
+  const r = await fetch('/api/admin/points/config', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ pointsAmount, intervalMinutes })
+  });
+  const json = await r.json();
+  if (!r.ok) return showInline('points-config-msg', json.error || 'Erreur', false);
+  toast('⭐ Système de points mis à jour ✓ (effectif sous 2 min)');
 }
 
 async function loadBotFeatures() {

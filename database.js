@@ -200,6 +200,11 @@ async function initSchema() {
       enabled    INTEGER NOT NULL DEFAULT 1,
       created_at TEXT NOT NULL DEFAULT (datetime('now'))
     )`,
+    `CREATE TABLE IF NOT EXISTS points_config (
+      key        TEXT PRIMARY KEY,
+      value      TEXT NOT NULL DEFAULT '',
+      updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+    )`,
     `CREATE TABLE IF NOT EXISTS tts_config (
       key        TEXT PRIMARY KEY,
       value      TEXT NOT NULL DEFAULT '',
@@ -539,6 +544,27 @@ async function deleteAccessRequest(username) {
   await run(`DELETE FROM panel_access WHERE username = ?`, [username.toLowerCase()]);
 }
 
+// ─── Points Config (montant et intervalle pilotables depuis le panel) ─────────
+
+async function getPointsConfig() {
+  const rows = await all(`SELECT * FROM points_config`);
+  const result = {};
+  rows.forEach(r => { result[r.key] = r.value; });
+  return result;
+}
+async function setPointsConfigValue(key, value) {
+  await run(
+    `INSERT INTO points_config (key, value, updated_at) VALUES (?, ?, datetime('now'))
+     ON CONFLICT(key) DO UPDATE SET value = ?, updated_at = datetime('now')`,
+    [key, String(value), String(value)]
+  );
+}
+async function setPointsConfigBulk(obj) {
+  for (const [key, value] of Object.entries(obj)) {
+    await setPointsConfigValue(key, value);
+  }
+}
+
 // ─── TTS Config (réglages pilotables depuis le panel) ──────────────────────────
 
 async function getTTSConfig() {
@@ -859,6 +885,7 @@ module.exports = {
   getTTSBlacklist, addTTSBlacklistWord, deleteTTSBlacklistWord, isTTSBlacklisted,
   getTTSHistory, addTTSHistory, clearTTSHistory,
   getTTSConfig, setTTSConfigValue, setTTSConfigBulk,
+  getPointsConfig, setPointsConfigValue, setPointsConfigBulk,
   setBotStatus, getBotStatus, getAllBotStatus,
   saveOAuthToken, getOAuthToken, deleteOAuthToken,
 };

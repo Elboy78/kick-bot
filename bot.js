@@ -41,8 +41,11 @@ async function init() {
   await db.ensureInit();
   await db.initSystemCommandsState(SYSTEM_COMMANDS);
   await startAnnouncements();
+  await syncPointsConfig();
   // Vérifier live + followers toutes les 2 minutes
   setInterval(checkLiveStatus, 120000);
+  // Resynchroniser montant/intervalle de points toutes les 2 minutes (changements panel)
+  setInterval(syncPointsConfig, 120000);
   console.log('[BOT] Base de données prête ✓');
 
   const oauthConfigured = kickOAuth.isConfigured();
@@ -676,13 +679,35 @@ function startPointsTracker() {
   pointsInterval = setInterval(distributePoints, CONFIG.intervalMs);
 }
 
+// Relit la config points depuis le panel (DB) — permet de changer montant/intervalle
+// sans redéployer. Si l'intervalle a changé, le tracker est relancé avec la nouvelle valeur.
+async function syncPointsConfig() {
+  try {
+    const cfg = await db.getPointsConfig();
+    const newAmount   = cfg.points_amount    ? parseInt(cfg.points_amount)    : CONFIG.pointsAmount;
+    const newInterval = cfg.interval_minutes ? parseInt(cfg.interval_minutes) * 60000 : CONFIG.intervalMs;
+
+    const intervalChanged = newInterval !== CONFIG.intervalMs;
+    CONFIG.pointsAmount = newAmount;
+    CONFIG.intervalMs   = newInterval;
+
+    if (intervalChanged) {
+      console.log(`[POINTS] Intervalle mis à jour depuis le panel → ${newInterval/60000} min`);
+      startPointsTracker();
+    }
+  } catch(e) { /* la DB n'est pas dispo, on garde les valeurs actuelles */ }
+}
+
 async function distributePoints() {
   if (!isLive) { console.log('[POINTS] Hors ligne — pas de points.'); return; }
   if (!await db.getSetting('points_enabled')) { console.log('[POINTS] Désactivé.'); return; }
-  const viewers = await db.getActiveViewers(120);
-  if (!viewers.length) { console.log('[POINTS] Aucun viewer actif.'); return; }
+  // Un viewer doit avoir parlé dans la fenêtre de l'intervalle de distribution (+ 1 min de marge)
+  // pour être considéré actif et toucher les points — pas une fenêtre fixe de 2h.
+  const windowMinutes = Math.ceil(CONFIG.intervalMs / 60000) + 1;
+  const viewers = await db.getActiveViewers(windowMinutes);
+  if (!viewers.length) { console.log('[POINTS] Aucun viewer actif dans le chat.'); return; }
   for (const v of viewers) await db.addPoints(v.username, CONFIG.pointsAmount, 'watch_time');
-  console.log(`[POINTS] +${CONFIG.pointsAmount} pts → ${viewers.length} viewer(s) ✓`);
+  console.log(`[POINTS] +${CONFIG.pointsAmount} pts → ${viewers.length} viewer(s) actif(s) dans le chat ✓`);
   checkObjectives();
 }
 
