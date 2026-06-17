@@ -319,15 +319,15 @@ async function getViewer(username) {
 async function getLeaderboard(limit = 10) {
   const rows = await all(`
     SELECT username, points, total_minutes, sessions, last_seen, level
-    FROM viewers WHERE points > 0
-    ORDER BY points DESC, username ASC
+    FROM viewers
+    ORDER BY points DESC, last_seen DESC
     LIMIT ?
   `, [limit]);
   return rows.map((v, i) => ({ ...v, rank: i + 1 }));
 }
 
 async function getViewerRank(username) {
-  const all_viewers = await all(`SELECT username FROM viewers WHERE points > 0 ORDER BY points DESC, username ASC`);
+  const all_viewers = await all(`SELECT username FROM viewers ORDER BY points DESC, last_seen DESC`);
   const idx = all_viewers.findIndex(v => v.username === username.toLowerCase());
   return idx >= 0 ? idx + 1 : null;
 }
@@ -341,7 +341,7 @@ async function getGlobalStats() {
       AVG(points) as avg_points,
       MAX(points) as max_points,
       (SELECT username FROM viewers ORDER BY points DESC LIMIT 1) as top_viewer
-    FROM viewers WHERE points > 0
+    FROM viewers
   `);
 }
 

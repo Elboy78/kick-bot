@@ -379,7 +379,7 @@ hr.div{border:none;border-top:1px solid var(--brd);margin:12px 0}
 
   <!-- ══ CLASSEMENT ══ -->
   <div class="page" id="page-classement">
-    <div class="header"><div><h1>Classement</h1><p>Top viewers et niveaux</p></div></div>
+    <div class="header"><div><h1>Classement</h1><p>Top viewers et niveaux</p></div><button class="btn" onclick="refreshLeaderboard()">↻ Actualiser</button></div>
     <div class="panel" style="margin-bottom:14px">
       <h3>🏆 Classement complet
         <span style="display:flex;gap:6px">
@@ -835,6 +835,15 @@ async function loadLeaderboard() {
     lbData = await get('/api/leaderboard?limit='+limit) || [];
     renderLB(lbData);
   } catch(e){}
+}
+
+async function refreshLeaderboard() {
+  const btn = event?.target;
+  if (btn) { btn.disabled = true; btn.textContent = '↻ Actualisation…'; }
+  await loadLeaderboard();
+  await loadLevels();
+  if (btn) { btn.disabled = false; btn.textContent = '↻ Actualiser'; }
+  toast('🏆 Classement actualisé');
 }
 
 function renderLB(data) {
