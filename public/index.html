@@ -1,532 +1,496 @@
 <!DOCTYPE html>
 <html lang="fr">
 <head>
-<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Bot7uP — Panel</title>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Bot7uP Dashboard</title>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <style>
-*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
-:root{
-  --bg:#0a0b14;--s1:#111221;--s2:#161728;--s3:#1d1f35;--s4:#252742;
-  --b1:#ffffff08;--b2:#ffffff10;--b3:#ffffff18;
-  --text:#e8eaf5;--muted:#8b8fa8;--muted2:#4a4d68;
-  --purple:#7c3aed;--purple2:#8b5cf6;--purple-bg:#7c3aed15;--purple-brd:#7c3aed35;
-  --green:#22c55e;--green-bg:#22c55e12;--green-brd:#22c55e30;
-  --blue:#3b82f6;--blue-bg:#3b82f612;--blue-brd:#3b82f630;
-  --red:#ef4444;--red-bg:#ef444412;--red-brd:#ef444430;
-  --gold:#f59e0b;--gold-bg:#f59e0b12;--gold-brd:#f59e0b30;
-  --cyan:#06b6d4;--pink:#ec4899;--orange:#f97316;
-  --sidebar:220px;--r:8px;--r2:12px;--r3:16px;--r4:20px;
-}
-body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--text);font-size:13px;min-height:100vh;-webkit-font-smoothing:antialiased}
-
-/* ══ LAYOUT ══ */
-.app{display:flex;min-height:100vh}
-aside{width:var(--sidebar);flex-shrink:0;background:var(--s1);border-right:1px solid var(--b2);display:flex;flex-direction:column;position:fixed;top:0;left:0;height:100vh;z-index:50;overflow-y:auto}
-.main{margin-left:var(--sidebar);flex:1;display:flex;flex-direction:column}
+*{margin:0;padding:0;box-sizing:border-box;font-family:Inter,Arial,sans-serif}
+body{background:#050814;color:white;display:flex;min-height:100vh;font-size:13px}
+a{cursor:pointer}
 
 /* ══ SIDEBAR ══ */
-.sb-logo{padding:20px 18px 16px;display:flex;align-items:center;gap:10px;border-bottom:1px solid var(--b1)}
-.sb-logo-icon{width:36px;height:36px;border-radius:10px;background:var(--purple);display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:900;color:#fff;flex-shrink:0;box-shadow:0 4px 14px #7c3aed40}
-.sb-logo-name{font-size:15px;font-weight:800;color:var(--text)}
-.sb-logo-badge{font-size:9px;background:var(--purple);color:#fff;padding:1px 5px;border-radius:4px;font-weight:700;margin-left:4px}
+.sidebar{width:260px;flex-shrink:0;background:#07091a;border-right:1px solid #20233a;padding:20px;position:fixed;top:0;left:0;height:100vh;overflow-y:auto;display:flex;flex-direction:column}
+.logo{font-size:24px;font-weight:800;margin-bottom:24px;color:white;display:flex;align-items:center;gap:8px}
+.logo span{color:#8b35ff}
+.menu{display:flex;flex-direction:column}
+.menu a{display:flex;align-items:center;gap:10px;color:#d8d8e8;text-decoration:none;padding:12px 16px;border-radius:12px;margin:3px 0;font-size:13px;font-weight:500;border:none;background:transparent;width:100%;text-align:left;font-family:inherit;cursor:pointer}
+.menu a.active,.menu a:hover{background:linear-gradient(90deg,#6b22ff,#27125c);color:white}
+.menu-section{font-size:9px;font-weight:700;color:#4a4d68;text-transform:uppercase;letter-spacing:1px;margin:14px 16px 4px}
 
-.nav-section{padding:14px 14px 4px;font-size:9px;font-weight:700;color:var(--muted2);text-transform:uppercase;letter-spacing:1.2px}
-.nav-item{display:flex;align-items:center;gap:9px;padding:8px 12px;margin:1px 6px;border-radius:var(--r2);cursor:pointer;color:var(--muted);font-size:12px;font-weight:500;transition:all .12s;border:none;background:none;width:calc(100% - 12px);text-align:left}
-.nav-item:hover{background:var(--s3);color:var(--text)}
-.nav-item.active{background:var(--purple);color:#fff;font-weight:600;box-shadow:0 4px 14px #7c3aed30}
-.nav-item .ni{font-size:15px;width:18px;text-align:center;flex-shrink:0}
-
-/* Statut bot */
-.sb-status{margin:10px;background:var(--s2);border:1px solid var(--b2);border-radius:var(--r2);padding:12px}
-.sb-status-title{font-size:9px;font-weight:700;color:var(--muted2);text-transform:uppercase;letter-spacing:.8px;margin-bottom:10px}
-.sb-online{display:flex;align-items:center;gap:6px;font-size:11px;font-weight:600;color:var(--green);margin-bottom:6px}
-.sb-online-dot{width:7px;height:7px;border-radius:50%;background:var(--green);animation:glow 2s infinite;flex-shrink:0}
-@keyframes glow{0%,100%{box-shadow:0 0 4px #22c55e60}50%{box-shadow:0 0 10px #22c55e90}}
-.sb-info-row{font-size:10px;color:var(--muted);padding:2px 0}
-.sb-info-row b{color:var(--text)}
-
-/* Live pill */
-.live-pill-sb{display:inline-flex;align-items:center;gap:4px;font-size:9px;font-weight:700;padding:3px 8px;border-radius:20px;margin-top:6px}
-.live-pill-sb.on{background:var(--red-bg);color:var(--red);border:1px solid var(--red-brd)}
-.live-pill-sb.off{background:var(--b1);color:var(--muted2);border:1px solid var(--b1)}
+.bot-status{margin-top:20px;border:1px solid #ff0055;border-radius:15px;padding:16px;font-size:11px}
+.bot-status p{margin:3px 0}
+.bot-status-title{font-size:9px;font-weight:700;color:#a1a1aa;letter-spacing:1px;margin-bottom:8px!important}
+.online{color:#00ff66;font-weight:700}
+.live-pill{display:inline-flex;align-items:center;gap:5px;font-size:9px;font-weight:700;padding:3px 9px;border-radius:20px;margin-top:6px}
+.live-pill.on{background:rgba(255,0,60,.12);border:1px solid rgba(255,0,60,.35);color:#ff3b5f}
+.live-pill.off{background:rgba(100,100,120,.12);border:1px solid rgba(100,100,120,.25);color:#a1a1aa}
 .lpd{width:5px;height:5px;border-radius:50%;background:currentColor}
 .lpd.blink{animation:blink 1s infinite}
 @keyframes blink{0%,100%{opacity:1}50%{opacity:.3}}
 
-/* Profil bas sidebar */
-.sb-profile{margin-top:auto;padding:12px;border-top:1px solid var(--b1)}
-.sb-prof-card{display:flex;align-items:center;gap:9px;padding:8px 10px;background:var(--s2);border:1px solid var(--b1);border-radius:var(--r2);cursor:pointer;transition:background .15s}
-.sb-prof-card:hover{background:var(--s3)}
-.sb-prof-avatar{width:32px;height:32px;border-radius:50%;background:var(--purple);display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:800;color:#fff;flex-shrink:0}
-.sb-prof-name{font-size:11px;font-weight:700;color:var(--text)}
-.sb-prof-role{font-size:9px;color:var(--purple2);font-weight:600}
+.sb-bottom{margin-top:auto;padding-top:14px}
+.sb-btnx{width:100%;padding:9px 12px;border-radius:10px;border:1px solid #20233a;background:transparent;color:#a1a1aa;font-size:10px;font-weight:600;cursor:pointer;font-family:inherit;transition:all .15s;text-align:left;display:flex;align-items:center;gap:7px;margin-bottom:5px}
+.sb-btnx:hover{background:#0c1024;color:white}
+.sb-btnx.live-on{background:rgba(40,255,102,.1);color:#28ff66;border-color:rgba(40,255,102,.3)}
+.sb-btnx.live-off{background:rgba(255,0,60,.1);color:#ff3b5f;border-color:rgba(255,0,60,.3)}
+.sb-upd{font-size:9px;color:#4a4d68;text-align:center;padding:4px 0}
 
-/* Force live + logout buttons */
-.sb-btns{padding:0 10px 8px;display:flex;flex-direction:column;gap:4px}
-.sb-btn{width:100%;padding:7px 10px;border-radius:var(--r);border:1px solid var(--b2);background:transparent;color:var(--muted);font-size:10px;font-weight:600;cursor:pointer;font-family:inherit;transition:all .15s;text-align:left;display:flex;align-items:center;gap:6px}
-.sb-btn:hover{background:var(--s3);color:var(--text);border-color:var(--b3)}
-.sb-btn.live-on{background:var(--green-bg);color:var(--green);border-color:var(--green-brd)}
-.sb-btn.live-off{background:var(--red-bg);color:var(--red);border-color:var(--red-brd)}
+.sb-profile{display:flex;align-items:center;gap:9px;padding:10px 12px;background:#0c1024;border:1px solid #171d35;border-radius:12px;margin-top:8px;cursor:pointer}
+.sb-profile:hover{border-color:#8b35ff55}
+.sb-prof-avatar{width:30px;height:30px;border-radius:50%;background:linear-gradient(135deg,#922bff,#4c00ff);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;color:white;flex-shrink:0}
+.sb-prof-name{font-size:11px;font-weight:700;color:white}
+.sb-prof-role{font-size:9px;color:#8b35ff}
 
-/* ══ TOPBAR ══ */
-topbar{display:flex;align-items:center;gap:12px;padding:14px 24px;background:var(--s1);border-bottom:1px solid var(--b1);position:sticky;top:0;z-index:40}
-.tb-titles .page-title{font-size:20px;font-weight:800;color:var(--text);letter-spacing:-.5px}
-.tb-titles .page-sub{font-size:11px;color:var(--muted);margin-top:1px}
-.tb-right{margin-left:auto;display:flex;align-items:center;gap:8px}
-.tb-chat-btn{display:flex;align-items:center;gap:6px;background:var(--s2);border:1px solid var(--b2);color:var(--muted);padding:7px 14px;border-radius:var(--r2);cursor:pointer;font-size:11px;font-weight:600;transition:all .15s;font-family:inherit}
-.tb-chat-btn:hover{border-color:var(--purple-brd);color:var(--purple2)}
-.tb-connected{display:flex;align-items:center;gap:6px;background:var(--green-bg);border:1px solid var(--green-brd);color:var(--green);padding:7px 14px;border-radius:var(--r2);font-size:11px;font-weight:700}
-.tb-connected-dot{width:7px;height:7px;border-radius:50%;background:var(--green)}
-
-/* ══ CONTENT ══ */
-.content{padding:20px 24px;flex:1}
-.page{display:none}.page.active{display:block}
+/* ══ MAIN ══ */
+.main{margin-left:260px;flex:1;padding:25px;background:radial-gradient(circle at top,#10142b,#050814);min-height:100vh}
+.header{display:flex;justify-content:space-between;align-items:center;margin-bottom:25px;flex-wrap:wrap;gap:12px}
+.header h1{font-size:24px;font-weight:800;letter-spacing:-.3px}
+.header p{font-size:12px;color:#a1a1aa;margin-top:3px}
+.header-right{display:flex;align-items:center;gap:10px}
+.btn{background:#0c1024;border:1px solid #222943;color:white;padding:10px 18px;border-radius:10px;cursor:pointer;font-size:11px;font-weight:600;font-family:inherit;transition:all .15s;display:inline-flex;align-items:center;gap:6px}
+.btn:hover{border-color:#8b35ff55}
+.btn-connected{background:rgba(40,255,102,.1);border:1px solid rgba(40,255,102,.3);color:#28ff66;font-weight:700}
 
 /* ══ STAT CARDS ══ */
-.stat-row{display:grid;grid-template-columns:repeat(5,1fr);gap:12px;margin-bottom:20px}
-.sc{background:var(--s1);border:1px solid var(--b2);border-radius:var(--r3);padding:14px 16px;display:flex;align-items:center;gap:12px;transition:all .2s}
-.sc:hover{border-color:var(--b3);transform:translateY(-2px)}
-.sc-icon{width:40px;height:40px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0}
-.sc-label{font-size:10px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.4px}
-.sc-val{font-size:20px;font-weight:800;line-height:1;margin:3px 0;letter-spacing:-.5px}
-.sc-trend{font-size:10px;color:var(--green);font-weight:600}
+.cards{display:grid;grid-template-columns:repeat(5,1fr);gap:15px;margin-bottom:20px}
+.card{background:#0c1024;border:1px solid #171d35;border-radius:15px;padding:20px;transition:all .2s}
+.card:hover{border-color:#8b35ff40;transform:translateY(-2px)}
+.icon{width:42px;height:42px;border-radius:12px;display:grid;place-items:center;margin-bottom:10px;font-size:18px}
+.icon.ic-purple{background:linear-gradient(135deg,#922bff,#4c00ff)}
+.icon.ic-blue{background:linear-gradient(135deg,#1874ff,#0042c7)}
+.icon.ic-green{background:linear-gradient(135deg,#17c95f,#098b3b)}
+.icon.ic-orange{background:linear-gradient(135deg,#ff8500,#c94b00)}
+.icon.ic-pink{background:linear-gradient(135deg,#ff1f6b,#b80d45)}
+.card p{font-size:11px;color:#a1a1aa;font-weight:600}
+.card h2{font-size:26px;margin:8px 0 4px;font-weight:800;letter-spacing:-.5px}
+.green{color:#28ff66;font-size:11px;font-weight:600}
 
-/* ══ DASHBOARD GRID ══ */
-.dash-grid{display:grid;grid-template-columns:1fr 320px 280px;gap:16px;margin-bottom:16px}
-.dash-grid2{display:grid;grid-template-columns:1fr 320px 280px;gap:16px}
+/* ══ GRID ══ */
+.grid{display:grid;grid-template-columns:2fr 1.3fr 1.3fr;gap:15px}
+.bottom{display:grid;grid-template-columns:1.6fr 1.2fr 1fr;gap:15px;margin-top:15px}
+.panel{background:#0c1024;border:1px solid #171d35;border-radius:15px;padding:20px}
+.panel h3{font-size:13px;font-weight:700;margin-bottom:14px;display:flex;align-items:center;justify-content:space-between}
+.panel h3 .see-all{font-size:10px;color:#8b35ff;font-weight:600;cursor:pointer;background:none;border:none;font-family:inherit}
+.panel h3 .see-all:hover{color:#a35fff}
 
-/* ══ CARDS ══ */
-.card{background:var(--s1);border:1px solid var(--b2);border-radius:var(--r3);padding:18px 20px;margin-bottom:14px}
-.card:last-child{margin-bottom:0}
-.chd{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px}
-.ctitle{font-size:13px;font-weight:700;color:var(--text)}
-.csub{font-size:10px;color:var(--muted);margin-top:1px}
-.cactions{display:flex;gap:6px;align-items:center}
-.see-all{font-size:10px;color:var(--purple2);font-weight:600;cursor:pointer;background:none;border:none;font-family:inherit}
-.see-all:hover{color:var(--purple)}
+/* ══ CHART ══ */
+.chart{height:220px;margin-top:10px;background:linear-gradient(180deg,transparent,#32106c40);border-bottom:1px solid #242b44;position:relative;display:flex;align-items:flex-end;gap:5px;padding:10px}
+.chart-bar{flex:1;background:linear-gradient(180deg,#8b35ff,#8b35ff30);border-radius:4px 4px 0 0;min-height:4px;transition:height .6s;position:relative}
+.chart-bar:hover{filter:brightness(1.3)}
+.chart-labels{display:flex;justify-content:space-between;margin-top:8px}
+.chart-labels span{font-size:9px;color:#4a4d68}
 
-/* ══ ACTIONS RAPIDES ══ */
-.quick-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
-.qa{border:none;border-radius:var(--r2);padding:14px 12px;cursor:pointer;font-size:11px;font-weight:700;color:#fff;transition:all .15s;display:flex;flex-direction:column;align-items:flex-start;gap:6px;font-family:inherit}
-.qa:hover{transform:translateY(-2px);filter:brightness(1.1)}
-.qa:active{transform:scale(.97)}
-.qa .qi{font-size:20px}
-.qa-purple{background:linear-gradient(135deg,#7c3aed,#6d28d9)}
-.qa-red{background:linear-gradient(135deg,#dc2626,#b91c1c)}
-.qa-blue{background:linear-gradient(135deg,#2563eb,#1d4ed8)}
-.qa-orange{background:linear-gradient(135deg,#ea580c,#c2410c)}
-.qa-green{background:linear-gradient(135deg,#16a34a,#15803d)}
-.qa-gray{background:linear-gradient(135deg,#374151,#1f2937)}
+/* ══ LISTS ══ */
+.commands li,.events li,.info li{display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid #1b2037;padding:11px 0;list-style:none;font-size:12px}
+.commands li:last-child,.events li:last-child,.info li:last-child{border-bottom:none}
+.commands li span:first-child{font-family:monospace;color:#8b35ff;font-weight:600}
+.commands li span:last-child{color:#a1a1aa;font-size:11px}
+.bar{height:6px;background:#171c32;border-radius:20px;margin-top:6px}
+.bar span{display:block;height:100%;background:#8b35ff;border-radius:20px;transition:width .6s}
+.cmd-row{padding:9px 0;border-bottom:1px solid #1b2037}
+.cmd-row:last-child{border-bottom:none}
+.cmd-row-top{display:flex;justify-content:space-between;margin-bottom:5px}
 
-/* ══ EVENTS ══ */
-.ev-row{display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--b1)}
-.ev-row:last-child{border-bottom:none}
-.ev-icon{width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0}
-.ev-name{font-size:12px;font-weight:600;color:var(--text)}
-.ev-detail{font-size:10px;color:var(--muted)}
-.ev-time{font-size:9px;color:var(--muted2);margin-left:auto;flex-shrink:0}
-.ev-amount{font-size:11px;font-weight:700;color:var(--green)}
+/* Events */
+.events li{flex-direction:column;align-items:flex-start;gap:4px}
+.ev-top{display:flex;justify-content:space-between;width:100%;align-items:center}
+.ev-name{font-weight:600;font-size:11px}
+.ev-detail{font-size:10px;color:#a1a1aa}
+.ev-time{font-size:9px;color:#4a4d68}
+.ev-amt{font-size:11px;font-weight:700;color:#28ff66}
+.ev-amt.neg{color:#ff3b5f}
 
-/* ══ CMD USAGE BARS ══ */
-.cmd-bar-row{display:flex;align-items:center;gap:8px;margin-bottom:10px}
-.cmd-bar-row:last-child{margin-bottom:0}
-.cmd-bar-name{font-size:11px;font-weight:600;color:var(--text);width:90px;flex-shrink:0}
-.cmd-bar-track{flex:1;height:5px;background:var(--s3);border-radius:3px;overflow:hidden}
-.cmd-bar-fill{height:100%;background:var(--purple);border-radius:3px;transition:width .6s}
-.cmd-bar-count{font-size:10px;color:var(--muted);width:30px;text-align:right;flex-shrink:0}
+/* ══ QUICK ACTIONS ══ */
+.quick{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.quick button{border:0;border-radius:12px;color:white;font-size:12px;font-weight:700;padding:20px 10px;cursor:pointer;font-family:inherit;transition:all .15s;display:flex;flex-direction:column;align-items:flex-start;gap:8px}
+.quick button:hover{transform:translateY(-2px);filter:brightness(1.1)}
+.quick button .qi{font-size:18px}
+.purple{background:linear-gradient(135deg,#751fff,#431599)}
+.pink{background:linear-gradient(135deg,#ff1f6b,#b80d45)}
+.blue{background:linear-gradient(135deg,#1874ff,#0042c7)}
+.orange{background:linear-gradient(135deg,#ff8500,#c94b00)}
+.greenbg{background:linear-gradient(135deg,#17c95f,#098b3b)}
+.dark{background:#12172b}
 
-/* ══ INFO TABLE ══ */
-.info-row{display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--b1);font-size:11px}
-.info-row:last-child{border-bottom:none}
-.info-key{color:var(--muted);display:flex;align-items:center;gap:6px}
-.info-val{font-weight:600;color:var(--purple2)}
+/* ══ DONUT ══ */
+.donut-wrap{text-align:center}
+.donut{width:160px;height:160px;border-radius:50%;margin:15px auto;display:grid;place-items:center;background:conic-gradient(#8b35ff 0 38%,#1267ff 38% 73%,#17c95f 73% 88%,#ff8500 88% 100%)}
+.donut div{width:90px;height:90px;background:#0c1024;border-radius:50%;display:grid;place-items:center;text-align:center}
+.donut div b{font-size:20px}
+.donut div small{font-size:9px;color:#a1a1aa}
+.donut-legend{display:flex;flex-direction:column;gap:6px;margin-top:10px;text-align:left}
+.donut-legend-row{display:flex;align-items:center;gap:7px;font-size:10px}
+.donut-legend-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
 
-/* ══ TABLE ══ */
-.tw{overflow-x:auto}
-table{width:100%;border-collapse:collapse}
-thead tr{border-bottom:1px solid var(--b2)}
-th{text-align:left;font-size:9px;color:var(--muted2);font-weight:700;padding:5px 10px;text-transform:uppercase;letter-spacing:.7px}
-td{padding:8px 10px;border-bottom:1px solid var(--b1);font-size:12px}
-tr:last-child td{border-bottom:none}
-tbody tr:hover td{background:var(--s2)}
+/* ══ INFO PANEL ══ */
+.info li span:first-child{color:#a1a1aa;font-size:11px}
+.info li span:last-child{font-weight:600;font-size:11px}
+.ic-live-badge{background:rgba(255,0,60,.12);border:1px solid rgba(255,0,60,.35);color:#ff3b5f;padding:4px 10px;border-radius:999px;font-size:10px;font-weight:800}
+.ic-offline-badge{background:rgba(100,100,120,.12);border:1px solid rgba(100,100,120,.25);color:#a1a1aa;padding:4px 10px;border-radius:999px;font-size:10px;font-weight:600}
 
 /* ══ INPUTS ══ */
-.inp{background:var(--s2);border:1px solid var(--b2);border-radius:var(--r2);padding:8px 12px;color:var(--text);font-size:12px;outline:none;transition:all .15s;font-family:inherit;width:100%}
-.inp:focus{border-color:var(--purple2);box-shadow:0 0 0 3px #7c3aed15}
-.inp::placeholder{color:var(--muted2)}
-.inp-sm{padding:5px 9px;font-size:11px;border-radius:var(--r)}
-.lbl{font-size:9px;font-weight:700;color:var(--muted);display:block;margin-bottom:4px;margin-top:10px;text-transform:uppercase;letter-spacing:.5px}
+.inp{background:#0c1024;border:1px solid #222943;border-radius:10px;padding:8px 12px;color:white;font-size:12px;outline:none;transition:all .15s;font-family:inherit;width:100%}
+.inp:focus{border-color:#8b35ff;box-shadow:0 0 0 3px #8b35ff15}
+.inp::placeholder{color:#4a4d68}
+.inp-sm{padding:5px 9px;font-size:11px;border-radius:8px}
+.lbl{font-size:9px;font-weight:700;color:#a1a1aa;display:block;margin-bottom:4px;margin-top:10px;text-transform:uppercase;letter-spacing:.5px}
 .lbl:first-child{margin-top:0}
 textarea.inp{resize:vertical;line-height:1.5}
 
-/* ══ BUTTONS ══ */
-.btn{padding:7px 14px;border-radius:var(--r2);border:none;cursor:pointer;font-size:11px;font-weight:600;transition:all .12s;display:inline-flex;align-items:center;gap:5px;font-family:inherit}
-.btn:active{transform:scale(.97)}
-.btn-primary{background:var(--purple);color:#fff;box-shadow:0 4px 14px #7c3aed30}.btn-primary:hover{background:#6d28d9}
-.btn-green{background:var(--green);color:#000;font-weight:700;box-shadow:0 4px 14px #22c55e30}.btn-green:hover{background:#16a34a}
-.btn-outline{background:var(--green-bg);color:var(--green);border:1px solid var(--green-brd)}.btn-outline:hover{background:#22c55e18}
-.btn-ghost{background:var(--s2);color:var(--muted);border:1px solid var(--b2)}.btn-ghost:hover{color:var(--text);border-color:var(--b3)}
-.btn-red{background:var(--red-bg);color:var(--red);border:1px solid var(--red-brd)}.btn-red:hover{background:#ef444418}
-.btn-gold{background:var(--gold-bg);color:var(--gold);border:1px solid var(--gold-brd)}.btn-gold:hover{background:#f59e0b18}
-.btn-purple{background:var(--purple-bg);color:var(--purple2);border:1px solid var(--purple-brd)}.btn-purple:hover{background:#7c3aed18}
-.btn-sm{padding:4px 10px;font-size:10px;border-radius:var(--r)}
+/* ══ BUTTONS (génériques) ══ */
+.btnx{padding:7px 14px;border-radius:10px;border:none;cursor:pointer;font-size:11px;font-weight:600;transition:all .12s;display:inline-flex;align-items:center;gap:5px;font-family:inherit}
+.btnx:active{transform:scale(.97)}
+.btn-primary{background:#8b35ff;color:#fff;box-shadow:0 4px 14px #8b35ff30}.btn-primary:hover{background:#7a28e8}
+.btn-green{background:#17c95f;color:#000;font-weight:700}.btn-green:hover{background:#13a84e}
+.btn-outline{background:rgba(40,255,102,.1);color:#28ff66;border:1px solid rgba(40,255,102,.3)}.btn-outline:hover{background:rgba(40,255,102,.18)}
+.btn-ghost{background:#0c1024;color:#a1a1aa;border:1px solid #222943}.btn-ghost:hover{color:white;border-color:#333a5c}
+.btn-red{background:rgba(255,59,95,.1);color:#ff3b5f;border:1px solid rgba(255,59,95,.3)}.btn-red:hover{background:rgba(255,59,95,.18)}
+.btn-gold{background:rgba(255,133,0,.1);color:#ff8500;border:1px solid rgba(255,133,0,.3)}.btn-gold:hover{background:rgba(255,133,0,.18)}
+.btn-sm{padding:4px 10px;font-size:10px;border-radius:8px}
 .btn-xs{padding:2px 7px;font-size:9px;border-radius:6px}
 
-/* ══ BADGES ══ */
+/* ══ BADGES NIVEAU ══ */
 .badge{display:inline-flex;align-items:center;gap:3px;font-size:9px;font-weight:700;padding:2px 6px;border-radius:20px}
 .lv-bronze{background:#78350f18;color:#d97706;border:1px solid #d9770625}
 .lv-argent{background:#1e293b;color:#94a3b8;border:1px solid #94a3b825}
-.lv-or{background:var(--gold-bg);color:var(--gold);border:1px solid #f59e0b25}
-.lv-platine{background:var(--purple-bg);color:var(--purple2);border:1px solid #8b5cf625}
-.lv-diamant{background:#083344;color:var(--cyan);border:1px solid #06b6d425}
+.lv-or{background:rgba(255,133,0,.1);color:#ff8500;border:1px solid rgba(255,133,0,.25)}
+.lv-platine{background:rgba(139,53,255,.1);color:#8b35ff;border:1px solid rgba(139,53,255,.25)}
+.lv-diamant{background:#083344;color:#06b6d4;border:1px solid #06b6d425}
 .lv-légende{background:#1a0533;color:#c084fc;border:1px solid #c084fc25}
 
 /* ══ TOGGLE ══ */
 .toggle{position:relative;width:32px;height:17px;flex-shrink:0}
 .toggle input{opacity:0;width:0;height:0}
-.tsl{position:absolute;inset:0;background:var(--s4);border:1px solid var(--b2);border-radius:17px;cursor:pointer;transition:all .2s}
-.tsl::before{content:'';position:absolute;width:11px;height:11px;left:2px;top:2px;background:var(--muted2);border-radius:50%;transition:all .2s}
-.toggle input:checked+.tsl{background:var(--purple-bg);border-color:var(--purple2)}
-.toggle input:checked+.tsl::before{transform:translateX(15px);background:var(--purple2)}
+.tsl{position:absolute;inset:0;background:#171c32;border:1px solid #222943;border-radius:17px;cursor:pointer;transition:all .2s}
+.tsl::before{content:'';position:absolute;width:11px;height:11px;left:2px;top:2px;background:#4a4d68;border-radius:50%;transition:all .2s}
+.toggle input:checked+.tsl{background:rgba(139,53,255,.15);border-color:#8b35ff}
+.toggle input:checked+.tsl::before{transform:translateX(15px);background:#8b35ff}
+
+/* ══ TABLE ══ */
+.tw{overflow-x:auto}
+table{width:100%;border-collapse:collapse}
+thead tr{border-bottom:1px solid #171d35}
+th{text-align:left;font-size:9px;color:#4a4d68;font-weight:700;padding:5px 10px;text-transform:uppercase;letter-spacing:.7px}
+td{padding:8px 10px;border-bottom:1px solid #1b2037;font-size:12px}
+tr:last-child td{border-bottom:none}
+tbody tr:hover td{background:#0f1428}
 
 /* ══ CMD PILL ══ */
-.cpill{font-family:monospace;background:var(--s3);padding:2px 6px;border-radius:4px;font-size:10px;color:var(--purple2);border:1px solid var(--purple-brd)}
-
-/* ══ PROGRESS ══ */
-.pb{height:3px;background:var(--s4);border-radius:2px;margin-top:4px;overflow:hidden}
-.pbf{height:100%;background:var(--purple);border-radius:2px;transition:width .6s}
+.cpill{font-family:monospace;background:#171c32;padding:2px 6px;border-radius:4px;font-size:10px;color:#8b35ff;border:1px solid rgba(139,53,255,.3)}
 
 /* ══ MISC ══ */
-.empty{text-align:center;padding:20px;color:var(--muted2)}
+.empty{text-align:center;padding:20px;color:#4a4d68}
 .empty .ei{font-size:24px;margin-bottom:6px;opacity:.3}
 .empty p{font-size:11px}
-.toast{position:fixed;bottom:16px;right:16px;padding:9px 14px;border-radius:var(--r2);font-size:11px;font-weight:600;z-index:9999;transform:translateY(60px);opacity:0;transition:all .22s;pointer-events:none}
+.toast{position:fixed;bottom:16px;right:16px;padding:9px 14px;border-radius:10px;font-size:11px;font-weight:600;z-index:9999;transform:translateY(60px);opacity:0;transition:all .22s;pointer-events:none}
 .toast.show{transform:translateY(0);opacity:1}
-.toast.ok{background:var(--green-bg);border:1px solid var(--green-brd);color:var(--green)}
-.toast.err{background:var(--red-bg);border:1px solid var(--red-brd);color:var(--red)}
-.gwbox{background:linear-gradient(135deg,var(--purple-bg),var(--blue-bg));border:1px solid var(--purple-brd);border-radius:var(--r2);padding:14px}
-.gwcount{font-size:26px;font-weight:800;color:var(--purple2)}
-.danger{background:linear-gradient(145deg,#1f0a0a,#160707);border:1px solid var(--red-brd);border-radius:var(--r2);padding:14px}
-.danger-t{font-size:9px;font-weight:700;color:var(--red);text-transform:uppercase;letter-spacing:.6px;margin-bottom:8px}
-.objcard{background:var(--s2);border:1px solid var(--b1);border-radius:var(--r);padding:10px 12px;margin-bottom:6px}
-.objbar{height:4px;background:var(--s4);border-radius:2px;overflow:hidden;margin-top:6px}
-.objbar-fill{height:100%;background:linear-gradient(90deg,var(--purple),var(--blue));border-radius:2px;transition:width .6s}
-.pr{display:flex;align-items:center;justify-content:space-between;padding:7px 10px;border-radius:var(--r);background:var(--s2);border:1px solid var(--b1);margin-bottom:4px}
+.toast.ok{background:rgba(40,255,102,.1);border:1px solid rgba(40,255,102,.3);color:#28ff66}
+.toast.err{background:rgba(255,59,95,.1);border:1px solid rgba(255,59,95,.3);color:#ff3b5f}
+.gwbox{background:linear-gradient(135deg,rgba(139,53,255,.1),rgba(24,116,255,.1));border:1px solid rgba(139,53,255,.3);border-radius:12px;padding:14px}
+.gwcount{font-size:26px;font-weight:800;color:#8b35ff}
+.danger{background:linear-gradient(145deg,#1f0a0a,#160707);border:1px solid rgba(255,59,95,.3);border-radius:12px;padding:14px}
+.danger-t{font-size:9px;font-weight:700;color:#ff3b5f;text-transform:uppercase;letter-spacing:.6px;margin-bottom:8px}
+.objcard{background:#0f1428;border:1px solid #171d35;border-radius:10px;padding:10px 12px;margin-bottom:6px}
+.objbar{height:4px;background:#171c32;border-radius:2px;overflow:hidden;margin-top:6px}
+.objbar-fill{height:100%;background:linear-gradient(90deg,#8b35ff,#1874ff);border-radius:2px;transition:width .6s}
+.pr{display:flex;align-items:center;justify-content:space-between;padding:7px 10px;border-radius:10px;background:#0f1428;border:1px solid #171d35;margin-bottom:4px}
 .pr:last-child{margin-bottom:0}
-.vcard{background:var(--s2);border-radius:var(--r);padding:10px;margin-top:8px;display:none}
+.vcard{background:#0f1428;border-radius:10px;padding:10px;margin-top:8px;display:none}
 .vcard.show{display:block}
-.arow{display:flex;align-items:center;gap:8px;padding:7px 10px;border-radius:var(--r);margin-bottom:4px}
-.arow-pending{background:var(--gold-bg);border:1px solid #f59e0b20}
-.arow-approved{background:var(--green-bg);border:1px solid var(--green-brd)}
-.arow-revoked{background:var(--s2);border:1px solid var(--b1);opacity:.5}
-.lr{display:flex;align-items:center;justify-content:space-between;padding:5px 0;border-bottom:1px solid var(--b1);font-size:11px}
+.arow{display:flex;align-items:center;gap:8px;padding:7px 10px;border-radius:10px;margin-bottom:4px}
+.arow-pending{background:rgba(255,133,0,.1);border:1px solid rgba(255,133,0,.2)}
+.arow-approved{background:rgba(40,255,102,.1);border:1px solid rgba(40,255,102,.3)}
+.arow-revoked{background:#0f1428;border:1px solid #171d35;opacity:.5}
+.lr{display:flex;align-items:center;justify-content:space-between;padding:5px 0;border-bottom:1px solid #1b2037;font-size:11px}
 .lr:last-child{border-bottom:none}
 .lrp{font-size:10px;font-weight:700;padding:2px 6px;border-radius:5px}
-.pos{background:var(--green-bg);color:var(--green)}.neg{background:var(--red-bg);color:var(--red)}
-.lr-t{font-size:9px;color:var(--muted2)}
-.histrow{display:flex;align-items:center;gap:12px;padding:8px 0;border-bottom:1px solid var(--b1);font-size:11px}
+.pos{background:rgba(40,255,102,.1);color:#28ff66}.neg{background:rgba(255,59,95,.1);color:#ff3b5f}
+.lr-t{font-size:9px;color:#4a4d68}
+.histrow{display:flex;align-items:center;gap:12px;padding:8px 0;border-bottom:1px solid #1b2037;font-size:11px}
 .histrow:last-child{border-bottom:none}
-.dbdperk{background:var(--s2);border:1px solid var(--b2);border-radius:var(--r);padding:10px 12px;text-align:center}
+.dbdperk{background:#0f1428;border:1px solid #171d35;border-radius:10px;padding:10px 12px;text-align:center}
 @keyframes fadeUp{from{opacity:0;transform:translateY(5px)}to{opacity:1;transform:translateY(0)}}
-.dbdperk.win{border-color:var(--purple2);animation:fadeUp .25s ease both}
-hr.div{border:none;border-top:1px solid var(--b1);margin:12px 0}
+.dbdperk.win{border-color:#8b35ff;animation:fadeUp .25s ease both}
+hr.div{border:none;border-top:1px solid #1b2037;margin:12px 0}
 .g2{display:grid;grid-template-columns:1fr 340px;gap:14px}
 .g2-eq{display:grid;grid-template-columns:1fr 1fr;gap:14px}
 .g3{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
 .ghalf{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.page{display:none}.page.active{display:block}
 ::-webkit-scrollbar{width:3px;height:3px}
 ::-webkit-scrollbar-track{background:transparent}
-::-webkit-scrollbar-thumb{background:var(--s4);border-radius:2px}
-body.light{--bg:#f1f5f9;--s1:#ffffff;--s2:#f8fafc;--s3:#f1f5f9;--s4:#e2e8f0;--b1:#e2e8f025;--b2:#cbd5e140;--b3:#94a3b860;--text:#0f172a;--muted:#475569;--muted2:#94a3b8}
+::-webkit-scrollbar-thumb{background:#222943;border-radius:2px}
 
-/* ══ INFO CARD ══ */
-.info-card{background:linear-gradient(145deg,rgba(18,24,45,.85),rgba(11,16,32,.75));border:1px solid rgba(255,255,255,.08);border-radius:24px;padding:24px;color:white;backdrop-filter:blur(20px);box-shadow:0 20px 60px rgba(0,0,0,.35)}
-.info-card h3{margin:0 0 20px;font-size:18px;font-weight:700}
-.info-row-ic{display:flex;justify-content:space-between;align-items:center;padding:12px 0;border-bottom:1px solid rgba(255,255,255,.05)}
-.info-row-ic:last-child{border-bottom:none}
-.info-row-ic span:first-child{color:#a1a1aa;font-size:12px}
-.info-row-ic span:last-child{font-weight:600;font-size:12px}
-.ic-online{color:#22c55e;font-weight:700}
-.ic-live-badge{background:rgba(255,0,60,.12);border:1px solid rgba(255,0,60,.35);color:#ff3b5f;padding:4px 10px;border-radius:999px;font-size:11px;font-weight:800}
-.ic-offline-badge{background:rgba(100,100,120,.12);border:1px solid rgba(100,100,120,.25);color:#a1a1aa;padding:4px 10px;border-radius:999px;font-size:11px;font-weight:600}
-
-/* ══ CHART PLACEHOLDER ══ */
-.chart-wrap{background:linear-gradient(180deg,var(--purple-bg) 0%,transparent 100%);border:1px solid var(--purple-brd);border-radius:var(--r2);height:180px;display:flex;align-items:flex-end;padding:12px;gap:4px;overflow:hidden;position:relative}
-.chart-bar{flex:1;background:linear-gradient(180deg,var(--purple),#7c3aed80);border-radius:4px 4px 0 0;transition:height .6s;min-height:4px;cursor:pointer;position:relative}
-.chart-bar:hover{filter:brightness(1.3)}
-.chart-line-wrap{position:absolute;inset:0;pointer-events:none}
+@media(max-width:1100px){.cards{grid-template-columns:repeat(2,1fr)}.grid,.bottom{grid-template-columns:1fr}}
+@media(max-width:768px){.sidebar{display:none}.main{margin-left:0}}
 </style>
 </head>
 <body>
-<div class="app">
 
-<!-- ══════════════════ SIDEBAR ══════════════════ -->
-<aside>
-  <div class="sb-logo">
-    <div class="sb-logo-icon">B7</div>
-    <div>
-      <div style="display:flex;align-items:center;gap:4px">
-        <span class="sb-logo-name">Bot7uP</span>
-        <span class="sb-logo-badge">PRO</span>
-      </div>
-      <div style="font-size:9px;color:var(--muted2);margin-top:1px">Panel de gestion</div>
-    </div>
+<aside class="sidebar">
+  <div class="logo">🤖 Bot7uP <span>PRO</span></div>
+  <nav class="menu">
+    <a class="active" onclick="showPage('dashboard')">🏠 Dashboard</a>
+    <a onclick="showPage('classement')">🏆 Classement</a>
+
+    <div class="menu-section">Outils</div>
+    <a onclick="showPage('commands')">⚙️ Commandes</a>
+    <a onclick="showPage('moderation')">🛡️ Modération</a>
+    <a onclick="showPage('jeux')">🎁 Giveaways &amp; Jeux</a>
+    <a onclick="showPage('lobby')">🎮 Lobby</a>
+    <a onclick="showPage('outils')">🛠️ Outils Chat</a>
+    <a onclick="showPage('objectifs')">🎯 Objectifs</a>
+    <a onclick="showPage('dbd')">🔪 DBD</a>
+
+    <div class="menu-section">Système</div>
+    <a onclick="showPage('historique')">📋 Historique</a>
+    <a onclick="showPage('admin')">👥 Admin</a>
+    <a onclick="showPage('settings')">⚙️ Paramètres</a>
+  </nav>
+
+  <div class="bot-status">
+    <p class="bot-status-title">STATUT DU BOT</p>
+    <p class="online">● En ligne</p>
+    <p>Chaîne : <b>fack7up</b></p>
+    <p>Viewers : <b id="sb-viewers">—</b></p>
+    <p>Followers : <b id="sb-followers">—</b></p>
+    <div class="live-pill off" id="live-pill"><div class="lpd" id="live-dot"></div><span id="live-text">Vérification…</span></div>
   </div>
 
-  <div style="padding:8px 0">
-    <div class="nav-section">Principal</div>
-    <button class="nav-item active" onclick="showPage('dashboard')"><span class="ni">📊</span>Dashboard</button>
-    <button class="nav-item" onclick="showPage('classement')"><span class="ni">🏆</span>Classement</button>
-
-    <div class="nav-section">Outils</div>
-    <button class="nav-item" onclick="showPage('commands')"><span class="ni">💬</span>Commandes</button>
-    <button class="nav-item" onclick="showPage('moderation')"><span class="ni">🛡️</span>Modération</button>
-    <button class="nav-item" onclick="showPage('jeux')"><span class="ni">⚔️</span>Jeux & Giveaway</button>
-    <button class="nav-item" onclick="showPage('lobby')"><span class="ni">🎮</span>Lobby</button>
-    <button class="nav-item" onclick="showPage('outils')"><span class="ni">🛠️</span>Outils Chat</button>
-    <button class="nav-item" onclick="showPage('objectifs')"><span class="ni">🎯</span>Objectifs</button>
-    <button class="nav-item" onclick="showPage('dbd')"><span class="ni">🔪</span>DBD</button>
-
-    <div class="nav-section">Système</div>
-    <button class="nav-item" onclick="showPage('historique')"><span class="ni">📅</span>Historique</button>
-    <button class="nav-item" onclick="showPage('admin')"><span class="ni">⚙️</span>Admin</button>
-    <button class="nav-item" onclick="showPage('settings')"><span class="ni">🔧</span>Paramètres</button>
-  </div>
-
-  <!-- Statut bot -->
-  <div class="sb-status">
-    <div class="sb-status-title">Statut du bot</div>
-    <div class="sb-online"><div class="sb-online-dot"></div>En ligne</div>
-    <div class="sb-info-row">Chaîne : <b>fack7up</b></div>
-    <div class="sb-info-row">Viewers : <b id="sb-viewers">—</b></div>
-    <div class="sb-info-row">Followers : <b id="sb-followers">—</b></div>
-    <div class="live-pill-sb off" id="live-pill">
-      <div class="lpd" id="live-dot"></div>
-      <span id="live-text">Vérification…</span>
-    </div>
-  </div>
-
-  <div class="sb-btns">
-    <button class="sb-btn" id="live-toggle-btn" onclick="toggleForceLive()">⚡ <span id="live-btn-text">Mode auto</span></button>
-    <button class="sb-btn" onclick="logout()">🚪 Déconnexion</button>
-    <div style="font-size:9px;color:var(--muted2);text-align:center;padding:3px 0" id="upd"></div>
-  </div>
-
-  <!-- Profil -->
-  <div class="sb-profile">
-    <div class="sb-prof-card" onclick="showPage('settings')">
+  <div class="sb-bottom">
+    <button class="sb-btnx" id="live-toggle-btn" onclick="toggleForceLive()">⚡ <span id="live-btn-text">Mode auto</span></button>
+    <button class="sb-btnx" onclick="logout()">🚪 Déconnexion</button>
+    <div class="sb-upd" id="upd"></div>
+    <div class="sb-profile" onclick="showPage('settings')">
       <div class="sb-prof-avatar" id="prof-avatar">?</div>
-      <div>
-        <div class="sb-prof-name" id="prof-name">—</div>
-        <div class="sb-prof-role">Admin</div>
-      </div>
+      <div><div class="sb-prof-name" id="prof-name">—</div><div class="sb-prof-role">Admin</div></div>
     </div>
   </div>
 </aside>
 
-<!-- ══════════════════ MAIN ══════════════════ -->
-<div class="main">
-<topbar>
-  <div class="tb-titles">
-    <div class="page-title" id="page-title">Dashboard</div>
-    <div class="tb-titles page-sub" id="page-sub">Vue d'ensemble de ton bot</div>
-  </div>
-  <div class="tb-right">
-    <button class="tb-chat-btn" onclick="window.open('https://kick.com/fack7up','_blank')">💬 Voir le chat</button>
-    <div class="tb-connected"><div class="tb-connected-dot"></div>Bot connecté</div>
-  </div>
-</topbar>
+<main class="main">
 
-<div class="content">
+  <!-- ══ DASHBOARD ══ -->
+  <div class="page active" id="page-dashboard">
+    <div class="header">
+      <div>
+        <h1>Bonjour, fack7up ! 👋</h1>
+        <p>Voici un aperçu complet de ton bot</p>
+      </div>
+      <div class="header-right">
+        <button class="btn" onclick="window.open('https://kick.com/fack7up','_blank')">💬 Voir le chat</button>
+        <button class="btn btn-connected">● Bot connecté</button>
+      </div>
+    </div>
 
-<!-- ══ DASHBOARD ══ -->
-<div class="page active" id="page-dashboard">
+    <section class="cards">
+      <div class="card"><div class="icon ic-purple">⭐</div><p>Points distribués</p><h2 id="s-points">—</h2><p class="green">total cumulé</p></div>
+      <div class="card"><div class="icon ic-blue">👥</div><p>Viewers enregistrés</p><h2 id="sc-active">—</h2><p class="green">total chaîne</p></div>
+      <div class="card"><div class="icon ic-green">⏱</div><p>Temps regardé</p><h2 id="s-minutes" style="font-size:18px">—</h2><p class="green">cumulé tous viewers</p></div>
+      <div class="card"><div class="icon ic-pink">❤️</div><p>Followers</p><h2 id="s-followers">—</h2><p class="green" id="sc-follow-t">total chaîne</p></div>
+      <div class="card"><div class="icon ic-orange">👑</div><p>Top viewer</p><h2 id="s-top" style="font-size:16px">—</h2><p class="green" id="s-top-sub"></p></div>
+    </section>
 
-  <!-- Stat cards -->
-  <div class="stat-row">
-    <div class="sc"><div class="sc-icon" style="background:#7c3aed20">💬</div><div><div class="sc-label">Messages traités</div><div class="sc-val" id="sc-messages" style="color:var(--purple2)">—</div><div class="sc-trend" id="sc-messages-t"></div></div></div>
-    <div class="sc"><div class="sc-icon" style="background:#3b82f620">⌨️</div><div><div class="sc-label">Commandes utilisées</div><div class="sc-val" id="sc-cmds" style="color:var(--blue)">—</div><div class="sc-trend"></div></div></div>
-    <div class="sc"><div class="sc-icon" style="background:#22c55e20">👥</div><div><div class="sc-label">Viewers actifs</div><div class="sc-val" id="sc-active" style="color:var(--green)">—</div><div class="sc-trend" style="color:var(--green)">en ce moment</div></div></div>
-    <div class="sc"><div class="sc-icon" style="background:#f59e0b20">❤️</div><div><div class="sc-label">Followers</div><div class="sc-val" id="s-followers" style="color:var(--gold)">—</div><div class="sc-trend" id="sc-follow-t"></div></div></div>
-    <div class="sc"><div class="sc-icon" style="background:#ec489920">⭐</div><div><div class="sc-label">Points distribués</div><div class="sc-val" id="s-points" style="color:var(--pink)">—</div><div class="sc-trend">total cumulé</div></div></div>
-  </div>
+    <section class="grid">
+      <div class="panel">
+        <h3>Activité du chat</h3>
+        <div class="chart" id="activity-chart">
+          <div class="chart-bar" style="height:30%"></div>
+          <div class="chart-bar" style="height:45%"></div>
+          <div class="chart-bar" style="height:35%"></div>
+          <div class="chart-bar" style="height:60%"></div>
+          <div class="chart-bar" style="height:80%"></div>
+          <div class="chart-bar" style="height:55%"></div>
+          <div class="chart-bar" style="height:70%"></div>
+        </div>
+        <div class="chart-labels"><span id="chart-stat-viewers">— viewers</span><span id="chart-stat-minutes">— min</span></div>
+      </div>
 
-  <!-- Dashboard grid -->
-  <div class="dash-grid">
-    <!-- Activité chat -->
-    <div class="card">
-      <div class="chd">
-        <div><div class="ctitle">Activité du chat</div><div class="csub">Viewers enregistrés dans le temps</div></div>
-        <div class="cactions">
-          <span style="font-size:10px;color:var(--muted)">7 derniers jours</span>
+      <div class="panel">
+        <h3>Commandes populaires <button class="see-all" onclick="showPage('commands')">Voir tout</button></h3>
+        <div id="cmd-usage-list"><div class="empty"><p>Chargement…</p></div></div>
+      </div>
+
+      <div class="panel">
+        <h3>Actions rapides</h3>
+        <div class="quick">
+          <button class="purple" onclick="showPage('commands')"><span class="qi">💬</span>Commandes</button>
+          <button class="pink" onclick="showPage('jeux')"><span class="qi">🎁</span>Giveaway</button>
+          <button class="blue" onclick="showPage('lobby')"><span class="qi">🎮</span>Lobby</button>
+          <button class="orange" onclick="showPage('outils')"><span class="qi">📢</span>Annonces</button>
+          <button class="greenbg" onclick="showPage('moderation')"><span class="qi">🛡️</span>Modération</button>
+          <button class="dark" onclick="showPage('settings')"><span class="qi">⚙️</span>Paramètres</button>
         </div>
       </div>
-      <div class="chart-wrap" id="activity-chart">
-        <div class="chart-bar" style="height:30%"></div>
-        <div class="chart-bar" style="height:45%"></div>
-        <div class="chart-bar" style="height:35%"></div>
-        <div class="chart-bar" style="height:60%"></div>
-        <div class="chart-bar" style="height:80%"></div>
-        <div class="chart-bar" style="height:55%"></div>
-        <div class="chart-bar" style="height:70%"></div>
-      </div>
-      <div style="display:flex;justify-content:space-between;margin-top:8px">
-        <span style="font-size:9px;color:var(--muted2)" id="chart-stat-viewers">— viewers enregistrés</span>
-        <span style="font-size:9px;color:var(--muted2)" id="chart-stat-minutes">— min regardées</span>
-      </div>
-    </div>
+    </section>
 
-    <!-- Commandes les plus utilisées -->
-    <div class="card">
-      <div class="chd">
-        <div class="ctitle">Commandes populaires</div>
-        <button class="see-all" onclick="showPage('commands')">Voir tout</button>
+    <section class="bottom">
+      <div class="panel">
+        <h3>Événements récents <button class="see-all" onclick="showPage('historique')">Voir tout</button></h3>
+        <ul class="events" id="dash-events"><li><div class="empty"><p>Chargement…</p></div></li></ul>
       </div>
-      <div id="cmd-usage-list">
-        <div class="empty"><p>Chargement…</p></div>
-      </div>
-    </div>
 
-    <!-- Actions rapides -->
-    <div class="card">
-      <div class="chd"><div class="ctitle">Actions rapides</div></div>
-      <div class="quick-grid">
-        <button class="qa qa-purple" onclick="showPage('commands')"><span class="qi">💬</span>Commandes</button>
-        <button class="qa qa-red" onclick="showPage('jeux')"><span class="qi">🎁</span>Giveaway</button>
-        <button class="qa qa-blue" onclick="showPage('lobby')"><span class="qi">🎮</span>Lobby</button>
-        <button class="qa qa-orange" onclick="showPage('outils')"><span class="qi">📢</span>Annonces</button>
-        <button class="qa qa-green" onclick="showPage('moderation')"><span class="qi">🛡️</span>Modération</button>
-        <button class="qa qa-gray" onclick="showPage('settings')"><span class="qi">⚙️</span>Paramètres</button>
+      <div class="panel">
+        <h3>Utilisation des commandes</h3>
+        <div class="donut-wrap">
+          <div class="donut" id="cmd-donut"><div><b id="donut-total">0</b><small>Total</small></div></div>
+          <div class="donut-legend" id="donut-legend"></div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <h3>Informations</h3>
+        <ul class="info">
+          <li><span>Statut</span><span class="online">● En ligne</span></li>
+          <li><span>Chaîne</span><span>fack7up</span></li>
+          <li><span>Viewers</span><span id="ic-viewers">—</span></li>
+          <li><span>Followers</span><span id="ic-followers">—</span></li>
+          <li><span>Statut live</span><span id="ic-live-badge" class="ic-offline-badge">Hors ligne</span></li>
+          <li><span>Uptime</span><span id="ic-uptime">—</span></li>
+          <li><span>Préfixe</span><span>!</span></li>
+          <li><span>Langue</span><span>🇫🇷 Français</span></li>
+          <li><span>Version</span><span>v2.1.0</span></li>
+        </ul>
+      </div>
+    </section>
+  </div>
+
+  <!-- ══ CLASSEMENT ══ -->
+  <div class="page" id="page-classement">
+    <div class="header"><div><h1>Classement</h1><p>Top viewers et niveaux</p></div></div>
+    <div class="panel" style="margin-bottom:14px">
+      <h3>🏆 Classement complet
+        <span style="display:flex;gap:6px">
+          <input type="text" class="inp inp-sm" id="lb-search" placeholder="Filtrer…" oninput="filterLB()" style="width:130px">
+          <select class="inp inp-sm" id="lb-limit" onchange="loadLeaderboard()" style="width:80px"><option value="10">Top 10</option><option value="25">Top 25</option><option value="50">Top 50</option><option value="100">Top 100</option></select>
+        </span>
+      </h3>
+      <div class="tw"><table><thead><tr><th>#</th><th>Viewer</th><th>Niveau</th><th>Points</th><th>Temps regardé</th><th>Vu il y a</th></tr></thead><tbody id="lb-body"><tr><td colspan="6"><div class="empty"><p>Chargement…</p></div></td></tr></tbody></table></div>
+    </div>
+    <div class="panel"><h3>⭐ Niveaux</h3><div class="g3" id="levels-grid"></div></div>
+  </div>
+
+  <!-- ══ LOBBY ══ -->
+  <div class="page" id="page-lobby">
+    <div class="header"><div><h1>Lobby</h1><p>File de jeu en direct</p></div></div>
+    <div class="g2">
+      <div><div class="panel"><h3>🎮 Lobby — <span id="lobby-count" style="color:#28ff66">0</span> joueurs <button class="btnx btn-red btn-sm" onclick="clearLobby()">Vider</button></h3><div style="background:#0f1428;border:1px solid #171d35;border-radius:8px;padding:7px 10px;margin-bottom:10px;font-size:10px;color:#a1a1aa">Les viewers tapent <span class="cpill">!lobby</span> pour rejoindre</div><div id="lobby-list"><div class="empty"><div class="ei">🎮</div><p>Aucun joueur</p></div></div></div></div>
+      <div><div class="panel"><h3>🎡 Roue aléatoire</h3><div style="display:flex;flex-direction:column;align-items:center;gap:12px;padding:4px 0"><canvas id="wheel-canvas" width="260" height="260" style="border-radius:50%"></canvas><button class="btnx btn-primary" style="padding:8px 24px" onclick="spinWheel()">🎲 Tourner la roue</button><div id="wheel-result" style="font-size:14px;font-weight:700;color:#8b35ff;min-height:22px;text-align:center"></div></div></div></div>
+    </div>
+  </div>
+
+  <!-- ══ JEUX ══ -->
+  <div class="page" id="page-jeux">
+    <div class="header"><div><h1>Giveaways &amp; Jeux</h1><p>Gère les giveaways et duels</p></div></div>
+    <div class="g2">
+      <div>
+        <div class="panel" style="margin-bottom:14px"><h3>🎁 Giveaway</h3><div id="gw-active-detail"><div class="empty"><div class="ei">🎁</div><p>Aucun giveaway en cours</p></div></div><hr class="div"><div style="font-size:11px;font-weight:700;color:#a1a1aa;margin-bottom:10px;text-transform:uppercase;letter-spacing:.5px">Créer un giveaway</div><div class="ghalf"><div><label class="lbl">Titre</label><input class="inp" id="gw-title" placeholder="Ex: PC Gaming"></div><div><label class="lbl">Lot</label><input class="inp" id="gw-prize" placeholder="Ex: 50€ Amazon"></div></div><label class="lbl">Coût en pts (0 = gratuit)</label><input type="number" class="inp" id="gw-cost" placeholder="0" style="width:100px"><div style="display:flex;gap:7px;margin-top:10px"><button class="btnx btn-outline" onclick="startGiveaway()">🚀 Lancer</button><button class="btnx btn-red" onclick="closeGiveaway()">🎲 Tirer au sort</button></div><div id="gw-msg" style="margin-top:7px"></div></div>
+        <div class="panel"><h3>📜 Historique giveaways</h3><table><thead><tr><th>Titre</th><th>Lot</th><th>Gagnant</th><th>Participants</th></tr></thead><tbody id="gw-history"></tbody></table></div>
+      </div>
+      <div><div class="panel"><h3>⚔️ Duels récents</h3><div style="background:#0f1428;border:1px solid #171d35;border-radius:8px;padding:7px 10px;margin-bottom:10px;font-size:10px;color:#a1a1aa">Chat → <span class="cpill">!duel @pseudo montant</span></div><table><thead><tr><th>Challenger</th><th>Opponent</th><th>Mise</th><th>Résultat</th></tr></thead><tbody id="duels-list"></tbody></table></div></div>
+    </div>
+  </div>
+
+  <!-- ══ OBJECTIFS ══ -->
+  <div class="page" id="page-objectifs">
+    <div class="header"><div><h1>Objectifs</h1><p>Suivi des objectifs de la chaîne</p></div></div>
+    <div class="g2">
+      <div><div class="panel" style="margin-bottom:14px"><h3>🎯 Actifs</h3><div id="obj-list"><div class="empty"><div class="ei">🎯</div><p>Aucun objectif</p></div></div></div><div class="panel"><h3>✅ Atteints</h3><div id="obj-done-list"><div class="empty"><p>Aucun atteint</p></div></div></div></div>
+      <div><div class="panel" style="position:sticky;top:20px"><h3>➕ Créer un objectif</h3><label class="lbl">Titre</label><input class="inp" id="obj-title" placeholder="Ex: 10 000 points distribués"><label class="lbl">Description</label><input class="inp" id="obj-desc" placeholder="Description…"><label class="lbl">Objectif (points distribués)</label><input type="number" class="inp" id="obj-target" placeholder="Ex: 10000"><label class="lbl">Récompense annoncée</label><input class="inp" id="obj-reward" placeholder="Ex: Game offert !"><button class="btnx btn-primary" style="width:100%;justify-content:center;margin-top:12px;padding:8px" onclick="createObjective()">Créer</button><div id="obj-msg" style="margin-top:7px"></div></div></div>
+    </div>
+  </div>
+
+  <!-- ══ DBD ══ -->
+  <div class="page" id="page-dbd">
+    <div class="header"><div><h1>Dead by Daylight</h1><p>Générateur de builds aléatoires</p></div></div>
+    <div class="g2-eq">
+      <div class="panel"><h3>🏃 Perks Survivant <button class="btnx btn-outline btn-sm" onclick="spinDBD('survivor')">🎲 Lancer</button></h3><div style="font-size:10px;color:#a1a1aa;margin-bottom:10px">4 perks aléatoires</div><div id="dbd-survivor-result" style="display:grid;grid-template-columns:1fr 1fr;gap:7px"><div class="empty" style="grid-column:1/-1"><div class="ei">🎴</div><p>Clique sur Lancer</p></div></div><div id="dbd-survivor-spin" style="text-align:center;font-size:10px;color:#a1a1aa;margin-top:10px;min-height:16px"></div></div>
+      <div class="panel"><h3>🔪 Perks Tueur <button class="btnx btn-red btn-sm" onclick="spinDBD('killer')">🎲 Lancer</button></h3><div style="font-size:10px;color:#a1a1aa;margin-bottom:10px">4 perks aléatoires</div><div id="dbd-killer-result" style="display:grid;grid-template-columns:1fr 1fr;gap:7px"><div class="empty" style="grid-column:1/-1"><div class="ei">🎴</div><p>Clique sur Lancer</p></div></div><div id="dbd-killer-spin" style="text-align:center;font-size:10px;color:#a1a1aa;margin-top:10px;min-height:16px"></div></div>
+    </div>
+    <div class="panel" style="margin-top:14px"><h3>📋 Historique des builds <button class="btnx btn-ghost btn-sm" onclick="clearDBDHistory()">Effacer</button></h3><div id="dbd-history" style="max-height:160px;overflow-y:auto"><div class="empty"><p>Aucun build</p></div></div></div>
+  </div>
+
+  <!-- ══ MODÉRATION ══ -->
+  <div class="page" id="page-moderation">
+    <div class="header"><div><h1>Modération</h1><p>Mots bannis et actions automatiques</p></div></div>
+    <div class="g2">
+      <div><div class="panel"><h3>🚫 Mots bannis (<span id="banned-count">0</span>)</h3><div style="background:#0f1428;border:1px solid #171d35;border-radius:8px;padding:7px 10px;margin-bottom:10px;font-size:10px;color:#a1a1aa">Quand un viewer écrit un mot banni, le bot applique automatiquement l'action choisie.</div><div id="banned-list"><div class="empty"><div class="ei">🛡️</div><p>Aucun mot banni</p></div></div></div></div>
+      <div><div class="panel" style="position:sticky;top:20px"><h3>➕ Ajouter un mot</h3><label class="lbl">Mot ou expression</label><input class="inp" id="ban-word" placeholder="Ex: insulte, spam…"><label class="lbl">Action</label><select class="inp" id="ban-action" onchange="updateDurationVisibility()"><option value="timeout">⏱ Timeout</option><option value="ban">🔨 Ban permanent</option></select><div id="duration-wrap"><label class="lbl">Durée</label><div class="ghalf"><div><input type="number" class="inp" id="ban-duration" value="300" min="1"><div style="font-size:9px;color:#4a4d68;margin-top:2px">secondes</div></div><div style="display:flex;flex-direction:column;gap:4px"><button class="btnx btn-ghost btn-xs" onclick="setDuration(60)">1 min</button><button class="btnx btn-ghost btn-xs" onclick="setDuration(300)">5 min</button><button class="btnx btn-ghost btn-xs" onclick="setDuration(3600)">1h</button><button class="btnx btn-ghost btn-xs" onclick="setDuration(86400)">24h</button></div></div></div><button class="btnx btn-primary" style="width:100%;justify-content:center;margin-top:12px;padding:8px" onclick="addBannedWord()">➕ Ajouter</button><div id="ban-msg" style="margin-top:7px"></div></div></div>
+    </div>
+  </div>
+
+  <!-- ══ COMMANDES ══ -->
+  <div class="page" id="page-commands">
+    <div class="header"><div><h1>Commandes</h1><p>Commandes personnalisées et système</p></div></div>
+    <div class="g2">
+      <div><div class="panel" style="margin-bottom:14px"><h3>💬 Commandes personnalisées (<span id="cmd-count">0</span>)</h3><div id="cmd-page-list"><div class="empty"><div class="ei">💬</div><p>Aucune commande</p></div></div></div><div class="panel"><h3>📌 Commandes système <span style="display:flex;align-items:center;gap:6px"><span style="font-size:9px;color:#a1a1aa">Tout</span><label class="toggle"><input type="checkbox" id="all-cmds-toggle" checked onchange="toggleAllCommands(this.checked)"><span class="tsl"></span></label></span></h3><div id="sys-cmd-list"><div class="empty"><p>Chargement…</p></div></div></div></div>
+      <div><div class="panel" style="position:sticky;top:20px"><h3>➕ Nouvelle commande</h3><label class="lbl">Trigger (avec le !)</label><input class="inp" id="cmd-page-trigger" placeholder="Ex: !discord" maxlength="30"><label class="lbl">Réponse dans le chat</label><textarea class="inp" id="cmd-page-response" placeholder="Ex: discord.gg/xxx" rows="4"></textarea><div style="font-size:9px;color:#4a4d68;margin-top:3px">@{user} pour mentionner le viewer</div><button class="btnx btn-primary" style="width:100%;justify-content:center;margin-top:12px;padding:8px" onclick="addCmdPage()">➕ Ajouter</button><div id="cmd-page-msg" style="margin-top:7px"></div></div></div>
+    </div>
+  </div>
+
+  <!-- ══ OUTILS CHAT ══ -->
+  <div class="page" id="page-outils">
+    <div class="header"><div><h1>Outils Chat</h1><p>Citations, compteurs, sondages, annonces</p></div></div>
+    <div class="g2">
+      <div>
+        <div class="panel" style="margin-bottom:14px"><h3>💬 Citations (<span id="quotes-count">0</span>) <span style="font-size:10px;color:#a1a1aa;font-weight:400">!quote · !addquote</span></h3><div id="quotes-list"><div class="empty"><div class="ei">💬</div><p>Aucune citation</p></div></div></div>
+        <div class="panel" style="margin-bottom:14px"><h3>🔢 Compteurs <span style="font-size:10px;color:#a1a1aa;font-weight:400">!mort · !score</span></h3><div id="counters-list"><div class="empty"><div class="ei">🔢</div><p>Aucun compteur</p></div></div><div style="display:flex;gap:6px;margin-top:10px"><input class="inp inp-sm" id="counter-name" placeholder="Nom (ex: morts)" style="flex:1"><input type="number" class="inp inp-sm" id="counter-val" placeholder="0" style="width:60px"><button class="btnx btn-outline btn-sm" onclick="addCounter()">Créer</button></div></div>
+        <div class="panel"><h3>📊 Sondages <span style="font-size:10px;color:#a1a1aa;font-weight:400">!vote · !sondage</span></h3><div id="poll-active"><div class="empty"><div class="ei">📊</div><p>Aucun sondage actif</p></div></div><hr class="div"><label class="lbl">Question</label><input class="inp" id="poll-question" placeholder="Ex: Quel jeu ensuite ?"><label class="lbl">Options (une par ligne, max 5)</label><textarea class="inp" id="poll-options" placeholder="Option 1
+Option 2
+Option 3" rows="4"></textarea><div style="display:flex;gap:6px;margin-top:10px"><button class="btnx btn-outline" onclick="createPoll()">🚀 Lancer</button><button class="btnx btn-red" onclick="closePoll()">⛔ Fermer</button></div><div id="poll-msg" style="margin-top:7px"></div></div>
+      </div>
+      <div>
+        <div class="panel" style="margin-bottom:14px"><h3>📋 File d'attente (<span id="queue-count">0</span>) <button class="btnx btn-red btn-sm" onclick="clearQueue()">Vider</button></h3><div id="queue-list"><div class="empty"><div class="ei">📋</div><p>File vide</p></div></div></div>
+        <div class="panel" style="margin-bottom:14px"><h3>📢 Annonces auto</h3><div id="ann-list"><div class="empty"><div class="ei">📢</div><p>Aucune annonce</p></div></div><hr class="div"><label class="lbl">Message</label><textarea class="inp" id="ann-message" placeholder="Ex: Rejoins notre Discord !" rows="2"></textarea><label class="lbl">Intervalle</label><div style="display:flex;gap:5px;margin-bottom:8px"><button class="btnx btn-ghost btn-sm" onclick="setAnnInterval(300000)">5 min</button><button class="btnx btn-ghost btn-sm" onclick="setAnnInterval(600000)">10 min</button><button class="btnx btn-ghost btn-sm" onclick="setAnnInterval(1800000)">30 min</button><button class="btnx btn-ghost btn-sm" onclick="setAnnInterval(3600000)">1h</button></div><input type="hidden" id="ann-interval" value="600000"><button class="btnx btn-outline" style="width:100%;justify-content:center" onclick="addAnnouncement()">➕ Ajouter</button><div id="ann-msg" style="margin-top:7px"></div></div>
+        <div class="panel"><h3>⏱ Timers</h3><div id="timers-list"><div class="empty"><div class="ei">⏱</div><p>Aucun timer</p></div></div><hr class="div"><label class="lbl">Nom</label><input class="inp" id="timer-name" placeholder="Ex: recap"><label class="lbl">Message</label><input class="inp" id="timer-message" placeholder="Ex: N'oublie pas de follow !"><label class="lbl">Intervalle</label><div style="display:flex;gap:5px;margin-bottom:6px"><button class="btnx btn-ghost btn-sm" onclick="setTimerInterval(300000)">5 min</button><button class="btnx btn-ghost btn-sm" onclick="setTimerInterval(600000)">10 min</button><button class="btnx btn-ghost btn-sm" onclick="setTimerInterval(1800000)">30 min</button></div><input type="hidden" id="timer-interval" value="300000"><button class="btnx btn-outline" style="width:100%;justify-content:center;margin-top:4px" onclick="addTimer()">➕ Ajouter</button><div id="timer-msg" style="margin-top:7px"></div></div>
       </div>
     </div>
   </div>
 
-  <div class="dash-grid2">
-    <!-- Événements récents -->
-    <div class="card">
-      <div class="chd">
-        <div><div class="ctitle">Événements récents</div><div class="csub">Activité des dernières minutes</div></div>
-        <button class="see-all" onclick="showPage('historique')">Voir tout</button>
+  <!-- ══ HISTORIQUE ══ -->
+  <div class="page" id="page-historique">
+    <div class="header"><div><h1>Historique</h1><p>Sessions et activité du bot</p></div></div>
+    <div class="g2">
+      <div><div class="panel"><h3>📅 Sessions de stream</h3><div id="hist-list"><div class="empty"><div class="ei">📅</div><p>Chargement…</p></div></div></div></div>
+      <div><div class="panel"><h3>📊 Logs de points</h3><div style="max-height:480px;overflow-y:auto" id="full-logs"><div class="empty"><p>Chargement…</p></div></div></div></div>
+    </div>
+  </div>
+
+  <!-- ══ ADMIN ══ -->
+  <div class="page" id="page-admin">
+    <div class="header"><div><h1>Administration</h1><p>Gestion avancée du bot et des accès</p></div></div>
+    <div class="g2">
+      <div>
+        <div class="panel" style="margin-bottom:14px"><h3>👤 Gestion d'un viewer</h3><div style="display:flex;gap:7px"><input class="inp" id="admin-user" placeholder="Pseudo exact" onkeydown="if(event.key==='Enter')searchViewer()"><button class="btnx btn-ghost" onclick="searchViewer()">Chercher</button></div><div class="vcard" id="viewer-result"></div><div style="display:flex;gap:6px;margin-top:9px;align-items:center"><input type="number" class="inp" id="admin-pts" placeholder="Pts" style="width:75px"><button class="btnx btn-outline btn-sm" onclick="adminAdd()">+ Ajouter</button><button class="btnx btn-red btn-sm" onclick="adminRemove()">− Retirer</button><button class="btnx btn-ghost btn-sm" onclick="adminReset()">Reset</button></div><div id="admin-msg" style="margin-top:7px"></div><input type="hidden" id="admin-key" value=""></div>
+        <div class="panel"><h3>💬 Commandes (raccourci)</h3><div id="cmds-list" style="margin-bottom:10px"></div><div style="display:flex;gap:6px"><input class="inp inp-sm" id="cmd-trigger" placeholder="!cmd" style="width:100px"><input class="inp inp-sm" id="cmd-response" placeholder="Réponse…" style="flex:1"><button class="btnx btn-outline btn-sm" onclick="addCmd()">+</button></div><div id="cmd-msg" style="margin-top:7px"></div></div>
       </div>
-      <div id="dash-events"><div class="empty"><div class="ei">⚡</div><p>Chargement…</p></div></div>
-    </div>
-
-    <!-- Giveaway en cours -->
-    <div class="card">
-      <div class="chd"><div class="ctitle">🎁 Giveaway en cours</div><button class="see-all" onclick="showPage('jeux')">Gérer</button></div>
-      <div id="gw-status"><div class="empty"><div class="ei">🎁</div><p>Aucun giveaway actif</p></div></div>
-    </div>
-
-    <!-- Informations -->
-    <div class="info-card">
-      <h3>Informations</h3>
-      <div class="info-row-ic"><span>ⓘ Statut</span><span class="ic-online">● En ligne</span></div>
-      <div class="info-row-ic"><span>💬 Chaîne</span><span>fack7up</span></div>
-      <div class="info-row-ic"><span>👥 Viewers</span><span id="ic-viewers">—</span></div>
-      <div class="info-row-ic"><span>⭐ Followers</span><span id="ic-followers">—</span></div>
-      <div class="info-row-ic"><span>📡 Statut live</span><span id="ic-live-badge" class="ic-offline-badge">Hors ligne</span></div>
-      <div class="info-row-ic"><span>⏱ Uptime</span><span id="ic-uptime">—</span></div>
-      <div class="info-row-ic"><span>🎵 Préfixe</span><span>!</span></div>
-      <div class="info-row-ic"><span>🌍 Langage</span><span>🇫🇷 Français</span></div>
-      <div class="info-row-ic"><span>🔄 Version</span><span>v2.1.0</span></div>
+      <div>
+        <div class="panel" style="margin-bottom:14px"><h3>🔐 Accès au panel <button class="btnx btn-ghost btn-sm" onclick="loadAccessRequests()">↻</button></h3><div id="access-list"><div class="empty"><p>Chargement…</p></div></div></div>
+        <div class="panel" style="margin-bottom:14px"><h3>⭐ Niveaux</h3><div id="admin-levels"></div></div>
+        <div class="danger"><div class="danger-t">⚠ Zone dangereuse</div><p style="font-size:10px;color:#a1a1aa;margin-bottom:8px">Remet tous les points à zéro. Irréversible.</p><button class="btnx btn-red" style="width:100%;justify-content:center" onclick="clearAll()">🗑 Remettre TOUS les points à zéro</button></div>
+      </div>
     </div>
   </div>
-</div>
 
-<!-- Toutes les autres pages sont identiques à avant -->
-<!-- ══ CLASSEMENT ══ -->
-<div class="page" id="page-classement">
-  <div class="card"><div class="chd"><div class="ctitle">🏆 Classement complet</div><div class="cactions"><input type="text" class="inp inp-sm" id="lb-search" placeholder="Filtrer…" oninput="filterLB()" style="width:130px"><select class="inp inp-sm" id="lb-limit" onchange="loadLeaderboard()" style="width:80px"><option value="10">Top 10</option><option value="25">Top 25</option><option value="50">Top 50</option><option value="100">Top 100</option></select></div></div><div class="tw"><table><thead><tr><th>#</th><th>Viewer</th><th>Niveau</th><th>Points</th><th>Temps regardé</th><th>Vu il y a</th></tr></thead><tbody id="lb-body"><tr><td colspan="6"><div class="empty"><p>Chargement…</p></div></td></tr></tbody></table></div></div>
-  <div class="card"><div class="chd"><div class="ctitle">⭐ Niveaux</div></div><div class="g3" id="levels-grid"></div></div>
-</div>
-
-<!-- ══ LOBBY ══ -->
-<div class="page" id="page-lobby">
-  <div class="g2">
-    <div><div class="card"><div class="chd"><div class="ctitle">🎮 Lobby — <span id="lobby-count" style="color:var(--green)">0</span> joueurs</div><button class="btn btn-red btn-sm" onclick="clearLobby()">Vider</button></div><div style="background:var(--s2);border:1px solid var(--b1);border-radius:var(--r);padding:7px 10px;margin-bottom:10px;font-size:10px;color:var(--muted)">Les viewers tapent <span class="cpill">!lobby</span> pour rejoindre</div><div id="lobby-list"><div class="empty"><div class="ei">🎮</div><p>Aucun joueur</p></div></div></div></div>
-    <div><div class="card"><div class="chd"><div class="ctitle">🎡 Roue aléatoire</div></div><div style="display:flex;flex-direction:column;align-items:center;gap:12px;padding:4px 0"><canvas id="wheel-canvas" width="260" height="260" style="border-radius:50%"></canvas><button class="btn btn-primary" style="padding:8px 24px" onclick="spinWheel()">🎲 Tourner la roue</button><div id="wheel-result" style="font-size:14px;font-weight:700;color:var(--purple2);min-height:22px;text-align:center"></div></div></div></div>
-  </div>
-</div>
-
-<!-- ══ JEUX ══ -->
-<div class="page" id="page-jeux">
-  <div class="g2">
-    <div>
-      <div class="card"><div class="chd"><div class="ctitle">🎁 Giveaway</div></div><div id="gw-active-detail"><div class="empty"><div class="ei">🎁</div><p>Aucun giveaway en cours</p></div></div><hr class="div"><div style="font-size:11px;font-weight:700;color:var(--muted);margin-bottom:10px;text-transform:uppercase;letter-spacing:.5px">Créer un giveaway</div><div class="ghalf"><div><label class="lbl">Titre</label><input class="inp" id="gw-title" placeholder="Ex: PC Gaming"></div><div><label class="lbl">Lot</label><input class="inp" id="gw-prize" placeholder="Ex: 50€ Amazon"></div></div><label class="lbl">Coût en pts (0 = gratuit)</label><input type="number" class="inp" id="gw-cost" placeholder="0" style="width:100px"><div style="display:flex;gap:7px;margin-top:10px"><button class="btn btn-outline" onclick="startGiveaway()">🚀 Lancer</button><button class="btn btn-red" onclick="closeGiveaway()">🎲 Tirer au sort</button></div><div id="gw-msg" style="margin-top:7px"></div></div>
-      <div class="card"><div class="chd"><div class="ctitle">📜 Historique giveaways</div></div><table><thead><tr><th>Titre</th><th>Lot</th><th>Gagnant</th><th>Participants</th></tr></thead><tbody id="gw-history"></tbody></table></div>
-    </div>
-    <div>
-      <div class="card"><div class="chd"><div class="ctitle">⚔️ Duels récents</div></div><div style="background:var(--s2);border:1px solid var(--b1);border-radius:var(--r);padding:7px 10px;margin-bottom:10px;font-size:10px;color:var(--muted)">Chat → <span class="cpill">!duel @pseudo montant</span></div><table><thead><tr><th>Challenger</th><th>Opponent</th><th>Mise</th><th>Résultat</th></tr></thead><tbody id="duels-list"></tbody></table></div>
+  <!-- ══ SETTINGS ══ -->
+  <div class="page" id="page-settings">
+    <div class="header"><div><h1>Paramètres</h1><p>Préférences et configuration du bot</p></div></div>
+    <div class="g2">
+      <div>
+        <div class="panel" style="margin-bottom:14px"><h3>🎨 Apparence</h3><div style="display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid #1b2037"><div><div style="font-size:12px;font-weight:600">Mode d'affichage</div><div style="font-size:10px;color:#a1a1aa;margin-top:2px">Thème sombre ou clair</div></div><div style="display:flex;gap:6px"><button class="btnx btn-sm" id="theme-dark" onclick="setTheme('dark')" style="background:#8b35ff;color:#fff">🌙 Dark</button><button class="btnx btn-ghost btn-sm" id="theme-light" onclick="setTheme('light')">☀️ Light</button></div></div><div style="display:flex;align-items:center;justify-content:space-between;padding:10px 0"><div style="font-size:12px;font-weight:600">Couleur d'accent</div><div style="display:flex;gap:6px"><button onclick="setAccent('#8b35ff')" style="width:22px;height:22px;border-radius:50%;background:#8b35ff;border:2px solid #fff2;cursor:pointer"></button><button onclick="setAccent('#28ff66')" style="width:22px;height:22px;border-radius:50%;background:#28ff66;border:2px solid #fff2;cursor:pointer"></button><button onclick="setAccent('#1874ff')" style="width:22px;height:22px;border-radius:50%;background:#1874ff;border:2px solid #fff2;cursor:pointer"></button><button onclick="setAccent('#ff8500')" style="width:22px;height:22px;border-radius:50%;background:#ff8500;border:2px solid #fff2;cursor:pointer"></button><button onclick="setAccent('#ff1f6b')" style="width:22px;height:22px;border-radius:50%;background:#ff1f6b;border:2px solid #fff2;cursor:pointer"></button></div></div></div>
+        <div class="panel"><h3>🤖 Fonctionnalités du bot <button class="btnx btn-ghost btn-sm" onclick="loadBotFeatures()">↻</button></h3><div style="font-size:10px;color:#a1a1aa;margin-bottom:10px">Active ou désactive chaque fonctionnalité en un clic.</div><div id="bot-features-list"><div class="empty"><p>Chargement…</p></div></div></div>
+      </div>
+      <div>
+        <div class="panel" style="margin-bottom:14px"><h3>🌍 Langue</h3><label class="lbl">Langue de l'interface</label><select class="inp" onchange="setLanguage(this.value)" id="lang-select"><option value="fr">🇫🇷 Français</option><option value="en">🇬🇧 English</option><option value="es">🇪🇸 Español</option></select></div>
+        <div class="panel" style="margin-bottom:14px"><h3>ℹ️ À propos</h3><ul class="info"><li><span>Version</span><span style="color:#8b35ff;font-weight:700">Bot7uP v2.1.0</span></li><li><span>Base de données</span><span>Turso (LibSQL)</span></li><li><span>Hébergement</span><span>Render.com</span></li><li><span>Chaîne</span><span>fack7up</span></li></ul></div>
+        <div class="danger"><div class="danger-t">⚠ Réinitialisation</div><p style="font-size:10px;color:#a1a1aa;margin-bottom:8px">Remet les préférences aux valeurs par défaut.</p><button class="btnx btn-red" style="width:100%;justify-content:center" onclick="resetSettings()">🔄 Réinitialiser</button></div>
+      </div>
     </div>
   </div>
-</div>
 
-<!-- ══ OBJECTIFS ══ -->
-<div class="page" id="page-objectifs">
-  <div class="g2"><div><div class="card"><div class="chd"><div class="ctitle">🎯 Actifs</div></div><div id="obj-list"><div class="empty"><div class="ei">🎯</div><p>Aucun objectif</p></div></div></div><div class="card"><div class="chd"><div class="ctitle">✅ Atteints</div></div><div id="obj-done-list"><div class="empty"><p>Aucun atteint</p></div></div></div></div><div><div class="card" style="position:sticky;top:56px"><div class="chd"><div class="ctitle">➕ Créer un objectif</div></div><label class="lbl">Titre</label><input class="inp" id="obj-title" placeholder="Ex: 10 000 points distribués"><label class="lbl">Description</label><input class="inp" id="obj-desc" placeholder="Description…"><label class="lbl">Objectif (points distribués)</label><input type="number" class="inp" id="obj-target" placeholder="Ex: 10000"><label class="lbl">Récompense annoncée</label><input class="inp" id="obj-reward" placeholder="Ex: Game offert !"><button class="btn btn-primary" style="width:100%;justify-content:center;margin-top:12px;padding:8px" onclick="createObjective()">Créer</button><div id="obj-msg" style="margin-top:7px"></div></div></div></div>
-</div>
-
-<!-- ══ DBD ══ -->
-<div class="page" id="page-dbd">
-  <div class="g2-eq"><div class="card"><div class="chd"><div class="ctitle">🏃 Perks Survivant</div><button class="btn btn-outline btn-sm" onclick="spinDBD('survivor')">🎲 Lancer</button></div><div style="font-size:10px;color:var(--muted);margin-bottom:10px">4 perks aléatoires parmi tous les perks survivants</div><div id="dbd-survivor-result" style="display:grid;grid-template-columns:1fr 1fr;gap:7px"><div class="empty" style="grid-column:1/-1"><div class="ei">🎴</div><p>Clique sur Lancer</p></div></div><div id="dbd-survivor-spin" style="text-align:center;font-size:10px;color:var(--muted);margin-top:10px;min-height:16px"></div></div><div class="card"><div class="chd"><div class="ctitle">🔪 Perks Tueur</div><button class="btn btn-red btn-sm" onclick="spinDBD('killer')">🎲 Lancer</button></div><div style="font-size:10px;color:var(--muted);margin-bottom:10px">4 perks aléatoires parmi tous les perks tueurs</div><div id="dbd-killer-result" style="display:grid;grid-template-columns:1fr 1fr;gap:7px"><div class="empty" style="grid-column:1/-1"><div class="ei">🎴</div><p>Clique sur Lancer</p></div></div><div id="dbd-killer-spin" style="text-align:center;font-size:10px;color:var(--muted);margin-top:10px;min-height:16px"></div></div></div>
-  <div class="card"><div class="chd"><div class="ctitle">📋 Historique des builds</div><button class="btn btn-ghost btn-sm" onclick="clearDBDHistory()">Effacer</button></div><div id="dbd-history" style="max-height:160px;overflow-y:auto"><div class="empty"><p>Aucun build</p></div></div></div>
-</div>
-
-<!-- ══ MODÉRATION ══ -->
-<div class="page" id="page-moderation">
-  <div class="g2"><div><div class="card"><div class="chd"><div class="ctitle">🚫 Mots bannis (<span id="banned-count">0</span>)</div></div><div style="background:var(--s2);border:1px solid var(--b1);border-radius:var(--r);padding:7px 10px;margin-bottom:10px;font-size:10px;color:var(--muted)">Quand un viewer écrit un mot banni, le bot applique automatiquement l'action choisie.</div><div id="banned-list"><div class="empty"><div class="ei">🛡️</div><p>Aucun mot banni</p></div></div></div></div><div><div class="card" style="position:sticky;top:56px"><div class="chd"><div class="ctitle">➕ Ajouter un mot</div></div><label class="lbl">Mot ou expression</label><input class="inp" id="ban-word" placeholder="Ex: insulte, spam…"><label class="lbl">Action</label><select class="inp" id="ban-action" onchange="updateDurationVisibility()"><option value="timeout">⏱ Timeout</option><option value="ban">🔨 Ban permanent</option></select><div id="duration-wrap"><label class="lbl">Durée</label><div class="ghalf"><div><input type="number" class="inp" id="ban-duration" value="300" min="1"><div style="font-size:9px;color:var(--muted2);margin-top:2px">secondes</div></div><div style="display:flex;flex-direction:column;gap:4px"><button class="btn btn-ghost btn-xs" onclick="setDuration(60)">1 min</button><button class="btn btn-ghost btn-xs" onclick="setDuration(300)">5 min</button><button class="btn btn-ghost btn-xs" onclick="setDuration(3600)">1h</button><button class="btn btn-ghost btn-xs" onclick="setDuration(86400)">24h</button></div></div></div><button class="btn btn-primary" style="width:100%;justify-content:center;margin-top:12px;padding:8px" onclick="addBannedWord()">➕ Ajouter</button><div id="ban-msg" style="margin-top:7px"></div></div></div></div>
-</div>
-
-<!-- ══ COMMANDES ══ -->
-<div class="page" id="page-commands">
-  <div class="g2"><div><div class="card"><div class="chd"><div class="ctitle">💬 Commandes personnalisées (<span id="cmd-count">0</span>)</div></div><div id="cmd-page-list"><div class="empty"><div class="ei">💬</div><p>Aucune commande</p></div></div></div><div class="card"><div class="chd"><div class="ctitle">📌 Commandes système</div><div class="cactions"><span style="font-size:9px;color:var(--muted)">Tout</span><label class="toggle"><input type="checkbox" id="all-cmds-toggle" checked onchange="toggleAllCommands(this.checked)"><span class="tsl"></span></label></div></div><div id="sys-cmd-list"><div class="empty"><p>Chargement…</p></div></div></div></div><div><div class="card" style="position:sticky;top:56px"><div class="chd"><div class="ctitle">➕ Nouvelle commande</div></div><label class="lbl">Trigger (avec le !)</label><input class="inp" id="cmd-page-trigger" placeholder="Ex: !discord" maxlength="30"><label class="lbl">Réponse dans le chat</label><textarea class="inp" id="cmd-page-response" placeholder="Ex: discord.gg/xxx" rows="4"></textarea><div style="font-size:9px;color:var(--muted2);margin-top:3px">@{user} pour mentionner le viewer</div><button class="btn btn-primary" style="width:100%;justify-content:center;margin-top:12px;padding:8px" onclick="addCmdPage()">➕ Ajouter</button><div id="cmd-page-msg" style="margin-top:7px"></div></div></div></div>
-</div>
-
-<!-- ══ OUTILS CHAT ══ -->
-<div class="page" id="page-outils">
-  <div class="g2">
-    <div>
-      <div class="card"><div class="chd"><div class="ctitle">💬 Citations (<span id="quotes-count">0</span>)</div><span style="font-size:10px;color:var(--muted)">!quote · !addquote</span></div><div id="quotes-list"><div class="empty"><div class="ei">💬</div><p>Aucune citation</p></div></div></div>
-      <div class="card"><div class="chd"><div class="ctitle">🔢 Compteurs</div><span style="font-size:10px;color:var(--muted)">!mort · !score</span></div><div id="counters-list"><div class="empty"><div class="ei">🔢</div><p>Aucun compteur</p></div></div><div style="display:flex;gap:6px;margin-top:10px"><input class="inp inp-sm" id="counter-name" placeholder="Nom (ex: morts)" style="flex:1"><input type="number" class="inp inp-sm" id="counter-val" placeholder="0" style="width:60px"><button class="btn btn-outline btn-sm" onclick="addCounter()">Créer</button></div></div>
-      <div class="card"><div class="chd"><div class="ctitle">📊 Sondages</div><span style="font-size:10px;color:var(--muted)">!vote · !sondage</span></div><div id="poll-active"><div class="empty"><div class="ei">📊</div><p>Aucun sondage actif</p></div></div><hr class="div"><label class="lbl">Question</label><input class="inp" id="poll-question" placeholder="Ex: Quel jeu ensuite ?"><label class="lbl">Options (une par ligne, max 5)</label><textarea class="inp" id="poll-options" placeholder="Option 1&#10;Option 2&#10;Option 3" rows="4"></textarea><div style="display:flex;gap:6px;margin-top:10px"><button class="btn btn-outline" onclick="createPoll()">🚀 Lancer</button><button class="btn btn-red" onclick="closePoll()">⛔ Fermer</button></div><div id="poll-msg" style="margin-top:7px"></div></div>
-    </div>
-    <div>
-      <div class="card"><div class="chd"><div class="ctitle">📋 File d'attente (<span id="queue-count">0</span>)</div><div class="cactions"><span style="font-size:10px;color:var(--muted)">!queue</span><button class="btn btn-red btn-sm" onclick="clearQueue()">Vider</button></div></div><div id="queue-list"><div class="empty"><div class="ei">📋</div><p>File vide</p></div></div></div>
-      <div class="card"><div class="chd"><div class="ctitle">📢 Annonces auto</div></div><div id="ann-list"><div class="empty"><div class="ei">📢</div><p>Aucune annonce</p></div></div><hr class="div"><label class="lbl">Message</label><textarea class="inp" id="ann-message" placeholder="Ex: Rejoins notre Discord !" rows="2"></textarea><label class="lbl">Intervalle</label><div style="display:flex;gap:5px;margin-bottom:8px"><button class="btn btn-ghost btn-sm" onclick="setAnnInterval(300000)">5 min</button><button class="btn btn-ghost btn-sm" onclick="setAnnInterval(600000)">10 min</button><button class="btn btn-ghost btn-sm" onclick="setAnnInterval(1800000)">30 min</button><button class="btn btn-ghost btn-sm" onclick="setAnnInterval(3600000)">1h</button></div><input type="hidden" id="ann-interval" value="600000"><button class="btn btn-outline" style="width:100%;justify-content:center" onclick="addAnnouncement()">➕ Ajouter</button><div id="ann-msg" style="margin-top:7px"></div></div>
-      <div class="card"><div class="chd"><div class="ctitle">⏱ Timers</div></div><div id="timers-list"><div class="empty"><div class="ei">⏱</div><p>Aucun timer</p></div></div><hr class="div"><label class="lbl">Nom</label><input class="inp" id="timer-name" placeholder="Ex: recap"><label class="lbl">Message</label><input class="inp" id="timer-message" placeholder="Ex: N'oublie pas de follow !"><label class="lbl">Intervalle</label><div style="display:flex;gap:5px;margin-bottom:6px"><button class="btn btn-ghost btn-sm" onclick="setTimerInterval(300000)">5 min</button><button class="btn btn-ghost btn-sm" onclick="setTimerInterval(600000)">10 min</button><button class="btn btn-ghost btn-sm" onclick="setTimerInterval(1800000)">30 min</button></div><input type="hidden" id="timer-interval" value="300000"><button class="btn btn-outline" style="width:100%;justify-content:center;margin-top:4px" onclick="addTimer()">➕ Ajouter</button><div id="timer-msg" style="margin-top:7px"></div></div>
-    </div>
-  </div>
-</div>
-
-<!-- ══ HISTORIQUE ══ -->
-<div class="page" id="page-historique">
-  <div class="g2"><div><div class="card"><div class="chd"><div class="ctitle">📅 Sessions de stream</div></div><div id="hist-list"><div class="empty"><div class="ei">📅</div><p>Chargement…</p></div></div></div></div><div><div class="card"><div class="chd"><div class="ctitle">📊 Logs de points</div></div><div style="max-height:480px;overflow-y:auto" id="full-logs"><div class="empty"><p>Chargement…</p></div></div></div></div></div>
-</div>
-
-<!-- ══ ADMIN ══ -->
-<div class="page" id="page-admin">
-  <div class="g2"><div><div class="card"><div class="chd"><div class="ctitle">👤 Gestion d'un viewer</div></div><div style="display:flex;gap:7px"><input class="inp" id="admin-user" placeholder="Pseudo exact" onkeydown="if(event.key==='Enter')searchViewer()"><button class="btn btn-ghost" onclick="searchViewer()">Chercher</button></div><div class="vcard" id="viewer-result"></div><div style="display:flex;gap:6px;margin-top:9px;align-items:center"><input type="number" class="inp" id="admin-pts" placeholder="Pts" style="width:75px"><button class="btn btn-outline btn-sm" onclick="adminAdd()">+ Ajouter</button><button class="btn btn-red btn-sm" onclick="adminRemove()">− Retirer</button><button class="btn btn-ghost btn-sm" onclick="adminReset()">Reset</button></div><div id="admin-msg" style="margin-top:7px"></div><input type="hidden" id="admin-key" value=""></div><div class="card"><div class="chd"><div class="ctitle">💬 Commandes (raccourci)</div></div><div id="cmds-list" style="margin-bottom:10px"></div><div style="display:flex;gap:6px"><input class="inp inp-sm" id="cmd-trigger" placeholder="!cmd" style="width:100px"><input class="inp inp-sm" id="cmd-response" placeholder="Réponse…" style="flex:1"><button class="btn btn-outline btn-sm" onclick="addCmd()">+</button></div><div id="cmd-msg" style="margin-top:7px"></div></div></div><div><div class="card"><div class="chd"><div class="ctitle">🔐 Accès au panel</div><button class="btn btn-ghost btn-sm" onclick="loadAccessRequests()">↻</button></div><div id="access-list"><div class="empty"><p>Chargement…</p></div></div></div><div class="card"><div class="chd"><div class="ctitle">⭐ Niveaux</div></div><div id="admin-levels"></div></div><div class="danger"><div class="danger-t">⚠ Zone dangereuse</div><p style="font-size:10px;color:var(--muted);margin-bottom:8px">Remet tous les points à zéro. Irréversible.</p><button class="btn btn-red" style="width:100%;justify-content:center" onclick="clearAll()">🗑 Remettre TOUS les points à zéro</button></div></div></div>
-</div>
-
-<!-- ══ SETTINGS ══ -->
-<div class="page" id="page-settings">
-  <div class="g2">
-    <div>
-      <div class="card"><div class="chd"><div class="ctitle">🎨 Apparence</div></div><div style="display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--b1)"><div><div style="font-size:12px;font-weight:600">Mode d'affichage</div><div style="font-size:10px;color:var(--muted);margin-top:2px">Thème sombre ou clair</div></div><div style="display:flex;gap:6px"><button class="btn btn-sm" id="theme-dark" onclick="setTheme('dark')" style="background:var(--purple);color:#fff">🌙 Dark</button><button class="btn btn-ghost btn-sm" id="theme-light" onclick="setTheme('light')">☀️ Light</button></div></div><div style="display:flex;align-items:center;justify-content:space-between;padding:10px 0"><div><div style="font-size:12px;font-weight:600">Couleur d'accent</div></div><div style="display:flex;gap:6px"><button onclick="setAccent('#7c3aed')" style="width:22px;height:22px;border-radius:50%;background:#7c3aed;border:2px solid #fff2;cursor:pointer"></button><button onclick="setAccent('#22c55e')" style="width:22px;height:22px;border-radius:50%;background:#22c55e;border:2px solid #fff2;cursor:pointer"></button><button onclick="setAccent('#3b82f6')" style="width:22px;height:22px;border-radius:50%;background:#3b82f6;border:2px solid #fff2;cursor:pointer"></button><button onclick="setAccent('#f59e0b')" style="width:22px;height:22px;border-radius:50%;background:#f59e0b;border:2px solid #fff2;cursor:pointer"></button><button onclick="setAccent('#ef4444')" style="width:22px;height:22px;border-radius:50%;background:#ef4444;border:2px solid #fff2;cursor:pointer"></button></div></div></div>
-      <div class="card"><div class="chd"><div class="ctitle">🤖 Fonctionnalités du bot</div><button class="btn btn-ghost btn-sm" onclick="loadBotFeatures()">↻</button></div><div style="font-size:10px;color:var(--muted);margin-bottom:10px">Active ou désactive chaque fonctionnalité en un clic.</div><div id="bot-features-list"><div class="empty"><p>Chargement…</p></div></div></div>
-    </div>
-    <div>
-      <div class="card"><div class="chd"><div class="ctitle">🌍 Langue</div></div><label class="lbl">Langue de l'interface</label><select class="inp" onchange="setLanguage(this.value)" id="lang-select"><option value="fr">🇫🇷 Français</option><option value="en">🇬🇧 English</option><option value="es">🇪🇸 Español</option></select></div>
-      <div class="card"><div class="chd"><div class="ctitle">ℹ️ À propos</div></div><div><div class="info-row"><span class="info-key">Version</span><span class="info-val" style="color:var(--purple2)">Bot7uP v2.1.0</span></div><div class="info-row"><span class="info-key">Base de données</span><span class="info-val">Turso (LibSQL)</span></div><div class="info-row"><span class="info-key">Hébergement</span><span class="info-val">Render.com</span></div><div class="info-row"><span class="info-key">Chaîne</span><span class="info-val">fack7up</span></div></div></div>
-      <div class="danger"><div class="danger-t">⚠ Réinitialisation</div><p style="font-size:10px;color:var(--muted);margin-bottom:8px">Remet les préférences aux valeurs par défaut.</p><button class="btn btn-red" style="width:100%;justify-content:center" onclick="resetSettings()">🔄 Réinitialiser</button></div>
-    </div>
-  </div>
-</div>
-
-</div><!-- /content -->
-</div><!-- /main -->
-</div><!-- /app -->
+</main>
 
 <div class="toast" id="toast"></div>
 <script>
@@ -537,18 +501,16 @@ const API = '';
 const MEDALS = ['🥇','🥈','🥉'];
 let lbData = [], levels = [];
 const PAGE_TITLES = {dashboard:'Dashboard',classement:'Classement',lobby:'Lobby',jeux:'Jeux',objectifs:'Objectifs',dbd:'Dead by Daylight',moderation:'Modération',commands:'Commandes',historique:'Historique',admin:'Administration',settings:'Paramètres',outils:'Outils Chat'};
-const PAGE_SUBS = {dashboard:"Vue d'ensemble de ton bot",classement:'Top viewers et niveaux',lobby:'File de jeu en direct',jeux:'Giveaways et duels',objectifs:'Suivi des objectifs',dbd:'Générateur de builds',moderation:'Mots bannis et actions',commands:'Commandes personnalisées',historique:'Sessions et activité',admin:'Gestion avancée',settings:'Préférences et configuration',outils:'Outils de chat en direct'};
 
 // ── Navigation ─────────────────────────────────────────────────────────────────
 function showPage(name) {
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
-  document.querySelectorAll('.nav-item').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.menu a').forEach(t => t.classList.remove('active'));
   const page = document.getElementById('page-'+name);
   if(page) page.classList.add('active');
-  document.querySelectorAll('.nav-item').forEach(t => {
+  document.querySelectorAll('.menu a').forEach(t => {
     if(t.getAttribute('onclick') === "showPage('"+name+"')") t.classList.add('active');
   });
-  document.getElementById('page-title').textContent = PAGE_TITLES[name] || name;
   if(name==='classement') loadLeaderboard();
   if(name==='jeux') { loadDuels(); loadGiveaways(); loadActiveGiveaway(); }
   if(name==='objectifs') loadObjectives();
@@ -585,88 +547,30 @@ async function del(url) {
 // ── Load all ───────────────────────────────────────────────────────────────────
 async function loadAll() {
   loadLiveStatus();
-  await Promise.all([loadStats(), loadDashLB(), loadDashLogs(), loadDashSessions(), loadDashEvents(), loadCmdUsage(), loadLevels(), loadActiveGiveaway()]);
+  await Promise.all([loadStats(), loadDashLB(), loadDashLogs(), loadCmdUsage(), loadLevels(), loadActiveGiveaway()]);
   const el = document.getElementById('upd');
   if(el) el.textContent = new Date().toLocaleTimeString('fr-FR');
 }
 
 async function loadFollowers() {
-  // Chargés dans loadLiveStatus
-}
-
-async function loadDashEvents() {
-  try {
-    const logs = await get('/api/logs?limit=8') || [];
-    const el = document.getElementById('dash-events');
-    if (!el) return;
-    if (!logs.length) { el.innerHTML = '<div class="empty"><div class="ei">⚡</div><p>Aucune activité récente</p></div>'; return; }
-    const icons = { watch_time:'⏱', duel_win:'⚔️', duel_loss:'⚔️', giveaway_entry:'🎁', admin_manual:'⚙️' };
-    const colors = { watch_time:'#7c3aed20', duel_win:'#22c55e20', duel_loss:'#ef444420', giveaway_entry:'#f59e0b20', admin_manual:'#3b82f620' };
-    el.innerHTML = logs.map(l => `
-      <div class="ev-row">
-        <div class="ev-icon" style="background:${colors[l.reason]||'#7c3aed20'}">${icons[l.reason]||'⚡'}</div>
-        <div>
-          <div class="ev-name">${esc(l.username)}</div>
-          <div class="ev-detail">${fmtReason(l.reason)}</div>
-        </div>
-        <span class="ev-amount ${l.points>0?'':'neg'}">${l.points>0?'+':''}${l.points} pts</span>
-        <span class="ev-time">${timeAgo(l.created_at)}</span>
-      </div>`).join('');
-  } catch(e) {}
-}
-
-async function loadCmdUsage() {
-  try {
-    const cmds = await get('/api/commands') || [];
-    const el = document.getElementById('cmd-usage-list');
-    if (!el) return;
-    const sys = ['!points','!top','!rang','!niveau','!lobby','!duel','!vote','!so','!uptime','!quote'];
-    const allCmds = [...sys.slice(0,5), ...cmds.slice(0,3).map(c => c.trigger)];
-    if (!allCmds.length) { el.innerHTML = '<div class="empty"><p>Aucune commande</p></div>'; return; }
-    const max = 100;
-    el.innerHTML = allCmds.map((cmd, i) => {
-      const pct = Math.max(10, 100 - i * 18);
-      const count = Math.floor(pct * 3.2);
-      return `<div class="cmd-bar-row">
-        <span class="cmd-bar-name">${esc(cmd)}</span>
-        <div class="cmd-bar-track"><div class="cmd-bar-fill" style="width:${pct}%"></div></div>
-        <span class="cmd-bar-count">${count}</span>
-      </div>`;
-    }).join('');
-  } catch(e) {}
-}
-
-async function loadDashSessions() {
-  try {
-    const data = await get('/api/history?limit=3') || [];
-    const el = document.getElementById('dash-sessions');
-    if (!el) return;
-    if (!data.length) { el.innerHTML = '<div class="empty" style="padding:16px"><div class="ei">📅</div><p>Aucune session</p></div>'; return; }
-    el.innerHTML = data.map(s => `
-      <div class="histrow" style="padding:8px 14px">
-        <div style="width:8px;height:8px;border-radius:50%;background:var(--green);flex-shrink:0"></div>
-        <div style="flex:1">
-          <div style="font-weight:600;font-size:11px">${new Date(s.started_at+'Z').toLocaleDateString('fr-FR',{day:'2-digit',month:'short',year:'numeric'})}</div>
-          <div style="font-size:10px;color:var(--muted)">${fmtMin(s.duration_min||0)}</div>
-        </div>
-        <div style="font-size:10px;color:var(--muted)">👥 ${s.peak_viewers} max</div>
-      </div>`).join('');
-  } catch(e) {}
+  // Les followers sont maintenant chargés dans loadLiveStatus directement
 }
 
 async function loadStats() {
   try {
     const d = await get('/api/stats'); if(!d) return;
-    document.getElementById('s-viewers').textContent = (d.total_viewers||0).toLocaleString('fr');
-    document.getElementById('s-points').textContent  = (d.total_points_distributed||0).toLocaleString('fr');
-    document.getElementById('s-minutes').textContent = fmtMin(d.total_minutes_watched||0);
-    document.getElementById('s-top').textContent     = d.top_viewer || '—';
-    document.getElementById('s-top-sub').textContent = d.max_points ? d.max_points.toLocaleString('fr')+' pts' : '';
-    // Sidebar stats
-    const sbv = document.getElementById('sb-viewers');
-    const sbp = document.getElementById('sb-points');
-    if(sbv) sbv.textContent = (d.total_viewers||0).toLocaleString('fr');
-    if(sbp) sbp.textContent = (d.total_points_distributed||0).toLocaleString('fr');
+    const setEl = (id, val) => { const el = document.getElementById(id); if(el) el.textContent = val; };
+    setEl('sc-active', (d.total_viewers||0).toLocaleString('fr'));
+    setEl('s-points', (d.total_points_distributed||0).toLocaleString('fr'));
+    setEl('s-minutes', fmtMin(d.total_minutes_watched||0));
+    setEl('s-top', d.top_viewer || '—');
+    setEl('s-top-sub', d.max_points ? d.max_points.toLocaleString('fr')+' pts' : '');
+    setEl('chart-stat-viewers', (d.total_viewers||0).toLocaleString('fr') + ' viewers enregistrés');
+    setEl('chart-stat-minutes', fmtMin(d.total_minutes_watched||0) + ' regardées');
+    // Profil sidebar
+    const user = localStorage.getItem('kick_panel_user') || '?';
+    setEl('prof-avatar', user[0]?.toUpperCase() || '?');
+    setEl('prof-name', user);
   } catch(e){}
 }
 
@@ -694,18 +598,53 @@ async function loadDashLB() {
 
 async function loadDashLogs() {
   try {
-    const logs = await get('/api/logs?limit=20') || [];
-    document.getElementById('dash-logs').innerHTML = logs.map(l => `
-      <div class="log-item">
-        <div>
-          <div class="log-user">${esc(l.username)}</div>
-          <div class="log-reason">${fmtReason(l.reason)}</div>
+    const logs = await get('/api/logs?limit=8') || [];
+    const el = document.getElementById('dash-events');
+    if (!el) return;
+    if (!logs.length) { el.innerHTML = '<li><div class="empty"><div class="ei">⚡</div><p>Aucune activité récente</p></div></li>'; return; }
+    el.innerHTML = logs.map(l => `
+      <li>
+        <div class="ev-top">
+          <span class="ev-name">${esc(l.username)}</span>
+          <span class="ev-amt ${l.points>=0?'':'neg'}">${l.points>0?'+':''}${l.points} pts</span>
         </div>
-        <div style="text-align:right">
-          <div class="log-pts ${l.points>=0?'pos':'neg'}">${l.points>0?'+':''}${l.points} pts</div>
-          <div class="log-time">${timeAgo(l.created_at)}</div>
+        <div class="ev-top">
+          <span class="ev-detail">${fmtReason(l.reason)}</span>
+          <span class="ev-time">${timeAgo(l.created_at)}</span>
         </div>
-      </div>`).join('') || '<div class="empty"><div class="empty-icon">⚡</div><p>Aucune activité</p></div>';
+      </li>`).join('');
+  } catch(e){}
+}
+
+async function loadCmdUsage() {
+  try {
+    const cmds = await get('/api/commands') || [];
+    const el = document.getElementById('cmd-usage-list');
+    if (!el) return;
+    const sys = ['!points','!top','!rang','!niveau','!lobby'];
+    const allCmds = [...sys, ...cmds.slice(0,3).map(c => c.trigger)].slice(0,6);
+    if (!allCmds.length) { el.innerHTML = '<div class="empty"><p>Aucune commande</p></div>'; return; }
+    el.innerHTML = allCmds.map((cmd, i) => {
+      const pct = Math.max(12, 100 - i * 15);
+      return `<div class="cmd-row">
+        <div class="cmd-row-top"><span style="font-family:monospace;color:#8b35ff;font-weight:600;font-size:11px">${esc(cmd)}</span><span style="font-size:10px;color:#a1a1aa">${pct}%</span></div>
+        <div class="bar"><span style="width:${pct}%"></span></div>
+      </div>`;
+    }).join('');
+
+    // Donut chart
+    const total = allCmds.length;
+    const donutTotal = document.getElementById('donut-total');
+    if (donutTotal) donutTotal.textContent = total;
+    const colors = ['#8b35ff','#1267ff','#17c95f','#ff8500','#ff1f6b','#06b6d4'];
+    const legend = document.getElementById('donut-legend');
+    if (legend) {
+      legend.innerHTML = allCmds.slice(0,4).map((cmd, i) => `
+        <div class="donut-legend-row">
+          <div class="donut-legend-dot" style="background:${colors[i]}"></div>
+          <span style="font-family:monospace;color:#8b35ff">${esc(cmd)}</span>
+        </div>`).join('');
+    }
   } catch(e){}
 }
 
@@ -1056,61 +995,7 @@ async function loadLiveStatus() {
     const viewers   = d.livestream?.viewer_count ?? 0;
     const followers = d.followersCount ?? d.followers_count ?? 0;
 
-    // Mettre à jour le pill live
-    const pill = document.getElementById('live-pill');
-    const txt  = document.getElementById('live-text');
-    const dot  = document.getElementById('live-dot');
-    if (pill && txt) {
-      if (live) {
-        pill.className = 'live-pill-sb on';
-        if(dot) dot.className = 'live-dot blink';
-        txt.textContent = 'EN LIVE' + (viewers ? ' · ' + viewers + ' viewers' : '');
-      } else {
-        pill.className = 'live-pill-sb off';
-        if(dot) dot.className = 'live-dot';
-        txt.textContent = 'Hors ligne';
-      }
-    }
-
-    // Mettre à jour followers partout
-    if (followers > 0) {
-      const fmt = followers >= 1000 ? (followers/1000).toFixed(1)+'k' : followers;
-      ['s-followers','sb-followers'].forEach(id => {
-        const el = document.getElementById(id);
-        if(el) el.textContent = fmt;
-      });
-    }
-
-    // Mettre à jour viewers sidebar
-    const sbv = document.getElementById('sb-viewers');
-    if(sbv) sbv.textContent = live ? (viewers || '0') : '—';
-
-    // Mettre à jour info-card
-    const icv = document.getElementById('ic-viewers');
-    const icf = document.getElementById('ic-followers');
-    const icb = document.getElementById('ic-live-badge');
-    const icu = document.getElementById('ic-uptime');
-    if(icv) icv.textContent = live ? (viewers || '0') : '—';
-    if(icf && followers > 0) icf.textContent = followers >= 1000 ? (followers/1000).toFixed(1)+'k' : followers;
-    if(icb) {
-      if(live) {
-        icb.className = 'ic-live-badge';
-        icb.textContent = 'EN LIVE' + (viewers ? ' - ' + viewers + ' viewers' : '');
-      } else {
-        icb.className = 'ic-offline-badge';
-        icb.textContent = 'Hors ligne';
-      }
-    }
-    // Uptime
-    if(icu && live) {
-      if(!window._streamStart) window._streamStart = Date.now();
-      const diff = Math.floor((Date.now() - window._streamStart) / 1000);
-      const h = Math.floor(diff/3600), m = Math.floor((diff%3600)/60), s = diff%60;
-      icu.textContent = h > 0 ? h+'h '+m+'m '+s+'s' : m > 0 ? m+'m '+s+'s' : s+'s';
-    } else if(icu && !live) {
-      window._streamStart = null;
-      icu.textContent = '—';
-    }
+    updateLiveUI(live, viewers, followers);
 
     // Envoyer l'état au serveur pour que le bot sache si le stream est live
     fetch('/api/live/update', {
@@ -1124,14 +1009,68 @@ async function loadLiveStatus() {
     try {
       const r2 = await fetch('/api/live');
       const d2 = await r2.json();
-      const pill = document.getElementById('live-pill');
-      const txt  = document.getElementById('live-text');
-      const dot  = document.getElementById('live-dot');
-      if(pill && txt) {
-        if(d2.live) { pill.className='live-badge on'; if(dot) dot.className='live-dot blink'; txt.textContent='EN LIVE'; }
-        else { pill.className='live-badge off'; if(dot) dot.className='live-dot'; txt.textContent='Hors ligne'; }
-      }
+      updateLiveUI(!!d2.live, d2.viewers||0, d2.followers||0);
     } catch(e2) {}
+  }
+}
+
+function updateLiveUI(live, viewers, followers) {
+  // Pill sidebar
+  const pill = document.getElementById('live-pill');
+  const txt  = document.getElementById('live-text');
+  const dot  = document.getElementById('live-dot');
+  if (pill && txt) {
+    if (live) {
+      pill.className = 'live-pill on';
+      if(dot) dot.className = 'lpd blink';
+      txt.textContent = 'EN LIVE' + (viewers ? ' · ' + viewers : '');
+    } else {
+      pill.className = 'live-pill off';
+      if(dot) dot.className = 'lpd';
+      txt.textContent = 'Hors ligne';
+    }
+  }
+
+  // Followers (carte dashboard + sidebar + info panel)
+  if (followers > 0) {
+    const fmt = followers >= 1000 ? (followers/1000).toFixed(1)+'k' : followers;
+    ['s-followers','sb-followers','ic-followers'].forEach(id => {
+      const el = document.getElementById(id);
+      if(el) el.textContent = fmt;
+    });
+  }
+
+  // Viewers (sidebar + info panel)
+  const viewersFmt = live ? (viewers || '0') : '—';
+  ['sb-viewers','ic-viewers'].forEach(id => {
+    const el = document.getElementById(id);
+    if(el) el.textContent = viewersFmt;
+  });
+
+  // Badge live dans le panel Informations
+  const icb = document.getElementById('ic-live-badge');
+  if (icb) {
+    if (live) {
+      icb.className = 'ic-live-badge';
+      icb.textContent = 'EN LIVE' + (viewers ? ' - ' + viewers + ' viewers' : '');
+    } else {
+      icb.className = 'ic-offline-badge';
+      icb.textContent = 'Hors ligne';
+    }
+  }
+
+  // Uptime
+  const icu = document.getElementById('ic-uptime');
+  if (icu) {
+    if (live) {
+      if (!window._streamStart) window._streamStart = Date.now();
+      const diff = Math.floor((Date.now() - window._streamStart) / 1000);
+      const h = Math.floor(diff/3600), m = Math.floor((diff%3600)/60), s = diff%60;
+      icu.textContent = h > 0 ? h+'h '+m+'m '+s+'s' : m > 0 ? m+'m '+s+'s' : s+'s';
+    } else {
+      window._streamStart = null;
+      icu.textContent = '—';
+    }
   }
 }
 
@@ -1235,7 +1174,7 @@ async function deleteCmdPage(trigger) {
 let forceLive = null; // null = auto, true = forcé ON, false = forcé OFF
 
 async function toggleForceLive() {
-  const btn = document.getElementById('live-toggle-btn'); const btnTxt = document.getElementById('live-btn-text'); if(!btn) return;
+  const btn = document.getElementById('live-toggle-btn'); const btnTxt = document.getElementById('live-btn-text');
   let nextState;
   if (forceLive === null)  nextState = 'on';
   else if (forceLive === true) nextState = 'off';
@@ -1249,21 +1188,22 @@ async function toggleForceLive() {
 
   const pill = document.getElementById('live-pill');
   const txt  = document.getElementById('live-text');
+  const dot  = document.getElementById('live-dot');
 
   if (forceLive === true) {
-    btn.className = 'sb-btn live-on';
+    btn.className = 'sb-btnx live-on';
     if(btnTxt) btnTxt.textContent = 'Forcé EN LIGNE'; else btn.textContent = '⚡ Forcé EN LIGNE';
-    if(pill) pill.className='live-badge on'; if(dot) dot.className='live-dot blink';
+    if(pill) pill.className='live-pill on'; if(dot) dot.className='lpd blink';
     if(txt)  txt.textContent='● LIVE (forcé)';
     toast('Stream forcé EN LIGNE ✓');
   } else if (forceLive === false) {
-    btn.className = 'sb-btn live-off';
+    btn.className = 'sb-btnx live-off';
     if(btnTxt) btnTxt.textContent = 'Forcé HORS LIGNE'; else btn.textContent = '⚡ Forcé HORS LIGNE';
-    if(pill) pill.className='live-badge off'; if(dot) dot.className='live-dot';
+    if(pill) pill.className='live-pill off'; if(dot) dot.className='lpd';
     if(txt)  txt.textContent='Hors ligne (forcé)';
     toast('Stream forcé HORS LIGNE', false);
   } else {
-    btn.className = 'sb-btn';
+    btn.className = 'sb-btnx';
     if(btnTxt) btnTxt.textContent = 'Mode auto'; else btn.textContent = '⚡ Mode auto';
     toast('Mode automatique rétabli');
     loadLiveStatus();
@@ -1925,16 +1865,6 @@ function setFontSize(size) {
 function setLanguage(lang) {
   currentLang = lang;
   localStorage.setItem('bot7up_lang', lang);
-  const t = TRANSLATIONS[lang] || TRANSLATIONS.fr;
-  // Mettre à jour les noms dans la nav
-  document.querySelectorAll('.nav-item').forEach(btn => {
-    const onclick = btn.getAttribute('onclick') || '';
-    const match = onclick.match(/showPage\('([^']+)'\)/);
-    if(match && t[match[1]]) {
-      const span = btn.querySelector('span:last-child');
-      if(span) span.textContent = t[match[1]];
-    }
-  });
   toast('🌍 Langue : ' + {fr:'Français',en:'English',es:'Español'}[lang]);
 }
 
@@ -2151,4 +2081,6 @@ setInterval(()=>{if(document.getElementById('page-lobby').classList.contains('ac
 
 
 
-</script></body></html>
+</script>
+</body>
+</html>
