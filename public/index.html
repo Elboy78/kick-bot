@@ -2391,7 +2391,7 @@ function buildVodCard(v) {
       <div style="display:flex;gap:6px">
         <a href="${esc(vodUrl)}" target="_blank" class="btnx btn-outline btn-sm" style="flex:1;justify-content:center;text-decoration:none">▶️ Voir</a>
         <a href="https://kick-video.download/?url=${encodeURIComponent(vodUrl)}" target="_blank" class="btnx btn-ghost btn-sm" style="text-decoration:none" title="Télécharger">⬇️</a>
-        <button class="btnx btn-ghost btn-sm" title="Marquer un moment" onclick="prefillMoment('${esc(String(vodSlug||vodId))}','${safe}','${esc(vodUrl)}')">📌</button>
+        <button class="btnx btn-ghost btn-sm" title="Marquer un moment" onclick="prefillMoment('${esc(String(vodUuid||vodId))}','${safe}','${esc(vodUrl)}')">📌</button>
       </div>
     </div>
   </div>`;
@@ -2450,9 +2450,10 @@ function buildClipCard(c) {
   const thumb    = c.thumbnail_url || c.thumbnail || '';
   const clipId   = c.id || c.uuid || '';
   // URL de la page Kick pour "Voir"
-  const clipPage = c.clip_url || (clipId ? `https://kick.com/${activeKickChannel}/clips/${clipId}` : '#');
-  // video_url = URL m3u8 HLS confirmée par l'API Kick
-  const videoUrl = c.video_url || c.clip_url || '';
+  // URL page Kick du clip — NE PAS utiliser clip_url (c'est le m3u8, pas la page)
+  const clipPage = clipId ? `https://kick.com/${activeKickChannel}/clips/${clipId}` : '#';
+  // video_url = URL m3u8 HLS pour le téléchargement
+  const videoUrl = c.video_url || '';
   const views    = (c.view_count || c.views || 0) > 0 ? (c.view_count || c.views).toLocaleString('fr') + ' vues' : '';
   const dur      = c.duration ? fmtVodDuration(c.duration * 1000) : '';
   const creator  = esc(c.created_by?.username || c.channel?.slug || '');
