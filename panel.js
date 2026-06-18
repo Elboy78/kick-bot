@@ -67,69 +67,71 @@ app.get('/api/channel-info', (req, res) => {
 // (header CORS manquant / politique de référent).
 app.get('/api/proxy-download', async (req, res) => {
   const url      = req.query.url;
-  const filename = req.query.filename || 'clip.mp4';
+  const filename = (req.query.filename || 'clip.mp4').replace(/[^a-zA-Z0-9_.-]/g, '_');
 
   if (!url) return res.status(400).json({ error: 'url requis' });
 
-  // Sécurité : n'autoriser que les URLs venant des CDN Kick
-  const allowedHosts = ['kick.com', 'clips.kick.com', 'cdn.kick.com', 'stream.kick.com',
-                        'cloudfront.net', 'akamaized.net', 'fastly.net', 'amazonaws.com',
-                        'edgedelivery.net', 'kickcontent.com'];
+  // Sécurité : n'autoriser que les domaines Kick
+  const allowedHosts = ['kick.com', 'clips.kick.com', 'cdn.kick.com',
+                        'cloudfront.net', 'akamaized.net', 'fastly.net', 'amazonaws.com'];
   let parsedUrl;
   try { parsedUrl = new URL(url); } catch(e) { return res.status(400).json({ error: 'URL invalide' }); }
   const hostOk = allowedHosts.some(h => parsedUrl.hostname.endsWith(h));
   if (!hostOk) return res.status(403).json({ error: 'Domaine non autorisé: ' + parsedUrl.hostname });
 
-  try {
-    const upstream = await axios.get(url, {
-      responseType: 'arraybuffer',  // Buffer complet pour vérifier le contenu avant d'envoyer
-      timeout: 60000,
-      headers: {
-        'Accept': 'video/mp4,video/*,*/*',
-        'Accept-Language': 'en-US',
-        'Referer': 'https://kick.com/',
-        'Origin': 'https://kick.com',
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120.0.0.0 Safari/537.36',
-      },
-      maxRedirects: 10,
-    });
+  const { spawn } = require('child_process');
+  const os = require('os');
+  const path = require('path');
+  const fs = require('fs');
 
-    const contentType = upstream.headers['content-type'] || '';
-    const buffer = Buffer.from(upstream.data);
+  const tmpFile = path.join(os.tmpdir(), `kick_clip_${Date.now()}.mp4`);
 
-    console.log(`[PROXY DL] URL: ${url.slice(0,80)} | Content-Type: ${contentType} | Size: ${buffer.length} bytes`);
+  console.log(`[PROXY DL] Conversion m3u8→mp4: ${url.slice(0, 80)}`);
 
-    // Vérifier que c'est bien une vidéo (magic bytes MP4: ftyp à l'offset 4)
-    const isVideo = contentType.includes('video') ||
-                    contentType.includes('octet-stream') ||
-                    (buffer.length > 8 && buffer.slice(4, 8).toString('ascii') === 'ftyp') ||
-                    (buffer.length > 8 && buffer.slice(4, 8).toString('ascii') === 'mdat');
+  // FFmpeg : lit le m3u8 HLS et copie les streams directement en MP4 (pas de re-encodage)
+  const ffmpeg = spawn('ffmpeg', [
+    '-i', url,
+    '-c', 'copy',           // copie sans re-encodage — ultra rapide, ~1s pour 30s de clip
+    '-bsf:a', 'aac_adtstoasc',  // correction format audio pour MP4
+    '-movflags', 'faststart',    // MP4 optimisé pour lecture immédiate
+    '-y',                   // écraser si existe
+    tmpFile
+  ]);
 
-    if (!isVideo) {
-      // Ce n'est pas une vidéo — logguer ce qu'on a reçu pour debug
-      console.error(`[PROXY DL] Pas une vidéo! Content-Type: ${contentType}. Début du contenu:`, buffer.slice(0,200).toString('utf8'));
-      return res.status(502).json({
-        error: 'Kick n\'a pas retourné un fichier vidéo',
-        contentType,
-        hint: 'Vérifie la console du navigateur (F12) pour voir [CLIP DETAIL] et trouver le bon champ URL'
-      });
+  let ffmpegErr = '';
+  ffmpeg.stderr.on('data', d => { ffmpegErr += d.toString(); });
+
+  ffmpeg.on('close', (code) => {
+    if (code !== 0 || !fs.existsSync(tmpFile)) {
+      console.error('[PROXY DL] FFmpeg erreur (code', code, '):', ffmpegErr.slice(-300));
+      if (!res.headersSent) res.status(500).json({ error: 'Conversion échouée', code });
+      return;
     }
+
+    const stat = fs.statSync(tmpFile);
+    console.log(`[PROXY DL] Converti: ${stat.size} bytes → ${filename}`);
 
     res.setHeader('Content-Type', 'video/mp4');
     res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
-    res.setHeader('Content-Length', buffer.length);
-    res.send(buffer);
+    res.setHeader('Content-Length', stat.size);
 
-  } catch(e) {
-    console.error('[PROXY DL] Erreur:', e.response?.status, e.message);
-    if (!res.headersSent) {
-      res.status(500).json({
-        error: 'Erreur lors du téléchargement',
-        status: e.response?.status,
-        message: e.message
-      });
-    }
-  }
+    const stream = fs.createReadStream(tmpFile);
+    stream.pipe(res);
+    stream.on('end', () => {
+      fs.unlink(tmpFile, () => {}); // nettoyage après envoi
+    });
+    stream.on('error', (e) => {
+      console.error('[PROXY DL] Stream error:', e.message);
+      fs.unlink(tmpFile, () => {});
+    });
+  });
+
+  // Timeout de sécurité : tuer FFmpeg après 60s
+  setTimeout(() => {
+    try { ffmpeg.kill('SIGKILL'); } catch(e) {}
+    try { fs.unlink(tmpFile, () => {}); } catch(e) {}
+    if (!res.headersSent) res.status(504).json({ error: 'Timeout conversion' });
+  }, 60000);
 });
 
 // CRUD moments
