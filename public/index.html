@@ -267,7 +267,7 @@ hr.div{border:none;border-top:1px solid var(--brd);margin:12px 0}
     <p class="bot-status-title">STATUT DU BOT</p>
     <p class="online">● En ligne</p>
     <p>Chaîne : <b>fack7up</b></p>
-    <p>Viewers : <b id="sb-viewers">—</b></p>
+    <p>Uptime : <b id="sb-uptime">—</b></p>
     <p>Followers : <b id="sb-followers">—</b></p>
     <div class="live-pill off" id="live-pill"><div class="lpd" id="live-dot"></div><span id="live-text">Vérification…</span></div>
   </div>
@@ -373,7 +373,7 @@ hr.div{border:none;border-top:1px solid var(--brd);margin:12px 0}
           <li><span>Viewers</span><span id="ic-viewers">—</span></li>
           <li><span>Followers</span><span id="ic-followers">—</span></li>
           <li><span>Statut live</span><span id="ic-live-badge" class="ic-offline-badge">Hors ligne</span></li>
-          <li><span>Vu par le bot</span><span id="ic-bot-live-status">—</span></li>
+          <li><span>Vu par le bot</span><span style="display:flex;align-items:center;gap:6px"><span id="ic-bot-live-status">—</span><button class="btnx btn-ghost btn-xs" id="force-live-btn" onclick="toggleForceLive()" title="Forcer le statut live si la détection automatique échoue">⚡</button></span></li>
           <li><span>Uptime</span><span id="ic-uptime">—</span></li>
           <li><span>Préfixe</span><span>!</span></li>
           <li><span>Langue</span><span>🇫🇷 Français</span></li>
@@ -802,8 +802,37 @@ Option 3" rows="4"></textarea><div style="display:flex;gap:6px;margin-top:10px">
             <b style="color:var(--text)">⚙️ Configuration requise</b><br>
             Pour recevoir les events de follow, ajoute ce webhook dans <a href="https://kick.com/settings/developer" target="_blank" style="color:var(--accent)">kick.com/settings/developer</a> → Event Subscriptions :<br>
             <code style="background:var(--card);padding:2px 6px;border-radius:4px;color:var(--accent);font-size:9px;display:block;margin-top:4px;word-break:break-all">https://kick-bot-agkk.onrender.com/webhook/kick</code>
-            <span style="margin-top:4px;display:block">Événement à cocher : <b>channel.followed</b></span>
+            <span style="margin-top:4px;display:block">Événements à cocher : <b>channel.followed</b>, <b>channel.subscription.new</b>, <b>channel.subscription.renewal</b>, <b>channel.subscription.gifts</b></span>
           </div>
+        </div>
+
+        <div class="panel" style="margin-bottom:14px">
+          <h3>⭐ Annonce de sub</h3>
+          <div style="font-size:10px;color:var(--muted);margin-bottom:10px;line-height:1.6">
+            Messages envoyés dans le chat pour les nouveaux subs, renouvellements et sub gifts.<br>
+            Variables : <code style="background:var(--card2);padding:1px 4px;border-radius:4px">{username}</code> <code style="background:var(--card2);padding:1px 4px;border-radius:4px">{months}</code> <code style="background:var(--card2);padding:1px 4px;border-radius:4px">{gifter}</code> <code style="background:var(--card2);padding:1px 4px;border-radius:4px">{count}</code>
+          </div>
+          <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--brd);margin-bottom:12px">
+            <div>
+              <div style="font-size:12px;font-weight:600">Activer les annonces de sub</div>
+              <div style="font-size:10px;color:var(--muted);margin-top:2px">Nouveau sub, renouvellement et sub gift</div>
+            </div>
+            <label class="switch"><input type="checkbox" id="sub-announce-toggle" onchange="saveSubAnnounce()"><span class="slider"></span></label>
+          </div>
+
+          <label class="lbl">🆕 Nouveau sub</label>
+          <textarea class="inp" id="sub-announce-new" rows="2" placeholder="🎉 Merci pour le sub @{username} !" style="resize:vertical;min-height:52px" oninput="clearTimeout(this._st);this._st=setTimeout(()=>saveSubAnnounce(),800)"></textarea>
+          <div style="font-size:9px;color:var(--muted);margin-top:2px;margin-bottom:10px">Aperçu : <span id="sub-preview-new" style="color:var(--text)"></span></div>
+
+          <label class="lbl">🔄 Renouvellement</label>
+          <textarea class="inp" id="sub-announce-renew" rows="2" placeholder="🔄 @{username} renouvelle pour {months} mois !" style="resize:vertical;min-height:52px" oninput="clearTimeout(this._st);this._st=setTimeout(()=>saveSubAnnounce(),800)"></textarea>
+          <div style="font-size:9px;color:var(--muted);margin-top:2px;margin-bottom:10px">Aperçu : <span id="sub-preview-renew" style="color:var(--text)"></span></div>
+
+          <label class="lbl">🎁 Sub gift</label>
+          <textarea class="inp" id="sub-announce-gift" rows="2" placeholder="🎁 @{gifter} offre {count} sub(s) !" style="resize:vertical;min-height:52px" oninput="clearTimeout(this._st);this._st=setTimeout(()=>saveSubAnnounce(),800)"></textarea>
+          <div style="font-size:9px;color:var(--muted);margin-top:2px;margin-bottom:10px">Aperçu : <span id="sub-preview-gift" style="color:var(--text)"></span></div>
+
+          <div id="sub-announce-msg" style="margin-top:4px"></div>
         </div>
 
         <div class="panel"><h3>🤖 Fonctionnalités du bot <button class="btnx btn-ghost btn-sm" onclick="loadBotFeatures()">↻</button></h3><div style="font-size:10px;color:#a1a1aa;margin-bottom:10px">Active ou désactive chaque fonctionnalité en un clic.</div><div id="bot-features-list"><div class="empty"><p>Chargement…</p></div></div></div>
@@ -1563,12 +1592,10 @@ function updateLiveUI(live, viewers, followers) {
     });
   }
 
-  // Viewers (sidebar + info panel)
+  // Viewers (panel info uniquement — la sidebar affiche maintenant l'uptime)
   const viewersFmt = live ? (viewers || '0') : '—';
-  ['sb-viewers','ic-viewers'].forEach(id => {
-    const el = document.getElementById(id);
-    if(el) el.textContent = viewersFmt;
-  });
+  const icViewers = document.getElementById('ic-viewers');
+  if (icViewers) icViewers.textContent = viewersFmt;
 
   // Badge live dans le panel Informations
   const icb = document.getElementById('ic-live-badge');
@@ -1582,18 +1609,20 @@ function updateLiveUI(live, viewers, followers) {
     }
   }
 
-  // Uptime
-  const icu = document.getElementById('ic-uptime');
-  if (icu) {
-    if (live) {
-      if (!window._streamStart) window._streamStart = Date.now();
-      const diff = Math.floor((Date.now() - window._streamStart) / 1000);
-      const h = Math.floor(diff/3600), m = Math.floor((diff%3600)/60), s = diff%60;
-      icu.textContent = h > 0 ? h+'h '+m+'m '+s+'s' : m > 0 ? m+'m '+s+'s' : s+'s';
-    } else {
-      window._streamStart = null;
-      icu.textContent = '—';
-    }
+  // Uptime — affiché dans la sidebar ET dans le panel Informations
+  const sbUp = document.getElementById('sb-uptime');
+  const icu  = document.getElementById('ic-uptime');
+  if (live) {
+    if (!window._streamStart) window._streamStart = Date.now();
+    const diff = Math.floor((Date.now() - window._streamStart) / 1000);
+    const h = Math.floor(diff/3600), m = Math.floor((diff%3600)/60), s = diff%60;
+    const uptimeTxt = h > 0 ? h+'h '+m+'m '+s+'s' : m > 0 ? m+'m '+s+'s' : s+'s';
+    if (sbUp) sbUp.textContent = uptimeTxt;
+    if (icu)  icu.textContent  = uptimeTxt;
+  } else {
+    window._streamStart = null;
+    if (sbUp) sbUp.textContent = '—';
+    if (icu)  icu.textContent  = '—';
   }
 }
 
@@ -3048,6 +3077,7 @@ function initSettings() {
   loadOAuthStatus();
   loadPointsConfig();
   loadFollowAnnounce();
+  loadSubAnnounce();
 }
 
 async function loadFollowAnnounce() {
@@ -3080,6 +3110,53 @@ async function saveFollowAnnounce() {
   });
   if (r.ok) showInline('follow-announce-msg', '✅ Sauvegardé', true);
   else showInline('follow-announce-msg', 'Erreur lors de la sauvegarde', false);
+}
+
+async function loadSubAnnounce() {
+  try {
+    const r = await fetch('/api/sub-announce');
+    const d = await r.json();
+    const toggle = document.getElementById('sub-announce-toggle');
+    if (toggle) toggle.checked = d.enabled !== false;
+    const newEl   = document.getElementById('sub-announce-new');
+    const renewEl = document.getElementById('sub-announce-renew');
+    const giftEl  = document.getElementById('sub-announce-gift');
+    if (newEl)   newEl.value   = d.message_new   || '🎉 Merci pour le sub {username} ! Bienvenue dans les subs 🔥';
+    if (renewEl) renewEl.value = d.message_renew || '🔄 {username} renouvelle son sub pour {months} mois, merci ! ❤️';
+    if (giftEl)  giftEl.value  = d.message_gift  || '🎁 {gifter} offre {count} sub(s) à la communauté, incroyable !';
+    updateSubPreviews();
+  } catch(e) {}
+}
+
+function updateSubPreviews() {
+  const newEl   = document.getElementById('sub-announce-new');
+  const renewEl = document.getElementById('sub-announce-renew');
+  const giftEl  = document.getElementById('sub-announce-gift');
+  const pNew   = document.getElementById('sub-preview-new');
+  const pRenew = document.getElementById('sub-preview-renew');
+  const pGift  = document.getElementById('sub-preview-gift');
+  if (pNew && newEl)     pNew.textContent   = newEl.value.replace(/\{username\}/gi, 'PseudoExemple');
+  if (pRenew && renewEl) pRenew.textContent = renewEl.value.replace(/\{username\}/gi, 'PseudoExemple').replace(/\{months\}/gi, '3');
+  if (pGift && giftEl)   pGift.textContent  = giftEl.value.replace(/\{gifter\}/gi, 'GifterExemple').replace(/\{count\}/gi, '5');
+}
+
+async function saveSubAnnounce() {
+  updateSubPreviews();
+  const toggle  = document.getElementById('sub-announce-toggle');
+  const newEl   = document.getElementById('sub-announce-new');
+  const renewEl = document.getElementById('sub-announce-renew');
+  const giftEl  = document.getElementById('sub-announce-gift');
+  const r = await fetch('/api/admin/sub-announce', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      enabled:       toggle?.checked ?? true,
+      message_new:   newEl?.value.trim()   || '',
+      message_renew: renewEl?.value.trim() || '',
+      message_gift:  giftEl?.value.trim()  || '',
+    })
+  });
+  if (r.ok) showInline('sub-announce-msg', '✅ Sauvegardé', true);
+  else showInline('sub-announce-msg', 'Erreur lors de la sauvegarde', false);
 }
 
 async function loadPointsConfig() {

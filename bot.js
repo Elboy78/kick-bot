@@ -833,4 +833,25 @@ init().catch(err => {
 process.on('SIGINT',  () => { cleanup(); process.exit(0); });
 process.on('SIGTERM', () => { cleanup(); process.exit(0); });
 
-module.exports = { sendChat };
+module.exports = {
+  sendChat,
+  setIsLive: (val) => {
+    const was = isLive;
+    isLive = !!val;
+    db.setBotStatus('is_live', isLive ? '1' : '0').catch(()=>{});
+    if (isLive && !was) {
+      console.log('[BOT] setIsLive → LIVE (via webhook panel)');
+      if (!currentSessionId) startSession();
+      startAnnouncements();
+      startPointsTracker();
+    } else if (!isLive && was) {
+      console.log('[BOT] setIsLive → HORS LIGNE (via webhook panel)');
+      if (currentSessionId) {
+        const dur = sessionStart ? Math.floor((Date.now() - sessionStart) / 60000) : 0;
+        db.endSession(currentSessionId, peakViewers, dur);
+        currentSessionId = null;
+      }
+      if (pointsInterval) { clearInterval(pointsInterval); pointsInterval = null; }
+    }
+  },
+};

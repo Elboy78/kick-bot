@@ -84,17 +84,66 @@ app.post('/api/admin/follow-announce', async (req, res) => {
   } catch(e) { res.status(500).json({ error: e.message }); }
 });
 
+// Route de secours — force manuellement le statut live si l'API Kick est bloquée par Cloudflare
+app.post('/api/admin/set-live', async (req, res) => {
+  try {
+    const { live } = req.body;
+    const { setIsLive } = require('./bot');
+    setIsLive(!!live);
+    console.log(`[PANEL] set-live forcé → ${live ? 'LIVE' : 'HORS LIGNE'}`);
+    res.json({ success: true, isLive: !!live });
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+// ── Sub Announce ───────────────────────────────────────────────────────────────
+
+const DEFAULT_SUB_NEW_MSG   = '🎉 Merci pour le sub @{username} ! Bienvenue dans les subs 🔥';
+const DEFAULT_SUB_RENEW_MSG = '🔄 @{username} renouvelle son sub pour {months} mois, merci ! ❤️';
+const DEFAULT_SUB_GIFT_MSG  = '🎁 @{gifter} offre {count} sub(s) à la communauté, incroyable !';
+
+app.get('/api/sub-announce', async (req, res) => {
+  try {
+    res.json({
+      enabled:     await db.getSetting('sub_announce_enabled'),
+      message_new:   await db.getSettingStr('sub_announce_new',   DEFAULT_SUB_NEW_MSG),
+      message_renew: await db.getSettingStr('sub_announce_renew', DEFAULT_SUB_RENEW_MSG),
+      message_gift:  await db.getSettingStr('sub_announce_gift',  DEFAULT_SUB_GIFT_MSG),
+    });
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+app.post('/api/admin/sub-announce', async (req, res) => {
+  try {
+    const { enabled, message_new, message_renew, message_gift } = req.body;
+    if (typeof enabled === 'boolean') await db.setSetting('sub_announce_enabled', enabled);
+    if (typeof message_new   === 'string' && message_new.trim())   await db.setSettingStr('sub_announce_new',   message_new.trim());
+    if (typeof message_renew === 'string' && message_renew.trim()) await db.setSettingStr('sub_announce_renew', message_renew.trim());
+    if (typeof message_gift  === 'string' && message_gift.trim())  await db.setSettingStr('sub_announce_gift',  message_gift.trim());
+    res.json({ success: true });
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
 // Webhook officiel Kick — reçu à chaque nouveau follow
 // À configurer sur : kick.com/settings/developer → Event Subscriptions → channel.followed
 // URL à renseigner : https://kick-bot-agkk.onrender.com/webhook/kick
 app.post('/webhook/kick', async (req, res) => {
   try {
     // Kick signe les webhooks avec un header — on accepte tous pour l'instant
-    // (la vérification de signature peut être ajoutée avec KICK_WEBHOOK_SECRET)
     const event = req.body;
-    const eventType = event?.event || event?.type || '';
+    // L'event type est dans le header Kick-Event-Type OU dans le body
+    const eventType = req.headers['kick-event-type'] || event?.event || event?.type || '';
     console.log('[WEBHOOK KICK]', eventType, JSON.stringify(event).slice(0, 200));
 
+    const { sendChat, setIsLive } = require('./bot');
+
+    // ── Statut live (Kick envoie cet event au démarrage/arrêt du stream) ─────────
+    if (eventType === 'livestream.status.updated') {
+      const isLiveNow = !!(event?.data?.is_live);
+      console.log(`[WEBHOOK] livestream.status.updated → is_live=${isLiveNow}`);
+      if (typeof setIsLive === 'function') setIsLive(isLiveNow);
+    }
+
+    // ── Follow ──────────────────────────────────────────────────────────────────
     if (eventType === 'channel.followed' || eventType === 'ChannelFollowed') {
       const username = event?.data?.user?.username
                     || event?.data?.follower?.username
@@ -102,17 +151,48 @@ app.post('/webhook/kick', async (req, res) => {
                     || 'quelqu\'un';
 
       const enabled = await db.getSetting('follow_announce_enabled');
-      if (!enabled) return res.json({ ok: true, skipped: 'disabled' });
+      if (enabled) {
+        const template = await db.getSettingStr('follow_announce_message', DEFAULT_FOLLOW_MSG);
+        const message  = template.replace(/\{username\}/gi, username);
+        if (typeof sendChat === 'function') { await sendChat(message); console.log(`[FOLLOW] ${username}`); }
+      }
+    }
 
-      const template = await db.getSettingStr('follow_announce_message', DEFAULT_FOLLOW_MSG);
-      const message  = template.replace(/\{username\}/gi, '@' + username)
-                                .replace(/@\{username\}/gi, '@' + username);
+    // ── Sub nouveau ─────────────────────────────────────────────────────────────
+    else if (eventType === 'channel.subscription.new') {
+      const username = event?.data?.subscriber?.username || 'quelqu\'un';
+      const enabled  = await db.getSetting('sub_announce_enabled');
+      if (enabled) {
+        const template = await db.getSettingStr('sub_announce_new', DEFAULT_SUB_NEW_MSG);
+        const message  = template.replace(/\{username\}/gi, username);
+        if (typeof sendChat === 'function') { await sendChat(message); console.log(`[SUB NEW] ${username}`); }
+      }
+    }
 
-      // Envoyer dans le chat via le bot
-      const { sendChat } = require('./bot');
-      if (typeof sendChat === 'function') {
-        await sendChat(message);
-        console.log(`[FOLLOW] Annonce envoyée pour ${username}`);
+    // ── Sub renouvellement ──────────────────────────────────────────────────────
+    else if (eventType === 'channel.subscription.renewal') {
+      const username = event?.data?.subscriber?.username || 'quelqu\'un';
+      const months   = event?.data?.duration || 1;
+      const enabled  = await db.getSetting('sub_announce_enabled');
+      if (enabled) {
+        const template = await db.getSettingStr('sub_announce_renew', DEFAULT_SUB_RENEW_MSG);
+        const message  = template.replace(/\{username\}/gi, username).replace(/\{months\}/gi, months);
+        if (typeof sendChat === 'function') { await sendChat(message); console.log(`[SUB RENEW] ${username} x${months}`); }
+      }
+    }
+
+    // ── Sub gift ────────────────────────────────────────────────────────────────
+    else if (eventType === 'channel.subscription.gifts') {
+      const gifter  = event?.data?.gifter?.username || 'Anonyme';
+      const isAnon  = event?.data?.gifter?.is_anonymous || false;
+      const count   = event?.data?.giftees?.length || 1;
+      const enabled = await db.getSetting('sub_announce_enabled');
+      if (enabled) {
+        const template = await db.getSettingStr('sub_announce_gift', DEFAULT_SUB_GIFT_MSG);
+        const message  = template
+          .replace(/\{gifter\}/gi, isAnon ? 'un anonyme' : gifter)
+          .replace(/\{count\}/gi, count);
+        if (typeof sendChat === 'function') { await sendChat(message); console.log(`[SUB GIFT] ${gifter} x${count}`); }
       }
     }
 
@@ -389,7 +469,18 @@ app.post('/api/live/update', (req, res) => {
 
 // Live force
 let forcedLiveStatus = null;
-app.post('/api/admin/live/force', requireAuth, (req,res) => { const {status}=req.body; forcedLiveStatus=status==='on'?true:status==='off'?false:null; res.json({success:true,forced:forcedLiveStatus}); });
+app.post('/api/admin/live/force', requireAuth, (req,res) => {
+  const { status } = req.body;
+  forcedLiveStatus = status === 'on' ? true : status === 'off' ? false : null;
+  // Propager au bot pour activer/désactiver la distribution de points
+  try {
+    const { setIsLive } = require('./bot');
+    if (typeof setIsLive === 'function' && forcedLiveStatus !== null) {
+      setIsLive(!!forcedLiveStatus);
+    }
+  } catch(e) {}
+  res.json({ success: true, forced: forcedLiveStatus });
+});
 app.get('/api/admin/live/status', requireAuth, (req,res) => res.json({forced:forcedLiveStatus}));
 
 // Live status
