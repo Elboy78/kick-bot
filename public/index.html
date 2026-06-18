@@ -448,7 +448,13 @@ hr.div{border:none;border-top:1px solid var(--brd);margin:12px 0}
     <div class="header"><div><h1>Lobby</h1><p>File de jeu en direct</p></div></div>
     <div class="g2" style="grid-template-columns:300px 1fr">
       <div><div class="panel"><h3>🎮 Lobby — <span id="lobby-count" style="color:#28ff66">0</span> joueurs <button class="btnx btn-red btn-sm" onclick="clearLobby()">Vider</button></h3><div style="background:#0f1428;border:1px solid #171d35;border-radius:8px;padding:7px 10px;margin-bottom:10px;font-size:10px;color:#a1a1aa">Les viewers tapent <span class="cpill">!lobby</span> pour rejoindre</div><div id="lobby-list" style="max-height:420px;overflow-y:auto"><div class="empty"><div class="ei">🎮</div><p>Aucun joueur</p></div></div></div></div>
-      <div><div class="panel"><h3>🎡 Roue aléatoire</h3><div style="display:flex;flex-direction:column;align-items:center;gap:18px;padding:10px 0"><canvas id="wheel-canvas" width="480" height="480" style="border-radius:50%;max-width:100%;height:auto"></canvas><button class="btnx btn-primary" style="padding:12px 32px;font-size:14px" onclick="spinWheel()">🎲 Tourner la roue</button><div id="wheel-result" style="font-size:18px;font-weight:700;color:#8b35ff;min-height:28px;text-align:center"></div></div></div></div>
+      <div><div class="panel"><h3>🎡 Roue aléatoire</h3><div style="display:flex;flex-direction:column;align-items:center;gap:18px;padding:10px 0"><canvas id="wheel-canvas" width="480" height="480" style="border-radius:50%;max-width:100%;height:auto"></canvas><button class="btnx btn-primary" style="padding:12px 32px;font-size:14px" onclick="spinWheel()">🎲 Tourner la roue</button><div id="wheel-result" style="font-size:18px;font-weight:700;color:#8b35ff;min-height:28px;text-align:center"></div>
+        <div style="width:100%;max-width:420px;background:var(--card2);border:1px solid var(--brd);border-radius:12px;padding:14px;margin-top:8px">
+          <div style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px">🏆 Derniers gagnants</div>
+          <div id="wheel-winners-list" style="display:flex;flex-direction:column;gap:6px;margin-bottom:10px"><div style="font-size:11px;color:var(--muted2)">Aucun gagnant pour le moment</div></div>
+          <button class="btnx btn-ghost btn-sm" style="width:100%;justify-content:center" onclick="clearWheelWinners()">🔄 Réinitialiser les gagnants</button>
+        </div>
+      </div></div></div>
     </div>
   </div>
 
@@ -759,7 +765,7 @@ function showPage(name) {
   if(name==='settings') initSettings();
   if(name==='outils') loadOutils();
   if(name==='tts') loadTTS();
-  if(name==='lobby') loadLobby();
+  if(name==='lobby') { loadLobby(); renderWheelWinners(); }
 }
 
 // ── Toast ──────────────────────────────────────────────────────────────────────
@@ -1220,7 +1226,7 @@ function loadAdminLevels(){renderAdminLevels();}
 function renderAdminLevels(){const el=document.getElementById('admin-levels');if(!el||!levels.length)return;el.innerHTML=levels.map(l=>`<div style="display:flex;justify-content:space-between;align-items:center;padding:9px 0;border-bottom:1px solid var(--brd)"><span>${l.emoji||'⭐'} <b style="margin-left:4px">${esc(l.name)}</b></span><span style="color:var(--muted2);font-size:12px">${l.min.toLocaleString('fr')} pts</span></div>`).join('');}
 
 // ── Lobby ──────────────────────────────────────────────────────────────────────
-let lobbyData=[], wheelSpinning=false, wheelAngle=0;
+let lobbyData=[], wheelSpinning=false, wheelAngle=0, wheelWinners=[];
 
 async function loadLobby(){
   try{
@@ -1297,11 +1303,46 @@ function spinWheel(){
     else{
       wheelAngle=final%(Math.PI*2);
       drawWheel(wi);
-      document.getElementById('wheel-result').textContent='🎉 '+names[wi]+' est sélectionné !';
+      const winnerName=names[wi];
+      document.getElementById('wheel-result').textContent='🎉 '+winnerName+' est sélectionné !';
       wheelSpinning=false;
+      onWheelWinnerSelected(winnerName);
     }
   }
   requestAnimationFrame(frame);
+}
+
+async function onWheelWinnerSelected(username){
+  // Garder les 3 derniers gagnants, le plus récent en premier
+  wheelWinners.unshift(username);
+  wheelWinners = wheelWinners.slice(0, 3);
+  renderWheelWinners();
+
+  // Retirer le gagnant du lobby côté serveur — il ne pourra plus être tiré
+  // tant qu'il ne retape pas !lobby pour reparticiper.
+  await fetch('/api/admin/lobby/remove',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username})});
+  await loadLobby(); // recharge lobbyData + redessine la roue sans le gagnant
+}
+
+function renderWheelWinners(){
+  const el = document.getElementById('wheel-winners-list');
+  if (!el) return;
+  if (!wheelWinners.length) {
+    el.innerHTML = '<div style="font-size:11px;color:var(--muted2)">Aucun gagnant pour le moment</div>';
+    return;
+  }
+  const medals = ['🥇','🥈','🥉'];
+  el.innerHTML = wheelWinners.map((w, i) => `
+    <div style="display:flex;align-items:center;gap:8px;padding:7px 10px;background:var(--card);border:1px solid var(--brd);border-radius:8px">
+      <span style="font-size:14px">${medals[i]||'🎖️'}</span>
+      <span style="font-weight:600;font-size:12px;flex:1">${esc(w)}</span>
+    </div>`).join('');
+}
+
+function clearWheelWinners(){
+  wheelWinners = [];
+  renderWheelWinners();
+  toast('Liste des gagnants réinitialisée ✓');
 }
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
