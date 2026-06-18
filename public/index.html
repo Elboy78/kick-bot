@@ -2343,8 +2343,6 @@ async function loadVods() {
       const items = json.data || json || [];
       if (!Array.isArray(items) || !items.length) break;
       allVodsData.push(...items);
-      // Log du 1er VOD pour voir les champs d'ID disponibles
-      if (p === 1 && items.length > 0) console.log('[VOD DEBUG]', JSON.stringify(items[0], null, 2));
       // Arrêt si la dernière vidéo a plus d'un mois
       const lastDate = new Date(items[items.length-1].created_at || 0).getTime();
       if (Date.now() - lastDate > 31*86400000) break;
@@ -2371,11 +2369,13 @@ function renderVodsGrid(vods) {
 }
 
 function buildVodCard(v) {
-  const vodId   = v.id || v.uuid || '';
+  // UUID stocké dans v.video.uuid — c'est lui qui forme l'URL réelle kick.com/video/{uuid}
+  const vodUuid = v.video?.uuid || v.uuid || '';
+  const vodId   = v.id || '';
   const title   = esc(v.session_title || v.title || 'Sans titre');
   const thumb   = v.thumbnail?.src || (typeof v.thumbnail === 'string' ? v.thumbnail : '');
   const dur     = fmtVodDuration(v.duration);
-  const vodUrl  = `https://kick.com/${activeKickChannel}/videos/${vodId}`;
+  const vodUrl  = vodUuid ? `https://kick.com/video/${vodUuid}` : `https://kick.com/${activeKickChannel}/videos`;
   const date    = v.created_at ? new Date(v.created_at).toLocaleDateString('fr-FR',{day:'2-digit',month:'short',year:'numeric'}) : '';
   const views   = (v.views||0) > 0 ? (v.views).toLocaleString('fr') + ' vues' : '';
   const safe    = title.replace(/`/g,"'");
@@ -2390,7 +2390,7 @@ function buildVodCard(v) {
       <div style="display:flex;gap:6px">
         <a href="${esc(vodUrl)}" target="_blank" class="btnx btn-outline btn-sm" style="flex:1;justify-content:center;text-decoration:none">▶️ Voir</a>
         <a href="https://kick-video.download/?url=${encodeURIComponent(vodUrl)}" target="_blank" class="btnx btn-ghost btn-sm" style="text-decoration:none" title="Télécharger">⬇️</a>
-        <button class="btnx btn-ghost btn-sm" title="Marquer un moment" onclick="prefillMoment('${esc(String(vodId))}','${safe}','${esc(vodUrl)}')">📌</button>
+        <button class="btnx btn-ghost btn-sm" title="Marquer un moment" onclick="prefillMoment('${esc(String(vodUuid))}','${safe}','${esc(vodUrl)}')">📌</button>
       </div>
     </div>
   </div>`;
