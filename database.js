@@ -622,7 +622,10 @@ async function joinLobby(username) {
   try {
     await run(`INSERT INTO lobby (username) VALUES (?)`, [username.toLowerCase()]);
     return true;
-  } catch(e) { return false; }
+  } catch(e) {
+    console.error(`[LOBBY] Erreur ajout ${username}:`, e.message);
+    return false;
+  }
 }
 
 async function removeFromLobby(username) {

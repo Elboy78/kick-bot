@@ -270,10 +270,12 @@ async function cmdAide(username) {
 }
 
 async function cmdLobby(username) {
+  console.log(`[LOBBY] Commande !lobby reçue de ${username}`);
   const already = (await db.getLobby()).find(v => v.username === username.toLowerCase());
-  if (already) return; // déjà dans le lobby, on ne répond rien
-  await db.joinLobby(username);
-  // Ajout silencieux — pas de message dans le chat, visible directement dans le panel
+  if (already) { console.log(`[LOBBY] ${username} déjà dans le lobby`); return; }
+  const ok = await db.joinLobby(username);
+  console.log(`[LOBBY] Ajout de ${username}: ${ok ? 'succès' : 'échec'}`);
+  // Ajout silencieux dans le chat — visible directement dans le panel
 }
 
 async function cmdDuel(challenger, parts) {
