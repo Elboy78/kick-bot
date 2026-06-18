@@ -444,8 +444,12 @@ app.get('/api/followers', async (req, res) => {
 let liveFromBrowser = { live: false, viewers: 0, followers: 0, updatedAt: null };
 
 app.post('/api/live/update', (req, res) => {
-  const { live, viewers, followers } = req.body;
-  liveFromBrowser = { live: !!live, viewers: viewers||0, followers: followers||0, updatedAt: Date.now() };
+  const { live, viewers, followers, vodUuid, streamTitle, streamStartedAt } = req.body;
+  liveFromBrowser = {
+    live: !!live, viewers: viewers||0, followers: followers||0,
+    vodUuid: vodUuid||'', streamTitle: streamTitle||'', streamStartedAt: streamStartedAt||null,
+    updatedAt: Date.now()
+  };
   res.json({ success: true });
 });
 

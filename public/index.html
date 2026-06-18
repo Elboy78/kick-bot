@@ -1526,7 +1526,11 @@ async function loadLiveStatus() {
     fetch('/api/live/update', {
       method: 'POST',
       headers: {'Content-Type':'application/json'},
-      body: JSON.stringify({ live, viewers, followers })
+      body: JSON.stringify({ live, viewers, followers,
+        vodUuid: d.livestream?.video?.uuid || String(d.livestream?.id || ''),
+        streamTitle: d.livestream?.session_title || d.livestream?.title || '',
+        streamStartedAt
+      })
     }).catch(() => {});
 
   } catch(e) {

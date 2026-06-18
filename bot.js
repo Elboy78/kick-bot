@@ -640,7 +640,7 @@ async function fetchKickChannelOfficial() {
   try {
     const { token, official } = await getActiveToken();
     if (!token || !official) {
-      console.log('[STREAM] OAuth officiel non disponible pour checkLiveStatus (token absent ou legacy)');
+      console.log('[STREAM] Token OAuth absent ou expiré → se reconnecter dans Paramètres → Connexion Kick');
       return null; // null = pas pu interroger l'API → on essaie le fallback
     }
 
@@ -731,8 +731,18 @@ async function checkLiveStatus() {
         db.setBotStatus('last_live_check_source', 'browser_relay').catch(()=>{});
         db.setBotStatus('is_live', isLive ? '1' : '0').catch(()=>{});
         console.log(`[STREAM] Statut via navigateur → is_live=${isLive}`);
+        if (isLive) {
+          // Mettre à jour les métadonnées en continu même si déjà live
+          if (r.data.vodUuid)    db.setSettingStr('current_vod_uuid', r.data.vodUuid).catch(()=>{});
+          if (r.data.streamTitle) db.setSettingStr('current_stream_title', r.data.streamTitle).catch(()=>{});
+          // Corriger streamStartTime si on a la vraie date Kick
+          if (r.data.streamStartedAt && !streamStartTime) {
+            streamStartTime = r.data.streamStartedAt;
+            db.setBotStatus('stream_started_at', streamStartTime.toString()).catch(()=>{});
+          }
+        }
         if (isLive && !wasLive) {
-          streamStartTime = Date.now();
+          streamStartTime = r.data.streamStartedAt || Date.now();
           db.setBotStatus('stream_started_at', streamStartTime.toString()).catch(()=>{});
           if (!currentSessionId) startSession();
           startAnnouncements();
