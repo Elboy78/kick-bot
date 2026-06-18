@@ -137,6 +137,7 @@ function handleEvent(msg) {
         streamStartTime = Date.now();
         if (!currentSessionId) startSession();
         startAnnouncements();
+        startPointsTracker(); // ← déclencher le tracker de points dès le début du live
       }
       break;
     }
@@ -606,7 +607,7 @@ async function fetchKickChannelOfficial() {
     const { token, official } = await getActiveToken();
     if (!token || !official) {
       console.log('[STREAM] OAuth officiel non disponible pour checkLiveStatus (token absent ou legacy)');
-      return null;
+      return null; // null = pas pu interroger l'API → on essaie le fallback
     }
 
     const res = await axios.get(
@@ -620,23 +621,24 @@ async function fetchKickChannelOfficial() {
     const channel = res.data?.data?.[0];
     if (!channel) {
       console.log(`[STREAM] API officielle: aucune chaîne trouvée pour le slug "${CONFIG.channel}"`);
-      return null;
+      return null; // null = réponse inutilisable → on essaie le fallback
     }
 
     const isLiveNow = !!(channel.stream && channel.stream.is_live);
     console.log(`[STREAM] API officielle OK — is_live=${isLiveNow} viewer_count=${channel.stream?.viewer_count ?? 'n/a'}`);
 
+    // On retourne toujours un objet (même si hors ligne) pour signaler que l'API a répondu
     return {
       livestream: isLiveNow ? {
         is_live: true,
         viewer_count: channel.stream.viewer_count || 0,
-      } : null,
+      } : { is_live: false },  // ← IMPORTANT: objet explicite au lieu de null
       followers_count: channel.followers_count || 0,
       _source: 'official',
     };
   } catch(err) {
     console.log(`[STREAM] API officielle erreur: ${err.response?.status || err.message}`);
-    return null;
+    return null; // null = erreur réseau → on essaie le fallback
   }
 }
 
@@ -700,6 +702,7 @@ async function checkLiveStatus() {
     streamStartTime = Date.now();
     if (!currentSessionId) startSession();
     startAnnouncements();
+    startPointsTracker(); // ← déclencher le tracker dès la détection du live
   } else if (!isLive && wasLive) {
     console.log('[STREAM] Stream terminé.');
     if (currentSessionId) {
@@ -737,9 +740,16 @@ async function checkLiveStatus() {
 // ─── Points ───────────────────────────────────────────────────────────────────
 
 function startPointsTracker() {
-  if (pointsInterval) clearInterval(pointsInterval);
-  console.log(`[BOT] Tracker démarré — +${CONFIG.pointsAmount} pts toutes les ${CONFIG.intervalMs/60000} min`);
-  setTimeout(distributePoints, 30000);
+  if (pointsInterval) {
+    clearInterval(pointsInterval);
+    pointsInterval = null;
+  }
+  console.log(`[POINTS] ▶ Tracker démarré — +${CONFIG.pointsAmount} pts toutes les ${CONFIG.intervalMs/60000} min — isLive=${isLive}`);
+  // Premier check dans 30s pour ne pas attendre tout l'intervalle
+  setTimeout(() => {
+    console.log(`[POINTS] Premier check — isLive=${isLive}`);
+    distributePoints();
+  }, 30000);
   pointsInterval = setInterval(distributePoints, CONFIG.intervalMs);
 }
 
@@ -763,15 +773,23 @@ async function syncPointsConfig() {
 }
 
 async function distributePoints() {
-  if (!isLive) { console.log('[POINTS] Hors ligne — pas de points.'); return; }
-  if (!await db.getSetting('points_enabled')) { console.log('[POINTS] Désactivé.'); return; }
-  // Un viewer doit avoir parlé dans la fenêtre de l'intervalle de distribution (+ 1 min de marge)
-  // pour être considéré actif et toucher les points — pas une fenêtre fixe de 2h.
+  if (!isLive) {
+    console.log('[POINTS] Hors ligne — pas de points distribuĂŠs.');
+    return;
+  }
+  if (!await db.getSetting('points_enabled')) {
+    console.log('[POINTS] Système de points désactivé dans les paramètres.');
+    return;
+  }
   const windowMinutes = Math.ceil(CONFIG.intervalMs / 60000) + 1;
   const viewers = await db.getActiveViewers(windowMinutes);
-  if (!viewers.length) { console.log('[POINTS] Aucun viewer actif dans le chat.'); return; }
+  console.log(`[POINTS] Fenêtre active: ${windowMinutes} min — ${viewers.length} viewer(s) trouvé(s)`);
+  if (!viewers.length) {
+    console.log('[POINTS] Aucun viewer actif dans le chat sur cette fenêtre.');
+    return;
+  }
   for (const v of viewers) await db.addPoints(v.username, CONFIG.pointsAmount, 'watch_time', Math.round(CONFIG.intervalMs / 60000));
-  console.log(`[POINTS] +${CONFIG.pointsAmount} pts → ${viewers.length} viewer(s) actif(s) dans le chat ✓`);
+  console.log(`[POINTS] ✅ +${CONFIG.pointsAmount} pts → ${viewers.length} viewer(s): ${viewers.map(v=>v.username).join(', ')}`);
   checkObjectives();
 }
 
