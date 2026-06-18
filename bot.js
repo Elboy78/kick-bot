@@ -182,10 +182,14 @@ async function handleChatMessage(payload) {
   const parts = content.trim().split(' ');
   const cmd   = parts[0].toLowerCase();
 
+  if (cmd.includes('lobby')) {
+    console.log(`[DEBUG LOBBY] cmd="${cmd}" (longueur ${cmd.length}) — codes: [${[...cmd].map(c=>c.charCodeAt(0)).join(',')}] — SYSTEM_COMMANDS.includes: ${SYSTEM_COMMANDS.includes(cmd)}`);
+  }
+
   // Commandes système
   if (SYSTEM_COMMANDS.includes(cmd)) {
     const enabled = await db.isSystemCmdEnabled(cmd);
-    if (!enabled) return;
+    if (!enabled) { console.log(`[DEBUG] Commande ${cmd} désactivée via isSystemCmdEnabled`); return; }
     db.logCommandUsage(cmd, username).catch(()=>{});
     switch(cmd) {
       case '!points':    return cmdPoints(username);
@@ -198,7 +202,11 @@ async function handleChatMessage(payload) {
       case '!refuser':   return cmdRefuser(username);
       case '!participer':return (await db.getSetting('giveaway_enabled')) ? cmdParticiper(username) : null;
       case '!giveaway':  return (await db.getSetting('giveaway_enabled')) ? cmdGiveawayInfo(username) : null;
-      case '!lobby':     return (await db.getSetting('lobby_enabled')) ? cmdLobby(username) : null;
+      case '!lobby': {
+        const lobbyOn = await db.getSetting('lobby_enabled');
+        console.log(`[DEBUG LOBBY] getSetting('lobby_enabled') = ${lobbyOn}`);
+        return lobbyOn ? cmdLobby(username) : null;
+      }
       case '!quote':     return (await db.getSetting('quote_enabled')) ? cmdQuote(username, parts) : null;
       case '!addquote':  return (await db.getSetting('quote_enabled')) ? cmdAddQuote(username, parts) : null;
       case '!mort':
