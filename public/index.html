@@ -636,36 +636,71 @@ Option 3" rows="4"></textarea><div style="display:flex;gap:6px;margin-top:10px">
   <!-- ══ VODs & CLIPS ══ -->
   <div class="page" id="page-vods">
     <div class="header">
-      <div><h1>VODs &amp; Clips</h1><p>Tes replays Kick et moments marqués</p></div>
+      <div><h1>VODs &amp; Clips</h1><p>Tes replays et clips Kick du dernier mois</p></div>
       <div class="header-right">
-        <button class="btn" onclick="loadVods()">↻ Actualiser</button>
-        <button class="btn btn-connected" onclick="window.open('https://kick.com/fack7up/videos','_blank')">🎬 Voir sur Kick</button>
+        <button class="btn" onclick="refreshCurrentVodTab()">↻ Actualiser</button>
+        <button class="btn btn-connected" id="vod-kick-link" onclick="openOnKick()">🎬 Voir sur Kick</button>
       </div>
     </div>
 
     <!-- Onglets internes -->
-    <div style="display:flex;gap:6px;margin-bottom:16px">
+    <div style="display:flex;gap:6px;margin-bottom:14px;flex-wrap:wrap;align-items:center">
       <button class="btnx btn-primary" id="vod-tab-replays" onclick="switchVodTab('replays')">📺 Replays</button>
+      <button class="btnx btn-ghost" id="vod-tab-clips" onclick="switchVodTab('clips')">✂️ Clips</button>
       <button class="btnx btn-ghost" id="vod-tab-moments" onclick="switchVodTab('moments')">📌 Moments marqués</button>
+    </div>
+
+    <!-- ── FILTRES communs Replays & Clips ── -->
+    <div id="vod-filters" style="background:var(--card);border:1px solid var(--brd);border-radius:12px;padding:12px 16px;margin-bottom:14px;display:flex;gap:10px;flex-wrap:wrap;align-items:center">
+      <input class="inp inp-sm" id="vod-search" placeholder="🔍 Filtrer par titre…" oninput="applyVodFilters()" style="width:200px">
+      <select class="inp inp-sm" id="vod-sort" onchange="applyVodFilters()" style="width:160px">
+        <option value="date_desc">📅 Plus récent</option>
+        <option value="date_asc">📅 Plus ancien</option>
+        <option value="views_desc">👁 Plus de vues</option>
+        <option value="views_asc">👁 Moins de vues</option>
+        <option value="duration_desc">⏱ Plus long</option>
+        <option value="duration_asc">⏱ Plus court</option>
+      </select>
+      <select class="inp inp-sm" id="vod-period" onchange="applyVodFilters()" style="width:140px">
+        <option value="30">Dernier mois</option>
+        <option value="7">7 derniers jours</option>
+        <option value="90">3 derniers mois</option>
+        <option value="0">Tout</option>
+      </select>
+      <span id="vod-count" style="font-size:10px;color:var(--muted);margin-left:auto"></span>
     </div>
 
     <!-- Onglet Replays -->
     <div id="vod-section-replays">
       <div id="vods-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:14px">
-        <div class="empty" style="grid-column:1/-1"><div class="ei">🎬</div><p>Chargement de tes replays…</p></div>
+        <div class="empty" style="grid-column:1/-1"><div class="ei">⏳</div><p>Chargement…</p></div>
       </div>
       <div style="display:flex;justify-content:center;gap:8px;margin-top:14px" id="vods-pagination"></div>
     </div>
 
+    <!-- Onglet Clips -->
+    <div id="vod-section-clips" style="display:none">
+      <div id="clips-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:14px">
+        <div class="empty" style="grid-column:1/-1"><div class="ei">⏳</div><p>Chargement…</p></div>
+      </div>
+      <div style="display:flex;justify-content:center;gap:8px;margin-top:14px" id="clips-pagination"></div>
+    </div>
+
     <!-- Onglet Moments -->
     <div id="vod-section-moments" style="display:none">
+      <!-- Filtre catégorie pour les moments -->
+      <div style="display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap">
+        <button class="btnx btn-primary btn-sm" id="mcat-all" onclick="filterMoments('all')">Tous</button>
+        <button class="btnx btn-ghost btn-sm" id="mcat-highlight" onclick="filterMoments('highlight')">⭐ Highlight</button>
+        <button class="btnx btn-ghost btn-sm" id="mcat-clutch" onclick="filterMoments('clutch')">🔥 Clutch</button>
+        <button class="btnx btn-ghost btn-sm" id="mcat-funny" onclick="filterMoments('funny')">😂 Funny</button>
+        <button class="btnx btn-ghost btn-sm" id="mcat-fail" onclick="filterMoments('fail')">💀 Fail</button>
+        <button class="btnx btn-ghost btn-sm" id="mcat-moment" onclick="filterMoments('moment')">🎯 Moment</button>
+      </div>
       <div class="g2">
         <div>
           <div class="panel">
-            <h3>📌 Tous les moments marqués (<span id="moments-count">0</span>)</h3>
-            <div style="font-size:10px;color:var(--muted);margin-bottom:10px;line-height:1.6">
-              Un moment marqué est un timestamp dans un replay Kick. Tu peux le noter manuellement ou via le bouton 📌 sur chaque replay.
-            </div>
+            <h3>📌 Moments marqués (<span id="moments-count">0</span>)</h3>
             <div id="moments-list"><div class="empty"><div class="ei">📌</div><p>Aucun moment marqué</p></div></div>
           </div>
         </div>
@@ -680,11 +715,11 @@ Option 3" rows="4"></textarea><div style="display:flex;gap:6px;margin-top:10px">
             <input class="inp" id="moment-label" placeholder="Ex: moment drôle, clutch, fail…">
             <label class="lbl">Catégorie</label>
             <select class="inp" id="moment-category">
-              <option value="moment">🎯 Moment</option>
-              <option value="funny">😂 Funny</option>
-              <option value="clutch">🔥 Clutch</option>
-              <option value="fail">💀 Fail</option>
               <option value="highlight">⭐ Highlight</option>
+              <option value="clutch">🔥 Clutch</option>
+              <option value="funny">😂 Funny</option>
+              <option value="fail">💀 Fail</option>
+              <option value="moment">🎯 Moment</option>
             </select>
             <button class="btnx btn-primary" style="width:100%;justify-content:center;margin-top:12px" onclick="addVodMoment()">📌 Marquer ce moment</button>
             <div id="moment-msg" style="margin-top:7px"></div>
@@ -2211,134 +2246,296 @@ async function deleteTimer(name) {
 // ── VODs & Clips ─────────────────────────────────────────────────────────────
 
 const VOD_CAT_LABELS = { moment:'🎯 Moment', funny:'😂 Funny', clutch:'🔥 Clutch', fail:'💀 Fail', highlight:'⭐ Highlight' };
-let vodCurrentPage = 1;
+let vodCurrentPage   = 1;
+let clipsCurrentPage = 1;
+let currentVodTab    = 'replays';
+let allVodsData      = [];  // cache brut de tous les VODs chargés
+let allClipsData     = [];  // cache brut de tous les clips chargés
+let allMomentsData   = [];  // cache brut des moments
+let activeKickChannel = 'fack7up';
 
-function switchVodTab(tab) {
-  document.getElementById('vod-section-replays').style.display = tab === 'replays' ? 'block' : 'none';
-  document.getElementById('vod-section-moments').style.display = tab === 'moments' ? 'block' : 'none';
-  document.getElementById('vod-tab-replays').className = 'btnx ' + (tab === 'replays' ? 'btn-primary' : 'btn-ghost');
-  document.getElementById('vod-tab-moments').className = 'btnx ' + (tab === 'moments' ? 'btn-primary' : 'btn-ghost');
-  if (tab === 'moments') loadVodMoments();
+function openOnKick() {
+  const urls = { replays:'videos', clips:'clips' };
+  const section = urls[currentVodTab] || 'videos';
+  window.open(`https://kick.com/${activeKickChannel}/${section}`, '_blank');
 }
 
-async function loadVods(page) {
-  if (page) vodCurrentPage = page;
+function refreshCurrentVodTab() {
+  if (currentVodTab === 'replays') { allVodsData=[]; loadVods(); }
+  else if (currentVodTab === 'clips') { allClipsData=[]; loadClips(); }
+  else loadVodMoments();
+}
+
+function switchVodTab(tab) {
+  currentVodTab = tab;
+  ['replays','clips','moments'].forEach(t => {
+    document.getElementById('vod-section-'+t).style.display = t === tab ? 'block' : 'none';
+    const btn = document.getElementById('vod-tab-'+t);
+    if (btn) btn.className = 'btnx ' + (t === tab ? 'btn-primary' : 'btn-ghost');
+  });
+  // Afficher/masquer les filtres communs (pas pour moments)
+  const filters = document.getElementById('vod-filters');
+  if (filters) filters.style.display = tab === 'moments' ? 'none' : 'flex';
+
+  if (tab === 'replays' && !allVodsData.length) loadVods();
+  else if (tab === 'replays') applyVodFilters();
+  else if (tab === 'clips' && !allClipsData.length) loadClips();
+  else if (tab === 'clips') applyVodFilters();
+  else if (tab === 'moments') loadVodMoments();
+}
+
+// ── Filtre & tri communs (appliqués côté client sur les données mises en cache) ──
+
+function getFilterParams() {
+  return {
+    search: (document.getElementById('vod-search')?.value || '').toLowerCase().trim(),
+    sort:   document.getElementById('vod-sort')?.value || 'date_desc',
+    days:   parseInt(document.getElementById('vod-period')?.value || '30'),
+  };
+}
+
+function filterAndSort(items, params, type) {
+  const cutoff = params.days > 0 ? Date.now() - params.days * 86400000 : 0;
+  let result = items.filter(v => {
+    const created = new Date(v.created_at || v.start_time || 0).getTime();
+    if (cutoff && created < cutoff) return false;
+    const title = (v.session_title || v.title || v.clip_title || '').toLowerCase();
+    if (params.search && !title.includes(params.search)) return false;
+    return true;
+  });
+  const [key, dir] = params.sort.split('_');
+  result.sort((a, b) => {
+    let va, vb;
+    if (key === 'date') { va = new Date(a.created_at || a.start_time || 0); vb = new Date(b.created_at || b.start_time || 0); }
+    else if (key === 'views') { va = a.views||a.view_count||0; vb = b.views||b.view_count||0; }
+    else if (key === 'duration') { va = a.duration||0; vb = b.duration||0; }
+    else return 0;
+    return dir === 'desc' ? (vb > va ? 1 : -1) : (va > vb ? 1 : -1);
+  });
+  return result;
+}
+
+function applyVodFilters() {
+  const params = getFilterParams();
+  if (currentVodTab === 'replays') renderVodsGrid(filterAndSort(allVodsData, params, 'vod'));
+  else if (currentVodTab === 'clips') renderClipsGrid(filterAndSort(allClipsData, params, 'clip'));
+}
+
+// ── Chargement des VODs ──────────────────────────────────────────────────────
+
+async function loadVods() {
   const grid = document.getElementById('vods-grid');
   if (!grid) return;
   grid.innerHTML = '<div class="empty" style="grid-column:1/-1"><div class="ei">⏳</div><p>Chargement des replays…</p></div>';
 
   try {
-    // Récupérer le slug depuis le serveur (variable KICK_CHANNEL sur Render)
     const infoR = await fetch('/api/channel-info');
     const info = await infoR.json();
-    const channel = info.channel || 'fack7up';
+    activeKickChannel = info.channel || 'fack7up';
 
-    // Appel direct depuis le navigateur — Kick ne bloque pas les navigateurs (seulement les IPs de datacenter)
-    const kickR = await fetch(
-      `https://kick.com/api/v2/channels/${channel}/videos?page=${vodCurrentPage}&limit=12&sort=desc`,
-      { headers: { 'Accept': 'application/json', 'Accept-Language': 'en-US' } }
-    );
-
-    if (!kickR.ok) {
-      grid.innerHTML = `<div class="empty" style="grid-column:1/-1"><div class="ei">⚠️</div><p>Kick a retourné une erreur (${kickR.status})</p><p style="font-size:10px;margin-top:6px">Assure-toi que les replays sont activés sur ta chaîne Kick → Paramètres chaîne → VODs.</p></div>`;
-      return;
+    // Charger toutes les pages du dernier mois (max 3 pages de 12)
+    allVodsData = [];
+    for (let p = 1; p <= 3; p++) {
+      const r = await fetch(`https://kick.com/api/v2/channels/${activeKickChannel}/videos?page=${p}&limit=12&sort=desc`,
+        { headers: { 'Accept':'application/json','Accept-Language':'en-US' } });
+      if (!r.ok) break;
+      const json = await r.json();
+      const items = json.data || json || [];
+      if (!Array.isArray(items) || !items.length) break;
+      allVodsData.push(...items);
+      // Arrêt si la dernière vidéo a plus d'un mois
+      const lastDate = new Date(items[items.length-1].created_at || 0).getTime();
+      if (Date.now() - lastDate > 31*86400000) break;
+      if (!json.meta || p >= json.meta.last_page) break;
     }
 
-    const json = await kickR.json();
-    const vods = json.data || json || [];
-
-    if (!Array.isArray(vods) || !vods.length) {
-      grid.innerHTML = `<div class="empty" style="grid-column:1/-1"><div class="ei">🎬</div><p>Aucun replay trouvé</p><p style="font-size:10px;margin-top:6px">Active les VODs dans les paramètres de ta chaîne sur kick.com/${esc(channel)}</p></div>`;
-      return;
-    }
-
-    grid.innerHTML = vods.map(v => {
-      const vodId = v.id || v.uuid || '';
-      const title = esc(v.session_title || v.title || 'Sans titre');
-      const thumb = v.thumbnail?.src || (typeof v.thumbnail === 'string' ? v.thumbnail : '');
-      const duration = fmtVodDuration(v.duration);
-      const vodUrl = `https://kick.com/${esc(channel)}/videos/${vodId}`;
-      const date = v.created_at ? new Date(v.created_at).toLocaleDateString('fr-FR', { day:'2-digit', month:'short', year:'numeric' }) : '';
-      const views = v.views ? v.views.toLocaleString('fr') + ' vues' : '';
-      const titleSafe = title.replace(/`/g, "'");
-      return `<div style="background:var(--card);border:1px solid var(--brd);border-radius:12px;overflow:hidden;transition:transform .2s" onmouseenter="this.style.transform='translateY(-3px)'" onmouseleave="this.style.transform=''">
-        <div style="position:relative;aspect-ratio:16/9;background:var(--card2);overflow:hidden">
-          ${thumb ? `<img src="${esc(thumb)}" style="width:100%;height:100%;object-fit:cover" loading="lazy" onerror="this.style.display='none'">` : '<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:32px">🎬</div>'}
-          ${duration ? `<div style="position:absolute;bottom:6px;right:6px;background:rgba(0,0,0,.75);color:#fff;font-size:10px;font-weight:700;padding:2px 6px;border-radius:4px">${duration}</div>` : ''}
-        </div>
-        <div style="padding:10px 12px">
-          <div style="font-weight:600;font-size:12px;margin-bottom:4px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${title}">${title}</div>
-          <div style="display:flex;justify-content:space-between;font-size:10px;color:var(--muted);margin-bottom:8px">
-            <span>${date}</span><span>${views}</span>
-          </div>
-          <div style="display:flex;gap:6px">
-            <a href="${esc(vodUrl)}" target="_blank" class="btnx btn-outline btn-sm" style="flex:1;justify-content:center;text-decoration:none">▶️ Voir</a>
-            <a href="https://kick-video.download/?url=${encodeURIComponent(vodUrl)}" target="_blank" class="btnx btn-ghost btn-sm" style="justify-content:center;text-decoration:none" title="Télécharger ce replay">⬇️</a>
-            <button class="btnx btn-ghost btn-sm" title="Marquer un moment sur ce replay" onclick="prefillMoment('${esc(String(vodId))}','${titleSafe}','${esc(vodUrl)}')">📌</button>
-          </div>
-        </div>
-      </div>`;
-    }).join('');
-
-    // Pagination
-    const meta = json.meta;
-    const pagEl = document.getElementById('vods-pagination');
-    if (pagEl && meta && meta.last_page > 1) {
-      pagEl.innerHTML = '';
-      if (vodCurrentPage > 1) {
-        const pb = document.createElement('button');
-        pb.className = 'btnx btn-ghost btn-sm'; pb.textContent = '← Précédent';
-        pb.onclick = () => loadVods(vodCurrentPage - 1);
-        pagEl.appendChild(pb);
-      }
-      const info2 = document.createElement('span');
-      info2.style.cssText = 'font-size:11px;color:var(--muted);align-self:center';
-      info2.textContent = `Page ${vodCurrentPage} / ${meta.last_page}`;
-      pagEl.appendChild(info2);
-      if (vodCurrentPage < meta.last_page) {
-        const nb = document.createElement('button');
-        nb.className = 'btnx btn-ghost btn-sm'; nb.textContent = 'Suivant →';
-        nb.onclick = () => loadVods(vodCurrentPage + 1);
-        pagEl.appendChild(nb);
-      }
-    } else if (pagEl) { pagEl.innerHTML = ''; }
-
+    applyVodFilters();
   } catch(e) {
-    console.error('[VODs]', e);
     grid.innerHTML = '<div class="empty" style="grid-column:1/-1"><div class="ei">⚠️</div><p>Erreur de chargement — vérifie ta connexion</p></div>';
   }
 }
 
-function fmtVodDuration(ms) {
-  if (!ms) return '';
-  const s = Math.floor((typeof ms === 'number' && ms > 10000 ? ms / 1000 : ms));
-  const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), sec = s % 60;
-  if (h > 0) return `${h}h${String(m).padStart(2,'0')}m`;
-  return `${m}m${String(sec).padStart(2,'0')}s`;
+function renderVodsGrid(vods) {
+  const grid = document.getElementById('vods-grid');
+  const countEl = document.getElementById('vod-count');
+  if (!grid) return;
+  if (countEl) countEl.textContent = vods.length + ' replay' + (vods.length > 1 ? 's' : '');
+
+  if (!vods.length) {
+    grid.innerHTML = '<div class="empty" style="grid-column:1/-1"><div class="ei">🎬</div><p>Aucun replay correspondant</p></div>';
+    return;
+  }
+  grid.innerHTML = vods.map(v => buildVodCard(v)).join('');
+}
+
+function buildVodCard(v) {
+  const vodId   = v.id || v.uuid || '';
+  const title   = esc(v.session_title || v.title || 'Sans titre');
+  const thumb   = v.thumbnail?.src || (typeof v.thumbnail === 'string' ? v.thumbnail : '');
+  const dur     = fmtVodDuration(v.duration);
+  const vodUrl  = `https://kick.com/${activeKickChannel}/videos/${vodId}`;
+  const date    = v.created_at ? new Date(v.created_at).toLocaleDateString('fr-FR',{day:'2-digit',month:'short',year:'numeric'}) : '';
+  const views   = (v.views||0) > 0 ? (v.views).toLocaleString('fr') + ' vues' : '';
+  const safe    = title.replace(/`/g,"'");
+  return `<div style="background:var(--card);border:1px solid var(--brd);border-radius:12px;overflow:hidden;transition:transform .2s" onmouseenter="this.style.transform='translateY(-3px)'" onmouseleave="this.style.transform=''">
+    <div style="position:relative;aspect-ratio:16/9;background:var(--card2);overflow:hidden">
+      ${thumb ? `<img src="${esc(thumb)}" style="width:100%;height:100%;object-fit:cover" loading="lazy" onerror="this.style.display='none'">` : '<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:32px">🎬</div>'}
+      ${dur ? `<div style="position:absolute;bottom:6px;right:6px;background:rgba(0,0,0,.8);color:#fff;font-size:10px;font-weight:700;padding:2px 6px;border-radius:4px">${dur}</div>` : ''}
+    </div>
+    <div style="padding:10px 12px">
+      <div style="font-weight:600;font-size:12px;margin-bottom:4px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${title}">${title}</div>
+      <div style="display:flex;justify-content:space-between;font-size:10px;color:var(--muted);margin-bottom:8px"><span>${date}</span><span>${views}</span></div>
+      <div style="display:flex;gap:6px">
+        <a href="${esc(vodUrl)}" target="_blank" class="btnx btn-outline btn-sm" style="flex:1;justify-content:center;text-decoration:none">▶️ Voir</a>
+        <a href="https://kick-video.download/?url=${encodeURIComponent(vodUrl)}" target="_blank" class="btnx btn-ghost btn-sm" style="text-decoration:none" title="Télécharger">⬇️</a>
+        <button class="btnx btn-ghost btn-sm" title="Marquer un moment" onclick="prefillMoment('${esc(String(vodId))}','${safe}','${esc(vodUrl)}')">📌</button>
+      </div>
+    </div>
+  </div>`;
+}
+
+// ── Chargement des Clips ─────────────────────────────────────────────────────
+
+async function loadClips() {
+  const grid = document.getElementById('clips-grid');
+  if (!grid) return;
+  grid.innerHTML = '<div class="empty" style="grid-column:1/-1"><div class="ei">⏳</div><p>Chargement des clips…</p></div>';
+
+  try {
+    if (!activeKickChannel || activeKickChannel === 'fack7up') {
+      const infoR = await fetch('/api/channel-info');
+      const info  = await infoR.json();
+      activeKickChannel = info.channel || 'fack7up';
+    }
+
+    // Charger jusqu'à 3 pages de clips pour couvrir le dernier mois
+    allClipsData = [];
+    for (let p = 1; p <= 3; p++) {
+      const r = await fetch(
+        `https://kick.com/api/v2/channels/${activeKickChannel}/clips?page=${p}&limit=12&sort=date&time=month`,
+        { headers: { 'Accept':'application/json','Accept-Language':'en-US' } }
+      );
+      if (!r.ok) break;
+      const json = await r.json();
+      const items = json.data || json.clips || json || [];
+      if (!Array.isArray(items) || !items.length) break;
+      allClipsData.push(...items);
+      if (!json.meta || p >= (json.meta.last_page||1)) break;
+    }
+
+    applyVodFilters();
+  } catch(e) {
+    grid.innerHTML = '<div class="empty" style="grid-column:1/-1"><div class="ei">⚠️</div><p>Erreur lors du chargement des clips</p></div>';
+  }
+}
+
+function renderClipsGrid(clips) {
+  const grid = document.getElementById('clips-grid');
+  const countEl = document.getElementById('vod-count');
+  if (!grid) return;
+  if (countEl) countEl.textContent = clips.length + ' clip' + (clips.length > 1 ? 's' : '');
+
+  if (!clips.length) {
+    grid.innerHTML = '<div class="empty" style="grid-column:1/-1"><div class="ei">✂️</div><p>Aucun clip correspondant pour cette période</p></div>';
+    return;
+  }
+  grid.innerHTML = clips.map(c => buildClipCard(c)).join('');
+}
+
+function buildClipCard(c) {
+  const title    = esc(c.title || c.clip_title || 'Clip sans titre');
+  const thumb    = c.thumbnail_url || c.thumbnail || '';
+  const clipUrl  = c.clip_url || (c.id ? `https://kick.com/${activeKickChannel}/clips/${c.id}` : '#');
+  const views    = (c.view_count || c.views || 0) > 0 ? (c.view_count || c.views).toLocaleString('fr') + ' vues' : '';
+  const dur      = c.duration ? fmtVodDuration(c.duration * 1000) : '';
+  const creator  = esc(c.created_by?.username || c.channel?.slug || '');
+  const date     = c.created_at ? new Date(c.created_at).toLocaleDateString('fr-FR',{day:'2-digit',month:'short',year:'numeric'}) : '';
+  return `<div style="background:var(--card);border:1px solid var(--brd);border-radius:12px;overflow:hidden;transition:transform .2s" onmouseenter="this.style.transform='translateY(-3px)'" onmouseleave="this.style.transform=''">
+    <div style="position:relative;aspect-ratio:16/9;background:var(--card2);overflow:hidden">
+      ${thumb ? `<img src="${esc(thumb)}" style="width:100%;height:100%;object-fit:cover" loading="lazy" onerror="this.style.display='none'">` : '<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:32px">✂️</div>'}
+      ${dur ? `<div style="position:absolute;bottom:6px;right:6px;background:rgba(0,0,0,.8);color:#fff;font-size:10px;font-weight:700;padding:2px 6px;border-radius:4px">${dur}</div>` : ''}
+      <div style="position:absolute;top:6px;left:6px;background:rgba(139,53,255,.85);color:#fff;font-size:9px;font-weight:700;padding:2px 7px;border-radius:10px">✂️ CLIP</div>
+    </div>
+    <div style="padding:10px 12px">
+      <div style="font-weight:600;font-size:12px;margin-bottom:4px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${title}">${title}</div>
+      <div style="display:flex;justify-content:space-between;font-size:10px;color:var(--muted);margin-bottom:8px">
+        <span>${creator ? 'par ' + creator : date}</span><span>${views}</span>
+      </div>
+      <div style="display:flex;gap:6px">
+        <a href="${esc(clipUrl)}" target="_blank" class="btnx btn-outline btn-sm" style="flex:1;justify-content:center;text-decoration:none">▶️ Voir</a>
+        <a href="${esc(clipUrl)}" target="_blank" class="btnx btn-ghost btn-sm" style="text-decoration:none" title="Partager ce clip">🔗</a>
+      </div>
+    </div>
+  </div>`;
+}
+
+// ── Moments marqués ───────────────────────────────────────────────────────────
+
+let currentMomentFilter = 'all';
+
+function filterMoments(cat) {
+  currentMomentFilter = cat;
+  ['all','highlight','clutch','funny','fail','moment'].forEach(c => {
+    const btn = document.getElementById('mcat-' + c);
+    if (btn) btn.className = 'btnx ' + (c === cat ? 'btn-primary' : 'btn-ghost') + ' btn-sm';
+  });
+  renderMomentsList(allMomentsData);
+}
+
+function renderMomentsList(data) {
+  const filtered = currentMomentFilter === 'all' ? data : data.filter(m => m.category === currentMomentFilter);
+  const countEl = document.getElementById('moments-count');
+  if (countEl) countEl.textContent = filtered.length;
+  const el = document.getElementById('moments-list');
+  if (!el) return;
+  if (!filtered.length) {
+    el.innerHTML = '<div class="empty"><div class="ei">📌</div><p>Aucun moment dans cette catégorie</p></div>';
+    return;
+  }
+  el.innerHTML = filtered.map(m => {
+    const kickUrl = m.vod_url ? `${m.vod_url}?t=${m.timestamp_s}` : '#';
+    const catLabel = VOD_CAT_LABELS[m.category] || m.category;
+    const dateStr = m.created_at ? new Date(m.created_at+'Z').toLocaleDateString('fr-FR',{day:'2-digit',month:'short'}) : '';
+    return `<div style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:var(--card2);border:1px solid var(--brd);border-radius:10px;margin-bottom:6px">
+      <div style="font-size:18px">${catLabel.split(' ')[0]}</div>
+      <div style="flex:1;min-width:0">
+        <div style="font-weight:600;font-size:12px">${esc(m.label)}</div>
+        <div style="font-size:10px;color:var(--muted);margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">
+          ${m.vod_title ? esc(m.vod_title) + ' · ' : ''}⏱ ${fmtTimestamp(m.timestamp_s)} · ${dateStr}
+        </div>
+      </div>
+      <span style="font-size:9px;color:var(--muted2);flex-shrink:0">${catLabel.split(' ').slice(1).join(' ')}</span>
+      <a href="${esc(kickUrl)}" target="_blank" class="btnx btn-outline btn-xs" style="text-decoration:none;flex-shrink:0">▶️</a>
+      <button class="btnx btn-red btn-xs" onclick="deleteVodMoment(${m.id})" style="flex-shrink:0">✕</button>
+    </div>`;
+  }).join('');
+}
+
+async function loadVodMoments() {
+  try {
+    allMomentsData = await get('/api/vod-moments') || [];
+    renderMomentsList(allMomentsData);
+  } catch(e) {}
 }
 
 function prefillMoment(vodId, vodTitle, vodUrl) {
   document.getElementById('moment-vod-url').value = vodUrl || '';
   document.getElementById('moment-label').value = '';
   document.getElementById('moment-timestamp').value = '';
-  switchVodTab('moments');
-  // Stocker le vodId et titre en data-
   document.getElementById('moment-vod-url').dataset.vodId = vodId;
   document.getElementById('moment-vod-url').dataset.vodTitle = vodTitle;
+  switchVodTab('moments');
 }
 
 function parseTimestamp(str) {
   if (!str) return 0;
   const clean = str.trim().toLowerCase();
-  // Déjà en secondes
   if (/^\d+$/.test(clean)) return parseInt(clean);
-  // Format 1h23m45s, 23m45s, 45s, 1:23:45, 23:45
   let h = 0, m = 0, s = 0;
   const hm = clean.match(/(\d+)h/); if (hm) h = parseInt(hm[1]);
   const mm = clean.match(/(\d+)m/); if (mm) m = parseInt(mm[1]);
   const sm = clean.match(/(\d+)s/); if (sm) s = parseInt(sm[1]);
   if (h || m || s) return h * 3600 + m * 60 + s;
-  // 1:23:45 ou 23:45
   const parts = clean.split(':').map(Number);
   if (parts.length === 3) return parts[0]*3600 + parts[1]*60 + parts[2];
   if (parts.length === 2) return parts[0]*60 + parts[1];
@@ -2353,27 +2550,28 @@ function fmtTimestamp(s) {
   return `${sec}s`;
 }
 
+function fmtVodDuration(ms) {
+  if (!ms) return '';
+  const s = Math.floor(ms > 10000 ? ms / 1000 : ms);
+  const h = Math.floor(s/3600), m = Math.floor((s%3600)/60), sec = s%60;
+  if (h > 0) return `${h}h${String(m).padStart(2,'0')}m`;
+  return `${m}m${String(sec).padStart(2,'0')}s`;
+}
+
 async function addVodMoment() {
   const urlInput = document.getElementById('moment-vod-url');
-  const vodUrl = urlInput.value.trim();
-  const label = document.getElementById('moment-label').value.trim();
+  const vodUrl   = urlInput.value.trim();
+  const label    = document.getElementById('moment-label').value.trim();
   const category = document.getElementById('moment-category').value;
-  const tsStr = document.getElementById('moment-timestamp').value.trim();
+  const tsStr    = document.getElementById('moment-timestamp').value.trim();
   const timestampS = parseTimestamp(tsStr);
-
   if (!vodUrl) return showInline('moment-msg', 'Entre l\u2019URL du replay', false);
-  if (!label) return showInline('moment-msg', 'Entre une description du moment', false);
-
-  // Extraire l'ID du VOD depuis l'URL ou depuis data-
-  let vodId = urlInput.dataset.vodId || '';
+  if (!label)  return showInline('moment-msg', 'Entre une description du moment', false);
+  let vodId    = urlInput.dataset.vodId || '';
   let vodTitle = urlInput.dataset.vodTitle || '';
-  if (!vodId) {
-    const m = vodUrl.match(/\/videos\/([a-zA-Z0-9_-]+)/);
-    vodId = m ? m[1] : vodUrl;
-  }
-
+  if (!vodId) { const mch = vodUrl.match(/\/videos\/([a-zA-Z0-9_-]+)/); vodId = mch ? mch[1] : vodUrl; }
   const r = await fetch('/api/admin/vod-moments', {
-    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    method:'POST', headers:{'Content-Type':'application/json'},
     body: JSON.stringify({ vodId, vodTitle, vodUrl, timestampS, label, category })
   });
   if (!r.ok) return showInline('moment-msg', 'Erreur lors de l\u2019ajout', false);
@@ -2383,42 +2581,9 @@ async function addVodMoment() {
   loadVodMoments();
 }
 
-async function loadVodMoments() {
-  try {
-    const moments = await get('/api/vod-moments') || [];
-    const countEl = document.getElementById('moments-count');
-    if (countEl) countEl.textContent = moments.length;
-    const el = document.getElementById('moments-list');
-    if (!el) return;
-
-    if (!moments.length) {
-      el.innerHTML = '<div class="empty"><div class="ei">📌</div><p>Aucun moment marqué pour le moment</p></div>';
-      return;
-    }
-
-    el.innerHTML = moments.map(m => {
-      const kickUrl = m.vod_url ? `${m.vod_url}?t=${m.timestamp_s}` : '#';
-      const catLabel = VOD_CAT_LABELS[m.category] || m.category;
-      const dateStr = m.created_at ? new Date(m.created_at+'Z').toLocaleDateString('fr-FR', { day:'2-digit', month:'short' }) : '';
-      return `<div style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:var(--card2);border:1px solid var(--brd);border-radius:10px;margin-bottom:6px">
-        <div style="font-size:18px">${catLabel.split(' ')[0]}</div>
-        <div style="flex:1;min-width:0">
-          <div style="font-weight:600;font-size:12px">${esc(m.label)}</div>
-          <div style="font-size:10px;color:var(--muted);margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">
-            ${m.vod_title ? esc(m.vod_title) + ' · ' : ''}⏱ ${fmtTimestamp(m.timestamp_s)} · ${dateStr}
-          </div>
-        </div>
-        <span style="font-size:9px;color:var(--muted2);flex-shrink:0">${catLabel.split(' ').slice(1).join(' ')}</span>
-        <a href="${esc(kickUrl)}" target="_blank" class="btnx btn-outline btn-xs" style="text-decoration:none;flex-shrink:0">▶️</a>
-        <button class="btnx btn-red btn-xs" onclick="deleteVodMoment(${m.id})" style="flex-shrink:0">✕</button>
-      </div>`;
-    }).join('');
-  } catch(e) {}
-}
-
 async function deleteVodMoment(id) {
   if (!confirm('Supprimer ce moment ?')) return;
-  await fetch('/api/admin/vod-moments/' + id, { method: 'DELETE' });
+  await fetch('/api/admin/vod-moments/' + id, { method:'DELETE' });
   toast('Moment supprimé');
   loadVodMoments();
 }
