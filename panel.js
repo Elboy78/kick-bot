@@ -52,26 +52,13 @@ app.get('/api/stats',          waitDB,          async (req,res) => { try { res.j
 app.get('/api/logs',           waitDB,           async (req,res) => { try { res.json({data: await db.getRecentLogs(Math.min(parseInt(req.query.limit||50),500))}); } catch(e){res.json({data:[]}); }});
 app.get('/api/active',         async (req,res) => { try { res.json({data: await db.getActiveViewers(parseInt(req.query.minutes||10))}); } catch(e){res.json({data:[]}); }});
 // ── VODs & Moments ─────────────────────────────────────────────────────────────
+// Note: l'API Kick VODs est appelée directement depuis le navigateur du panel
+// (côté client) pour éviter le blocage Cloudflare sur les IPs de datacenters.
+// Le serveur gère uniquement le CRUD des moments marqués.
 
-// Proxy pour récupérer les VODs Kick — évite les problèmes CORS depuis le navigateur
-app.get('/api/vods', async (req, res) => {
-  try {
-    const channel = process.env.KICK_CHANNEL || 'fack7up';
-    const page = parseInt(req.query.page) || 1;
-    const r = await axios.get(`https://kick.com/api/v2/channels/${channel}/videos`, {
-      params: { page, limit: 12, sort: 'desc' },
-      headers: {
-        'Accept': 'application/json',
-        'Accept-Language': 'en-US',
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120.0.0.0',
-      },
-      timeout: 10000,
-    });
-    res.json({ data: r.data?.data || r.data || [], meta: r.data?.meta || null });
-  } catch(e) {
-    console.error('[VOD] Erreur API Kick:', e.response?.status || e.message);
-    res.json({ data: [], error: 'API Kick indisponible' });
-  }
+// Expose le slug de la chaîne au client pour les appels directs vers Kick
+app.get('/api/channel-info', (req, res) => {
+  res.json({ channel: process.env.KICK_CHANNEL || 'fack7up' });
 });
 
 // CRUD moments

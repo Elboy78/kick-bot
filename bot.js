@@ -9,7 +9,7 @@ const db       = require('./database');
 const kickOAuth = require('./kick-oauth');
 
 const CONFIG = {
-  channel:      process.env.KICK_CHANNEL       || 'votre_chaine',
+  channel:      process.env.KICK_CHANNEL       || 'fack7up',
   channelId:    process.env.KICK_CHANNEL_ID    || '0',
   token:        process.env.KICK_TOKEN         || '',
   botUsername:  process.env.BOT_USERNAME       || 'bot',

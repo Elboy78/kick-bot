@@ -2225,35 +2225,46 @@ async function loadVods(page) {
   if (page) vodCurrentPage = page;
   const grid = document.getElementById('vods-grid');
   if (!grid) return;
-  grid.innerHTML = '<div class="empty" style="grid-column:1/-1"><div class="ei">⏳</div><p>Chargement…</p></div>';
+  grid.innerHTML = '<div class="empty" style="grid-column:1/-1"><div class="ei">⏳</div><p>Chargement des replays…</p></div>';
 
   try {
-    const r = await fetch(`/api/vods?page=${vodCurrentPage}`);
-    const json = await r.json();
-    const vods = json.data || [];
+    // Récupérer le slug depuis le serveur (variable KICK_CHANNEL sur Render)
+    const infoR = await fetch('/api/channel-info');
+    const info = await infoR.json();
+    const channel = info.channel || 'fack7up';
 
-    if (json.error && !vods.length) {
-      grid.innerHTML = `<div class="empty" style="grid-column:1/-1"><div class="ei">⚠️</div><p>${esc(json.error)}</p><p style="font-size:10px;margin-top:6px">Vérifie que la variable KICK_CHANNEL est bien configurée sur Render.</p></div>`;
+    // Appel direct depuis le navigateur — Kick ne bloque pas les navigateurs (seulement les IPs de datacenter)
+    const kickR = await fetch(
+      `https://kick.com/api/v2/channels/${channel}/videos?page=${vodCurrentPage}&limit=12&sort=desc`,
+      { headers: { 'Accept': 'application/json', 'Accept-Language': 'en-US' } }
+    );
+
+    if (!kickR.ok) {
+      grid.innerHTML = `<div class="empty" style="grid-column:1/-1"><div class="ei">⚠️</div><p>Kick a retourné une erreur (${kickR.status})</p><p style="font-size:10px;margin-top:6px">Assure-toi que les replays sont activés sur ta chaîne Kick → Paramètres chaîne → VODs.</p></div>`;
       return;
     }
 
-    if (!vods.length) {
-      grid.innerHTML = '<div class="empty" style="grid-column:1/-1"><div class="ei">🎬</div><p>Aucun replay trouvé — assure-toi que les VODs sont activés sur ta chaîne Kick.</p></div>';
+    const json = await kickR.json();
+    const vods = json.data || json || [];
+
+    if (!Array.isArray(vods) || !vods.length) {
+      grid.innerHTML = `<div class="empty" style="grid-column:1/-1"><div class="ei">🎬</div><p>Aucun replay trouvé</p><p style="font-size:10px;margin-top:6px">Active les VODs dans les paramètres de ta chaîne sur kick.com/${esc(channel)}</p></div>`;
       return;
     }
 
     grid.innerHTML = vods.map(v => {
       const vodId = v.id || v.uuid || '';
       const title = esc(v.session_title || v.title || 'Sans titre');
-      const thumb = v.thumbnail?.src || v.thumbnail || '';
+      const thumb = v.thumbnail?.src || (typeof v.thumbnail === 'string' ? v.thumbnail : '');
       const duration = fmtVodDuration(v.duration);
-      const vodUrl = `https://kick.com/fack7up/videos/${vodId}`;
+      const vodUrl = `https://kick.com/${esc(channel)}/videos/${vodId}`;
       const date = v.created_at ? new Date(v.created_at).toLocaleDateString('fr-FR', { day:'2-digit', month:'short', year:'numeric' }) : '';
       const views = v.views ? v.views.toLocaleString('fr') + ' vues' : '';
+      const titleSafe = title.replace(/`/g, "'");
       return `<div style="background:var(--card);border:1px solid var(--brd);border-radius:12px;overflow:hidden;transition:transform .2s" onmouseenter="this.style.transform='translateY(-3px)'" onmouseleave="this.style.transform=''">
         <div style="position:relative;aspect-ratio:16/9;background:var(--card2);overflow:hidden">
           ${thumb ? `<img src="${esc(thumb)}" style="width:100%;height:100%;object-fit:cover" loading="lazy" onerror="this.style.display='none'">` : '<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:32px">🎬</div>'}
-          <div style="position:absolute;bottom:6px;right:6px;background:rgba(0,0,0,.75);color:#fff;font-size:10px;font-weight:700;padding:2px 6px;border-radius:4px">${duration}</div>
+          ${duration ? `<div style="position:absolute;bottom:6px;right:6px;background:rgba(0,0,0,.75);color:#fff;font-size:10px;font-weight:700;padding:2px 6px;border-radius:4px">${duration}</div>` : ''}
         </div>
         <div style="padding:10px 12px">
           <div style="font-weight:600;font-size:12px;margin-bottom:4px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${title}">${title}</div>
@@ -2261,9 +2272,9 @@ async function loadVods(page) {
             <span>${date}</span><span>${views}</span>
           </div>
           <div style="display:flex;gap:6px">
-            <a href="${vodUrl}" target="_blank" class="btnx btn-outline btn-sm" style="flex:1;justify-content:center;text-decoration:none">▶️ Voir</a>
+            <a href="${esc(vodUrl)}" target="_blank" class="btnx btn-outline btn-sm" style="flex:1;justify-content:center;text-decoration:none">▶️ Voir</a>
             <a href="https://kick-video.download/?url=${encodeURIComponent(vodUrl)}" target="_blank" class="btnx btn-ghost btn-sm" style="justify-content:center;text-decoration:none" title="Télécharger ce replay">⬇️</a>
-            <button class="btnx btn-ghost btn-sm" title="Marquer un moment sur ce replay" onclick="prefillMoment('${esc(vodId)}','${title.replace(/'/g,'`')}','${esc(vodUrl)}')">📌</button>
+            <button class="btnx btn-ghost btn-sm" title="Marquer un moment sur ce replay" onclick="prefillMoment('${esc(String(vodId))}','${titleSafe}','${esc(vodUrl)}')">📌</button>
           </div>
         </div>
       </div>`;
@@ -2280,10 +2291,10 @@ async function loadVods(page) {
         pb.onclick = () => loadVods(vodCurrentPage - 1);
         pagEl.appendChild(pb);
       }
-      const info = document.createElement('span');
-      info.style = 'font-size:11px;color:var(--muted);align-self:center';
-      info.textContent = `Page ${vodCurrentPage} / ${meta.last_page}`;
-      pagEl.appendChild(info);
+      const info2 = document.createElement('span');
+      info2.style.cssText = 'font-size:11px;color:var(--muted);align-self:center';
+      info2.textContent = `Page ${vodCurrentPage} / ${meta.last_page}`;
+      pagEl.appendChild(info2);
       if (vodCurrentPage < meta.last_page) {
         const nb = document.createElement('button');
         nb.className = 'btnx btn-ghost btn-sm'; nb.textContent = 'Suivant →';
@@ -2291,8 +2302,10 @@ async function loadVods(page) {
         pagEl.appendChild(nb);
       }
     } else if (pagEl) { pagEl.innerHTML = ''; }
+
   } catch(e) {
-    grid.innerHTML = '<div class="empty" style="grid-column:1/-1"><div class="ei">⚠️</div><p>Erreur lors du chargement des replays</p></div>';
+    console.error('[VODs]', e);
+    grid.innerHTML = '<div class="empty" style="grid-column:1/-1"><div class="ei">⚠️</div><p>Erreur de chargement — vérifie ta connexion</p></div>';
   }
 }
 
