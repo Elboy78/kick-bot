@@ -638,10 +638,15 @@ async function sendChat(message) {
 
 async function fetchKickChannelOfficial() {
   try {
+    // Diagnostic OAuth complet
+    const configured = kickOAuth.isConfigured();
+    const storedToken = await db.getOAuthToken('kick');
+    console.log(`[OAUTH DEBUG] isConfigured=${configured} | token en DB=${!!storedToken} | expires_at=${storedToken?.expires_at} | now=${Date.now()}`);
+
     const { token, official } = await getActiveToken();
     if (!token || !official) {
       console.log('[STREAM] Token OAuth absent ou expiré → se reconnecter dans Paramètres → Connexion Kick');
-      return null; // null = pas pu interroger l'API → on essaie le fallback
+      return null;
     }
 
     const res = await axios.get(
