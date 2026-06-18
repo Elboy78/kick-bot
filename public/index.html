@@ -2420,6 +2420,8 @@ async function loadClips() {
       const items = json.data || json.clips || json || [];
       if (!Array.isArray(items) || !items.length) break;
       allClipsData.push(...items);
+      // Log du 1er clip pour debug — sera retiré une fois les champs confirmés
+      if (p === 1 && items.length > 0) console.log('[CLIPS DEBUG] Premier clip:', JSON.stringify(items[0], null, 2));
       if (!json.meta || p >= (json.meta.last_page||1)) break;
     }
 
@@ -2445,14 +2447,24 @@ function renderClipsGrid(clips) {
 function buildClipCard(c) {
   const title    = esc(c.title || c.clip_title || 'Clip sans titre');
   const thumb    = c.thumbnail_url || c.thumbnail || '';
-  const clipUrl  = c.clip_url || (c.id ? `https://kick.com/${activeKickChannel}/clips/${c.id}` : '#');
+  const clipId   = c.id || c.uuid || '';
+  // URL de la page Kick pour "Voir"
+  const clipPage = c.clip_url || (clipId ? `https://kick.com/${activeKickChannel}/clips/${clipId}` : '#');
+  // URL .mp4 directe — on tente tous les champs connus, on passera par le proxy si vide
+  const videoUrl = c.video_url || c.stream || c.source || c.mp4_url || c.download_url || '';
   const views    = (c.view_count || c.views || 0) > 0 ? (c.view_count || c.views).toLocaleString('fr') + ' vues' : '';
   const dur      = c.duration ? fmtVodDuration(c.duration * 1000) : '';
   const creator  = esc(c.created_by?.username || c.channel?.slug || '');
   const date     = c.created_at ? new Date(c.created_at).toLocaleDateString('fr-FR',{day:'2-digit',month:'short',year:'numeric'}) : '';
+  const safeId   = esc(String(clipId));
+  const safeUrl  = esc(videoUrl);
+  const safeName = (c.title || 'clip').replace(/[^a-zA-Z0-9_-]/g,'_').slice(0,40);
   return `<div style="background:var(--card);border:1px solid var(--brd);border-radius:12px;overflow:hidden;transition:transform .2s" onmouseenter="this.style.transform='translateY(-3px)'" onmouseleave="this.style.transform=''">
-    <div style="position:relative;aspect-ratio:16/9;background:var(--card2);overflow:hidden">
+    <div style="position:relative;aspect-ratio:16/9;background:var(--card2);overflow:hidden;cursor:pointer" onclick="window.open('${esc(clipPage)}','_blank')">
       ${thumb ? `<img src="${esc(thumb)}" style="width:100%;height:100%;object-fit:cover" loading="lazy" onerror="this.style.display='none'">` : '<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:32px">✂️</div>'}
+      <div style="position:absolute;inset:0;background:rgba(0,0,0,0);display:flex;align-items:center;justify-content:center;transition:background .15s" onmouseenter="this.style.background='rgba(0,0,0,.4)'" onmouseleave="this.style.background='rgba(0,0,0,0)'">
+        <span style="font-size:36px;opacity:0;transition:opacity .15s" onmouseenter="this.style.opacity='1'" onmouseleave="this.style.opacity='0'">▶️</span>
+      </div>
       ${dur ? `<div style="position:absolute;bottom:6px;right:6px;background:rgba(0,0,0,.8);color:#fff;font-size:10px;font-weight:700;padding:2px 6px;border-radius:4px">${dur}</div>` : ''}
       <div style="position:absolute;top:6px;left:6px;background:rgba(139,53,255,.85);color:#fff;font-size:9px;font-weight:700;padding:2px 7px;border-radius:10px">✂️ CLIP</div>
     </div>
@@ -2462,11 +2474,61 @@ function buildClipCard(c) {
         <span>${creator ? 'par ' + creator : date}</span><span>${views}</span>
       </div>
       <div style="display:flex;gap:6px">
-        <a href="${esc(clipUrl)}" target="_blank" class="btnx btn-outline btn-sm" style="flex:1;justify-content:center;text-decoration:none">▶️ Voir</a>
-        <a href="${esc(clipUrl)}" target="_blank" class="btnx btn-ghost btn-sm" style="text-decoration:none" title="Partager ce clip">🔗</a>
+        <a href="${esc(clipPage)}" target="_blank" class="btnx btn-outline btn-sm" style="flex:1;justify-content:center;text-decoration:none">▶️ Voir le clip</a>
+        <button class="btnx btn-green btn-sm" onclick="downloadClip('${safeId}','${safeUrl}','${safeName}')" title="Télécharger en MP4">⬇️</button>
       </div>
     </div>
   </div>`;
+}
+
+async function downloadClip(clipId, videoUrl, filename) {
+  if (!clipId && !videoUrl) { toast('Impossible d\u2019identifier ce clip', false); return; }
+
+  toast('🔍 Récupération du lien MP4…');
+
+  // Étape 1 : si on n'a pas d'URL directe, on l'obtient via l'API Kick (depuis le navigateur)
+  let mp4Url = videoUrl;
+  if (!mp4Url || !mp4Url.includes('.mp4')) {
+    try {
+      const r = await fetch(`https://kick.com/api/v2/clips/${clipId}`,
+        { headers: { 'Accept':'application/json','Accept-Language':'en-US' } });
+      if (r.ok) {
+        const data = await r.json();
+        const clip = data.clip || data;
+        // On logue tous les champs pour identifier le bon — visible dans la console F12
+        console.log('[CLIP DETAIL]', JSON.stringify(clip, null, 2));
+        mp4Url = clip.video_url || clip.stream || clip.source || clip.mp4_url
+               || clip.download_url || clip.clip_url || '';
+      }
+    } catch(e) { console.error('[CLIP DL]', e); }
+  }
+
+  if (!mp4Url) {
+    toast('URL MP4 introuvable — ouverture du clip sur Kick', false);
+    window.open(`https://kick.com/${activeKickChannel}/clips/${clipId}`, '_blank');
+    return;
+  }
+
+  // Étape 2 : téléchargement via le proxy serveur pour contourner les restrictions CORS
+  // Le serveur fetch le .mp4 et le renvoie au navigateur avec Content-Disposition: attachment
+  const proxyUrl = `/api/proxy-download?url=${encodeURIComponent(mp4Url)}&filename=${encodeURIComponent(filename + '.mp4')}`;
+  const a = document.createElement('a');
+  a.href = proxyUrl;
+  a.download = filename + '.mp4';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  toast('⬇️ Téléchargement en cours… ' + filename + '.mp4');
+}
+
+function triggerDownload(url, filename) {
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  a.target = '_blank';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
 }
 
 // ── Moments marqués ───────────────────────────────────────────────────────────

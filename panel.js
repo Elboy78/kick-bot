@@ -61,6 +61,49 @@ app.get('/api/channel-info', (req, res) => {
   res.json({ channel: process.env.KICK_CHANNEL || 'fack7up' });
 });
 
+// Proxy de téléchargement — récupère le .mp4 depuis les CDN Kick et le renvoie
+// au navigateur avec Content-Disposition: attachment pour forcer le téléchargement.
+// Nécessaire car les CDN Kick bloquent le téléchargement direct depuis un navigateur
+// (header CORS manquant / politique de référent).
+app.get('/api/proxy-download', async (req, res) => {
+  const url      = req.query.url;
+  const filename = req.query.filename || 'clip.mp4';
+
+  if (!url) return res.status(400).json({ error: 'url requis' });
+
+  // Sécurité : n'autoriser que les URLs venant des CDN Kick
+  const allowedHosts = ['kick.com', 'clips.kick.com', 'cdn.kick.com', 'stream.kick.com',
+                        'cloudfront.net', 'akamaized.net', 'fastly.net', 'amazonaws.com'];
+  let parsedUrl;
+  try { parsedUrl = new URL(url); } catch(e) { return res.status(400).json({ error: 'URL invalide' }); }
+  const hostOk = allowedHosts.some(h => parsedUrl.hostname.endsWith(h));
+  if (!hostOk) return res.status(403).json({ error: 'Domaine non autorisé' });
+
+  try {
+    const upstream = await axios.get(url, {
+      responseType: 'stream',
+      timeout: 60000,
+      headers: {
+        'Accept': '*/*',
+        'Accept-Language': 'en-US',
+        'Referer': 'https://kick.com/',
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120.0.0.0',
+      },
+      maxRedirects: 5,
+    });
+
+    res.setHeader('Content-Type', upstream.headers['content-type'] || 'video/mp4');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    if (upstream.headers['content-length']) {
+      res.setHeader('Content-Length', upstream.headers['content-length']);
+    }
+    upstream.data.pipe(res);
+  } catch(e) {
+    console.error('[PROXY DL] Erreur:', e.response?.status || e.message);
+    if (!res.headersSent) res.status(500).json({ error: 'Erreur lors du téléchargement' });
+  }
+});
+
 // CRUD moments
 app.get('/api/vod-moments',       async (req,res) => { try { res.json({data: await db.getVodMoments(req.query.vod_id||null)}); } catch(e){res.json({data:[]});} });
 app.post('/api/admin/vod-moments', async (req,res) => {
