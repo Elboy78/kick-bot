@@ -2369,13 +2369,13 @@ function renderVodsGrid(vods) {
 }
 
 function buildVodCard(v) {
-  // UUID stocké dans v.video.uuid — c'est lui qui forme l'URL réelle kick.com/video/{uuid}
-  const vodUuid = v.video?.uuid || v.uuid || '';
+  // L'URL réelle : kick.com/{channel}/videos/{id} où id est l'entier numérique (ex: 113413434)
   const vodId   = v.id || '';
+  const vodUuid = v.video?.uuid || v.uuid || '';
   const title   = esc(v.session_title || v.title || 'Sans titre');
   const thumb   = v.thumbnail?.src || (typeof v.thumbnail === 'string' ? v.thumbnail : '');
   const dur     = fmtVodDuration(v.duration);
-  const vodUrl  = vodUuid ? `https://kick.com/video/${vodUuid}` : `https://kick.com/${activeKickChannel}/videos`;
+  const vodUrl  = vodId ? `https://kick.com/${activeKickChannel}/videos/${vodId}` : `https://kick.com/${activeKickChannel}/videos`;
   const date    = v.created_at ? new Date(v.created_at).toLocaleDateString('fr-FR',{day:'2-digit',month:'short',year:'numeric'}) : '';
   const views   = (v.views||0) > 0 ? (v.views).toLocaleString('fr') + ' vues' : '';
   const safe    = title.replace(/`/g,"'");
