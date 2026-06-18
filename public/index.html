@@ -373,7 +373,7 @@ hr.div{border:none;border-top:1px solid var(--brd);margin:12px 0}
           <li><span>Viewers</span><span id="ic-viewers">—</span></li>
           <li><span>Followers</span><span id="ic-followers">—</span></li>
           <li><span>Statut live</span><span id="ic-live-badge" class="ic-offline-badge">Hors ligne</span></li>
-          <li><span>Vu par le bot</span><span style="display:flex;align-items:center;gap:6px"><span id="ic-bot-live-status">—</span><button class="btnx btn-ghost btn-xs" id="force-live-btn" onclick="toggleForceLive()" title="Forcer le statut live si la détection automatique échoue">⚡</button></span></li>
+          <li><span>Vu par le bot</span><span id="ic-bot-live-status">—</span></li>
           <li><span>Uptime</span><span id="ic-uptime">—</span></li>
           <li><span>Préfixe</span><span>!</span></li>
           <li><span>Langue</span><span>🇫🇷 Français</span></li>
@@ -1546,6 +1546,10 @@ async function loadLiveStatus() {
     const live      = !!d.livestream;
     const viewers   = d.livestream?.viewer_count ?? 0;
     const followers = d.followersCount ?? d.followers_count ?? 0;
+    // Timestamp réel de démarrage du live fourni par Kick — persist entre les refreshs
+    const streamStartedAt = live && d.livestream?.created_at ? new Date(d.livestream.created_at).getTime() : null;
+    if (streamStartedAt) window._streamStart = streamStartedAt;
+    else if (!live) window._streamStart = null;
 
     updateLiveUI(live, viewers, followers);
 
@@ -1613,8 +1617,7 @@ function updateLiveUI(live, viewers, followers) {
   const sbUp = document.getElementById('sb-uptime');
   const icu  = document.getElementById('ic-uptime');
   if (live) {
-    if (!window._streamStart) window._streamStart = Date.now();
-    const diff = Math.floor((Date.now() - window._streamStart) / 1000);
+    const diff = Math.floor((Date.now() - (window._streamStart || Date.now())) / 1000);
     const h = Math.floor(diff/3600), m = Math.floor((diff%3600)/60), s = diff%60;
     const uptimeTxt = h > 0 ? h+'h '+m+'m '+s+'s' : m > 0 ? m+'m '+s+'s' : s+'s';
     if (sbUp) sbUp.textContent = uptimeTxt;

@@ -7,6 +7,7 @@ const WebSocket = require('ws');
 const axios    = require('axios');
 const db       = require('./database');
 const kickOAuth = require('./kick-oauth');
+const shared   = require('./shared');
 
 const CONFIG = {
   channel:      process.env.KICK_CHANNEL       || 'votre_chaine',
@@ -40,6 +41,8 @@ let followerCheckInterval = null;
 async function init() {
   await db.ensureInit();
   await db.initSystemCommandsState(SYSTEM_COMMANDS);
+  // Enregistrer sendChat dans le module partagé pour que panel.js puisse l'utiliser
+  shared.registerSendChat(sendChat);
   await startAnnouncements();
   await syncPointsConfig();
   // Vérifier live + followers toutes les 2 minutes
@@ -135,6 +138,7 @@ function handleEvent(msg) {
       if (!wasLive) {
         console.log('[STREAM] Stream démarré — points activés !');
         streamStartTime = Date.now();
+        db.setBotStatus('stream_started_at', streamStartTime.toString()).catch(()=>{});
         if (!currentSessionId) startSession();
         startAnnouncements();
         startPointsTracker(); // ← déclencher le tracker de points dès le début du live
@@ -700,6 +704,7 @@ async function checkLiveStatus() {
   if (isLive && !wasLive) {
     console.log('[STREAM] Stream démarré !');
     streamStartTime = Date.now();
+    db.setBotStatus('stream_started_at', streamStartTime.toString()).catch(()=>{});
     if (!currentSessionId) startSession();
     startAnnouncements();
     startPointsTracker(); // ← déclencher le tracker dès la détection du live

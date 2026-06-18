@@ -84,17 +84,6 @@ app.post('/api/admin/follow-announce', async (req, res) => {
   } catch(e) { res.status(500).json({ error: e.message }); }
 });
 
-// Route de secours — force manuellement le statut live si l'API Kick est bloquée par Cloudflare
-app.post('/api/admin/set-live', async (req, res) => {
-  try {
-    const { live } = req.body;
-    const { setIsLive } = require('./bot');
-    setIsLive(!!live);
-    console.log(`[PANEL] set-live forcé → ${live ? 'LIVE' : 'HORS LIGNE'}`);
-    res.json({ success: true, isLive: !!live });
-  } catch(e) { res.status(500).json({ error: e.message }); }
-});
-
 // ── Sub Announce ───────────────────────────────────────────────────────────────
 
 const DEFAULT_SUB_NEW_MSG   = '🎉 Merci pour le sub @{username} ! Bienvenue dans les subs 🔥';
@@ -134,14 +123,7 @@ app.post('/webhook/kick', async (req, res) => {
     const eventType = req.headers['kick-event-type'] || event?.event || event?.type || '';
     console.log('[WEBHOOK KICK]', eventType, JSON.stringify(event).slice(0, 200));
 
-    const { sendChat, setIsLive } = require('./bot');
-
-    // ── Statut live (Kick envoie cet event au démarrage/arrêt du stream) ─────────
-    if (eventType === 'livestream.status.updated') {
-      const isLiveNow = !!(event?.data?.is_live);
-      console.log(`[WEBHOOK] livestream.status.updated → is_live=${isLiveNow}`);
-      if (typeof setIsLive === 'function') setIsLive(isLiveNow);
-    }
+    const shared = require('./shared');
 
     // ── Follow ──────────────────────────────────────────────────────────────────
     if (eventType === 'channel.followed' || eventType === 'ChannelFollowed') {
@@ -154,7 +136,7 @@ app.post('/webhook/kick', async (req, res) => {
       if (enabled) {
         const template = await db.getSettingStr('follow_announce_message', DEFAULT_FOLLOW_MSG);
         const message  = template.replace(/\{username\}/gi, username);
-        if (typeof sendChat === 'function') { await sendChat(message); console.log(`[FOLLOW] ${username}`); }
+        { await shared.shared.sendChat(message); console.log(`[FOLLOW] ${username}`); }
       }
     }
 
@@ -165,7 +147,7 @@ app.post('/webhook/kick', async (req, res) => {
       if (enabled) {
         const template = await db.getSettingStr('sub_announce_new', DEFAULT_SUB_NEW_MSG);
         const message  = template.replace(/\{username\}/gi, username);
-        if (typeof sendChat === 'function') { await sendChat(message); console.log(`[SUB NEW] ${username}`); }
+        { await shared.shared.sendChat(message); console.log(`[SUB NEW] ${username}`); }
       }
     }
 
@@ -177,7 +159,7 @@ app.post('/webhook/kick', async (req, res) => {
       if (enabled) {
         const template = await db.getSettingStr('sub_announce_renew', DEFAULT_SUB_RENEW_MSG);
         const message  = template.replace(/\{username\}/gi, username).replace(/\{months\}/gi, months);
-        if (typeof sendChat === 'function') { await sendChat(message); console.log(`[SUB RENEW] ${username} x${months}`); }
+        { await shared.shared.sendChat(message); console.log(`[SUB RENEW] ${username} x${months}`); }
       }
     }
 
@@ -192,7 +174,7 @@ app.post('/webhook/kick', async (req, res) => {
         const message  = template
           .replace(/\{gifter\}/gi, isAnon ? 'un anonyme' : gifter)
           .replace(/\{count\}/gi, count);
-        if (typeof sendChat === 'function') { await sendChat(message); console.log(`[SUB GIFT] ${gifter} x${count}`); }
+        { await shared.shared.sendChat(message); console.log(`[SUB GIFT] ${gifter} x${count}`); }
       }
     }
 
@@ -469,18 +451,7 @@ app.post('/api/live/update', (req, res) => {
 
 // Live force
 let forcedLiveStatus = null;
-app.post('/api/admin/live/force', requireAuth, (req,res) => {
-  const { status } = req.body;
-  forcedLiveStatus = status === 'on' ? true : status === 'off' ? false : null;
-  // Propager au bot pour activer/désactiver la distribution de points
-  try {
-    const { setIsLive } = require('./bot');
-    if (typeof setIsLive === 'function' && forcedLiveStatus !== null) {
-      setIsLive(!!forcedLiveStatus);
-    }
-  } catch(e) {}
-  res.json({ success: true, forced: forcedLiveStatus });
-});
+app.post('/api/admin/live/force', requireAuth, (req,res) => { const {status}=req.body; forcedLiveStatus=status==='on'?true:status==='off'?false:null; res.json({success:true,forced:forcedLiveStatus}); });
 app.get('/api/admin/live/status', requireAuth, (req,res) => res.json({forced:forcedLiveStatus}));
 
 // Live status
@@ -783,6 +754,7 @@ app.get('/api/bot-status', async (req, res) => {
       botStartedAt: status.bot_started_at?.value || null,
       lastUpdate: status.token_expired?.updated_at || null,
       isLive: status.is_live?.value === '1',
+      streamStartedAt: status.stream_started_at?.value ? parseInt(status.stream_started_at.value) : null,
       lastLiveCheckAt: status.last_live_check_at?.value ? parseInt(status.last_live_check_at.value) : null,
       lastLiveCheckSource: status.last_live_check_source?.value || null,
     });
