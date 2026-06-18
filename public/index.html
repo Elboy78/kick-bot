@@ -273,7 +273,6 @@ hr.div{border:none;border-top:1px solid var(--brd);margin:12px 0}
   </div>
 
   <div class="sb-bottom">
-    <button class="sb-btnx" id="live-toggle-btn" onclick="toggleForceLive()">⚡ <span id="live-btn-text">Mode auto</span></button>
     <button class="sb-btnx" onclick="logout()">🚪 Déconnexion</button>
     <div class="sb-upd" id="upd"></div>
     <div class="sb-profile" onclick="showPage('settings')">
@@ -375,7 +374,6 @@ hr.div{border:none;border-top:1px solid var(--brd);margin:12px 0}
           <li><span>Statut live</span><span id="ic-live-badge" class="ic-offline-badge">Hors ligne</span></li>
           <li><span>Vu par le bot</span><span id="ic-bot-live-status">—</span></li>
           <li><span>Uptime</span><span id="ic-uptime">—</span></li>
-          <li><span>Préfixe</span><span>!</span></li>
           <li><span>Langue</span><span>🇫🇷 Français</span></li>
           <li><span>Version</span><span>v2.1.0</span></li>
         </ul>
@@ -1546,9 +1544,13 @@ async function loadLiveStatus() {
     const live      = !!d.livestream;
     const viewers   = d.livestream?.viewer_count ?? 0;
     const followers = d.followersCount ?? d.followers_count ?? 0;
-    // Timestamp réel de démarrage du live fourni par Kick — toujours mis à jour
-    const streamStartedAt = live && d.livestream?.created_at ? new Date(d.livestream.created_at).getTime() : null;
-    window._streamStart = streamStartedAt; // null si hors ligne, timestamp exact si en live
+    // created_at Kick = "2026-06-18 20:00:00" sans Z → interprété local sans correction
+    // On force UTC en remplaçant l'espace par T et en ajoutant Z
+    const rawDate = d.livestream?.created_at || d.livestream?.start_time || null;
+    const streamStartedAt = live && rawDate
+      ? new Date(rawDate.replace(' ', 'T') + (rawDate.includes('Z') ? '' : 'Z')).getTime()
+      : null;
+    window._streamStart = streamStartedAt;
 
     updateLiveUI(live, viewers, followers);
 
@@ -1722,46 +1724,6 @@ async function deleteCmdPage(trigger) {
   toast('Commande ' + trigger + ' supprimée');
   loadCommandsPage();
   loadCmds();
-}
-
-// ── Live manuel ───────────────────────────────────────────────────────────────
-let forceLive = null; // null = auto, true = forcé ON, false = forcé OFF
-
-async function toggleForceLive() {
-  const btn = document.getElementById('live-toggle-btn'); const btnTxt = document.getElementById('live-btn-text');
-  let nextState;
-  if (forceLive === null)  nextState = 'on';
-  else if (forceLive === true) nextState = 'off';
-  else nextState = 'auto';
-
-  try {
-    await post('/api/admin/live/force', { status: nextState });
-  } catch(e) {}
-
-  forceLive = nextState === 'on' ? true : nextState === 'off' ? false : null;
-
-  const pill = document.getElementById('live-pill');
-  const txt  = document.getElementById('live-text');
-  const dot  = document.getElementById('live-dot');
-
-  if (forceLive === true) {
-    btn.className = 'sb-btnx live-on';
-    if(btnTxt) btnTxt.textContent = 'Forcé EN LIGNE'; else btn.textContent = '⚡ Forcé EN LIGNE';
-    if(pill) pill.className='live-pill on'; if(dot) dot.className='lpd blink';
-    if(txt)  txt.textContent='● LIVE (forcé)';
-    toast('Stream forcé EN LIGNE ✓');
-  } else if (forceLive === false) {
-    btn.className = 'sb-btnx live-off';
-    if(btnTxt) btnTxt.textContent = 'Forcé HORS LIGNE'; else btn.textContent = '⚡ Forcé HORS LIGNE';
-    if(pill) pill.className='live-pill off'; if(dot) dot.className='lpd';
-    if(txt)  txt.textContent='Hors ligne (forcé)';
-    toast('Stream forcé HORS LIGNE', false);
-  } else {
-    btn.className = 'sb-btnx';
-    if(btnTxt) btnTxt.textContent = 'Mode auto'; else btn.textContent = '⚡ Mode auto';
-    toast('Mode automatique rétabli');
-    loadLiveStatus();
-  }
 }
 
 // ── DBD ───────────────────────────────────────────────────────────────────────

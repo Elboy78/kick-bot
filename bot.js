@@ -689,7 +689,37 @@ async function checkLiveStatus() {
   db.setBotStatus('last_live_check_at', Date.now().toString()).catch(()=>{});
 
   if (!data) {
-    console.log('[STREAM] Impossible de vérifier le statut live (API officielle et interne indisponibles) — statut conservé:', isLive ? 'LIVE' : 'OFF');
+    // API Kick bloquée par Cloudflare depuis Render — on lit le statut live
+    // depuis le panel (qui le reçoit du navigateur toutes les 30s)
+    try {
+      const PORT = parseInt(process.env.PANEL_PORT || '3000');
+      const r = await axios.get(`http://localhost:${PORT}/api/live`, { timeout: 3000 });
+      if (r.data && typeof r.data.live === 'boolean') {
+        const liveNow = r.data.live;
+        const wasLive = isLive;
+        isLive = liveNow;
+        db.setBotStatus('last_live_check_source', 'browser_relay').catch(()=>{});
+        db.setBotStatus('is_live', isLive ? '1' : '0').catch(()=>{});
+        console.log(`[STREAM] Statut via navigateur → is_live=${isLive}`);
+        if (isLive && !wasLive) {
+          streamStartTime = Date.now();
+          db.setBotStatus('stream_started_at', streamStartTime.toString()).catch(()=>{});
+          if (!currentSessionId) startSession();
+          startAnnouncements();
+          startPointsTracker();
+        } else if (!isLive && wasLive) {
+          if (currentSessionId) {
+            const dur = sessionStart ? Math.floor((Date.now()-sessionStart)/60000) : 0;
+            db.endSession(currentSessionId, peakViewers, dur);
+            currentSessionId = null;
+          }
+          if (pointsInterval) { clearInterval(pointsInterval); pointsInterval = null; }
+        }
+        return isLive;
+      }
+    } catch(e) { /* panel pas encore prêt */ }
+
+    console.log('[STREAM] Impossible de vérifier le statut live — statut conservé:', isLive ? 'LIVE' : 'OFF');
     db.setBotStatus('last_live_check_source', 'failed').catch(()=>{});
     db.setBotStatus('is_live', isLive ? '1' : '0').catch(()=>{});
     return isLive;
