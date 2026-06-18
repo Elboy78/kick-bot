@@ -781,6 +781,31 @@ Option 3" rows="4"></textarea><div style="display:flex;gap:6px;margin-top:10px">
           <button class="btnx btn-outline" style="width:100%;justify-content:center;margin-top:12px" onclick="savePointsConfig()">💾 Enregistrer</button>
           <div id="points-config-msg" style="margin-top:7px"></div>
         </div>
+
+        <div class="panel" style="margin-bottom:14px">
+          <h3>🔔 Annonce de follow</h3>
+          <div style="font-size:10px;color:var(--muted);margin-bottom:10px;line-height:1.6">
+            Quand quelqu'un follow ta chaîne, le bot envoie un message dans le chat. Utilise <code style="background:var(--card2);padding:1px 4px;border-radius:4px">{username}</code> pour mentionner le nouveau follower.
+          </div>
+          <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--brd);margin-bottom:10px">
+            <div>
+              <div style="font-size:12px;font-weight:600">Activer l'annonce de follow</div>
+              <div style="font-size:10px;color:var(--muted);margin-top:2px">Le bot annonce chaque nouveau follower dans le chat</div>
+            </div>
+            <label class="switch"><input type="checkbox" id="follow-announce-toggle" onchange="saveFollowAnnounce()"><span class="slider"></span></label>
+          </div>
+          <label class="lbl">Message d'annonce</label>
+          <textarea class="inp" id="follow-announce-message" rows="3" placeholder="Merci pour le follow @{username} ! Bienvenue 🎉" style="resize:vertical;min-height:64px" oninput="clearTimeout(this._t);this._t=setTimeout(()=>saveFollowAnnounce(),800)"></textarea>
+          <div style="font-size:9px;color:var(--muted);margin-top:4px">Aperçu : <span id="follow-preview" style="color:var(--text)"></span></div>
+          <div id="follow-announce-msg" style="margin-top:7px"></div>
+          <div style="margin-top:10px;padding:10px;background:var(--card2);border:1px solid var(--brd);border-radius:8px;font-size:10px;color:var(--muted);line-height:1.7">
+            <b style="color:var(--text)">⚙️ Configuration requise</b><br>
+            Pour recevoir les events de follow, ajoute ce webhook dans <a href="https://kick.com/settings/developer" target="_blank" style="color:var(--accent)">kick.com/settings/developer</a> → Event Subscriptions :<br>
+            <code style="background:var(--card);padding:2px 6px;border-radius:4px;color:var(--accent);font-size:9px;display:block;margin-top:4px;word-break:break-all">https://kick-bot-agkk.onrender.com/webhook/kick</code>
+            <span style="margin-top:4px;display:block">Événement à cocher : <b>channel.followed</b></span>
+          </div>
+        </div>
+
         <div class="panel"><h3>🤖 Fonctionnalités du bot <button class="btnx btn-ghost btn-sm" onclick="loadBotFeatures()">↻</button></h3><div style="font-size:10px;color:#a1a1aa;margin-bottom:10px">Active ou désactive chaque fonctionnalité en un clic.</div><div id="bot-features-list"><div class="empty"><p>Chargement…</p></div></div></div>
       </div>
       <div>
@@ -3022,6 +3047,39 @@ function initSettings() {
   loadBotFeatures();
   loadOAuthStatus();
   loadPointsConfig();
+  loadFollowAnnounce();
+}
+
+async function loadFollowAnnounce() {
+  try {
+    const r = await fetch('/api/follow-announce');
+    const d = await r.json();
+    const toggle = document.getElementById('follow-announce-toggle');
+    const msgEl  = document.getElementById('follow-announce-message');
+    if (toggle) toggle.checked = d.enabled !== false;
+    if (msgEl)  msgEl.value = d.message || 'Merci pour le follow @{username} ! Bienvenue dans la communauté 🎉';
+    updateFollowPreview();
+  } catch(e) {}
+}
+
+function updateFollowPreview() {
+  const msgEl   = document.getElementById('follow-announce-message');
+  const preview = document.getElementById('follow-preview');
+  if (!msgEl || !preview) return;
+  preview.textContent = msgEl.value.replace(/\{username\}/gi, 'PseudoExemple');
+}
+
+async function saveFollowAnnounce() {
+  const toggle  = document.getElementById('follow-announce-toggle');
+  const msgEl   = document.getElementById('follow-announce-message');
+  if (!msgEl) return;
+  updateFollowPreview();
+  const r = await fetch('/api/admin/follow-announce', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ enabled: toggle?.checked ?? true, message: msgEl.value.trim() })
+  });
+  if (r.ok) showInline('follow-announce-msg', '✅ Sauvegardé', true);
+  else showInline('follow-announce-msg', 'Erreur lors de la sauvegarde', false);
 }
 
 async function loadPointsConfig() {

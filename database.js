@@ -838,6 +838,16 @@ async function setSetting(key, enabled) {
     [key, enabled ? '1' : '0', enabled ? '1' : '0']);
 }
 
+async function getSettingStr(key, defaultVal = '') {
+  const r = await get(`SELECT value FROM bot_settings WHERE key = ?`, [key]);
+  return r ? r.value : defaultVal;
+}
+
+async function setSettingStr(key, value) {
+  await run(`INSERT INTO bot_settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = ?, updated_at = datetime('now')`,
+    [key, value, value]);
+}
+
 // ─── System Commands ──────────────────────────────────────────────────────────
 
 async function initSystemCommandsState(commands) {
@@ -1029,7 +1039,7 @@ module.exports = {
   initPanelAccess, requestAccess, getAccessStatus, getAllAccessRequests,
   approveAccess, revokeAccess, deleteAccessRequest,
   initSystemCommandsState, isSystemCmdEnabled, getAllSystemCommandsState, toggleSystemCommand,
-  getAllSettings, getSetting, setSetting, DEFAULT_SETTINGS,
+  getAllSettings, getSetting, setSetting, getSettingStr, setSettingStr, DEFAULT_SETTINGS,
   getBannedWords, addBannedWord, deleteBannedWord, toggleBannedWord, checkBannedWords,
   getQuotes, addQuote, getRandomQuote, deleteQuote,
   getCounters, getCounter, setCounter, incrementCounter, deleteCounter,

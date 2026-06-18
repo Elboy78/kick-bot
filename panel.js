@@ -61,6 +61,68 @@ app.get('/api/channel-info', (req, res) => {
   res.json({ channel: process.env.KICK_CHANNEL || 'fack7up' });
 });
 
+// ── Follow Announce ────────────────────────────────────────────────────────────
+
+const DEFAULT_FOLLOW_MSG = 'Merci pour le follow @{username} ! Bienvenue dans la communauté 🎉';
+
+app.get('/api/follow-announce', async (req, res) => {
+  try {
+    const enabled = await db.getSetting('follow_announce_enabled');
+    const message = await db.getSettingStr('follow_announce_message', DEFAULT_FOLLOW_MSG);
+    res.json({ enabled, message });
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+app.post('/api/admin/follow-announce', async (req, res) => {
+  try {
+    const { enabled, message } = req.body;
+    if (typeof enabled === 'boolean') await db.setSetting('follow_announce_enabled', enabled);
+    if (typeof message === 'string' && message.trim()) {
+      await db.setSettingStr('follow_announce_message', message.trim());
+    }
+    res.json({ success: true });
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+// Webhook officiel Kick — reçu à chaque nouveau follow
+// À configurer sur : kick.com/settings/developer → Event Subscriptions → channel.followed
+// URL à renseigner : https://kick-bot-agkk.onrender.com/webhook/kick
+app.post('/webhook/kick', async (req, res) => {
+  try {
+    // Kick signe les webhooks avec un header — on accepte tous pour l'instant
+    // (la vérification de signature peut être ajoutée avec KICK_WEBHOOK_SECRET)
+    const event = req.body;
+    const eventType = event?.event || event?.type || '';
+    console.log('[WEBHOOK KICK]', eventType, JSON.stringify(event).slice(0, 200));
+
+    if (eventType === 'channel.followed' || eventType === 'ChannelFollowed') {
+      const username = event?.data?.user?.username
+                    || event?.data?.follower?.username
+                    || event?.data?.username
+                    || 'quelqu\'un';
+
+      const enabled = await db.getSetting('follow_announce_enabled');
+      if (!enabled) return res.json({ ok: true, skipped: 'disabled' });
+
+      const template = await db.getSettingStr('follow_announce_message', DEFAULT_FOLLOW_MSG);
+      const message  = template.replace(/\{username\}/gi, '@' + username)
+                                .replace(/@\{username\}/gi, '@' + username);
+
+      // Envoyer dans le chat via le bot
+      const { sendChat } = require('./bot');
+      if (typeof sendChat === 'function') {
+        await sendChat(message);
+        console.log(`[FOLLOW] Annonce envoyée pour ${username}`);
+      }
+    }
+
+    res.json({ ok: true });
+  } catch(e) {
+    console.error('[WEBHOOK KICK] Erreur:', e.message);
+    res.status(500).json({ error: e.message });
+  }
+});
+
 // Proxy de téléchargement — récupère le .mp4 depuis les CDN Kick et le renvoie
 // au navigateur avec Content-Disposition: attachment pour forcer le téléchargement.
 // Nécessaire car les CDN Kick bloquent le téléchargement direct depuis un navigateur

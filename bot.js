@@ -9,7 +9,7 @@ const db       = require('./database');
 const kickOAuth = require('./kick-oauth');
 
 const CONFIG = {
-  channel:      process.env.KICK_CHANNEL       || 'fack7up',
+  channel:      process.env.KICK_CHANNEL       || 'votre_chaine',
   channelId:    process.env.KICK_CHANNEL_ID    || '0',
   token:        process.env.KICK_TOKEN         || '',
   botUsername:  process.env.BOT_USERNAME       || 'bot',
@@ -814,3 +814,5 @@ init().catch(err => {
 
 process.on('SIGINT',  () => { cleanup(); process.exit(0); });
 process.on('SIGTERM', () => { cleanup(); process.exit(0); });
+
+module.exports = { sendChat };
