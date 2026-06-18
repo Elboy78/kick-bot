@@ -203,6 +203,16 @@ async function initSchema() {
       enabled    INTEGER NOT NULL DEFAULT 1,
       created_at TEXT NOT NULL DEFAULT (datetime('now'))
     )`,
+    `CREATE TABLE IF NOT EXISTS vod_moments (
+      id          INTEGER PRIMARY KEY AUTOINCREMENT,
+      vod_id      TEXT NOT NULL,
+      vod_title   TEXT NOT NULL DEFAULT '',
+      vod_url     TEXT NOT NULL DEFAULT '',
+      timestamp_s INTEGER NOT NULL DEFAULT 0,
+      label       TEXT NOT NULL DEFAULT '',
+      category    TEXT NOT NULL DEFAULT 'moment',
+      created_at  TEXT NOT NULL DEFAULT (datetime('now'))
+    )`,
     `CREATE TABLE IF NOT EXISTS command_usage (
       id         INTEGER PRIMARY KEY AUTOINCREMENT,
       trigger    TEXT NOT NULL,
@@ -485,6 +495,24 @@ async function endSession(id, peakViewers, durationMin) {
 
 async function getStreamHistory(limit = 10) {
   return all(`SELECT * FROM stream_sessions WHERE ended_at IS NOT NULL ORDER BY started_at DESC LIMIT ?`, [limit]);
+}
+
+// ─── Analytics : usage des commandes & activité du chat ────────────────────────
+
+// ─── VOD Moments (moments marqués sur les replays Kick) ───────────────────────
+
+async function getVodMoments(vodId) {
+  if (vodId) return all(`SELECT * FROM vod_moments WHERE vod_id = ? ORDER BY timestamp_s ASC`, [vodId]);
+  return all(`SELECT * FROM vod_moments ORDER BY created_at DESC`);
+}
+async function addVodMoment(vodId, vodTitle, vodUrl, timestampS, label, category) {
+  const r = await run(`INSERT INTO vod_moments (vod_id, vod_title, vod_url, timestamp_s, label, category) VALUES (?, ?, ?, ?, ?, ?)`,
+    [vodId, vodTitle || '', vodUrl || '', timestampS || 0, label || '', category || 'moment']);
+  return r;
+}
+async function deleteVodMoment(id) { await run(`DELETE FROM vod_moments WHERE id = ?`, [id]); }
+async function updateVodMomentLabel(id, label, category) {
+  await run(`UPDATE vod_moments SET label = ?, category = ? WHERE id = ?`, [label, category, id]);
 }
 
 // ─── Analytics : usage des commandes & activité du chat ────────────────────────
@@ -994,6 +1022,7 @@ module.exports = {
   getObjectives, createObjective, deleteObjective, achieveObjective,
   startSession, endSession, getStreamHistory, recordViewerSample, getSessionsWithAvgViewers,
   logCommandUsage, getCommandUsageStats, logChatActivity, getChatActivityWeek,
+  getVodMoments, addVodMoment, deleteVodMoment, updateVodMomentLabel,
   createDuel, getPendingDuel, resolveDuel, cancelDuel, getRecentDuels,
   createGiveaway, getActiveGiveaway, joinGiveaway, closeGiveaway, getGiveawayHistory,
   getLobby, joinLobby, removeFromLobby, clearLobby,

@@ -51,6 +51,48 @@ app.get('/api/viewer/:u',      waitDB,      async (req,res) => { try { const v=a
 app.get('/api/stats',          waitDB,          async (req,res) => { try { res.json({data: await db.getGlobalStats()}); } catch(e){res.json({data:{}}); }});
 app.get('/api/logs',           waitDB,           async (req,res) => { try { res.json({data: await db.getRecentLogs(Math.min(parseInt(req.query.limit||50),500))}); } catch(e){res.json({data:[]}); }});
 app.get('/api/active',         async (req,res) => { try { res.json({data: await db.getActiveViewers(parseInt(req.query.minutes||10))}); } catch(e){res.json({data:[]}); }});
+// ── VODs & Moments ─────────────────────────────────────────────────────────────
+
+// Proxy pour récupérer les VODs Kick — évite les problèmes CORS depuis le navigateur
+app.get('/api/vods', async (req, res) => {
+  try {
+    const channel = process.env.KICK_CHANNEL || 'fack7up';
+    const page = parseInt(req.query.page) || 1;
+    const r = await axios.get(`https://kick.com/api/v2/channels/${channel}/videos`, {
+      params: { page, limit: 12, sort: 'desc' },
+      headers: {
+        'Accept': 'application/json',
+        'Accept-Language': 'en-US',
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120.0.0.0',
+      },
+      timeout: 10000,
+    });
+    res.json({ data: r.data?.data || r.data || [], meta: r.data?.meta || null });
+  } catch(e) {
+    console.error('[VOD] Erreur API Kick:', e.response?.status || e.message);
+    res.json({ data: [], error: 'API Kick indisponible' });
+  }
+});
+
+// CRUD moments
+app.get('/api/vod-moments',       async (req,res) => { try { res.json({data: await db.getVodMoments(req.query.vod_id||null)}); } catch(e){res.json({data:[]});} });
+app.post('/api/admin/vod-moments', async (req,res) => {
+  try {
+    const { vodId, vodTitle, vodUrl, timestampS, label, category } = req.body;
+    if (!vodId) return res.status(400).json({ error: 'vodId requis' });
+    await db.addVodMoment(vodId, vodTitle, vodUrl, timestampS, label, category);
+    res.json({ success: true });
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+app.put('/api/admin/vod-moments/:id', async (req,res) => {
+  try { await db.updateVodMomentLabel(req.params.id, req.body.label, req.body.category); res.json({success:true}); }
+  catch(e) { res.status(500).json({ error: e.message }); }
+});
+app.delete('/api/admin/vod-moments/:id', async (req,res) => {
+  try { await db.deleteVodMoment(req.params.id); res.json({success:true}); }
+  catch(e) { res.status(500).json({ error: e.message }); }
+});
+
 app.get('/api/analytics/commands',  async (req,res) => { try { res.json({data: await db.getCommandUsageStats(7)}); } catch(e) { res.json({data:[]}); }});
 app.get('/api/analytics/chat-week', async (req,res) => { try { res.json({data: await db.getChatActivityWeek()}); } catch(e) { res.json({data:[]}); }});
 app.get('/api/analytics/sessions-viewers', async (req,res) => { try { res.json({data: await db.getSessionsWithAvgViewers(14)}); } catch(e) { res.json({data:[]}); }});
