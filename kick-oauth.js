@@ -11,8 +11,9 @@ const CLIENT_ID     = process.env.KICK_CLIENT_ID || '';
 const CLIENT_SECRET = process.env.KICK_CLIENT_SECRET || '';
 const REDIRECT_URI  = process.env.KICK_REDIRECT_URI || '';
 
-// PKCE en mémoire — un seul flow de login à la fois (suffisant pour un panel admin solo)
-let pendingPKCE = null; // { codeVerifier, state }
+// PKCE persisté en DB — survit aux redémarrages Render
+// (bot_status réutilisé car c'est une table clé-valeur générique)
+let pendingPKCE = null; // cache mémoire + DB
 
 function base64url(buffer) {
   return buffer.toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
@@ -32,6 +33,10 @@ function isConfigured() {
 function getAuthorizationUrl(scopes) {
   const { codeVerifier, codeChallenge, state } = generatePKCE();
   pendingPKCE = { codeVerifier, state, createdAt: Date.now() };
+  // Persister en DB pour survivre aux redémarrages
+  db.setBotStatus('pkce_code_verifier', codeVerifier).catch(()=>{});
+  db.setBotStatus('pkce_state', state).catch(()=>{});
+  db.setBotStatus('pkce_created_at', String(Date.now())).catch(()=>{});
 
   const params = new URLSearchParams({
     response_type: 'code',
@@ -47,11 +52,32 @@ function getAuthorizationUrl(scopes) {
 }
 
 async function exchangeCodeForToken(code, state) {
-  if (!pendingPKCE || pendingPKCE.state !== state) {
-    throw new Error('État OAuth invalide ou expiré — relance la connexion depuis le panel.');
+  // Essayer d'abord le cache mémoire, puis la DB (si Render a redémarré entre login et callback)
+  let pkce = pendingPKCE;
+  if (!pkce || pkce.state !== state) {
+    // Render a peut-être redémarré — on relit depuis la DB
+    const storedState   = await db.getBotStatus('pkce_state').then(r => r?.value).catch(() => null);
+    const storedVerifier = await db.getBotStatus('pkce_code_verifier').then(r => r?.value).catch(() => null);
+    const storedAt       = await db.getBotStatus('pkce_created_at').then(r => parseInt(r?.value||'0')).catch(() => 0);
+
+    if (storedState && storedState === state && storedVerifier) {
+      // Valide si moins de 10 minutes (sécurité)
+      if (Date.now() - storedAt < 600000) {
+        pkce = { codeVerifier: storedVerifier, state: storedState };
+        console.log('[OAUTH] PKCE récupéré depuis la DB après redémarrage Render ✓');
+      } else {
+        throw new Error('PKCE expiré (> 10 min) — relance la connexion depuis le panel.');
+      }
+    } else {
+      throw new Error(`État OAuth invalide — state reçu: ${state}, state DB: ${storedState}. Relance la connexion.`);
+    }
   }
-  const codeVerifier = pendingPKCE.codeVerifier;
+
+  const codeVerifier = pkce.codeVerifier;
   pendingPKCE = null;
+  // Nettoyer la DB
+  db.setBotStatus('pkce_code_verifier', '').catch(()=>{});
+  db.setBotStatus('pkce_state', '').catch(()=>{});
 
   const axios = require('axios');
   const response = await axios.post(
@@ -70,6 +96,7 @@ async function exchangeCodeForToken(code, state) {
   const data = response.data;
   const expiresAt = Date.now() + (data.expires_in * 1000);
   await db.saveOAuthToken(PROVIDER, data.access_token, data.refresh_token, expiresAt);
+  console.log('[OAUTH] Token Kick sauvegardé en DB ✓');
   return data.access_token;
 }
 
