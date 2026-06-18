@@ -1546,10 +1546,9 @@ async function loadLiveStatus() {
     const live      = !!d.livestream;
     const viewers   = d.livestream?.viewer_count ?? 0;
     const followers = d.followersCount ?? d.followers_count ?? 0;
-    // Timestamp réel de démarrage du live fourni par Kick — persist entre les refreshs
+    // Timestamp réel de démarrage du live fourni par Kick — toujours mis à jour
     const streamStartedAt = live && d.livestream?.created_at ? new Date(d.livestream.created_at).getTime() : null;
-    if (streamStartedAt) window._streamStart = streamStartedAt;
-    else if (!live) window._streamStart = null;
+    window._streamStart = streamStartedAt; // null si hors ligne, timestamp exact si en live
 
     updateLiveUI(live, viewers, followers);
 
