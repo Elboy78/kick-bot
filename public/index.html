@@ -2343,6 +2343,8 @@ async function loadVods() {
       const items = json.data || json || [];
       if (!Array.isArray(items) || !items.length) break;
       allVodsData.push(...items);
+      // Log du 1er VOD pour voir les champs d'ID disponibles
+      if (p === 1 && items.length > 0) console.log('[VOD DEBUG]', JSON.stringify(items[0], null, 2));
       // Arrêt si la dernière vidéo a plus d'un mois
       const lastDate = new Date(items[items.length-1].created_at || 0).getTime();
       if (Date.now() - lastDate > 31*86400000) break;
