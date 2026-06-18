@@ -2486,39 +2486,66 @@ async function downloadClip(clipId, videoUrl, filename) {
 
   toast('🔍 Récupération du lien MP4…');
 
-  // Étape 1 : si on n'a pas d'URL directe, on l'obtient via l'API Kick (depuis le navigateur)
+  // Étape 1 : récupérer l'URL .mp4 directe via l'API Kick
   let mp4Url = videoUrl;
-  if (!mp4Url || !mp4Url.includes('.mp4')) {
-    try {
-      const r = await fetch(`https://kick.com/api/v2/clips/${clipId}`,
-        { headers: { 'Accept':'application/json','Accept-Language':'en-US' } });
-      if (r.ok) {
-        const data = await r.json();
-        const clip = data.clip || data;
-        // On logue tous les champs pour identifier le bon — visible dans la console F12
-        console.log('[CLIP DETAIL]', JSON.stringify(clip, null, 2));
-        mp4Url = clip.video_url || clip.stream || clip.source || clip.mp4_url
-               || clip.download_url || clip.clip_url || '';
-      }
-    } catch(e) { console.error('[CLIP DL]', e); }
-  }
+  try {
+    const r = await fetch(`https://kick.com/api/v2/clips/${clipId}`,
+      { headers: { 'Accept':'application/json','Accept-Language':'en-US' } });
+    if (r.ok) {
+      const data = await r.json();
+      const clip = data.clip || data;
+      // Log complet pour debug — visible dans F12 > Console
+      console.log('[CLIP DETAIL] Champs disponibles:', Object.keys(clip));
+      console.log('[CLIP DETAIL] Complet:', JSON.stringify(clip, null, 2));
+      // Tenter tous les champs possibles
+      mp4Url = clip.video_url || clip.stream || clip.source || clip.mp4_url
+             || clip.download_url || clip.url || clip.file_url
+             || clip.clip_url || clip.playback_url || videoUrl || '';
+      console.log('[CLIP DETAIL] URL choisie:', mp4Url);
+    }
+  } catch(e) { console.error('[CLIP DL fetch]', e); }
 
   if (!mp4Url) {
-    toast('URL MP4 introuvable — ouverture du clip sur Kick', false);
-    window.open(`https://kick.com/${activeKickChannel}/clips/${clipId}`, '_blank');
+    toast('URL MP4 introuvable. Ouvre F12 > Console pour voir [CLIP DETAIL]', false);
     return;
   }
 
-  // Étape 2 : téléchargement via le proxy serveur pour contourner les restrictions CORS
-  // Le serveur fetch le .mp4 et le renvoie au navigateur avec Content-Disposition: attachment
+  toast('⬇️ Téléchargement en cours…');
+
+  // Étape 2 : passer par le proxy serveur
   const proxyUrl = `/api/proxy-download?url=${encodeURIComponent(mp4Url)}&filename=${encodeURIComponent(filename + '.mp4')}`;
-  const a = document.createElement('a');
-  a.href = proxyUrl;
-  a.download = filename + '.mp4';
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  toast('⬇️ Téléchargement en cours… ' + filename + '.mp4');
+
+  // Vérifier d'abord que le proxy retourne bien une vidéo (pas une erreur JSON)
+  try {
+    const check = await fetch(proxyUrl, { method: 'GET' });
+    const ct = check.headers.get('content-type') || '';
+
+    if (!ct.includes('video') && !ct.includes('octet-stream')) {
+      // Erreur côté proxy — afficher le message
+      const errJson = await check.json().catch(() => ({ error: 'Réponse invalide du serveur' }));
+      console.error('[PROXY DL] Erreur:', errJson);
+      toast('Impossible de télécharger — ouvre F12 > Console pour le détail', false);
+      // Fallback : ouvrir sur Kick
+      window.open(`https://kick.com/${activeKickChannel}/clips/${clipId}`, '_blank');
+      return;
+    }
+
+    // C'est bien une vidéo — déclencher le téléchargement
+    const blob = await check.blob();
+    const blobUrl = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = blobUrl;
+    a.download = filename + '.mp4';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(blobUrl), 10000);
+    toast('✅ ' + filename + '.mp4 téléchargé !');
+
+  } catch(e) {
+    console.error('[CLIP DL proxy]', e);
+    toast('Erreur réseau — réessaie', false);
+  }
 }
 
 function triggerDownload(url, filename) {

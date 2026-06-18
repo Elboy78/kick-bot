@@ -73,34 +73,62 @@ app.get('/api/proxy-download', async (req, res) => {
 
   // Sécurité : n'autoriser que les URLs venant des CDN Kick
   const allowedHosts = ['kick.com', 'clips.kick.com', 'cdn.kick.com', 'stream.kick.com',
-                        'cloudfront.net', 'akamaized.net', 'fastly.net', 'amazonaws.com'];
+                        'cloudfront.net', 'akamaized.net', 'fastly.net', 'amazonaws.com',
+                        'edgedelivery.net', 'kickcontent.com'];
   let parsedUrl;
   try { parsedUrl = new URL(url); } catch(e) { return res.status(400).json({ error: 'URL invalide' }); }
   const hostOk = allowedHosts.some(h => parsedUrl.hostname.endsWith(h));
-  if (!hostOk) return res.status(403).json({ error: 'Domaine non autorisé' });
+  if (!hostOk) return res.status(403).json({ error: 'Domaine non autorisé: ' + parsedUrl.hostname });
 
   try {
     const upstream = await axios.get(url, {
-      responseType: 'stream',
+      responseType: 'arraybuffer',  // Buffer complet pour vérifier le contenu avant d'envoyer
       timeout: 60000,
       headers: {
-        'Accept': '*/*',
+        'Accept': 'video/mp4,video/*,*/*',
         'Accept-Language': 'en-US',
         'Referer': 'https://kick.com/',
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120.0.0.0',
+        'Origin': 'https://kick.com',
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120.0.0.0 Safari/537.36',
       },
-      maxRedirects: 5,
+      maxRedirects: 10,
     });
 
-    res.setHeader('Content-Type', upstream.headers['content-type'] || 'video/mp4');
-    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
-    if (upstream.headers['content-length']) {
-      res.setHeader('Content-Length', upstream.headers['content-length']);
+    const contentType = upstream.headers['content-type'] || '';
+    const buffer = Buffer.from(upstream.data);
+
+    console.log(`[PROXY DL] URL: ${url.slice(0,80)} | Content-Type: ${contentType} | Size: ${buffer.length} bytes`);
+
+    // Vérifier que c'est bien une vidéo (magic bytes MP4: ftyp à l'offset 4)
+    const isVideo = contentType.includes('video') ||
+                    contentType.includes('octet-stream') ||
+                    (buffer.length > 8 && buffer.slice(4, 8).toString('ascii') === 'ftyp') ||
+                    (buffer.length > 8 && buffer.slice(4, 8).toString('ascii') === 'mdat');
+
+    if (!isVideo) {
+      // Ce n'est pas une vidéo — logguer ce qu'on a reçu pour debug
+      console.error(`[PROXY DL] Pas une vidéo! Content-Type: ${contentType}. Début du contenu:`, buffer.slice(0,200).toString('utf8'));
+      return res.status(502).json({
+        error: 'Kick n\'a pas retourné un fichier vidéo',
+        contentType,
+        hint: 'Vérifie la console du navigateur (F12) pour voir [CLIP DETAIL] et trouver le bon champ URL'
+      });
     }
-    upstream.data.pipe(res);
+
+    res.setHeader('Content-Type', 'video/mp4');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.setHeader('Content-Length', buffer.length);
+    res.send(buffer);
+
   } catch(e) {
-    console.error('[PROXY DL] Erreur:', e.response?.status || e.message);
-    if (!res.headersSent) res.status(500).json({ error: 'Erreur lors du téléchargement' });
+    console.error('[PROXY DL] Erreur:', e.response?.status, e.message);
+    if (!res.headersSent) {
+      res.status(500).json({
+        error: 'Erreur lors du téléchargement',
+        status: e.response?.status,
+        message: e.message
+      });
+    }
   }
 });
 
