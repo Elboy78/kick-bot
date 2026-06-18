@@ -2375,7 +2375,9 @@ function buildVodCard(v) {
   const title   = esc(v.session_title || v.title || 'Sans titre');
   const thumb   = v.thumbnail?.src || (typeof v.thumbnail === 'string' ? v.thumbnail : '');
   const dur     = fmtVodDuration(v.duration);
-  const vodUrl  = vodId ? `https://kick.com/${activeKickChannel}/videos/${vodId}` : `https://kick.com/${activeKickChannel}/videos`;
+  // v.slug = UUID+titre ex: 'fa404b89-aller-cr7-...' → kick.com/{channel}/videos/{slug}
+  const vodSlug = v.slug || '';
+  const vodUrl  = vodSlug ? `https://kick.com/${activeKickChannel}/videos/${vodSlug}` : `https://kick.com/${activeKickChannel}/videos`;
   const date    = v.created_at ? new Date(v.created_at).toLocaleDateString('fr-FR',{day:'2-digit',month:'short',year:'numeric'}) : '';
   const views   = (v.views||0) > 0 ? (v.views).toLocaleString('fr') + ' vues' : '';
   const safe    = title.replace(/`/g,"'");
@@ -2390,7 +2392,7 @@ function buildVodCard(v) {
       <div style="display:flex;gap:6px">
         <a href="${esc(vodUrl)}" target="_blank" class="btnx btn-outline btn-sm" style="flex:1;justify-content:center;text-decoration:none">▶️ Voir</a>
         <a href="https://kick-video.download/?url=${encodeURIComponent(vodUrl)}" target="_blank" class="btnx btn-ghost btn-sm" style="text-decoration:none" title="Télécharger">⬇️</a>
-        <button class="btnx btn-ghost btn-sm" title="Marquer un moment" onclick="prefillMoment('${esc(String(vodUuid))}','${safe}','${esc(vodUrl)}')">📌</button>
+        <button class="btnx btn-ghost btn-sm" title="Marquer un moment" onclick="prefillMoment('${esc(String(vodSlug||vodId))}','${safe}','${esc(vodUrl)}')">📌</button>
       </div>
     </div>
   </div>`;
