@@ -20,7 +20,7 @@ const CONFIG = {
 };
 
 const PUSHER_URL = 'wss://ws-us2.pusher.com/app/32cbd69e4b950bf97679?protocol=7&client=js&version=7.4.0&flash=false';
-const SYSTEM_COMMANDS = ['!points','!top','!rang','!niveau','!aide','!duel','!accepter','!refuser','!participer','!giveaway','!lobby','!quote','!addquote','!mort','!death','!score','!queue','!join','!leave','!pos','!vote','!sondage','!so','!uptime','!dice','!des','!rps','!pfc'];
+const SYSTEM_COMMANDS = ['!points','!top','!rang','!niveau','!aide','!duel','!accepter','!refuser','!participer','!giveaway','!lobby','!quote','!addquote','!mort','!death','!score','!queue','!join','!leave','!pos','!vote','!sondage','!so','!uptime','!dice','!des','!rps','!pfc','!clip'];
 
 let ws             = null;
 let reconnectDelay = 5000;
@@ -226,6 +226,7 @@ async function handleChatMessage(payload) {
       case '!sondage':   return (await db.getSetting('poll_enabled')) ? cmdPollInfo(username) : null;
       case '!so':        return (await db.getSetting('shoutout_enabled')) ? cmdShoutout(username, parts) : null;
       case '!uptime':    return (await db.getSetting('uptime_enabled')) ? cmdUptime(username) : null;
+      case '!clip':      return (await db.getSetting('clip_enabled')) ? cmdClip(username, parts) : null;
       case '!dice':
       case '!des':       return (await db.getSetting('dice_enabled')) ? cmdDice(username, parts) : null;
       case '!rps':
@@ -463,6 +464,35 @@ async function cmdUptime(username) {
   const s = diff % 60;
   const time = h > 0 ? `${h}h ${m}min` : m > 0 ? `${m}min ${s}s` : `${s}s`;
   sendChat(`⏱ Le stream est en ligne depuis ${time}`);
+}
+
+async function cmdClip(username, parts) {
+  if (!isLive || !streamStartTime) {
+    return sendChat(`@${username} Impossible de créer un clip — le stream n'est pas en ligne.`);
+  }
+
+  // Timestamp actuel dans le stream (secondes depuis le début)
+  const timestampS = Math.floor((Date.now() - streamStartTime) / 1000);
+  // Label optionnel passé par l'utilisateur : !clip moment drôle
+  const label = parts.slice(1).join(' ').trim() || `Clip de ${username}`;
+
+  try {
+    // On récupère l'ID du stream actuel depuis bot_status pour construire l'URL du replay
+    const vodUuid = await db.getSettingStr('current_vod_uuid', '');
+    const channel  = CONFIG.channel;
+    const vodUrl   = vodUuid ? `https://kick.com/${channel}/videos/${vodUuid}` : '';
+    const vodTitle = await db.getSettingStr('current_stream_title', 'Stream en cours');
+
+    await db.addVodMoment('live', vodTitle, vodUrl, timestampS, label, 'clip');
+
+    const h = Math.floor(timestampS/3600), m = Math.floor((timestampS%3600)/60), s = timestampS%60;
+    const ts = h > 0 ? `${h}h${String(m).padStart(2,'0')}m${String(s).padStart(2,'0')}s` : `${m}m${String(s).padStart(2,'0')}s`;
+    sendChat(`✂️ Clip marqué à ${ts} par @${username} — visible dans le panel VODs !`);
+    console.log(`[CLIP] Marqué à ${ts} par ${username}: "${label}"`);
+  } catch(e) {
+    console.error('[CLIP] Erreur:', e.message);
+    sendChat(`@${username} Erreur lors du marquage du clip.`);
+  }
 }
 
 // ─── Dice / RPS ───────────────────────────────────────────────────────────────
@@ -735,6 +765,11 @@ async function checkLiveStatus() {
     console.log('[STREAM] Stream démarré !');
     streamStartTime = Date.now();
     db.setBotStatus('stream_started_at', streamStartTime.toString()).catch(()=>{});
+    // Sauvegarder titre et UUID du stream pour les clips marqués depuis le chat
+    const title = data?.session_title || data?.livestream?.session_title || 'Stream';
+    const vodUuid = data?.video?.uuid || data?.livestream?.video?.uuid || '';
+    db.setSettingStr('current_stream_title', title).catch(()=>{});
+    db.setSettingStr('current_vod_uuid', vodUuid).catch(()=>{});
     if (!currentSessionId) startSession();
     startAnnouncements();
     startPointsTracker(); // ← déclencher le tracker dès la détection du live

@@ -815,6 +815,7 @@ const DEFAULT_SETTINGS = {
   'announcements_enabled': { label: 'Annonces automatiques', desc: 'Messages automatiques pendant le live', category: 'Chat' },
   'moderation_enabled': { label: 'Modération automatique', desc: 'Ban/timeout sur mots bannis', category: 'Modération' },
   'uptime_enabled':     { label: 'Commande uptime', desc: 'Permet aux viewers de voir la duree du stream avec !uptime', category: 'Chat' },
+  'clip_enabled':       { label: 'Commande !clip', desc: 'Permet aux viewers de marquer un moment avec !clip [description]', category: 'Chat' },
   'tts_enabled':        { label: 'TTS Donations', desc: 'Lit les messages de dons à voix haute sur l overlay', category: 'TTS' },
 };
 
