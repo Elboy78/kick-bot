@@ -500,6 +500,13 @@ hr.div{border:none;border-top:1px solid var(--brd);margin:12px 0}
   <!-- ══ COMMANDES ══ -->
   <div class="page" id="page-commands">
     <div class="header"><div><h1>Commandes</h1><p>Commandes personnalisées et système</p></div></div>
+    <div class="panel" style="margin-bottom:14px;padding:12px 16px;background:rgba(40,255,102,.06);border:1px solid rgba(40,255,102,.2)">
+      <div style="font-size:11px;color:var(--text);line-height:1.7">
+        <b>💬 Tes modérateurs peuvent créer des commandes directement depuis le chat</b><br>
+        <code style="background:var(--card2);padding:1px 6px;border-radius:4px">!addcmd !nom Réponse du bot</code> pour créer ou modifier — <code style="background:var(--card2);padding:1px 6px;border-radius:4px">!delcmd !nom</code> pour supprimer.<br>
+        Réservé aux modérateurs et au broadcaster — apparaît automatiquement ici une fois créée.
+      </div>
+    </div>
     <div class="g2">
       <div><div class="panel" style="margin-bottom:14px"><h3>💬 Commandes personnalisées (<span id="cmd-count">0</span>)</h3><div id="cmd-page-list"><div class="empty"><div class="ei">💬</div><p>Aucune commande</p></div></div></div><div class="panel"><h3>📌 Commandes système <span style="display:flex;align-items:center;gap:6px"><span style="font-size:9px;color:#a1a1aa">Tout</span><label class="toggle"><input type="checkbox" id="all-cmds-toggle" checked onchange="toggleAllCommands(this.checked)"><span class="tsl"></span></label></span></h3><div id="sys-cmd-list"><div class="empty"><p>Chargement…</p></div></div></div></div>
       <div><div class="panel" style="position:sticky;top:20px"><h3>➕ Nouvelle commande</h3><label class="lbl">Trigger (avec le !)</label><input class="inp" id="cmd-page-trigger" placeholder="Ex: !discord" maxlength="30"><label class="lbl">Réponse dans le chat</label><textarea class="inp" id="cmd-page-response" placeholder="Ex: discord.gg/xxx" rows="4"></textarea><div style="font-size:9px;color:#4a4d68;margin-top:3px">@{user} pour mentionner le viewer</div><button class="btnx btn-primary" style="width:100%;justify-content:center;margin-top:12px;padding:8px" onclick="addCmdPage()">➕ Ajouter</button><div id="cmd-page-msg" style="margin-top:7px"></div></div></div>

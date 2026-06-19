@@ -20,7 +20,7 @@ const CONFIG = {
 };
 
 const PUSHER_URL = 'wss://ws-us2.pusher.com/app/32cbd69e4b950bf97679?protocol=7&client=js&version=7.4.0&flash=false';
-const SYSTEM_COMMANDS = ['!points','!top','!rang','!niveau','!aide','!duel','!accepter','!refuser','!participer','!giveaway','!lobby','!quote','!addquote','!mort','!death','!score','!queue','!join','!leave','!pos','!vote','!sondage','!so','!uptime','!dice','!des','!rps','!pfc','!clip'];
+const SYSTEM_COMMANDS = ['!points','!top','!rang','!niveau','!aide','!duel','!accepter','!refuser','!participer','!giveaway','!lobby','!quote','!addquote','!mort','!death','!score','!queue','!join','!leave','!pos','!vote','!sondage','!so','!uptime','!dice','!des','!rps','!pfc','!clip','!addcmd','!delcmd'];
 
 let ws             = null;
 let reconnectDelay = 5000;
@@ -170,6 +170,10 @@ async function handleChatMessage(payload) {
   const kickId   = payload?.sender?.id?.toString() || null;
   if (!username || !content) return;
 
+  // Détection modérateur/broadcaster via les badges Kick (sender.identity.badges)
+  const badges = payload?.sender?.identity?.badges || [];
+  const isModOrBroadcaster = badges.some(b => b.type === 'moderator' || b.type === 'broadcaster');
+
   await db.upsertViewer(username, kickId);
   await db.logChatActivity(username);
   console.log(`[CHAT] ${username}: ${content}`);
@@ -227,6 +231,8 @@ async function handleChatMessage(payload) {
       case '!so':        return (await db.getSetting('shoutout_enabled')) ? cmdShoutout(username, parts) : null;
       case '!uptime':    return (await db.getSetting('uptime_enabled')) ? cmdUptime(username) : null;
       case '!clip':      return (await db.getSetting('clip_enabled')) ? cmdClip(username, parts) : null;
+      case '!addcmd':    return cmdAddCommand(username, parts, isModOrBroadcaster);
+      case '!delcmd':    return cmdDelCommand(username, parts, isModOrBroadcaster);
       case '!dice':
       case '!des':       return (await db.getSetting('dice_enabled')) ? cmdDice(username, parts) : null;
       case '!rps':
@@ -492,6 +498,57 @@ async function cmdClip(username, parts) {
   } catch(e) {
     console.error('[CLIP] Erreur:', e.message);
     sendChat(`@${username} Erreur lors du marquage du clip.`);
+  }
+}
+
+async function cmdAddCommand(username, parts, isModOrBroadcaster) {
+  if (!isModOrBroadcaster) {
+    return sendChat(`@${username} Seuls les modérateurs peuvent créer des commandes.`);
+  }
+  // Format attendu : !addcmd !nomcommande Réponse à donner ici
+  const trigger = (parts[1] || '').toLowerCase();
+  const response = parts.slice(2).join(' ').trim();
+
+  if (!trigger.startsWith('!') || trigger.length < 2) {
+    return sendChat(`@${username} Utilisation: !addcmd !nom La réponse du bot`);
+  }
+  if (!response) {
+    return sendChat(`@${username} Il manque la réponse. Ex: !addcmd !discord Rejoins notre Discord: lien.com`);
+  }
+  if (SYSTEM_COMMANDS.includes(trigger)) {
+    return sendChat(`@${username} "${trigger}" est une commande système réservée, choisis un autre nom.`);
+  }
+
+  try {
+    await db.setCustomCommand(trigger, response);
+    sendChat(`✅ Commande ${trigger} créée/mise à jour par @${username} !`);
+    console.log(`[ADDCMD] ${username} a créé/modifié ${trigger}: "${response}"`);
+  } catch(e) {
+    console.error('[ADDCMD] Erreur:', e.message);
+    sendChat(`@${username} Erreur lors de la création de la commande.`);
+  }
+}
+
+async function cmdDelCommand(username, parts, isModOrBroadcaster) {
+  if (!isModOrBroadcaster) {
+    return sendChat(`@${username} Seuls les modérateurs peuvent supprimer des commandes.`);
+  }
+  const trigger = (parts[1] || '').toLowerCase();
+  if (!trigger.startsWith('!')) {
+    return sendChat(`@${username} Utilisation: !delcmd !nom`);
+  }
+
+  try {
+    const existing = await db.getCustomCommand(trigger);
+    if (!existing) {
+      return sendChat(`@${username} La commande ${trigger} n'existe pas.`);
+    }
+    await db.deleteCustomCommand(trigger);
+    sendChat(`🗑️ Commande ${trigger} supprimée par @${username}.`);
+    console.log(`[DELCMD] ${username} a supprimé ${trigger}`);
+  } catch(e) {
+    console.error('[DELCMD] Erreur:', e.message);
+    sendChat(`@${username} Erreur lors de la suppression.`);
   }
 }
 
