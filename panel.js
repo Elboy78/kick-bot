@@ -264,7 +264,7 @@ app.post('/api/admin/vod-moments', async (req,res) => {
   try {
     const { vodId, vodTitle, vodUrl, timestampS, label, category } = req.body;
     if (!vodId) return res.status(400).json({ error: 'vodId requis' });
-    await db.addVodMoment(vodId, vodTitle, vodUrl, timestampS, label, category);
+    await db.addVodMoment(vodId, vodTitle, vodUrl, timestampS, label, category, 'Toi (panel)');
     res.json({ success: true });
   } catch(e) { res.status(500).json({ error: e.message }); }
 });

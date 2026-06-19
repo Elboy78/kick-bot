@@ -211,6 +211,7 @@ async function initSchema() {
       timestamp_s INTEGER NOT NULL DEFAULT 0,
       label       TEXT NOT NULL DEFAULT '',
       category    TEXT NOT NULL DEFAULT 'moment',
+      created_by  TEXT NOT NULL DEFAULT '',
       created_at  TEXT NOT NULL DEFAULT (datetime('now'))
     )`,
     `CREATE TABLE IF NOT EXISTS command_usage (
@@ -294,6 +295,7 @@ async function initSchema() {
     `ALTER TABLE stream_sessions ADD COLUMN avg_viewers INTEGER DEFAULT 0`,
     `ALTER TABLE stream_sessions ADD COLUMN viewer_sum INTEGER DEFAULT 0`,
     `ALTER TABLE stream_sessions ADD COLUMN viewer_samples INTEGER DEFAULT 0`,
+    `ALTER TABLE vod_moments ADD COLUMN created_by TEXT DEFAULT ''`,
   ];
   for (const sql of migrations) {
     try {
@@ -525,9 +527,9 @@ async function getVodMoments(vodId) {
   if (vodId) return all(`SELECT * FROM vod_moments WHERE vod_id = ? ORDER BY timestamp_s ASC`, [vodId]);
   return all(`SELECT * FROM vod_moments ORDER BY created_at DESC`);
 }
-async function addVodMoment(vodId, vodTitle, vodUrl, timestampS, label, category) {
-  const r = await run(`INSERT INTO vod_moments (vod_id, vod_title, vod_url, timestamp_s, label, category) VALUES (?, ?, ?, ?, ?, ?)`,
-    [vodId, vodTitle || '', vodUrl || '', timestampS || 0, label || '', category || 'moment']);
+async function addVodMoment(vodId, vodTitle, vodUrl, timestampS, label, category, createdBy) {
+  const r = await run(`INSERT INTO vod_moments (vod_id, vod_title, vod_url, timestamp_s, label, category, created_by) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+    [vodId, vodTitle || '', vodUrl || '', timestampS || 0, label || '', category || 'moment', createdBy || '']);
   return r;
 }
 async function deleteVodMoment(id) { await run(`DELETE FROM vod_moments WHERE id = ?`, [id]); }

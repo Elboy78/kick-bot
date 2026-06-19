@@ -488,10 +488,11 @@ async function cmdClip(username, parts) {
     // On récupère l'ID du stream actuel depuis bot_status pour construire l'URL du replay
     const vodUuid = await db.getSettingStr('current_vod_uuid', '');
     const channel  = CONFIG.channel;
-    const vodUrl   = vodUuid ? `https://kick.com/${channel}/videos/${vodUuid}` : '';
+    // Lien direct vers le replay AU bon timestamp pour retrouver le moment immédiatement
+    const vodUrl   = vodUuid ? `https://kick.com/${channel}/videos/${vodUuid}?t=${timestampS}` : '';
     const vodTitle = await db.getSettingStr('current_stream_title', 'Stream en cours');
 
-    await db.addVodMoment('live', vodTitle, vodUrl, timestampS, label, 'clip');
+    await db.addVodMoment('live', vodTitle, vodUrl, timestampS, label, 'clip', username);
 
     const h = Math.floor(timestampS/3600), m = Math.floor((timestampS%3600)/60), s = timestampS%60;
     const ts = h > 0 ? `${h}h${String(m).padStart(2,'0')}m${String(s).padStart(2,'0')}s` : `${m}m${String(s).padStart(2,'0')}s`;
@@ -550,6 +551,58 @@ async function cmdDelCommand(username, parts, isModOrBroadcaster) {
     console.log(`[DELCMD] ${username} a supprimé ${trigger}`);
   } catch(e) {
     console.error('[DELCMD] Erreur:', e.message);
+    sendChat(`@${username} Erreur lors de la suppression.`);
+  }
+}
+
+async function cmdAddBannedWord(username, parts, isModOrBroadcaster) {
+  if (!isModOrBroadcaster) {
+    return sendChat(`@${username} Seuls les modérateurs peuvent ajouter des mots bannis.`);
+  }
+  // Format: !addword <mot> <timeout|ban> [duree_secondes]
+  const word = (parts[1] || '').toLowerCase();
+  const actionRaw = (parts[2] || 'timeout').toLowerCase();
+  const durationRaw = parts[3];
+
+  if (!word) {
+    return sendChat(`@${username} Utilisation: !addword <mot> <timeout|ban> [durée_secondes]`);
+  }
+  const action = (actionRaw === 'ban' || actionRaw === 'permanent') ? 'ban' : 'timeout';
+  const duration = action === 'ban' ? 0 : (parseInt(durationRaw) || 300);
+
+  try {
+    const ok = await db.addBannedWord(word, action, duration);
+    if (!ok) {
+      return sendChat(`@${username} Erreur lors de l'ajout du mot banni.`);
+    }
+    const actionLabel = action === 'ban' ? 'ban permanent' : `timeout ${duration}s`;
+    sendChat(`🛡️ Mot banni ajouté par @${username} (${actionLabel}).`);
+    console.log(`[ADDWORD] ${username} a banni le mot "${word}" (${actionLabel})`);
+  } catch(e) {
+    console.error('[ADDWORD] Erreur:', e.message);
+    sendChat(`@${username} Erreur lors de l'ajout.`);
+  }
+}
+
+async function cmdDelBannedWord(username, parts, isModOrBroadcaster) {
+  if (!isModOrBroadcaster) {
+    return sendChat(`@${username} Seuls les modérateurs peuvent supprimer des mots bannis.`);
+  }
+  const word = (parts[1] || '').toLowerCase();
+  if (!word) {
+    return sendChat(`@${username} Utilisation: !delword <mot>`);
+  }
+
+  try {
+    const existing = await db.getBannedWordByText(word);
+    if (!existing) {
+      return sendChat(`@${username} Le mot "${word}" n'est pas dans la liste des mots bannis.`);
+    }
+    await db.deleteBannedWordByText(word);
+    sendChat(`✅ Mot banni "${word}" retiré par @${username}.`);
+    console.log(`[DELWORD] ${username} a retiré le mot "${word}"`);
+  } catch(e) {
+    console.error('[DELWORD] Erreur:', e.message);
     sendChat(`@${username} Erreur lors de la suppression.`);
   }
 }

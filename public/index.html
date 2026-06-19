@@ -2477,21 +2477,24 @@ async function loadMyClips() {
     }
     el.innerHTML = `<div style="display:flex;flex-direction:column;gap:8px">` + clips.map(c => {
       const ts      = fmtTimestamp(c.timestamp_s);
-      const kickUrl = c.vod_url ? `${c.vod_url}${c.timestamp_s?'?t='+c.timestamp_s:''}` : null;
+      // c.vod_url contient déjà ?t=timestamp (ajouté côté bot) — ne pas le rajouter ici
+      const kickUrl = c.vod_url || null;
       const cat     = VOD_CAT_LABELS[c.category]||'🎬 Clip';
       const date    = c.created_at ? new Date(c.created_at+'Z').toLocaleDateString('fr-FR',{day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'}) : '';
+      const creator = c.created_by ? esc(c.created_by) : null;
       return `<div style="display:flex;align-items:center;gap:12px;padding:12px 14px;background:var(--card);border:1px solid var(--brd);border-radius:12px">
         <div style="font-size:22px">${cat.split(' ')[0]}</div>
         <div style="flex:1;min-width:0">
           <div style="font-weight:600;font-size:13px;margin-bottom:2px">${esc(c.label||'Clip')}</div>
           <div style="font-size:10px;color:var(--muted);display:flex;gap:10px;flex-wrap:wrap">
+            ${creator ? '<span>👤 par <b style="color:var(--text)">'+creator+'</b></span>' : ''}
             ${c.vod_title ? '<span>📺 '+esc(c.vod_title)+'</span>' : ''}
             ${c.timestamp_s ? '<span>⏱ '+ts+' dans le replay</span>' : ''}
             <span>📅 ${date}</span>
           </div>
         </div>
         <div style="display:flex;gap:6px;flex-shrink:0">
-          ${kickUrl ? `<a href="${esc(kickUrl)}" target="_blank" class="btnx btn-outline btn-sm" style="text-decoration:none">▶️ Voir</a>` : ''}
+          ${kickUrl ? `<a href="${esc(kickUrl)}" target="_blank" class="btnx btn-outline btn-sm" style="text-decoration:none">▶️ Voir le replay</a>` : ''}
           <button class="btnx btn-red btn-sm" onclick="deleteMyClip(${c.id})">✕</button>
         </div>
       </div>`;
