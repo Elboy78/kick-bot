@@ -20,7 +20,7 @@ const CONFIG = {
 };
 
 const PUSHER_URL = 'wss://ws-us2.pusher.com/app/32cbd69e4b950bf97679?protocol=7&client=js&version=7.4.0&flash=false';
-const SYSTEM_COMMANDS = ['!points','!top','!rang','!niveau','!aide','!duel','!accepter','!refuser','!participer','!giveaway','!lobby','!quote','!addquote','!mort','!death','!score','!queue','!join','!leave','!pos','!vote','!sondage','!so','!uptime','!dice','!des','!rps','!pfc','!clip','!addcmd','!delcmd'];
+const SYSTEM_COMMANDS = ['!points','!top','!rang','!niveau','!aide','!duel','!accepter','!refuser','!participer','!giveaway','!lobby','!quote','!addquote','!mort','!death','!score','!queue','!join','!leave','!pos','!vote','!sondage','!so','!uptime','!dice','!des','!rps','!pfc','!clip','!addcmd','!delcmd','!addword','!delword'];
 
 let ws             = null;
 let reconnectDelay = 5000;
@@ -233,6 +233,8 @@ async function handleChatMessage(payload) {
       case '!clip':      return (await db.getSetting('clip_enabled')) ? cmdClip(username, parts) : null;
       case '!addcmd':    return cmdAddCommand(username, parts, isModOrBroadcaster);
       case '!delcmd':    return cmdDelCommand(username, parts, isModOrBroadcaster);
+      case '!addword':   return cmdAddBannedWord(username, parts, isModOrBroadcaster);
+      case '!delword':   return cmdDelBannedWord(username, parts, isModOrBroadcaster);
       case '!dice':
       case '!des':       return (await db.getSetting('dice_enabled')) ? cmdDice(username, parts) : null;
       case '!rps':
@@ -637,7 +639,10 @@ async function getActiveToken() {
 async function sendChat(message) {
   const { token, official } = await getActiveToken();
   if (!token) { console.log(`[BOT → CHAT] ${message}`); return; }
+  return sendChatVia(message, token, official, false);
+}
 
+async function sendChatVia(message, token, official, isRetry) {
   try {
     let response;
     if (official) {
@@ -666,12 +671,21 @@ async function sendChat(message) {
         }}
       );
     }
-    console.log(`[BOT] Message envoyé (${response.status}) via ${official ? 'OAuth officiel' : 'token manuel'}`);
+    console.log(`[BOT] Message envoyé (${response.status}) via ${official ? 'OAuth officiel' : 'token manuel'}${isRetry ? ' (retry)' : ''}`);
     db.setBotStatus('token_expired', '0').catch(()=>{});
   } catch(err) {
     const status = err.response?.status;
     const body   = err.response?.data;
     console.error(`[BOT] Erreur envoi (${status || 'réseau'}):`, typeof body === 'string' ? body : JSON.stringify(body) || err.message);
+    console.error(`[BOT] Message qui a échoué (longueur ${message.length}):`, JSON.stringify(message));
+
+    // L'API officielle Kick peut renvoyer un 500 de façon erratique (bug connu côté Kick,
+    // pas forcément lié au contenu du message). On bascule vers le token legacy si dispo,
+    // sans jamais relancer plus d'une fois pour éviter une boucle infinie.
+    if (status === 500 && official && !isRetry && CONFIG.token) {
+      console.log('[BOT] 500 sur API officielle → tentative via token manuel (fallback)...');
+      return sendChatVia(message, CONFIG.token, false, true);
+    }
 
     if (status === 401) {
       if (official) {

@@ -1008,6 +1008,15 @@ async function deleteBannedWord(id) {
   await run(`DELETE FROM banned_words WHERE id = ?`, [id]);
 }
 
+async function deleteBannedWordByText(word) {
+  const result = await run(`DELETE FROM banned_words WHERE word = ?`, [word.toLowerCase()]);
+  return result; // utile pour vérifier si une ligne a bien été supprimée
+}
+
+async function getBannedWordByText(word) {
+  return get(`SELECT * FROM banned_words WHERE word = ?`, [word.toLowerCase()]);
+}
+
 async function toggleBannedWord(id, enabled) {
   await run(`UPDATE banned_words SET enabled = ? WHERE id = ?`, [enabled ? 1 : 0, id]);
 }
@@ -1061,7 +1070,7 @@ module.exports = {
   approveAccess, revokeAccess, deleteAccessRequest,
   initSystemCommandsState, isSystemCmdEnabled, getAllSystemCommandsState, toggleSystemCommand,
   getAllSettings, getSetting, setSetting, getSettingStr, setSettingStr, DEFAULT_SETTINGS,
-  getBannedWords, addBannedWord, deleteBannedWord, toggleBannedWord, checkBannedWords,
+  getBannedWords, addBannedWord, deleteBannedWord, deleteBannedWordByText, getBannedWordByText, toggleBannedWord, checkBannedWords,
   getQuotes, addQuote, getRandomQuote, deleteQuote,
   getCounters, getCounter, setCounter, incrementCounter, deleteCounter,
   getTimers, setTimer, toggleTimer, deleteTimer,
