@@ -287,6 +287,26 @@ async function initSchema() {
       }
     }
   }
+
+  // Migrations : ajout de colonnes sur des tables déjà existantes avant leur introduction.
+  // ALTER TABLE ADD COLUMN échoue si la colonne existe déjà — on ignore silencieusement cette erreur précise.
+  const migrations = [
+    `ALTER TABLE stream_sessions ADD COLUMN avg_viewers INTEGER DEFAULT 0`,
+    `ALTER TABLE stream_sessions ADD COLUMN viewer_sum INTEGER DEFAULT 0`,
+    `ALTER TABLE stream_sessions ADD COLUMN viewer_samples INTEGER DEFAULT 0`,
+  ];
+  for (const sql of migrations) {
+    try {
+      await run(sql);
+      console.log('[DB] Migration appliquée:', sql.slice(0, 60));
+    } catch(e) {
+      // "duplicate column name" = déjà migré, c'est le cas normal après la 1ère fois
+      if (!e.message?.includes('duplicate column')) {
+        console.error('[DB] Erreur migration:', e.message);
+      }
+    }
+  }
+
   console.log('[DB] Schema initialisé ✓');
 }
 

@@ -674,16 +674,27 @@ app.get('/auth/login', (req, res) => {
     return res.status(400).send('KICK_CLIENT_ID, KICK_CLIENT_SECRET ou KICK_REDIRECT_URI manquant dans les variables Render.');
   }
   const url = kickOAuth.getAuthorizationUrl();
+  console.log('[OAUTH LOGIN] URL générée:', url);
   res.redirect(url);
 });
 
 app.get('/auth/callback', async (req, res) => {
+  console.log('[OAUTH CALLBACK] Requête reçue — query:', JSON.stringify(req.query));
   try {
-    const { code, state, error } = req.query;
-    if (error) return res.status(400).send(`Erreur Kick: ${error}`);
-    if (!code || !state) return res.status(400).send('Code ou state manquant.');
+    const { code, state, error, error_description } = req.query;
+    if (error) {
+      console.error('[OAUTH CALLBACK] Erreur Kick:', error, error_description);
+      return res.status(400).send(`Erreur Kick: ${error} — ${error_description || ''}`);
+    }
+    if (!code || !state) {
+      console.error('[OAUTH CALLBACK] Code ou state manquant. Query complète:', req.query);
+      return res.status(400).send('Code ou state manquant.');
+    }
 
+    console.log('[OAUTH CALLBACK] Code reçu, échange en cours...');
     await kickOAuth.exchangeCodeForToken(code, state);
+    console.log('[OAUTH CALLBACK] ✅ Token échangé et sauvegardé avec succès');
+
     res.send(`
       <html><body style="font-family:sans-serif;background:#050814;color:#fff;display:flex;align-items:center;justify-content:center;height:100vh;margin:0">
         <div style="text-align:center">
@@ -694,7 +705,8 @@ app.get('/auth/callback', async (req, res) => {
       </body></html>
     `);
   } catch (e) {
-    res.status(500).send(`Erreur: ${e.message}`);
+    console.error('[OAUTH CALLBACK] ❌ Exception:', e.message, e.stack);
+    res.status(500).send(`<pre style="color:red;background:#111;padding:20px;font-family:monospace">Erreur: ${e.message}\n\n${e.stack || ''}</pre>`);
   }
 });
 
