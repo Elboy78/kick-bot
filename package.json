@@ -2,11 +2,11 @@
   "name": "kick-loyalty-bot",
   "version": "1.0.0",
   "description": "Bot de fid\u00e9lit\u00e9 pour cha\u00eene Kick.com \u2014 points par temps de visionnage",
-  "main": "bot.js",
+  "main": "server.js",
   "scripts": {
-    "start": "node bot.js",
-    "panel": "node panel.js",
-    "dev": "node bot.js & node panel.js"
+    "start": "node server.js",
+    "bot-only": "node bot.js",
+    "panel-only": "node panel.js"
   },
   "dependencies": {
     "ws": "^8.16.0",
