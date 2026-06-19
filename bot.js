@@ -843,9 +843,28 @@ async function fetchKickChannel() {
   return null;
 }
 
+// Synchronise l'UUID de la VOD courante et le titre du stream depuis le navigateur.
+// Nécessaire car l'API officielle Kick (api.kick.com/public/v1/channels) ne fournit
+// pas ces champs — seule l'API interne (lue par le navigateur) les expose.
+async function syncVodMetadataFromBrowser() {
+  try {
+    const PORT = parseInt(process.env.PANEL_PORT || '3000');
+    const r = await axios.get(`http://localhost:${PORT}/api/live`, { timeout: 3000 });
+    if (r.data?.live) {
+      if (r.data.vodUuid)     await db.setSettingStr('current_vod_uuid', r.data.vodUuid);
+      if (r.data.streamTitle) await db.setSettingStr('current_stream_title', r.data.streamTitle);
+    }
+  } catch(e) { /* panel pas encore prêt ou hors ligne — pas grave, on retentera au prochain cycle */ }
+}
+
 async function checkLiveStatus() {
   const data = await fetchKickChannel();
   db.setBotStatus('last_live_check_at', Date.now().toString()).catch(()=>{});
+
+  // Quelle que soit la source qui détermine is_live (API officielle ou fallback),
+  // l'API officielle Kick ne fournit pas l'UUID de la VOD — on le récupère toujours
+  // depuis le navigateur (qui le lit en scrappant l'API interne kick.com/api/v2).
+  syncVodMetadataFromBrowser().catch(()=>{});
 
   if (!data) {
     // API Kick bloquée par Cloudflare depuis Render — on lit le statut live
@@ -861,9 +880,6 @@ async function checkLiveStatus() {
         db.setBotStatus('is_live', isLive ? '1' : '0').catch(()=>{});
         console.log(`[STREAM] Statut via navigateur → is_live=${isLive}`);
         if (isLive) {
-          // Mettre à jour les métadonnées en continu même si déjà live
-          if (r.data.vodUuid)    db.setSettingStr('current_vod_uuid', r.data.vodUuid).catch(()=>{});
-          if (r.data.streamTitle) db.setSettingStr('current_stream_title', r.data.streamTitle).catch(()=>{});
           // Corriger streamStartTime si on a la vraie date Kick
           if (r.data.streamStartedAt && !streamStartTime) {
             streamStartTime = r.data.streamStartedAt;

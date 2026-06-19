@@ -491,6 +491,13 @@ hr.div{border:none;border-top:1px solid var(--brd);margin:12px 0}
   <!-- ══ MODÉRATION ══ -->
   <div class="page" id="page-moderation">
     <div class="header"><div><h1>Modération</h1><p>Mots bannis et actions automatiques</p></div></div>
+    <div class="panel" style="margin-bottom:14px;padding:12px 16px;background:rgba(40,255,102,.06);border:1px solid rgba(40,255,102,.2)">
+      <div style="font-size:11px;color:var(--text);line-height:1.7">
+        <b>🛡️ Tes modérateurs peuvent gérer les mots bannis directement depuis le chat</b><br>
+        <code style="background:var(--card2);padding:1px 6px;border-radius:4px">!addword mot timeout 300</code> ou <code style="background:var(--card2);padding:1px 6px;border-radius:4px">!addword mot ban</code> pour ajouter — <code style="background:var(--card2);padding:1px 6px;border-radius:4px">!delword mot</code> pour supprimer.<br>
+        Réservé aux modérateurs et au broadcaster — apparaît automatiquement ici une fois ajouté.
+      </div>
+    </div>
     <div class="g2">
       <div><div class="panel"><h3>🚫 Mots bannis (<span id="banned-count">0</span>)</h3><div style="background:#0f1428;border:1px solid #171d35;border-radius:8px;padding:7px 10px;margin-bottom:10px;font-size:10px;color:#a1a1aa">Quand un viewer écrit un mot banni, le bot applique automatiquement l'action choisie.</div><div id="banned-list"><div class="empty"><div class="ei">🛡️</div><p>Aucun mot banni</p></div></div></div></div>
       <div><div class="panel" style="position:sticky;top:20px"><h3>➕ Ajouter un mot</h3><label class="lbl">Mot ou expression</label><input class="inp" id="ban-word" placeholder="Ex: insulte, spam…"><label class="lbl">Action</label><select class="inp" id="ban-action" onchange="updateDurationVisibility()"><option value="timeout">⏱ Timeout</option><option value="ban">🔨 Ban permanent</option></select><div id="duration-wrap"><label class="lbl">Durée</label><div class="ghalf"><div><input type="number" class="inp" id="ban-duration" value="300" min="1"><div style="font-size:9px;color:#4a4d68;margin-top:2px">secondes</div></div><div style="display:flex;flex-direction:column;gap:4px"><button class="btnx btn-ghost btn-xs" onclick="setDuration(60)">1 min</button><button class="btnx btn-ghost btn-xs" onclick="setDuration(300)">5 min</button><button class="btnx btn-ghost btn-xs" onclick="setDuration(3600)">1h</button><button class="btnx btn-ghost btn-xs" onclick="setDuration(86400)">24h</button></div></div></div><button class="btnx btn-primary" style="width:100%;justify-content:center;margin-top:12px;padding:8px" onclick="addBannedWord()">➕ Ajouter</button><div id="ban-msg" style="margin-top:7px"></div></div></div>
