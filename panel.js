@@ -260,6 +260,14 @@ app.get('/api/proxy-download', async (req, res) => {
 
 // CRUD moments
 app.get('/api/vod-moments',       async (req,res) => { try { res.json({data: await db.getVodMoments(req.query.vod_id||null)}); } catch(e){res.json({data:[]});} });
+app.get('/api/vod-moments/pending', async (req,res) => { try { res.json({data: await db.getPendingLiveMoments()}); } catch(e){res.json({data:[]});} });
+app.post('/api/admin/vod-moments/link', async (req,res) => {
+  try {
+    const { id, vodId, vodUrl } = req.body;
+    await db.linkMomentToVod(id, vodId, vodUrl);
+    res.json({ success: true });
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
 app.post('/api/admin/vod-moments', async (req,res) => {
   try {
     const { vodId, vodTitle, vodUrl, timestampS, label, category } = req.body;

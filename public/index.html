@@ -1526,9 +1526,6 @@ async function loadLiveStatus() {
     const live      = !!d.livestream;
     const viewers   = d.livestream?.viewer_count ?? 0;
     const followers = d.followersCount ?? d.followers_count ?? 0;
-
-    if (live) console.log('[LIVESTREAM DEBUG]', JSON.stringify(d.livestream, null, 2));
-
     // created_at Kick = "2026-06-18 20:00:00" sans Z → interprété local sans correction
     // On force UTC en remplaçant l'espace par T et en ajoutant Z
     const rawDate = d.livestream?.created_at || d.livestream?.start_time || null;
@@ -2344,9 +2341,48 @@ async function loadVods() {
       if (!json.meta||p>=json.meta.last_page) break;
     }
     applyVodFilters();
+    linkPendingClips(); // tente d'associer les clips créés pendant un live à leur VOD maintenant disponible
   } catch(e) {
     grid.innerHTML = '<div class="empty" style="grid-column:1/-1"><div class="ei">⚠️</div><p>Erreur de chargement</p></div>';
   }
+}
+
+// Les clips créés avec !clip pendant un live n'ont pas d'UUID de VOD utilisable
+// (l'API Kick ne fournit pas cet UUID tant que le stream est en cours — limitation
+// connue et documentée côté Kick). Une fois le live terminé et le replay généré,
+// on associe automatiquement chaque clip en attente au VOD dont l'heure de début
+// est la plus proche du moment où le clip a été créé.
+async function linkPendingClips() {
+  try {
+    const pending = await get('/api/vod-moments/pending') || [];
+    if (!pending.length || !allVodsData.length) return;
+
+    for (const moment of pending) {
+      const momentDate = new Date(moment.created_at + 'Z').getTime();
+      // Trouver le VOD dont started_at est le plus proche AVANT le moment du clip
+      let bestVod = null, bestDiff = Infinity;
+      for (const v of allVodsData) {
+        const vodStart = new Date((v.created_at||'').replace(' ','T') + 'Z').getTime();
+        const diff = momentDate - vodStart;
+        // Le clip doit avoir été créé APRÈS le début du VOD, et dans une fenêtre raisonnable (24h)
+        if (diff >= 0 && diff < 24*3600000 && diff < bestDiff) {
+          bestDiff = diff; bestVod = v;
+        }
+      }
+      if (bestVod) {
+        const vodUuid = bestVod.video?.uuid || '';
+        if (!vodUuid) continue;
+        const vodUrl = `https://kick.com/${activeKickChannel}/videos/${vodUuid}?t=${moment.timestamp_s}`;
+        await fetch('/api/admin/vod-moments/link', {
+          method: 'POST', headers: {'Content-Type':'application/json'},
+          body: JSON.stringify({ id: moment.id, vodId: vodUuid, vodUrl })
+        });
+        console.log(`[CLIP LINK] Clip #${moment.id} associé au VOD ${vodUuid}`);
+      }
+    }
+    // Recharger l'onglet Mes Clips si actif pour refléter les nouveaux liens
+    if (currentVodTab === 'myclips') loadMyClips();
+  } catch(e) { console.error('[CLIP LINK]', e); }
 }
 
 function renderVodsGrid(vods) {

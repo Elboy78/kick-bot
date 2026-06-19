@@ -537,6 +537,15 @@ async function updateVodMomentLabel(id, label, category) {
   await run(`UPDATE vod_moments SET label = ?, category = ? WHERE id = ?`, [label, category, id]);
 }
 
+// Lie rétroactivement les clips créés pendant un live (vod_id='live', sans URL)
+// au vrai VOD une fois le replay disponible sur Kick après la fin du stream.
+async function getPendingLiveMoments() {
+  return all(`SELECT * FROM vod_moments WHERE vod_id = 'live'`);
+}
+async function linkMomentToVod(id, vodId, vodUrl) {
+  await run(`UPDATE vod_moments SET vod_id = ?, vod_url = ? WHERE id = ?`, [vodId, vodUrl, id]);
+}
+
 // ─── Analytics : usage des commandes & activité du chat ────────────────────────
 
 async function logCommandUsage(trigger, username) {
@@ -1064,7 +1073,7 @@ module.exports = {
   getObjectives, createObjective, deleteObjective, achieveObjective,
   startSession, endSession, getStreamHistory, recordViewerSample, getSessionsWithAvgViewers,
   logCommandUsage, getCommandUsageStats, logChatActivity, getChatActivityWeek,
-  getVodMoments, addVodMoment, deleteVodMoment, updateVodMomentLabel,
+  getVodMoments, addVodMoment, deleteVodMoment, updateVodMomentLabel, getPendingLiveMoments, linkMomentToVod,
   createDuel, getPendingDuel, resolveDuel, cancelDuel, getRecentDuels,
   createGiveaway, getActiveGiveaway, joinGiveaway, closeGiveaway, getGiveawayHistory,
   getLobby, joinLobby, removeFromLobby, clearLobby,
