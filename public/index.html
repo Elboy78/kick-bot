@@ -1526,6 +1526,9 @@ async function loadLiveStatus() {
     const live      = !!d.livestream;
     const viewers   = d.livestream?.viewer_count ?? 0;
     const followers = d.followersCount ?? d.followers_count ?? 0;
+
+    if (live) console.log('[LIVESTREAM DEBUG]', JSON.stringify(d.livestream, null, 2));
+
     // created_at Kick = "2026-06-18 20:00:00" sans Z → interprété local sans correction
     // On force UTC en remplaçant l'espace par T et en ajoutant Z
     const rawDate = d.livestream?.created_at || d.livestream?.start_time || null;
