@@ -565,17 +565,33 @@ async function getCommandUsageStats(days = 7) {
 
 async function logChatActivity(username) {
   const today = todayParis();
-  const row = await get(`SELECT * FROM chat_activity_daily WHERE date = ?`, [today]);
-  if (!row) {
-    await run(`INSERT INTO chat_activity_daily (date, message_count, unique_chatters) VALUES (?, 1, ?)`,
-      [today, JSON.stringify([username.toLowerCase()])]);
-  } else {
-    let chatters = [];
-    try { chatters = JSON.parse(row.unique_chatters); } catch(e) {}
-    const lower = username.toLowerCase();
-    if (!chatters.includes(lower)) chatters.push(lower);
-    await run(`UPDATE chat_activity_daily SET message_count = message_count + 1, unique_chatters = ? WHERE date = ?`,
-      [JSON.stringify(chatters), today]);
+  const lower = username.toLowerCase();
+
+  try {
+    // Upsert atomique : élimine la race condition entre deux messages simultanés
+    // qui tentaient chacun un SELECT puis un INSERT séparé (cause du crash UNIQUE constraint).
+    await run(`
+      INSERT INTO chat_activity_daily (date, message_count, unique_chatters)
+      VALUES (?, 1, ?)
+      ON CONFLICT(date) DO UPDATE SET message_count = message_count + 1
+    `, [today, JSON.stringify([lower])]);
+
+    // La liste des chatteurs uniques nécessite de lire puis fusionner — pas atomique
+    // par nature (JSON), donc on accepte un risque résiduel minime ici, mais sans
+    // jamais pouvoir provoquer un crash : on entoure de try/catch.
+    const row = await get(`SELECT unique_chatters FROM chat_activity_daily WHERE date = ?`, [today]);
+    if (row) {
+      let chatters = [];
+      try { chatters = JSON.parse(row.unique_chatters); } catch(e) {}
+      if (!chatters.includes(lower)) {
+        chatters.push(lower);
+        await run(`UPDATE chat_activity_daily SET unique_chatters = ? WHERE date = ?`,
+          [JSON.stringify(chatters), today]);
+      }
+    }
+  } catch(e) {
+    // Ne jamais laisser une erreur de logging d'activité chat faire planter le bot
+    console.error('[CHAT ACTIVITY] Erreur non bloquante:', e.message);
   }
 }
 

@@ -175,7 +175,7 @@ async function handleChatMessage(payload) {
   const isModOrBroadcaster = badges.some(b => b.type === 'moderator' || b.type === 'broadcaster');
 
   await db.upsertViewer(username, kickId);
-  await db.logChatActivity(username);
+  db.logChatActivity(username).catch(e => console.error('[CHAT ACTIVITY] Erreur ignorée:', e.message));
   console.log(`[CHAT] ${username}: ${content}`);
 
   // Vérifier les mots bannis
