@@ -203,6 +203,12 @@ async function initSchema() {
       enabled    INTEGER NOT NULL DEFAULT 1,
       created_at TEXT NOT NULL DEFAULT (datetime('now'))
     )`,
+    `CREATE TABLE IF NOT EXISTS allowed_words (
+      id         INTEGER PRIMARY KEY AUTOINCREMENT,
+      word       TEXT NOT NULL UNIQUE,
+      note       TEXT NOT NULL DEFAULT '',
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    )`,
     `CREATE TABLE IF NOT EXISTS vod_moments (
       id          INTEGER PRIMARY KEY AUTOINCREMENT,
       vod_id      TEXT NOT NULL,
@@ -1050,11 +1056,38 @@ async function toggleBannedWord(id, enabled) {
 
 async function checkBannedWords(message) {
   const words = await all(`SELECT * FROM banned_words WHERE enabled = 1`);
+  const allowed = await all(`SELECT word FROM allowed_words`);
   const lower = message.toLowerCase();
+
+  // Si un mot de la liste blanche apparaît dans le message, on ne le traite jamais
+  // comme un déclenchement — utile pour les faux positifs (ex: "classe" contient "ass").
+  const isWhitelisted = allowed.some(a => lower.includes(a.word.toLowerCase()));
+  if (isWhitelisted) return null;
+
   for (const w of words) {
     if (lower.includes(w.word.toLowerCase())) return w;
   }
   return null;
+}
+
+async function getAllowedWords() {
+  return all(`SELECT * FROM allowed_words ORDER BY created_at DESC`);
+}
+async function addAllowedWord(word, note) {
+  try {
+    await run(`INSERT INTO allowed_words (word, note) VALUES (?, ?) ON CONFLICT(word) DO UPDATE SET note = ?`,
+      [word.toLowerCase(), note || '', note || '']);
+    return true;
+  } catch(e) { return false; }
+}
+async function deleteAllowedWord(id) {
+  await run(`DELETE FROM allowed_words WHERE id = ?`, [id]);
+}
+async function deleteAllowedWordByText(word) {
+  await run(`DELETE FROM allowed_words WHERE word = ?`, [word.toLowerCase()]);
+}
+async function getAllowedWordByText(word) {
+  return get(`SELECT * FROM allowed_words WHERE word = ?`, [word.toLowerCase()]);
 }
 
 async function getAllSystemCommandsState() {
@@ -1098,6 +1131,7 @@ module.exports = {
   initSystemCommandsState, isSystemCmdEnabled, getAllSystemCommandsState, toggleSystemCommand,
   getAllSettings, getSetting, setSetting, getSettingStr, setSettingStr, DEFAULT_SETTINGS,
   getBannedWords, addBannedWord, deleteBannedWord, deleteBannedWordByText, getBannedWordByText, toggleBannedWord, checkBannedWords,
+  getAllowedWords, addAllowedWord, deleteAllowedWord, deleteAllowedWordByText, getAllowedWordByText,
   getQuotes, addQuote, getRandomQuote, deleteQuote,
   getCounters, getCounter, setCounter, incrementCounter, deleteCounter,
   getTimers, setTimer, toggleTimer, deleteTimer,

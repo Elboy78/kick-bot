@@ -20,7 +20,7 @@ const CONFIG = {
 };
 
 const PUSHER_URL = 'wss://ws-us2.pusher.com/app/32cbd69e4b950bf97679?protocol=7&client=js&version=7.4.0&flash=false';
-const SYSTEM_COMMANDS = ['!points','!top','!rang','!niveau','!aide','!duel','!accepter','!refuser','!participer','!giveaway','!lobby','!quote','!addquote','!mort','!death','!score','!queue','!join','!leave','!pos','!vote','!sondage','!so','!uptime','!dice','!des','!rps','!pfc','!clip','!addcmd','!delcmd','!addword','!delword'];
+const SYSTEM_COMMANDS = ['!points','!top','!rang','!niveau','!aide','!duel','!accepter','!refuser','!participer','!giveaway','!lobby','!quote','!addquote','!mort','!death','!score','!queue','!join','!leave','!pos','!vote','!sondage','!so','!uptime','!dice','!des','!rps','!pfc','!clip','!addcmd','!delcmd','!addword','!delword','!allowword','!disallowword'];
 
 let ws             = null;
 let reconnectDelay = 5000;
@@ -235,6 +235,8 @@ async function handleChatMessage(payload) {
       case '!delcmd':    return cmdDelCommand(username, parts, isModOrBroadcaster);
       case '!addword':   return cmdAddBannedWord(username, parts, isModOrBroadcaster);
       case '!delword':   return cmdDelBannedWord(username, parts, isModOrBroadcaster);
+      case '!allowword':    return cmdAllowWord(username, parts, isModOrBroadcaster);
+      case '!disallowword': return cmdDisallowWord(username, parts, isModOrBroadcaster);
       case '!dice':
       case '!des':       return (await db.getSetting('dice_enabled')) ? cmdDice(username, parts) : null;
       case '!rps':
@@ -603,6 +605,50 @@ async function cmdDelBannedWord(username, parts, isModOrBroadcaster) {
     console.log(`[DELWORD] ${username} a retiré le mot "${word}"`);
   } catch(e) {
     console.error('[DELWORD] Erreur:', e.message);
+    sendChat(`@${username} Erreur lors de la suppression.`);
+  }
+}
+
+async function cmdAllowWord(username, parts, isModOrBroadcaster) {
+  if (!isModOrBroadcaster) {
+    return sendChat(`@${username} Seuls les modérateurs peuvent gérer la liste des mots autorisés.`);
+  }
+  const word = (parts[1] || '').toLowerCase();
+  const note = parts.slice(2).join(' ').trim();
+  if (!word) {
+    return sendChat(`@${username} Utilisation: !allowword <mot> [note]`);
+  }
+
+  try {
+    const ok = await db.addAllowedWord(word, note);
+    if (!ok) return sendChat(`@${username} Erreur lors de l'ajout.`);
+    sendChat(`✅ "${word}" ajouté à la liste blanche par @${username} — ne sera plus jamais sanctionné.`);
+    console.log(`[ALLOWWORD] ${username} a autorisé le mot "${word}"`);
+  } catch(e) {
+    console.error('[ALLOWWORD] Erreur:', e.message);
+    sendChat(`@${username} Erreur lors de l'ajout.`);
+  }
+}
+
+async function cmdDisallowWord(username, parts, isModOrBroadcaster) {
+  if (!isModOrBroadcaster) {
+    return sendChat(`@${username} Seuls les modérateurs peuvent gérer la liste des mots autorisés.`);
+  }
+  const word = (parts[1] || '').toLowerCase();
+  if (!word) {
+    return sendChat(`@${username} Utilisation: !disallowword <mot>`);
+  }
+
+  try {
+    const existing = await db.getAllowedWordByText(word);
+    if (!existing) {
+      return sendChat(`@${username} "${word}" n'est pas dans la liste blanche.`);
+    }
+    await db.deleteAllowedWordByText(word);
+    sendChat(`🗑️ "${word}" retiré de la liste blanche par @${username}.`);
+    console.log(`[DISALLOWWORD] ${username} a retiré "${word}" de la liste blanche`);
+  } catch(e) {
+    console.error('[DISALLOWWORD] Erreur:', e.message);
     sendChat(`@${username} Erreur lors de la suppression.`);
   }
 }

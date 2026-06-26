@@ -254,6 +254,7 @@ hr.div{border:none;border-top:1px solid var(--brd);margin:12px 0}
     <a onclick="showPage('outils')">🛠️ Outils Chat</a>
     <a onclick="showPage('tts')">🔊 TTS</a>
     <a onclick="showPage('vods')">🎬 VODs &amp; Clips</a>
+    <a onclick="showPage('subdon')">🎁 Sub/Don</a>
     <a onclick="showPage('objectifs')">🎯 Objectifs</a>
     <a onclick="showPage('dbd')">🔪 DBD</a>
 
@@ -502,6 +503,11 @@ hr.div{border:none;border-top:1px solid var(--brd);margin:12px 0}
       <div><div class="panel"><h3>🚫 Mots bannis (<span id="banned-count">0</span>)</h3><div style="background:#0f1428;border:1px solid #171d35;border-radius:8px;padding:7px 10px;margin-bottom:10px;font-size:10px;color:#a1a1aa">Quand un viewer écrit un mot banni, le bot applique automatiquement l'action choisie.</div><div id="banned-list"><div class="empty"><div class="ei">🛡️</div><p>Aucun mot banni</p></div></div></div></div>
       <div><div class="panel" style="position:sticky;top:20px"><h3>➕ Ajouter un mot</h3><label class="lbl">Mot ou expression</label><input class="inp" id="ban-word" placeholder="Ex: insulte, spam…"><label class="lbl">Action</label><select class="inp" id="ban-action" onchange="updateDurationVisibility()"><option value="timeout">⏱ Timeout</option><option value="ban">🔨 Ban permanent</option></select><div id="duration-wrap"><label class="lbl">Durée</label><div class="ghalf"><div><input type="number" class="inp" id="ban-duration" value="300" min="1"><div style="font-size:9px;color:#4a4d68;margin-top:2px">secondes</div></div><div style="display:flex;flex-direction:column;gap:4px"><button class="btnx btn-ghost btn-xs" onclick="setDuration(60)">1 min</button><button class="btnx btn-ghost btn-xs" onclick="setDuration(300)">5 min</button><button class="btnx btn-ghost btn-xs" onclick="setDuration(3600)">1h</button><button class="btnx btn-ghost btn-xs" onclick="setDuration(86400)">24h</button></div></div></div><button class="btnx btn-primary" style="width:100%;justify-content:center;margin-top:12px;padding:8px" onclick="addBannedWord()">➕ Ajouter</button><div id="ban-msg" style="margin-top:7px"></div></div></div>
     </div>
+
+    <div class="g2" style="margin-top:14px">
+      <div><div class="panel"><h3>✅ Mots autorisés (<span id="allowed-count">0</span>)</h3><div style="background:#0f1428;border:1px solid #171d35;border-radius:8px;padding:7px 10px;margin-bottom:10px;font-size:10px;color:#a1a1aa">Ces mots/expressions ne seront JAMAIS sanctionnés par la modération, même s'ils contiennent un mot banni (ex: "classe" contient "ass").</div><div id="allowed-list"><div class="empty"><div class="ei">✅</div><p>Aucun mot autorisé</p></div></div></div></div>
+      <div><div class="panel" style="position:sticky;top:20px"><h3>➕ Autoriser un mot</h3><label class="lbl">Mot ou expression</label><input class="inp" id="allow-word" placeholder="Ex: classe, passion…"><label class="lbl">Note (optionnel)</label><input class="inp" id="allow-note" placeholder="Ex: faux positif sur 'ass'"><button class="btnx btn-primary" style="width:100%;justify-content:center;margin-top:12px;padding:8px" onclick="addAllowedWord()">✅ Autoriser</button><div id="allow-msg" style="margin-top:7px"></div></div></div>
+    </div>
   </div>
 
   <!-- ══ COMMANDES ══ -->
@@ -708,7 +714,91 @@ Option 3" rows="4"></textarea><div style="display:flex;gap:6px;margin-top:10px">
     </div>
   </div>
 
-  <!-- ══ HISTORIQUE ══ -->
+  <!-- ══ SUB / DON ══ -->
+  <div class="page" id="page-subdon">
+    <div class="header"><div><h1>Sub / Don</h1><p>Alertes de follow, sub et donation dans le chat</p></div></div>
+    <div class="g2">
+      <div>
+        <div class="panel" style="margin-bottom:14px">
+          <h3>🔔 Annonce de follow</h3>
+          <div style="font-size:10px;color:var(--muted);margin-bottom:10px;line-height:1.6">
+            Quand quelqu'un follow ta chaîne, le bot envoie un message dans le chat. Utilise <code style="background:var(--card2);padding:1px 4px;border-radius:4px">{username}</code> pour mentionner le nouveau follower.
+          </div>
+          <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--brd);margin-bottom:10px">
+            <div>
+              <div style="font-size:12px;font-weight:600">Activer l'annonce de follow</div>
+              <div style="font-size:10px;color:var(--muted);margin-top:2px">Le bot annonce chaque nouveau follower dans le chat</div>
+            </div>
+            <label class="switch"><input type="checkbox" id="follow-announce-toggle" onchange="saveFollowAnnounce()"><span class="slider"></span></label>
+          </div>
+          <label class="lbl">Message d'annonce</label>
+          <textarea class="inp" id="follow-announce-message" rows="3" placeholder="Merci pour le follow @{username} ! Bienvenue 🎉" style="resize:vertical;min-height:64px" oninput="clearTimeout(this._t);this._t=setTimeout(()=>saveFollowAnnounce(),800)"></textarea>
+          <div style="font-size:9px;color:var(--muted);margin-top:4px">Aperçu : <span id="follow-preview" style="color:var(--text)"></span></div>
+          <div id="follow-announce-msg" style="margin-top:7px"></div>
+          <div style="margin-top:10px;padding:10px;background:var(--card2);border:1px solid var(--brd);border-radius:8px;font-size:10px;color:var(--muted);line-height:1.7">
+            <b style="color:var(--text)">⚙️ Configuration requise</b><br>
+            Pour recevoir les events de follow, ajoute ce webhook dans <a href="https://kick.com/settings/developer" target="_blank" style="color:var(--accent)">kick.com/settings/developer</a> → Event Subscriptions :<br>
+            <code style="background:var(--card);padding:2px 6px;border-radius:4px;color:var(--accent);font-size:9px;display:block;margin-top:4px;word-break:break-all">https://kick-bot-agkk.onrender.com/webhook/kick</code>
+            <span style="margin-top:4px;display:block">Événements à cocher : <b>channel.followed</b>, <b>channel.subscription.new</b>, <b>channel.subscription.renewal</b>, <b>channel.subscription.gifts</b></span>
+          </div>
+        </div>
+
+        <div class="panel" style="margin-bottom:14px">
+          <h3>⭐ Annonce de sub</h3>
+          <div style="font-size:10px;color:var(--muted);margin-bottom:10px;line-height:1.6">
+            Messages envoyés dans le chat pour les nouveaux subs, renouvellements et sub gifts.<br>
+            Variables : <code style="background:var(--card2);padding:1px 4px;border-radius:4px">{username}</code> <code style="background:var(--card2);padding:1px 4px;border-radius:4px">{months}</code> <code style="background:var(--card2);padding:1px 4px;border-radius:4px">{gifter}</code> <code style="background:var(--card2);padding:1px 4px;border-radius:4px">{count}</code>
+          </div>
+          <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--brd);margin-bottom:12px">
+            <div>
+              <div style="font-size:12px;font-weight:600">Activer les annonces de sub</div>
+              <div style="font-size:10px;color:var(--muted);margin-top:2px">Nouveau sub, renouvellement et sub gift</div>
+            </div>
+            <label class="switch"><input type="checkbox" id="sub-announce-toggle" onchange="saveSubAnnounce()"><span class="slider"></span></label>
+          </div>
+
+          <label class="lbl">🆕 Nouveau sub</label>
+          <textarea class="inp" id="sub-announce-new" rows="2" placeholder="🎉 Merci pour le sub @{username} !" style="resize:vertical;min-height:52px" oninput="clearTimeout(this._st);this._st=setTimeout(()=>saveSubAnnounce(),800)"></textarea>
+          <div style="font-size:9px;color:var(--muted);margin-top:2px;margin-bottom:10px">Aperçu : <span id="sub-preview-new" style="color:var(--text)"></span></div>
+
+          <label class="lbl">🔄 Renouvellement</label>
+          <textarea class="inp" id="sub-announce-renew" rows="2" placeholder="🔄 @{username} renouvelle pour {months} mois !" style="resize:vertical;min-height:52px" oninput="clearTimeout(this._st);this._st=setTimeout(()=>saveSubAnnounce(),800)"></textarea>
+          <div style="font-size:9px;color:var(--muted);margin-top:2px;margin-bottom:10px">Aperçu : <span id="sub-preview-renew" style="color:var(--text)"></span></div>
+
+          <label class="lbl">🎁 Sub gift</label>
+          <textarea class="inp" id="sub-announce-gift" rows="2" placeholder="🎁 @{gifter} offre {count} sub(s) !" style="resize:vertical;min-height:52px" oninput="clearTimeout(this._st);this._st=setTimeout(()=>saveSubAnnounce(),800)"></textarea>
+          <div style="font-size:9px;color:var(--muted);margin-top:2px;margin-bottom:10px">Aperçu : <span id="sub-preview-gift" style="color:var(--text)"></span></div>
+
+          <div id="sub-announce-msg" style="margin-top:4px"></div>
+        </div>
+      </div>
+      <div>
+        <div class="panel" style="margin-bottom:14px">
+          <h3>💰 Alertes de donation (TTS)</h3>
+          <div style="font-size:11px;color:var(--muted);margin-bottom:12px;line-height:1.6">
+            Les donations déclenchent une lecture vocale (TTS) sur l'overlay, avec un seuil minimum et une voix configurables.
+          </div>
+          <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid var(--brd)">
+            <span style="font-size:12px;color:var(--muted)">Seuil minimum actuel</span>
+            <b id="subdon-min-donation-preview" style="color:var(--accent)">—</b>
+          </div>
+          <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 0">
+            <span style="font-size:12px;color:var(--muted)">Statut TTS</span>
+            <b id="subdon-tts-status-preview" style="color:var(--muted)">—</b>
+          </div>
+          <button class="btnx btn-outline" style="width:100%;justify-content:center;margin-top:8px" onclick="showPage('tts')">🔊 Configurer le TTS &amp; seuil de don</button>
+        </div>
+
+        <div class="panel" style="padding:12px 16px;background:rgba(40,255,102,.06);border:1px solid rgba(40,255,102,.2)">
+          <div style="font-size:11px;color:var(--text);line-height:1.7">
+            <b>💡 Astuce</b><br>
+            Utilise <code style="background:var(--card2);padding:1px 6px;border-radius:4px">{username}</code>, <code style="background:var(--card2);padding:1px 6px;border-radius:4px">{months}</code>, <code style="background:var(--card2);padding:1px 6px;border-radius:4px">{gifter}</code> et <code style="background:var(--card2);padding:1px 6px;border-radius:4px">{count}</code> dans tes messages pour les personnaliser dynamiquement.
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- ══ HISTORIQUE ══ -->
   <div class="page" id="page-historique">
     <div class="header"><div><h1>Historique</h1><p>Sessions et activité du bot</p></div></div>
@@ -762,57 +852,10 @@ Option 3" rows="4"></textarea><div style="display:flex;gap:6px;margin-top:10px">
           <div id="points-config-msg" style="margin-top:7px"></div>
         </div>
 
-        <div class="panel" style="margin-bottom:14px">
-          <h3>🔔 Annonce de follow</h3>
-          <div style="font-size:10px;color:var(--muted);margin-bottom:10px;line-height:1.6">
-            Quand quelqu'un follow ta chaîne, le bot envoie un message dans le chat. Utilise <code style="background:var(--card2);padding:1px 4px;border-radius:4px">{username}</code> pour mentionner le nouveau follower.
-          </div>
-          <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--brd);margin-bottom:10px">
-            <div>
-              <div style="font-size:12px;font-weight:600">Activer l'annonce de follow</div>
-              <div style="font-size:10px;color:var(--muted);margin-top:2px">Le bot annonce chaque nouveau follower dans le chat</div>
-            </div>
-            <label class="switch"><input type="checkbox" id="follow-announce-toggle" onchange="saveFollowAnnounce()"><span class="slider"></span></label>
-          </div>
-          <label class="lbl">Message d'annonce</label>
-          <textarea class="inp" id="follow-announce-message" rows="3" placeholder="Merci pour le follow @{username} ! Bienvenue 🎉" style="resize:vertical;min-height:64px" oninput="clearTimeout(this._t);this._t=setTimeout(()=>saveFollowAnnounce(),800)"></textarea>
-          <div style="font-size:9px;color:var(--muted);margin-top:4px">Aperçu : <span id="follow-preview" style="color:var(--text)"></span></div>
-          <div id="follow-announce-msg" style="margin-top:7px"></div>
-          <div style="margin-top:10px;padding:10px;background:var(--card2);border:1px solid var(--brd);border-radius:8px;font-size:10px;color:var(--muted);line-height:1.7">
-            <b style="color:var(--text)">⚙️ Configuration requise</b><br>
-            Pour recevoir les events de follow, ajoute ce webhook dans <a href="https://kick.com/settings/developer" target="_blank" style="color:var(--accent)">kick.com/settings/developer</a> → Event Subscriptions :<br>
-            <code style="background:var(--card);padding:2px 6px;border-radius:4px;color:var(--accent);font-size:9px;display:block;margin-top:4px;word-break:break-all">https://kick-bot-agkk.onrender.com/webhook/kick</code>
-            <span style="margin-top:4px;display:block">Événements à cocher : <b>channel.followed</b>, <b>channel.subscription.new</b>, <b>channel.subscription.renewal</b>, <b>channel.subscription.gifts</b></span>
-          </div>
-        </div>
-
-        <div class="panel" style="margin-bottom:14px">
-          <h3>⭐ Annonce de sub</h3>
-          <div style="font-size:10px;color:var(--muted);margin-bottom:10px;line-height:1.6">
-            Messages envoyés dans le chat pour les nouveaux subs, renouvellements et sub gifts.<br>
-            Variables : <code style="background:var(--card2);padding:1px 4px;border-radius:4px">{username}</code> <code style="background:var(--card2);padding:1px 4px;border-radius:4px">{months}</code> <code style="background:var(--card2);padding:1px 4px;border-radius:4px">{gifter}</code> <code style="background:var(--card2);padding:1px 4px;border-radius:4px">{count}</code>
-          </div>
-          <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--brd);margin-bottom:12px">
-            <div>
-              <div style="font-size:12px;font-weight:600">Activer les annonces de sub</div>
-              <div style="font-size:10px;color:var(--muted);margin-top:2px">Nouveau sub, renouvellement et sub gift</div>
-            </div>
-            <label class="switch"><input type="checkbox" id="sub-announce-toggle" onchange="saveSubAnnounce()"><span class="slider"></span></label>
-          </div>
-
-          <label class="lbl">🆕 Nouveau sub</label>
-          <textarea class="inp" id="sub-announce-new" rows="2" placeholder="🎉 Merci pour le sub @{username} !" style="resize:vertical;min-height:52px" oninput="clearTimeout(this._st);this._st=setTimeout(()=>saveSubAnnounce(),800)"></textarea>
-          <div style="font-size:9px;color:var(--muted);margin-top:2px;margin-bottom:10px">Aperçu : <span id="sub-preview-new" style="color:var(--text)"></span></div>
-
-          <label class="lbl">🔄 Renouvellement</label>
-          <textarea class="inp" id="sub-announce-renew" rows="2" placeholder="🔄 @{username} renouvelle pour {months} mois !" style="resize:vertical;min-height:52px" oninput="clearTimeout(this._st);this._st=setTimeout(()=>saveSubAnnounce(),800)"></textarea>
-          <div style="font-size:9px;color:var(--muted);margin-top:2px;margin-bottom:10px">Aperçu : <span id="sub-preview-renew" style="color:var(--text)"></span></div>
-
-          <label class="lbl">🎁 Sub gift</label>
-          <textarea class="inp" id="sub-announce-gift" rows="2" placeholder="🎁 @{gifter} offre {count} sub(s) !" style="resize:vertical;min-height:52px" oninput="clearTimeout(this._st);this._st=setTimeout(()=>saveSubAnnounce(),800)"></textarea>
-          <div style="font-size:9px;color:var(--muted);margin-top:2px;margin-bottom:10px">Aperçu : <span id="sub-preview-gift" style="color:var(--text)"></span></div>
-
-          <div id="sub-announce-msg" style="margin-top:4px"></div>
+        <div class="panel" style="margin-bottom:14px;padding:14px 16px">
+          <h3>🔔 Alertes Follow / Sub / Don</h3>
+          <div style="font-size:11px;color:var(--muted);margin-bottom:10px">Gérées dans leur propre onglet maintenant.</div>
+          <button class="btnx btn-outline" style="width:100%;justify-content:center" onclick="showPage('subdon')">🎁 Aller à Sub/Don</button>
         </div>
 
         <div class="panel"><h3>🤖 Fonctionnalités du bot <button class="btnx btn-ghost btn-sm" onclick="loadBotFeatures()">↻</button></h3><div style="font-size:10px;color:#a1a1aa;margin-bottom:10px">Active ou désactive chaque fonctionnalité en un clic.</div><div id="bot-features-list"><div class="empty"><p>Chargement…</p></div></div></div>
@@ -890,10 +933,11 @@ function showPage(name) {
   if(name==='objectifs') loadObjectives();
   if(name==='historique') { loadHistory(); loadFullLogs(); loadViewersTrend(); }
   if(name==='vods') loadVods();
+  if(name==='subdon') { loadFollowAnnounce(); loadSubAnnounce(); loadSubDonPreview(); }
   if(name==='admin') { loadCmds(); loadAdminLevels(); loadAccessRequests(); }
   if(name==='commands') { loadCommandsPage(); loadSystemCommands(); }
   if(name==='dbd') initDBD();
-  if(name==='moderation') loadBannedWords();
+  if(name==='moderation') { loadBannedWords(); loadAllowedWords(); }
   if(name==='settings') initSettings();
   if(name==='outils') loadOutils();
   if(name==='tts') loadTTS();
@@ -2934,8 +2978,6 @@ function initSettings() {
   loadBotFeatures();
   loadOAuthStatus();
   loadPointsConfig();
-  loadFollowAnnounce();
-  loadSubAnnounce();
 }
 
 async function loadFollowAnnounce() {
@@ -2983,6 +3025,20 @@ async function loadSubAnnounce() {
     if (renewEl) renewEl.value = d.message_renew || '🔄 {username} renouvelle son sub pour {months} mois, merci ! ❤️';
     if (giftEl)  giftEl.value  = d.message_gift  || '🎁 {gifter} offre {count} sub(s) à la communauté, incroyable !';
     updateSubPreviews();
+  } catch(e) {}
+}
+
+async function loadSubDonPreview() {
+  try {
+    const r = await fetch('/api/tts/settings');
+    const d = await r.json();
+    const minEl = document.getElementById('subdon-min-donation-preview');
+    const statusEl = document.getElementById('subdon-tts-status-preview');
+    if (minEl) minEl.textContent = (d.minDonation || 0) + ' €';
+    if (statusEl) {
+      statusEl.textContent = d.configured ? '✅ Configuré' : '⚠️ Non configuré';
+      statusEl.style.color = d.configured ? 'var(--accent)' : '#ff8500';
+    }
   } catch(e) {}
 }
 
@@ -3170,7 +3226,7 @@ async function loadBotFeatures() {
       <div style="margin-bottom:12px">
         <div style="font-size:9px;font-weight:700;color:var(--muted2);text-transform:uppercase;letter-spacing:1px;margin-bottom:7px">${catIcons[cat]||''} ${cat}</div>
         ${items.map(item => `
-          <div style="display:flex;align-items:center;gap:10px;padding:8px 10px;background:var(--card2);border:1px solid var(--brd);border-radius:8px;margin-bottom:4px;transition:opacity .2s;opacity:${item.enabled?1:.55}">
+          <div style="display:flex;align-items:center;gap:10px;padding:8px 10px;background:${item.enabled?'rgba(40,255,102,.08)':'rgba(255,59,95,.08)'};border:1px solid ${item.enabled?'rgba(40,255,102,.25)':'rgba(255,59,95,.25)'};border-radius:8px;margin-bottom:4px;transition:background .2s,border-color .2s">
             <label class="toggle" style="flex-shrink:0">
               <input type="checkbox" ${item.enabled?'checked':''} onchange="toggleBotFeature('${item.key}',this.checked)">
               <span class="tsl"></span>
@@ -3179,7 +3235,7 @@ async function loadBotFeatures() {
               <div style="font-size:12px;font-weight:600;color:var(--text)">${item.label}</div>
               <div style="font-size:10px;color:var(--muted);margin-top:1px">${item.desc}</div>
             </div>
-            <div style="width:6px;height:6px;border-radius:50%;background:${item.enabled?'var(--accent)':'var(--muted2)'};flex-shrink:0"></div>
+            <div style="font-size:9px;font-weight:700;flex-shrink:0;color:${item.enabled?'var(--accent)':'#ff3b5f'}">${item.enabled?'● ACTIF':'● INACTIF'}</div>
           </div>`).join('')}
       </div>`).join('');
   } catch(e) { console.error('loadBotFeatures error:', e); }
@@ -3322,6 +3378,48 @@ function updateDurationVisibility() {
 }
 
 function setDuration(s) { document.getElementById('ban-duration').value = s; }
+
+async function loadAllowedWords() {
+  try {
+    const data = await get('/api/allowed-words') || [];
+    const countEl = document.getElementById('allowed-count');
+    if (countEl) countEl.textContent = data.length;
+    const el = document.getElementById('allowed-list');
+    if (!el) return;
+    if (!data.length) { el.innerHTML = '<div class="empty"><div class="ei">✅</div><p>Aucun mot autorisé</p></div>'; return; }
+    el.innerHTML = data.map(w => `
+      <div style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:var(--card2);border:1px solid var(--brd);border-radius:8px;margin-bottom:6px">
+        <div style="flex:1;min-width:0">
+          <div style="font-weight:600;font-family:monospace;color:var(--accent)">${esc(w.word)}</div>
+          ${w.note ? `<div style="font-size:11px;color:var(--muted);margin-top:2px">${esc(w.note)}</div>` : ''}
+        </div>
+        <button class="btnx btn-red btn-sm" onclick="deleteAllowedWordPanel(${w.id})">✕</button>
+      </div>`).join('');
+  } catch(e) {}
+}
+
+async function addAllowedWord() {
+  const word = document.getElementById('allow-word').value.trim();
+  const note = document.getElementById('allow-note').value.trim();
+  if (!word) return showInline('allow-msg', 'Entre un mot ou une expression', false);
+
+  const r = await fetch('/api/admin/allowed-words', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ word, note })
+  });
+  if (!r.ok) return showInline('allow-msg', 'Erreur lors de l\u2019ajout', false);
+  toast('✅ Mot autorisé ajouté');
+  document.getElementById('allow-word').value = '';
+  document.getElementById('allow-note').value = '';
+  loadAllowedWords();
+}
+
+async function deleteAllowedWordPanel(id) {
+  if (!confirm('Retirer ce mot de la liste blanche ?')) return;
+  await fetch('/api/admin/allowed-words/' + id, { method: 'DELETE' });
+  toast('Mot retiré de la liste blanche');
+  loadAllowedWords();
+}
 
 async function addBannedWord() {
   const word     = document.getElementById('ban-word').value.trim();

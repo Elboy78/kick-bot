@@ -406,6 +406,10 @@ app.post('/api/admin/banned-words',    requireAuth, async (req,res) => { try { c
 app.delete('/api/admin/banned-words/:id', requireAuth, async (req,res) => { try { await db.deleteBannedWord(req.params.id); res.json({success:true}); } catch(e){res.status(500).json({error:e.message}); }});
 app.post('/api/admin/banned-words/toggle', requireAuth, async (req,res) => { try { const {id,enabled}=req.body; await db.toggleBannedWord(id,enabled); res.json({success:true}); } catch(e){res.status(500).json({error:e.message}); }});
 
+app.get('/api/allowed-words',            async (req,res) => { try { res.json({data: await db.getAllowedWords()}); } catch(e){res.json({data:[]}); }});
+app.post('/api/admin/allowed-words',     requireAuth, async (req,res) => { try { const {word,note}=req.body; if(!word) return res.status(400).json({error:'mot requis'}); await db.addAllowedWord(word,note||''); res.json({success:true}); } catch(e){res.status(500).json({error:e.message}); }});
+app.delete('/api/admin/allowed-words/:id', requireAuth, async (req,res) => { try { await db.deleteAllowedWord(req.params.id); res.json({success:true}); } catch(e){res.status(500).json({error:e.message}); }});
+
 // Fonction commune pour appeler l'API Kick
 async function fetchKickAPI(channel) {
   const axios = require('axios');
