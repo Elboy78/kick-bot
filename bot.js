@@ -711,10 +711,12 @@ async function moderateUser(username, kickId, action, duration, word) {
   }
 
   if (official && userId) {
-    const broadcasterId = parseInt(CONFIG.channelId);
+    // broadcaster_user_id = ID UTILISATEUR de fack7up (différent de l'ID channel CONFIG.channelId)
+    const storedBroadcasterId = await db.getSettingStr('broadcaster_user_id', '');
+    const broadcasterId = parseInt(storedBroadcasterId) || parseInt(CONFIG.channelId);
     const userIdInt = parseInt(userId);
     if (!broadcasterId || !userIdInt) {
-      console.error(`[MOD] IDs invalides — broadcasterId=${broadcasterId} userId=${userIdInt} (channelId brut="${CONFIG.channelId}", userId brut="${userId}") — passage au fallback legacy`);
+      console.error(`[MOD] IDs invalides — broadcasterId=${broadcasterId} userId=${userIdInt} (broadcaster_user_id stocké="${storedBroadcasterId}", channelId brut="${CONFIG.channelId}", userId brut="${userId}") — passage au fallback legacy`);
     } else {
       try {
         const durationMinutes = action === 'ban' ? undefined : Math.max(1, Math.round((duration || 300) / 60));
@@ -887,6 +889,12 @@ async function fetchKickChannelOfficial() {
 
     const isLiveNow = !!(channel.stream && channel.stream.is_live);
     console.log(`[STREAM] API officielle OK — is_live=${isLiveNow} viewer_count=${channel.stream?.viewer_count ?? 'n/a'}`);
+
+    // broadcaster_user_id (ID utilisateur réel de fack7up) — différent de CONFIG.channelId
+    // qui est l'ID du CHANNEL. Requis pour l'API de modération officielle.
+    if (channel.broadcaster_user_id) {
+      db.setSettingStr('broadcaster_user_id', String(channel.broadcaster_user_id)).catch(()=>{});
+    }
 
     // On retourne toujours un objet (même si hors ligne) pour signaler que l'API a répondu
     return {
