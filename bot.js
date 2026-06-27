@@ -727,6 +727,15 @@ async function moderateUser(username, kickId, action, duration, word) {
 
         console.log('[MOD DEBUG] Body envoyé:', JSON.stringify(body));
 
+        // Diagnostic : vérifier qui est réellement authentifié avec ce token
+        try {
+          const whoami = await axios.get('https://api.kick.com/public/v1/users',
+            { headers: { 'Authorization': `Bearer ${token}`, 'Accept': 'application/json' } });
+          console.log('[MOD DEBUG] Identité du token (whoami):', JSON.stringify(whoami.data));
+        } catch(whoamiErr) {
+          console.log('[MOD DEBUG] whoami a échoué:', whoamiErr.response?.status, JSON.stringify(whoamiErr.response?.data));
+        }
+
         await axios.post(
           `https://api.kick.com/public/v1/moderation/bans`,
           body,
