@@ -721,7 +721,7 @@ async function moderateUser(username, kickId, action, duration, word) {
         const body = {
           broadcaster_user_id: broadcasterId,
           user_id: userIdInt,
-          reason: `Mot banni: ${word}`,
+          reason: 'Mot banni automatique',
         };
         if (durationMinutes) body.duration = durationMinutes;
 
@@ -735,7 +735,9 @@ async function moderateUser(username, kickId, action, duration, word) {
         console.log(`[MOD] ${username} ${action === 'ban' ? 'banni' : `timeout ${duration}s`} (API officielle) pour "${word}"`);
         return;
       } catch(err) {
-        console.error('[MOD] Erreur API officielle:', JSON.stringify(err.response?.data) || err.message);
+        console.error('[MOD] Erreur API officielle — status:', err.response?.status,
+          '| data:', JSON.stringify(err.response?.data),
+          '| headers:', JSON.stringify(err.response?.headers));
         if (!CONFIG.token) return;
         console.log('[MOD] Tentative via endpoint legacy...');
       }
