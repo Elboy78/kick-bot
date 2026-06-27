@@ -183,7 +183,7 @@ async function handleChatMessage(payload) {
     const banned = await db.checkBannedWords(content);
     if (banned) {
       console.log(`[MODÉRATION] Mot banni: "${banned.word}" de ${username}`);
-      await moderateUser(username, banned.action, banned.duration, banned.word);
+      await moderateUser(username, kickId, banned.action, banned.duration, banned.word);
       return;
     }
   }
@@ -699,27 +699,61 @@ async function startAnnouncements() {
 
 // ─── Modération ──────────────────────────────────────────────────────────────
 
-async function moderateUser(username, action, duration, word) {
-  const { token } = await getActiveToken();
+async function moderateUser(username, kickId, action, duration, word) {
+  const { token, official } = await getActiveToken();
   if (!token) { console.log(`[MOD] Simulation: ${action} ${username} pour "${word}"`); return; }
-  try {
-    if (action === 'ban') {
+
+  // Récupérer l'ID numérique Kick du viewer si on ne l'a pas déjà (requis par l'API officielle)
+  let userId = kickId;
+  if (!userId) {
+    const viewer = await db.getViewer(username);
+    userId = viewer?.kick_user_id || null;
+  }
+
+  if (official && userId) {
+    try {
+      const durationMinutes = action === 'ban' ? undefined : Math.max(1, Math.round((duration || 300) / 60));
+      const body = {
+        broadcaster_user_id: parseInt(CONFIG.channelId),
+        user_id: parseInt(userId),
+        reason: `Mot banni: ${word}`,
+      };
+      if (durationMinutes) body.duration = durationMinutes;
+
       await axios.post(
-        `https://kick.com/api/v2/channels/${CONFIG.channelId}/bans`,
-        { banned_username: username, permanent: true },
-        { headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json', 'Accept': 'application/json', 'User-Agent': 'Mozilla/5.0' } }
+        `https://api.kick.com/public/v1/moderation/bans`,
+        body,
+        { headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json', 'Accept': 'application/json' } }
       );
-      console.log(`[MOD] ${username} banni pour "${word}"`);
-    } else {
-      await axios.post(
-        `https://kick.com/api/v2/channels/${CONFIG.channelId}/bans`,
-        { banned_username: username, duration: duration || 300, permanent: false },
-        { headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json', 'Accept': 'application/json', 'User-Agent': 'Mozilla/5.0' } }
-      );
-      console.log(`[MOD] ${username} timeout ${duration}s pour "${word}"`);
+      console.log(`[MOD] ${username} ${action === 'ban' ? 'banni' : `timeout ${duration}s`} (API officielle) pour "${word}"`);
+      return;
+    } catch(err) {
+      console.error('[MOD] Erreur API officielle:', err.response?.data || err.message);
+      // On retente avec l'ancien endpoint seulement si on a un token manuel en fallback
+      if (!CONFIG.token) return;
+      console.log('[MOD] Tentative via endpoint legacy...');
     }
+  }
+
+  // Fallback : ancien endpoint interne (token manuel uniquement — l'API officielle
+  // OAuth se fait bloquer par Cloudflare sur cet endpoint legacy, donc on ne l'utilise
+  // qu'avec un vrai token de session manuel).
+  if (!CONFIG.token) {
+    console.log('[MOD] Pas de fallback disponible (pas de token manuel configuré) — action ignorée.');
+    return;
+  }
+  try {
+    const legacyBody = action === 'ban'
+      ? { banned_username: username, permanent: true }
+      : { banned_username: username, duration: duration || 300, permanent: false };
+    await axios.post(
+      `https://kick.com/api/v2/channels/${CONFIG.channelId}/bans`,
+      legacyBody,
+      { headers: { 'Authorization': `Bearer ${CONFIG.token}`, 'Content-Type': 'application/json', 'Accept': 'application/json', 'User-Agent': 'Mozilla/5.0' } }
+    );
+    console.log(`[MOD] ${username} ${action === 'ban' ? 'banni' : `timeout ${duration}s`} (legacy) pour "${word}"`);
   } catch(err) {
-    console.error('[MOD] Erreur modération:', err.response?.data || err.message);
+    console.error('[MOD] Erreur modération (legacy):', err.response?.data || err.message);
   }
 }
 
