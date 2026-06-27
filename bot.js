@@ -711,27 +711,34 @@ async function moderateUser(username, kickId, action, duration, word) {
   }
 
   if (official && userId) {
-    try {
-      const durationMinutes = action === 'ban' ? undefined : Math.max(1, Math.round((duration || 300) / 60));
-      const body = {
-        broadcaster_user_id: parseInt(CONFIG.channelId),
-        user_id: parseInt(userId),
-        reason: `Mot banni: ${word}`,
-      };
-      if (durationMinutes) body.duration = durationMinutes;
+    const broadcasterId = parseInt(CONFIG.channelId);
+    const userIdInt = parseInt(userId);
+    if (!broadcasterId || !userIdInt) {
+      console.error(`[MOD] IDs invalides — broadcasterId=${broadcasterId} userId=${userIdInt} (channelId brut="${CONFIG.channelId}", userId brut="${userId}") — passage au fallback legacy`);
+    } else {
+      try {
+        const durationMinutes = action === 'ban' ? undefined : Math.max(1, Math.round((duration || 300) / 60));
+        const body = {
+          broadcaster_user_id: broadcasterId,
+          user_id: userIdInt,
+          reason: `Mot banni: ${word}`,
+        };
+        if (durationMinutes) body.duration = durationMinutes;
 
-      await axios.post(
-        `https://api.kick.com/public/v1/moderation/bans`,
-        body,
-        { headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json', 'Accept': 'application/json' } }
-      );
-      console.log(`[MOD] ${username} ${action === 'ban' ? 'banni' : `timeout ${duration}s`} (API officielle) pour "${word}"`);
-      return;
-    } catch(err) {
-      console.error('[MOD] Erreur API officielle:', err.response?.data || err.message);
-      // On retente avec l'ancien endpoint seulement si on a un token manuel en fallback
-      if (!CONFIG.token) return;
-      console.log('[MOD] Tentative via endpoint legacy...');
+        console.log('[MOD DEBUG] Body envoyé:', JSON.stringify(body));
+
+        await axios.post(
+          `https://api.kick.com/public/v1/moderation/bans`,
+          body,
+          { headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json', 'Accept': 'application/json' } }
+        );
+        console.log(`[MOD] ${username} ${action === 'ban' ? 'banni' : `timeout ${duration}s`} (API officielle) pour "${word}"`);
+        return;
+      } catch(err) {
+        console.error('[MOD] Erreur API officielle:', JSON.stringify(err.response?.data) || err.message);
+        if (!CONFIG.token) return;
+        console.log('[MOD] Tentative via endpoint legacy...');
+      }
     }
   }
 
