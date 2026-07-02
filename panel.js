@@ -136,7 +136,7 @@ app.post('/webhook/kick', async (req, res) => {
       if (enabled) {
         const template = await db.getSettingStr('follow_announce_message', DEFAULT_FOLLOW_MSG);
         const message  = template.replace(/\{username\}/gi, username);
-        { await shared.shared.sendChat(message); console.log(`[FOLLOW] ${username}`); }
+        { await shared.sendChat(message); console.log(`[FOLLOW] ${username}`); }
       }
     }
 
@@ -147,7 +147,7 @@ app.post('/webhook/kick', async (req, res) => {
       if (enabled) {
         const template = await db.getSettingStr('sub_announce_new', DEFAULT_SUB_NEW_MSG);
         const message  = template.replace(/\{username\}/gi, username);
-        { await shared.shared.sendChat(message); console.log(`[SUB NEW] ${username}`); }
+        { await shared.sendChat(message); console.log(`[SUB NEW] ${username}`); }
       }
     }
 
@@ -159,7 +159,7 @@ app.post('/webhook/kick', async (req, res) => {
       if (enabled) {
         const template = await db.getSettingStr('sub_announce_renew', DEFAULT_SUB_RENEW_MSG);
         const message  = template.replace(/\{username\}/gi, username).replace(/\{months\}/gi, months);
-        { await shared.shared.sendChat(message); console.log(`[SUB RENEW] ${username} x${months}`); }
+        { await shared.sendChat(message); console.log(`[SUB RENEW] ${username} x${months}`); }
       }
     }
 
@@ -174,7 +174,7 @@ app.post('/webhook/kick', async (req, res) => {
         const message  = template
           .replace(/\{gifter\}/gi, isAnon ? 'un anonyme' : gifter)
           .replace(/\{count\}/gi, count);
-        { await shared.shared.sendChat(message); console.log(`[SUB GIFT] ${gifter} x${count}`); }
+        { await shared.sendChat(message); console.log(`[SUB GIFT] ${gifter} x${count}`); }
       }
     }
 
