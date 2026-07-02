@@ -410,6 +410,16 @@ app.get('/api/allowed-words',            async (req,res) => { try { res.json({da
 app.post('/api/admin/allowed-words',     requireAuth, async (req,res) => { try { const {word,note}=req.body; if(!word) return res.status(400).json({error:'mot requis'}); await db.addAllowedWord(word,note||''); res.json({success:true}); } catch(e){res.status(500).json({error:e.message}); }});
 app.delete('/api/admin/allowed-words/:id', requireAuth, async (req,res) => { try { await db.deleteAllowedWord(req.params.id); res.json({success:true}); } catch(e){res.status(500).json({error:e.message}); }});
 
+app.get('/api/moderation-logs', async (req,res) => {
+  try {
+    const limit = parseInt(req.query.limit) || 100;
+    res.json({ data: await db.getModerationLogs(limit) });
+  } catch(e) { res.json({ data: [] }); }
+});
+app.delete('/api/admin/moderation-logs', requireAuth, async (req,res) => {
+  try { await db.clearModerationLogs(); res.json({ success: true }); } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
 // Fonction commune pour appeler l'API Kick
 async function fetchKickAPI(channel) {
   const axios = require('axios');

@@ -118,6 +118,9 @@ function cleanup() {
 
 // ─── Événements ───────────────────────────────────────────────────────────────
 
+// Cache des 500 derniers messages pour retrouver le texte associé à un ban/timeout
+const recentMessages = new Map(); // username → { content, msgId }
+
 function handleEvent(msg) {
   const { event, data } = msg;
 
@@ -129,6 +132,22 @@ function handleEvent(msg) {
     case 'ChatMessageEvent': {
       let p; try { p = typeof data === 'string' ? JSON.parse(data) : data; } catch { break; }
       handleChatMessage(p);
+      break;
+    }
+
+    // Ban / Timeout (AI Mods, modérateur humain ou notre bot)
+    case 'App\\Events\\UserBannedEvent':
+    case 'UserBannedEvent': {
+      let p; try { p = typeof data === 'string' ? JSON.parse(data) : data; } catch { break; }
+      handleUserBanned(p);
+      break;
+    }
+
+    // Message supprimé (souvent lié à un ban/timeout)
+    case 'App\\Events\\ChatMessageDeletedEvent':
+    case 'ChatMessageDeleted': {
+      let p; try { p = typeof data === 'string' ? JSON.parse(data) : data; } catch { break; }
+      handleMessageDeleted(p);
       break;
     }
 
@@ -175,6 +194,9 @@ async function handleChatMessage(payload) {
   const isModOrBroadcaster = badges.some(b => b.type === 'moderator' || b.type === 'broadcaster');
 
   await db.upsertViewer(username, kickId);
+  // Mettre à jour le cache des derniers messages pour retrouver le contexte des bans
+  recentMessages.set(username.toLowerCase(), { content, kickId });
+  if (recentMessages.size > 500) recentMessages.delete(recentMessages.keys().next().value);
   db.logChatActivity(username).catch(e => console.error('[CHAT ACTIVITY] Erreur ignorée:', e.message));
   console.log(`[CHAT] ${username}: ${content}`);
 
@@ -504,6 +526,50 @@ async function cmdClip(username, parts) {
     console.error('[CLIP] Erreur:', e.message);
     sendChat(`@${username} Erreur lors du marquage du clip.`);
   }
+}
+
+async function handleUserBanned(payload) {
+  try {
+    // Structure Pusher : { user: {username, id}, banned_by: {username}, expires_at, permanent }
+    const username  = payload?.user?.username || payload?.username || '';
+    const bannedBy  = payload?.banned_by?.username || payload?.moderator?.username || 'inconnu';
+    const expiresAt = payload?.expires_at || null;
+    const permanent = payload?.permanent || !expiresAt;
+
+    // Calcul de la durée en secondes si c'est un timeout
+    let duration = null;
+    let type = 'ban';
+    if (!permanent && expiresAt) {
+      type = 'timeout';
+      const ms = new Date(expiresAt).getTime() - Date.now();
+      duration = Math.max(1, Math.round(ms / 1000));
+    }
+
+    // Récupérer le dernier message connu de cet utilisateur
+    const lastMsg = recentMessages.get(username.toLowerCase());
+    const msgContent = lastMsg?.content || '';
+
+    const durationLabel = type === 'ban' ? 'permanent' : `${duration}s`;
+    console.log(`[MOD LOG] ${type.toUpperCase()} — ${username} par ${bannedBy} (${durationLabel})${msgContent ? ` | dernier msg: "${msgContent}"` : ''}`);
+
+    await db.addModerationLog(type, username, duration, `Action par ${bannedBy}`, msgContent, bannedBy);
+  } catch(e) {
+    console.error('[MOD LOG] Erreur handleUserBanned:', e.message);
+  }
+}
+
+async function handleMessageDeleted(payload) {
+  try {
+    // Structure : { message: { id, content }, user: { username } }
+    const username = payload?.user?.username || payload?.username || '';
+    const content  = payload?.message?.content || payload?.content || '';
+    const msgId    = payload?.message?.id || '';
+
+    console.log(`[MOD LOG] MESSAGE SUPPRIMÉ — ${username}: "${content}"`);
+    // On ne logue pas en DB les suppressions simples (trop fréquentes), juste en console
+    // Elles seront visibles dans l'onglet Logs du panel via les logs récents.
+    // Un ban associé à cette suppression sera loggué via handleUserBanned.
+  } catch(e) { /* silencieux */ }
 }
 
 async function cmdAddCommand(username, parts, isModOrBroadcaster) {

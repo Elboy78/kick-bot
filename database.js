@@ -220,6 +220,16 @@ async function initSchema() {
       created_by  TEXT NOT NULL DEFAULT '',
       created_at  TEXT NOT NULL DEFAULT (datetime('now'))
     )`,
+    `CREATE TABLE IF NOT EXISTS moderation_logs (
+      id           INTEGER PRIMARY KEY AUTOINCREMENT,
+      type         TEXT NOT NULL DEFAULT 'ban',
+      username     TEXT NOT NULL DEFAULT '',
+      duration     INTEGER DEFAULT NULL,
+      reason       TEXT DEFAULT '',
+      message      TEXT DEFAULT '',
+      done_by      TEXT DEFAULT '',
+      created_at   TEXT NOT NULL DEFAULT (datetime('now'))
+    )`,
     `CREATE TABLE IF NOT EXISTS command_usage (
       id         INTEGER PRIMARY KEY AUTOINCREMENT,
       trigger    TEXT NOT NULL,
@@ -553,6 +563,22 @@ async function linkMomentToVod(id, vodId, vodUrl) {
 }
 
 // ─── Analytics : usage des commandes & activité du chat ────────────────────────
+
+// ─── Logs de modération ───────────────────────────────────────────────────────
+
+async function addModerationLog(type, username, duration, reason, message, doneBy) {
+  await run(`INSERT INTO moderation_logs (type, username, duration, reason, message, done_by)
+    VALUES (?, ?, ?, ?, ?, ?)`,
+    [type, (username||'').toLowerCase(), duration||null, reason||'', message||'', doneBy||'']);
+}
+
+async function getModerationLogs(limit = 100) {
+  return all(`SELECT * FROM moderation_logs ORDER BY created_at DESC LIMIT ?`, [limit]);
+}
+
+async function clearModerationLogs() {
+  await run(`DELETE FROM moderation_logs`);
+}
 
 async function logCommandUsage(trigger, username) {
   await run(`INSERT INTO command_usage (trigger, username) VALUES (?, ?)`, [trigger.toLowerCase(), (username||'').toLowerCase()]);
@@ -1121,6 +1147,7 @@ module.exports = {
   getCustomCommands, getCustomCommand, setCustomCommand, deleteCustomCommand, toggleCustomCommand,
   getObjectives, createObjective, deleteObjective, achieveObjective,
   startSession, endSession, getStreamHistory, recordViewerSample, getSessionsWithAvgViewers,
+  addModerationLog, getModerationLogs, clearModerationLogs,
   logCommandUsage, getCommandUsageStats, logChatActivity, getChatActivityWeek,
   getVodMoments, addVodMoment, deleteVodMoment, updateVodMomentLabel, getPendingLiveMoments, linkMomentToVod,
   createDuel, getPendingDuel, resolveDuel, cancelDuel, getRecentDuels,
