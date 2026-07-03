@@ -44,6 +44,12 @@ body.light{
 .sb-btnx{width:100%;padding:9px 12px;border-radius:10px;border:1px solid var(--brd2);background:transparent;color:var(--muted);font-size:10px;font-weight:600;cursor:pointer;font-family:inherit;transition:all .15s;text-align:left;display:flex;align-items:center;gap:7px;margin-bottom:5px}
 .sb-btnx:hover{background:var(--card);color:var(--text)}
 .sb-btnx.live-on{background:rgba(40,255,102,.1);color:var(--accent);border-color:rgba(40,255,102,.3)}
+.sb-btnx.stream-active{background:rgba(255,149,0,.1);color:#ff9500;border-color:rgba(255,149,0,.3)}
+.stream-blur{filter:blur(8px)!important;user-select:none!important;pointer-events:none!important}
+#search-overlay.open{display:flex}
+.search-item{padding:10px 12px;border-radius:8px;cursor:pointer;display:flex;align-items:center;gap:10px;font-size:13px;transition:background .1s}
+.search-item:hover,.search-item.active{background:var(--card2)}
+.search-item b{font-size:11px;color:var(--muted);font-weight:400;margin-left:auto}
 .sb-btnx.live-off{background:rgba(255,0,60,.1);color:#ff3b5f;border-color:rgba(255,0,60,.3)}
 .sb-upd{font-size:9px;color:var(--muted2);text-align:center;padding:4px 0}
 
@@ -239,6 +245,18 @@ hr.div{border:none;border-top:1px solid var(--brd);margin:12px 0}
 </head>
 <body>
 
+<!-- Modal recherche globale (Ctrl+K) -->
+<div id="search-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:9999;align-items:flex-start;justify-content:center;padding-top:80px" onclick="if(event.target===this)closeSearch()">
+  <div style="background:var(--card);border:1px solid var(--brd3);border-radius:16px;width:100%;max-width:560px;overflow:hidden;box-shadow:0 24px 64px rgba(0,0,0,.6)">
+    <div style="display:flex;align-items:center;gap:10px;padding:14px 16px;border-bottom:1px solid var(--brd)">
+      <span style="font-size:18px;color:var(--muted)">🔍</span>
+      <input id="search-input" class="inp" placeholder="Chercher un viewer, une commande, une page…" oninput="runSearch()" onkeydown="handleSearchKey(event)" style="border:none;background:transparent;font-size:15px;flex:1;outline:none;padding:0" autocomplete="off">
+      <kbd style="font-size:10px;color:var(--muted2);background:var(--card2);border:1px solid var(--brd);border-radius:4px;padding:2px 6px">Esc</kbd>
+    </div>
+    <div id="search-results" style="max-height:380px;overflow-y:auto;padding:8px"></div>
+  </div>
+</div>
+
 <aside class="sidebar">
   <div class="logo">🤖 Bot7uP</div>
   <nav class="menu">
@@ -275,6 +293,7 @@ hr.div{border:none;border-top:1px solid var(--brd);margin:12px 0}
   </div>
 
   <div class="sb-bottom">
+    <button class="sb-btnx" id="stream-mode-btn" onclick="toggleStreamMode()">🎥 Mode stream</button>
     <button class="sb-btnx" onclick="logout()">🚪 Déconnexion</button>
     <div class="sb-upd" id="upd"></div>
     <div class="sb-profile" onclick="showPage('settings')">
@@ -2841,6 +2860,166 @@ async function loadHeatmap() {
     if (labelsEl) labelsEl.innerHTML = DAYS_FR.map(d => `<span>${d}</span>`).join('');
   } catch(e) {}
 }
+
+// ── Mode Stream ───────────────────────────────────────────────────────────────
+
+let streamModeOn = false;
+
+// Sélecteurs des éléments contenant des infos sensibles à masquer
+const SENSITIVE_SELECTORS = [
+  '#ic-viewers',        // nombre de viewers exact
+  '#sb-followers',      // followers count
+  '#ic-live-badge',     // badge EN LIVE avec nb viewers
+  '#tts-api-key-current', // clé API ElevenLabs masquée
+  '#oauth-status-detail', // détails connexion OAuth (email bot)
+  '.points-log-item',   // logs de points (pseudos viewers)
+];
+
+function toggleStreamMode() {
+  streamModeOn = !streamModeOn;
+  const btn = document.getElementById('stream-mode-btn');
+  if (btn) {
+    btn.className = 'sb-btnx' + (streamModeOn ? ' stream-active' : '');
+    btn.textContent = streamModeOn ? '🔴 Mode stream ON' : '🎥 Mode stream';
+  }
+  SENSITIVE_SELECTORS.forEach(sel => {
+    document.querySelectorAll(sel).forEach(el => {
+      if (streamModeOn) el.classList.add('stream-blur');
+      else el.classList.remove('stream-blur');
+    });
+  });
+  // Masquer aussi les vraies valeurs numériques dans les stats
+  const statsEls = document.querySelectorAll('#ic-viewers, #sb-followers');
+  statsEls.forEach(el => {
+    if (streamModeOn) {
+      el.dataset.realVal = el.textContent;
+      el.textContent = '••••';
+    } else if (el.dataset.realVal) {
+      el.textContent = el.dataset.realVal;
+    }
+  });
+  toast(streamModeOn ? '🔴 Mode stream activé — infos sensibles masquées' : '✅ Mode stream désactivé');
+}
+
+// ── Recherche globale (Ctrl+K) ────────────────────────────────────────────────
+
+const SEARCH_PAGES = [
+  { icon:'🏠', label:'Dashboard',        page:'dashboard' },
+  { icon:'🏆', label:'Classement',       page:'classement' },
+  { icon:'🎚️', label:'Config Classement',page:'config-classement' },
+  { icon:'⚙️', label:'Commandes',        page:'commands' },
+  { icon:'🛡️', label:'Modération',       page:'moderation' },
+  { icon:'🎁', label:'Giveaways',        page:'jeux' },
+  { icon:'🎮', label:'Lobby',            page:'lobby' },
+  { icon:'🛠️', label:'Outils Chat',      page:'outils' },
+  { icon:'🔊', label:'TTS',              page:'tts' },
+  { icon:'🎬', label:'VODs & Clips',     page:'vods' },
+  { icon:'🎁', label:'Sub/Don',          page:'subdon' },
+  { icon:'📋', label:'Logs modération',  page:'logs' },
+  { icon:'🎯', label:'Objectifs',        page:'objectifs' },
+  { icon:'📋', label:'Historique',       page:'historique' },
+  { icon:'👥', label:'Admin',            page:'admin' },
+  { icon:'⚙️', label:'Paramètres',       page:'settings' },
+];
+
+let searchIdx = 0;
+let searchViewers = [];
+
+function openSearch() {
+  const overlay = document.getElementById('search-overlay');
+  const input   = document.getElementById('search-input');
+  if (!overlay || !input) return;
+  overlay.classList.add('open');
+  input.value = '';
+  input.focus();
+  runSearch();
+  // Pré-charger les viewers pour la recherche
+  get('/api/leaderboard?limit=200').then(d => { searchViewers = d || []; }).catch(()=>{});
+}
+
+function closeSearch() {
+  document.getElementById('search-overlay')?.classList.remove('open');
+}
+
+function handleSearchKey(e) {
+  const items = document.querySelectorAll('.search-item');
+  if (e.key === 'Escape') { closeSearch(); return; }
+  if (e.key === 'ArrowDown') { searchIdx = Math.min(searchIdx+1, items.length-1); highlightSearch(); e.preventDefault(); }
+  if (e.key === 'ArrowUp')   { searchIdx = Math.max(searchIdx-1, 0); highlightSearch(); e.preventDefault(); }
+  if (e.key === 'Enter') { items[searchIdx]?.click(); }
+}
+
+function highlightSearch() {
+  document.querySelectorAll('.search-item').forEach((el,i) => {
+    el.classList.toggle('active', i === searchIdx);
+  });
+}
+
+async function runSearch() {
+  const q = (document.getElementById('search-input')?.value || '').toLowerCase().trim();
+  const el = document.getElementById('search-results');
+  if (!el) return;
+  searchIdx = 0;
+
+  let results = [];
+
+  // Pages correspondantes
+  const matchPages = SEARCH_PAGES.filter(p =>
+    p.label.toLowerCase().includes(q) || p.page.includes(q)
+  );
+  results.push(...matchPages.map(p => ({
+    icon: p.icon, label: p.label, sub: 'Page', action: () => { closeSearch(); showPage(p.page); }
+  })));
+
+  // Viewers si au moins 2 caractères
+  if (q.length >= 2 && searchViewers.length) {
+    const matchViewers = searchViewers
+      .filter(v => v.username?.toLowerCase().includes(q))
+      .slice(0, 5);
+    results.push(...matchViewers.map(v => ({
+      icon: '👤',
+      label: v.username,
+      sub: `${(v.points||0).toLocaleString('fr')} pts · ${v.level||'Bronze'}`,
+      action: () => {
+        closeSearch();
+        showPage('classement');
+        // Pré-remplir le filtre du classement si disponible
+        setTimeout(() => {
+          const f = document.getElementById('lb-search');
+          if (f) { f.value = v.username; f.dispatchEvent(new Event('input')); }
+        }, 300);
+      }
+    })));
+  }
+
+  if (!results.length && q.length > 0) {
+    el.innerHTML = '<div style="padding:20px;text-align:center;color:var(--muted);font-size:12px">Aucun résultat pour « '+esc(q)+' »</div>';
+    return;
+  }
+  if (!q) {
+    el.innerHTML = '<div style="padding:16px 12px;font-size:11px;color:var(--muted2)">Navigue vers une page ou cherche un viewer (2 caractères min)</div>' +
+      SEARCH_PAGES.slice(0,6).map((p,i) => searchRow(p.icon, p.label, 'Page', i, () => { closeSearch(); showPage(p.page); })).join('');
+    highlightSearch();
+    return;
+  }
+
+  el.innerHTML = results.map((r,i) => searchRow(r.icon, r.label, r.sub, i, r.action)).join('');
+  highlightSearch();
+}
+
+function searchRow(icon, label, sub, idx, action) {
+  return `<div class="search-item" onclick="(${action.toString()})()" onmouseover="searchIdx=${idx};highlightSearch()">
+    <span style="font-size:16px">${icon}</span>
+    <span style="flex:1;font-weight:500">${esc(label)}</span>
+    <b>${esc(sub||'')}</b>
+  </div>`;
+}
+
+// Raccourci clavier Ctrl+K / Cmd+K
+document.addEventListener('keydown', e => {
+  if ((e.ctrlKey || e.metaKey) && e.key === 'k') { e.preventDefault(); openSearch(); }
+  if (e.key === 'Escape') closeSearch();
+});
 
 // ── Token Kick ────────────────────────────────────────────────────────────────
 
