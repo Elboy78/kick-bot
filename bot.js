@@ -602,9 +602,9 @@ async function cmdFollowage(username, parts) {
     const self = target === username.toLowerCase();
 
     if (self) {
-      sendChat(`📅 @${username} tu suis la chaîne depuis ${duree} — ${timeWatched} regardées, ${sessions} live${sessions > 1 ? 's' : ''} !`);
+      sendChat(`📅 @${username} premier message il y a ${duree} — ${timeWatched} regardées sur cette chaîne !`);
     } else {
-      sendChat(`📅 ${displayName} est là depuis ${duree} — ${timeWatched} regardées, ${sessions} live${sessions > 1 ? 's' : ''} !`);
+      sendChat(`📅 ${displayName} — premier message il y a ${duree}, ${timeWatched} regardées sur cette chaîne !`);
     }
   } catch(e) {
     console.error('[FC] Erreur:', e.message);
