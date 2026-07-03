@@ -380,6 +380,19 @@ hr.div{border:none;border-top:1px solid var(--brd);margin:12px 0}
           <li><span>Version</span><span>v2.1.0</span></li>
         </ul>
       </div>
+
+      <!-- Courbe viewers live -->
+      <div class="panel">
+        <h3>📈 Viewers en direct <span id="viewers-live-status" style="font-size:10px;color:var(--muted);font-weight:400">hors ligne</span></h3>
+        <div id="viewers-live-chart" style="height:80px;display:flex;align-items:flex-end;gap:3px;padding:4px 0">
+          <div style="color:var(--muted);font-size:11px;width:100%;text-align:center;line-height:80px">Démarre quand tu es en live</div>
+        </div>
+        <div style="display:flex;justify-content:space-between;font-size:9px;color:var(--muted2);margin-top:4px">
+          <span id="viewers-live-min">min</span>
+          <span id="viewers-live-avg">moy</span>
+          <span id="viewers-live-peak">pic</span>
+        </div>
+      </div>
     </section>
   </div>
 
@@ -827,13 +840,28 @@ Option 3" rows="4"></textarea><div style="display:flex;gap:6px;margin-top:10px">
 
   <!-- ══ HISTORIQUE ══ -->
   <div class="page" id="page-historique">
-    <div class="header"><div><h1>Historique</h1><p>Sessions et activité du bot</p></div></div>
+    <div class="header"><div><h1>Historique</h1><p>Sessions, fidélité et activité du bot</p></div></div>
     <div class="panel" style="margin-bottom:14px">
       <h3>📈 Moyenne de viewers par live</h3>
       <div style="font-size:10px;color:var(--muted);margin-bottom:10px">Moyenne de viewers connectés sur chaque session de stream — pour voir si l'audience est en hausse.</div>
       <div id="viewers-trend-chart" style="height:200px;display:flex;align-items:flex-end;gap:6px;padding:10px 4px 0"></div>
       <div id="viewers-trend-labels" style="display:flex;justify-content:space-between;padding:0 4px;margin-top:6px"></div>
     </div>
+
+    <!-- Heatmap activité -->
+    <div class="panel" style="margin-bottom:14px">
+      <h3>🌡️ Activité par jour (28 derniers jours)</h3>
+      <div style="font-size:10px;color:var(--muted);margin-bottom:12px">Les jours où ton chat est le plus actif en moyenne — utile pour choisir quand streamer.</div>
+      <div id="heatmap-bars" style="display:flex;gap:8px;align-items:flex-end;height:80px"></div>
+      <div id="heatmap-labels" style="display:flex;justify-content:space-between;margin-top:6px;font-size:10px;color:var(--muted)"></div>
+    </div>
+
+    <!-- Top fidélité -->
+    <div class="panel" style="margin-bottom:14px">
+      <h3>❤️ Top fidélité <span style="font-size:10px;color:var(--muted);font-weight:400">— classé par temps regardé, pas par points</span></h3>
+      <div id="fidelity-list"><div class="empty"><div class="ei">⏳</div><p>Chargement…</p></div></div>
+    </div>
+
     <div class="g2">
       <div><div class="panel"><h3>📅 Sessions de stream</h3><div id="hist-list"><div class="empty"><div class="ei">📅</div><p>Chargement…</p></div></div></div></div>
       <div><div class="panel"><h3>📊 Logs de points</h3><div style="max-height:480px;overflow-y:auto" id="full-logs"><div class="empty"><p>Chargement…</p></div></div></div></div>
@@ -957,7 +985,7 @@ function showPage(name) {
   if(name==='config-classement') loadConfigClassement();
   if(name==='jeux') { loadDuels(); loadGiveaways(); loadActiveGiveaway(); }
   if(name==='objectifs') loadObjectives();
-  if(name==='historique') { loadHistory(); loadFullLogs(); loadViewersTrend(); }
+  if(name==='historique') { loadHistory(); loadFullLogs(); loadViewersTrend(); loadFidelityList(); loadHeatmap(); }
   if(name==='vods') loadVods();
   if(name==='subdon') { loadFollowAnnounce(); loadSubAnnounce(); loadSubDonPreview(); }
   if(name==='logs') loadModerationLogs();
@@ -1629,6 +1657,10 @@ async function loadLiveStatus() {
 }
 
 function updateLiveUI(live, viewers, followers) {
+  // Enregistrer l'échantillon viewers pour la courbe temps réel du Dashboard
+  if (live) pushViewersSample(viewers);
+  else if (!live && viewersLiveHistory.length) renderViewersLiveChart();
+
   // Pill sidebar
   const pill = document.getElementById('live-pill');
   const txt  = document.getElementById('live-text');
@@ -2707,6 +2739,107 @@ async function clearModerationLogs() {
   allModLogs = [];
   filterModerationLogs();
   toast('Logs vidés ✓');
+}
+
+// ── Courbe viewers live (temps réel, sampled toutes les 30s via loadLiveStatus) ─────
+
+const viewersLiveHistory = []; // { time, count } — max 60 points = 30 min
+
+function pushViewersSample(count) {
+  if (!count && count !== 0) return;
+  viewersLiveHistory.push({ time: Date.now(), count });
+  if (viewersLiveHistory.length > 60) viewersLiveHistory.shift();
+  renderViewersLiveChart();
+}
+
+function renderViewersLiveChart() {
+  const chart = document.getElementById('viewers-live-chart');
+  const statusEl = document.getElementById('viewers-live-status');
+  const minEl  = document.getElementById('viewers-live-min');
+  const avgEl  = document.getElementById('viewers-live-avg');
+  const peakEl = document.getElementById('viewers-live-peak');
+  if (!chart) return;
+
+  if (!viewersLiveHistory.length) {
+    chart.innerHTML = '<div style="color:var(--muted);font-size:11px;width:100%;text-align:center;line-height:80px">Démarre quand tu es en live</div>';
+    return;
+  }
+
+  const counts = viewersLiveHistory.map(s => s.count);
+  const maxV   = Math.max(1, ...counts);
+  const minV   = Math.min(...counts);
+  const avgV   = Math.round(counts.reduce((a,b)=>a+b,0) / counts.length);
+  const peakV  = Math.max(...counts);
+
+  if (statusEl) statusEl.textContent = `${counts[counts.length-1]} viewers — ${viewersLiveHistory.length} mesures`;
+  if (minEl)  minEl.textContent  = `min ${minV}`;
+  if (avgEl)  avgEl.textContent  = `moy ${avgV}`;
+  if (peakEl) peakEl.textContent = `pic ${peakV}`;
+
+  chart.innerHTML = viewersLiveHistory.map(s => {
+    const h = Math.max(4, Math.round((s.count / maxV) * 76));
+    return `<div style="flex:1;height:${h}px;background:var(--accent);border-radius:2px 2px 0 0;opacity:.8" title="${s.count} viewers"></div>`;
+  }).join('');
+}
+
+// ── Fidélité ──────────────────────────────────────────────────────────────────
+
+async function loadFidelityList() {
+  const el = document.getElementById('fidelity-list');
+  if (!el) return;
+  try {
+    const data = await get('/api/analytics/fidelity') || [];
+    if (!data.length) { el.innerHTML = '<div class="empty"><div class="ei">❤️</div><p>Aucune donnée de fidélité pour le moment</p></div>'; return; }
+
+    const MEDALS = ['🥇','🥈','🥉'];
+    el.innerHTML = `<table style="width:100%;border-collapse:collapse">
+      <thead><tr style="font-size:9px;color:var(--muted);text-transform:uppercase;border-bottom:1px solid var(--brd)">
+        <th style="padding:6px 4px;text-align:left">#</th>
+        <th style="padding:6px 4px;text-align:left">Viewer</th>
+        <th style="padding:6px 4px;text-align:right">Temps regardé</th>
+        <th style="padding:6px 4px;text-align:right">Lives</th>
+        <th style="padding:6px 4px;text-align:right">Points</th>
+      </tr></thead>
+      <tbody>
+        ${data.slice(0, 20).map((v, i) => {
+          const mins = v.total_minutes || 0;
+          const timeStr = mins >= 60 ? `${Math.floor(mins/60)}h${String(mins%60).padStart(2,'0')}m` : `${mins}m`;
+          return `<tr style="border-bottom:1px solid var(--brd);font-size:12px">
+            <td style="padding:8px 4px"><span style="font-weight:700">${MEDALS[i] || '#'+(i+1)}</span></td>
+            <td style="padding:8px 4px;font-weight:600">${esc(v.username)}</td>
+            <td style="padding:8px 4px;text-align:right;color:var(--accent);font-weight:700">${timeStr}</td>
+            <td style="padding:8px 4px;text-align:right;color:var(--muted)">${v.sessions || 0}</td>
+            <td style="padding:8px 4px;text-align:right;color:var(--muted)">${(v.points||0).toLocaleString('fr')}</td>
+          </tr>`;
+        }).join('')}
+      </tbody>
+    </table>`;
+  } catch(e) { el.innerHTML = '<div class="empty"><div class="ei">⚠️</div><p>Erreur de chargement</p></div>'; }
+}
+
+// ── Heatmap activité chat par jour ───────────────────────────────────────────
+
+async function loadHeatmap() {
+  const barsEl   = document.getElementById('heatmap-bars');
+  const labelsEl = document.getElementById('heatmap-labels');
+  if (!barsEl) return;
+  try {
+    const data = await get('/api/analytics/heatmap') || {};
+    const DAYS_FR = ['Dim','Lun','Mar','Mer','Jeu','Ven','Sam'];
+    const values  = DAYS_FR.map((_, i) => data[i] ? Math.round(data[i].total / Math.max(1, data[i].count)) : 0);
+    const maxV    = Math.max(1, ...values);
+
+    barsEl.innerHTML = values.map((v, i) => {
+      const h = Math.max(4, Math.round((v / maxV) * 76));
+      const isToday = i === new Date().getDay();
+      return `<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:4px">
+        <div style="font-size:9px;color:var(--muted)">${v || ''}</div>
+        <div style="width:100%;height:${h}px;background:${isToday?'var(--accent)':'#3a4a6b'};border-radius:3px 3px 0 0" title="${DAYS_FR[i]}: ~${v} msg/live en moyenne"></div>
+      </div>`;
+    }).join('');
+
+    if (labelsEl) labelsEl.innerHTML = DAYS_FR.map(d => `<span>${d}</span>`).join('');
+  } catch(e) {}
 }
 
 // ── Token Kick ────────────────────────────────────────────────────────────────

@@ -20,7 +20,7 @@ const CONFIG = {
 };
 
 const PUSHER_URL = 'wss://ws-us2.pusher.com/app/32cbd69e4b950bf97679?protocol=7&client=js&version=7.4.0&flash=false';
-const SYSTEM_COMMANDS = ['!points','!top','!rang','!niveau','!aide','!duel','!accepter','!refuser','!participer','!giveaway','!lobby','!quote','!addquote','!mort','!death','!score','!queue','!join','!leave','!pos','!vote','!sondage','!so','!uptime','!dice','!des','!rps','!pfc','!clip','!addcmd','!delcmd','!addword','!delword','!allowword','!disallowword'];
+const SYSTEM_COMMANDS = ['!points','!top','!rang','!niveau','!aide','!duel','!accepter','!refuser','!participer','!giveaway','!lobby','!quote','!addquote','!mort','!death','!score','!queue','!join','!leave','!pos','!vote','!sondage','!so','!uptime','!fc','!dice','!des','!rps','!pfc','!clip','!addcmd','!delcmd','!addword','!delword','!allowword','!disallowword'];
 
 let ws             = null;
 let reconnectDelay = 5000;
@@ -247,6 +247,7 @@ async function handleChatMessage(payload) {
       case '!sondage':   return (await db.getSetting('poll_enabled')) ? cmdPollInfo(username) : null;
       case '!so':        return (await db.getSetting('shoutout_enabled')) ? cmdShoutout(username, parts) : null;
       case '!uptime':    return (await db.getSetting('uptime_enabled')) ? cmdUptime(username) : null;
+      case '!fc':        return cmdFollowage(username, parts);
       case '!clip':      return (await db.getSetting('clip_enabled')) ? cmdClip(username, parts) : null;
       case '!addcmd':    return cmdAddCommand(username, parts, isModOrBroadcaster);
       case '!delcmd':    return cmdDelCommand(username, parts, isModOrBroadcaster);
@@ -558,6 +559,57 @@ async function cmdUptime(username) {
   const s = diff % 60;
   const time = h > 0 ? `${h}h ${m}min` : m > 0 ? `${m}min ${s}s` : `${s}s`;
   sendChat(`⏱ Le stream est en ligne depuis ${time}`);
+}
+
+async function cmdFollowage(username, parts) {
+  // !fc → ses propres stats | !fc pseudo → stats d'un autre
+  const target = parts[1] ? parts[1].replace(/^@/, '').toLowerCase() : username.toLowerCase();
+  const displayName = parts[1] ? parts[1].replace(/^@/, '') : username;
+
+  try {
+    const viewer = await db.getViewerFirstSeen(target);
+    if (!viewer) {
+      return sendChat(`@${username} ${displayName} n'a jamais écrit dans le chat — impossible de calculer son ancienneté.`);
+    }
+
+    // Ancienneté depuis le premier message dans le chat
+    const firstSeen = new Date(viewer.first_seen + 'Z');
+    const now = new Date();
+    const diffMs = now - firstSeen;
+    const days  = Math.floor(diffMs / 86400000);
+    const h     = Math.floor((diffMs % 86400000) / 3600000);
+
+    let duree;
+    if (days >= 365) {
+      const years = Math.floor(days / 365);
+      const rem   = days % 365;
+      duree = `${years} an${years > 1 ? 's' : ''} et ${rem} jour${rem > 1 ? 's' : ''}`;
+    } else if (days >= 30) {
+      const months = Math.floor(days / 30);
+      duree = `${months} mois et ${days % 30} jour${days % 30 > 1 ? 's' : ''}`;
+    } else if (days > 0) {
+      duree = `${days} jour${days > 1 ? 's' : ''} et ${h}h`;
+    } else {
+      duree = `${h}h (tout frais !)`;
+    }
+
+    const mins = viewer.total_minutes || 0;
+    const timeWatched = mins >= 60
+      ? `${Math.floor(mins/60)}h${String(mins%60).padStart(2,'0')}min`
+      : `${mins}min`;
+
+    const sessions = viewer.sessions || 0;
+    const self = target === username.toLowerCase();
+
+    if (self) {
+      sendChat(`📅 @${username} tu suis la chaîne depuis ${duree} — ${timeWatched} regardées, ${sessions} live${sessions > 1 ? 's' : ''} !`);
+    } else {
+      sendChat(`📅 ${displayName} est là depuis ${duree} — ${timeWatched} regardées, ${sessions} live${sessions > 1 ? 's' : ''} !`);
+    }
+  } catch(e) {
+    console.error('[FC] Erreur:', e.message);
+    sendChat(`@${username} Impossible de récupérer les infos pour le moment.`);
+  }
 }
 
 async function cmdClip(username, parts) {

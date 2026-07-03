@@ -651,7 +651,40 @@ async function getSessionsWithAvgViewers(limit = 14) {
   return all(`SELECT id, started_at, avg_viewers, peak_viewers, duration_min FROM stream_sessions WHERE ended_at IS NOT NULL ORDER BY started_at DESC LIMIT ?`, [limit]);
 }
 
-// ─── Duels ────────────────────────────────────────────────────────────────────
+// Classement fidélité (temps regardé cumulé, pas points)
+async function getFidelityLeaderboard(limit = 50) {
+  const rows = await all(`
+    SELECT username, total_minutes, sessions, points, level, first_seen, last_seen
+    FROM viewers
+    WHERE total_minutes > 0
+    ORDER BY total_minutes DESC, sessions DESC
+    LIMIT ?
+  `, [limit]);
+  return rows.map((v, i) => ({ ...v, rank: i + 1 }));
+}
+
+// Heatmap : activité par heure et jour de la semaine (7 derniers jours)
+async function getChatHeatmap() {
+  // Reconstruit depuis chat_activity_daily — on agrège par jour de semaine
+  const rows = await all(`SELECT date, message_count FROM chat_activity_daily WHERE date >= date('now', '-28 days') ORDER BY date ASC`);
+  const heatmap = {};
+  rows.forEach(r => {
+    const d = new Date(r.date + 'T12:00:00Z'); // midi UTC évite les décalages de jour
+    const dow = d.getUTCDay(); // 0=dim, 1=lun...
+    if (!heatmap[dow]) heatmap[dow] = { total: 0, count: 0 };
+    heatmap[dow].total += r.message_count;
+    heatmap[dow].count += 1;
+  });
+  return heatmap; // { 0: { total, count }, 1: ... }
+}
+
+// Followage : date du premier message (proxy pour depuis quand il est là)
+async function getViewerFirstSeen(username) {
+  const row = await get(`SELECT first_seen, total_minutes, sessions FROM viewers WHERE username = ?`, [username.toLowerCase()]);
+  return row || null;
+}
+
+
 
 async function createDuel(challenger, opponent, amount) {
   const db = getDB();
@@ -1147,6 +1180,7 @@ module.exports = {
   getCustomCommands, getCustomCommand, setCustomCommand, deleteCustomCommand, toggleCustomCommand,
   getObjectives, createObjective, deleteObjective, achieveObjective,
   startSession, endSession, getStreamHistory, recordViewerSample, getSessionsWithAvgViewers,
+  getFidelityLeaderboard, getChatHeatmap, getViewerFirstSeen,
   addModerationLog, getModerationLogs, clearModerationLogs,
   logCommandUsage, getCommandUsageStats, logChatActivity, getChatActivityWeek,
   getVodMoments, addVodMoment, deleteVodMoment, updateVodMomentLabel, getPendingLiveMoments, linkMomentToVod,
