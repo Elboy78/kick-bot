@@ -852,11 +852,6 @@ async function cmdRPS(username, parts) {
   sendChat(`${emojis[userIdx]} vs ${emojis[botIdx]} — ${result} !`);
 }
 
-async function cmdFollowage(username, parts) {
-  const target = parts[1]?.replace('@', '') || username;
-  sendChat(`@${username} Je ne peux pas vérifier le followage sans l'API officielle Kick. Désolé !`);
-}
-
 // ─── Announcements automatiques ───────────────────────────────────────────────
 
 async function startAnnouncements() {
