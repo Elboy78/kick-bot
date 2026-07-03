@@ -213,10 +213,6 @@ async function handleChatMessage(payload) {
   const parts = content.trim().split(' ');
   const cmd   = parts[0].toLowerCase();
 
-  if (cmd.includes('lobby')) {
-    console.log(`[DEBUG LOBBY] cmd="${cmd}" (longueur ${cmd.length}) — codes: [${[...cmd].map(c=>c.charCodeAt(0)).join(',')}] — SYSTEM_COMMANDS.includes: ${SYSTEM_COMMANDS.includes(cmd)}`);
-  }
-
   // Commandes système
   if (SYSTEM_COMMANDS.includes(cmd)) {
     const enabled = await db.isSystemCmdEnabled(cmd);
@@ -235,7 +231,6 @@ async function handleChatMessage(payload) {
       case '!giveaway':  return (await db.getSetting('giveaway_enabled')) ? cmdGiveawayInfo(username) : null;
       case '!lobby': {
         const lobbyOn = await db.getSetting('lobby_enabled');
-        console.log(`[DEBUG LOBBY] getSetting('lobby_enabled') = ${lobbyOn}`);
         return lobbyOn ? cmdLobby(username) : null;
       }
       case '!quote':     return (await db.getSetting('quote_enabled')) ? cmdQuote(username, parts) : null;
@@ -311,16 +306,83 @@ async function cmdNiveau(username) {
 }
 
 async function cmdAide(username) {
-  const customs = (await db.getCustomCommands()).map(c => c.trigger).join(' ');
-  sendChat(`@${username} Commandes → !points !top !rang !niveau !duel !accepter !refuser !participer !giveaway !lobby !aide${customs ? ' | ' + customs : ''}`);
+  try {
+    // Commandes système activées — on lit l'état réel depuis la DB
+    const [systemStates, settings, customs] = await Promise.all([
+      db.getAllSystemCommandsState(),
+      db.getAllSettings(),
+      db.getCustomCommands(),
+    ]);
+
+    // Map des états des commandes système (trigger → enabled)
+    const stateMap = {};
+    systemStates.forEach(s => { stateMap[s.trigger] = s.enabled !== 0 && s.enabled !== false; });
+
+    // Map des fonctionnalités (pour exclure les commandes liées à une fonctionnalité désactivée)
+    const settingMap = {};
+    settings.forEach(s => { settingMap[s.key] = s.value === '1'; });
+
+    // Correspondance commande → clé de fonctionnalité associée
+    const cmdFeature = {
+      '!points': 'points_enabled',  '!top': 'points_enabled',
+      '!rang': 'points_enabled',    '!niveau': 'points_enabled',
+      '!duel': 'duel_enabled',      '!accepter': 'duel_enabled',    '!refuser': 'duel_enabled',
+      '!giveaway': 'giveaway_enabled', '!participer': 'giveaway_enabled',
+      '!lobby': 'lobby_enabled',
+      '!quote': 'quote_enabled',    '!addquote': 'quote_enabled',
+      '!uptime': 'uptime_enabled',
+      '!so': 'shoutout_enabled',
+      '!vote': 'poll_enabled',      '!sondage': 'poll_enabled',
+      '!dice': 'dice_enabled',      '!des': 'dice_enabled',
+      '!rps': 'dice_enabled',       '!pfc': 'dice_enabled',
+      '!clip': 'clip_enabled',
+    };
+
+    // Garder seulement ce qui est visible par les viewers (pas les commandes mod/admin)
+    const modOnly = ['!addcmd','!delcmd','!addword','!delword','!allowword','!disallowword'];
+    const visibleCmds = SYSTEM_COMMANDS.filter(cmd => {
+      if (modOnly.includes(cmd)) return false;
+      if (!(stateMap[cmd] ?? true)) return false; // désactivé dans system_commands_state
+      const feature = cmdFeature[cmd];
+      if (feature && !(settingMap[feature] ?? true)) return false; // fonctionnalité désactivée
+      return true;
+    });
+
+    // Commandes custom actives (excl. doublons avec système)
+    const customList = customs
+      .filter(c => c.enabled !== 0 && c.enabled !== false)
+      .map(c => c.trigger);
+
+    const all = [...visibleCmds, ...customList];
+    if (!all.length) {
+      sendChat(`@${username} Aucune commande activée pour le moment.`);
+      return;
+    }
+
+    // Kick limite les messages à ~500 caractères — on pagine si nécessaire
+    const prefix = `Commandes disponibles → `;
+    let line = prefix;
+    const lines = [];
+    for (const cmd of all) {
+      if ((line + cmd + ' ').length > 450) {
+        lines.push(line.trim());
+        line = '';
+      }
+      line += cmd + ' ';
+    }
+    if (line.trim()) lines.push(line.trim());
+
+    // N'envoyer que le premier message (les viewers peuvent retaper !aide pour voir le reste)
+    sendChat(`@${username} ${lines[0]}${lines.length > 1 ? ` (+${all.length - lines[0].split(' ').length + 1} autres)` : ''}`);
+  } catch(e) {
+    sendChat(`@${username} Commandes → !points !top !rang !niveau !lobby !duel !clip`);
+  }
 }
 
 async function cmdLobby(username) {
-  console.log(`[LOBBY] Commande !lobby reçue de ${username}`);
   const already = (await db.getLobby()).find(v => v.username === username.toLowerCase());
-  if (already) { console.log(`[LOBBY] ${username} déjà dans le lobby`); return; }
-  const ok = await db.joinLobby(username);
-  console.log(`[LOBBY] Ajout de ${username}: ${ok ? 'succès' : 'échec'}`);
+  if (already) return;
+  await db.joinLobby(username);
   // Ajout silencieux dans le chat — visible directement dans le panel
 }
 
