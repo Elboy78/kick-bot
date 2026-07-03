@@ -259,6 +259,7 @@ hr.div{border:none;border-top:1px solid var(--brd);margin:12px 0}
 
 <aside class="sidebar">
   <div class="logo">🤖 Bot7uP</div>
+  <button class="sb-btnx" id="stream-mode-btn" onclick="toggleStreamMode()" style="margin:6px 0 4px">🎥 Mode stream</button>
   <nav class="menu">
     <a class="active" onclick="showPage('dashboard')">🏠 Dashboard</a>
     <a onclick="showPage('classement')">🏆 Classement</a>
@@ -293,7 +294,6 @@ hr.div{border:none;border-top:1px solid var(--brd);margin:12px 0}
   </div>
 
   <div class="sb-bottom">
-    <button class="sb-btnx" id="stream-mode-btn" onclick="toggleStreamMode()">🎥 Mode stream</button>
     <button class="sb-btnx" onclick="logout()">🚪 Déconnexion</button>
     <div class="sb-upd" id="upd"></div>
     <div class="sb-profile" onclick="showPage('settings')">
