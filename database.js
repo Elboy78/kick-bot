@@ -1115,13 +1115,13 @@ async function toggleBannedWord(id, enabled) {
 
 async function checkBannedWords(message) {
   const words = await all(`SELECT * FROM banned_words WHERE enabled = 1`);
-  const allowed = await all(`SELECT word FROM allowed_words`);
   const lower = message.toLowerCase();
 
-  // Si un mot de la liste blanche apparaît dans le message, on ne le traite jamais
-  // comme un déclenchement — utile pour les faux positifs (ex: "classe" contient "ass").
-  const isWhitelisted = allowed.some(a => lower.includes(a.word.toLowerCase()));
-  if (isWhitelisted) return null;
+  // Liste blanche — protégé contre l'absence de la table (migration pas encore appliquée)
+  try {
+    const allowed = await all(`SELECT word FROM allowed_words`);
+    if (allowed.some(a => lower.includes(a.word.toLowerCase()))) return null;
+  } catch(e) { /* table pas encore créée — on ignore */ }
 
   for (const w of words) {
     if (lower.includes(w.word.toLowerCase())) return w;

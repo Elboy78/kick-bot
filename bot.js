@@ -202,11 +202,15 @@ async function handleChatMessage(payload) {
 
   // Vérifier les mots bannis
   if (await db.getSetting('moderation_enabled')) {
-    const banned = await db.checkBannedWords(content);
-    if (banned) {
-      console.log(`[MODÉRATION] Mot banni: "${banned.word}" de ${username}`);
-      await moderateUser(username, kickId, banned.action, banned.duration, banned.word);
-      return;
+    try {
+      const banned = await db.checkBannedWords(content);
+      if (banned) {
+        console.log(`[MODÉRATION] Mot banni: "${banned.word}" de ${username}`);
+        await moderateUser(username, kickId, banned.action, banned.duration, banned.word);
+        return;
+      }
+    } catch(e) {
+      console.error('[MOD] Erreur checkBannedWords (ignorée):', e.message);
     }
   }
 
