@@ -1092,6 +1092,23 @@ async function syncVodMetadataFromBrowser() {
 }
 
 async function checkLiveStatus() {
+  try {
+  } catch(e) {
+    console.error('[STREAM] Erreur checkLiveStatus (ignorée):', e.message);
+  }
+}
+async function syncVodMetadataFromBrowser() {
+  try {
+    const PORT = parseInt(process.env.PANEL_PORT || '3000');
+    const r = await axios.get(`http://localhost:${PORT}/api/live`, { timeout: 3000 });
+    if (r.data?.live) {
+      if (r.data.vodUuid)     await db.setSettingStr('current_vod_uuid', r.data.vodUuid);
+      if (r.data.streamTitle) await db.setSettingStr('current_stream_title', r.data.streamTitle);
+    }
+  } catch(e) { /* panel pas encore prêt ou hors ligne — pas grave, on retentera au prochain cycle */ }
+}
+
+async function checkLiveStatus() {
   const data = await fetchKickChannel();
   db.setBotStatus('last_live_check_at', Date.now().toString()).catch(()=>{});
 
@@ -1232,24 +1249,23 @@ async function syncPointsConfig() {
 }
 
 async function distributePoints() {
-  if (!isLive) {
-    console.log('[POINTS] Hors ligne — pas de points distribuĂŠs.');
-    return;
+  try {
+    if (!isLive) return;
+    if (!await db.getSetting('points_enabled')) return;
+    const windowMinutes = Math.ceil(CONFIG.intervalMs / 60000) + 1;
+    const viewers = await db.getActiveViewers(windowMinutes);
+    console.log(`[POINTS] Fenêtre active: ${windowMinutes} min — ${viewers.length} viewer(s)`);
+    if (!viewers.length) return;
+    for (const v of viewers) {
+      await db.addPoints(v.username, CONFIG.pointsAmount, 'watch_time', Math.round(CONFIG.intervalMs / 60000));
+    }
+    console.log(`[POINTS] ✅ +${CONFIG.pointsAmount} pts → ${viewers.length} viewer(s)`);
+    checkObjectives();
+  } catch(e) {
+    // Erreur réseau temporaire (ex: Turso 502) — on absorbe sans planter le bot.
+    // Le prochain cycle de distribution se fera normalement dans ${CONFIG.intervalMs/60000} minutes.
+    console.error('[POINTS] Erreur temporaire (ignorée, prochaine tentative au prochain cycle):', e.message);
   }
-  if (!await db.getSetting('points_enabled')) {
-    console.log('[POINTS] Système de points désactivé dans les paramètres.');
-    return;
-  }
-  const windowMinutes = Math.ceil(CONFIG.intervalMs / 60000) + 1;
-  const viewers = await db.getActiveViewers(windowMinutes);
-  console.log(`[POINTS] Fenêtre active: ${windowMinutes} min — ${viewers.length} viewer(s) trouvé(s)`);
-  if (!viewers.length) {
-    console.log('[POINTS] Aucun viewer actif dans le chat sur cette fenêtre.');
-    return;
-  }
-  for (const v of viewers) await db.addPoints(v.username, CONFIG.pointsAmount, 'watch_time', Math.round(CONFIG.intervalMs / 60000));
-  console.log(`[POINTS] ✅ +${CONFIG.pointsAmount} pts → ${viewers.length} viewer(s): ${viewers.map(v=>v.username).join(', ')}`);
-  checkObjectives();
 }
 
 async function checkObjectives() {
