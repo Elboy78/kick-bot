@@ -2816,18 +2816,19 @@ async function loadFidelityList() {
         <th style="padding:6px 4px;text-align:left">#</th>
         <th style="padding:6px 4px;text-align:left">Viewer</th>
         <th style="padding:6px 4px;text-align:right">Temps regardé</th>
-        <th style="padding:6px 4px;text-align:right">Lives</th>
+        <th style="padding:6px 4px;text-align:right">Depuis</th>
         <th style="padding:6px 4px;text-align:right">Points</th>
       </tr></thead>
       <tbody>
         ${data.slice(0, 20).map((v, i) => {
           const mins = v.total_minutes || 0;
           const timeStr = mins >= 60 ? `${Math.floor(mins/60)}h${String(mins%60).padStart(2,'0')}m` : `${mins}m`;
+          const since = v.first_seen ? new Date(v.first_seen + 'Z').toLocaleDateString('fr-FR', {day:'2-digit', month:'short', year:'2-digit'}) : '—';
           return `<tr style="border-bottom:1px solid var(--brd);font-size:12px">
             <td style="padding:8px 4px"><span style="font-weight:700">${MEDALS[i] || '#'+(i+1)}</span></td>
             <td style="padding:8px 4px;font-weight:600">${esc(v.username)}</td>
             <td style="padding:8px 4px;text-align:right;color:var(--accent);font-weight:700">${timeStr}</td>
-            <td style="padding:8px 4px;text-align:right;color:var(--muted)">${v.sessions || 0}</td>
+            <td style="padding:8px 4px;text-align:right;color:var(--muted);font-size:11px">${since}</td>
             <td style="padding:8px 4px;text-align:right;color:var(--muted)">${(v.points||0).toLocaleString('fr')}</td>
           </tr>`;
         }).join('')}
