@@ -610,6 +610,13 @@ Option 3" rows="4"></textarea><div style="display:flex;gap:6px;margin-top:10px">
             <select class="inp" id="tts-voice-select" style="flex:1"><option value="">— Sélectionner une voix —</option></select>
             <button class="btnx btn-ghost btn-sm" onclick="loadTTSVoices()" style="flex-shrink:0">↻</button>
           </div>
+          <div style="margin-top:8px">
+            <label class="lbl" style="font-size:9px">Ou saisis l'ID de voix manuellement <span style="color:var(--muted2)">(elevenlabs.io → Voices → ⋯ → Copy voice ID)</span></label>
+            <div style="display:flex;gap:6px">
+              <input class="inp inp-sm" id="tts-voice-id-manual" placeholder="Ex: EXAVITQu4vr4xnSDxMaL" style="flex:1;font-family:monospace;font-size:11px">
+              <button class="btnx btn-outline btn-sm" onclick="saveManualVoiceId()" style="flex-shrink:0">✓ Utiliser</button>
+            </div>
+          </div>
           <button class="btnx btn-purple btn-sm" style="width:100%;justify-content:center;margin-top:8px" onclick="previewVoice()">▶️ Écouter un aperçu</button>
 
           <label class="lbl">Stabilité <span id="tts-stability-val" style="color:var(--accent)">50%</span></label>
@@ -3199,7 +3206,7 @@ async function loadTTSVoices() {
       return;
     }
     if (d.error === 'invalid_api_key') {
-      select.innerHTML = '<option value="">— Clé API invalide —</option>';
+      select.innerHTML = '<option value="">— Clé sans permission "Voices Read" → utilise l\u2019ID manuel ↓ —</option>';
       return;
     }
     if (!d.data?.length) {
@@ -3210,6 +3217,24 @@ async function loadTTSVoices() {
     select.innerHTML = d.data.map(v => `<option value="${v.id}">${esc(v.name)}${v.category ? ' (' + v.category + ')' : ''}</option>`).join('');
     if (window._ttsSelectedVoiceId) select.value = window._ttsSelectedVoiceId;
   } catch(e) {}
+}
+
+async function saveManualVoiceId() {
+  const input = document.getElementById('tts-voice-id-manual');
+  const voiceId = (input?.value || '').trim();
+  if (!voiceId) return toast('Colle un ID de voix d\u2019abord', false);
+  if (voiceId.length < 15) return toast('ID de voix invalide (trop court)', false);
+
+  const r = await fetch('/api/admin/tts/settings', {
+    method: 'POST', headers: { 'Content-Type': 'application/json', 'x-panel-key': getKey() },
+    body: JSON.stringify({ voice_id: voiceId })
+  });
+  if (r.ok) {
+    window._ttsSelectedVoiceId = voiceId;
+    toast('✅ Voix enregistrée — teste avec ▶️ Écouter un aperçu');
+  } else {
+    toast('Erreur lors de la sauvegarde', false);
+  }
 }
 
 async function loadTTSQuota() {
@@ -3271,9 +3296,11 @@ async function saveTTSVoiceSettings() {
 
 async function previewVoice() {
   const message = "Bonjour, ceci est un aperçu de ma voix sur le stream.";
-  const voiceId = document.getElementById('tts-voice-select').value;
-  if (!voiceId) return toast('Sélectionne une voix d\u2019abord', false);
-  await saveTTSVoiceSettings();
+  const voiceId = document.getElementById('tts-voice-select').value
+               || document.getElementById('tts-voice-id-manual')?.value?.trim()
+               || window._ttsSelectedVoiceId;
+  if (!voiceId) return toast('Sélectionne une voix ou colle un ID d\u2019abord', false);
+  if (document.getElementById('tts-voice-select').value) await saveTTSVoiceSettings();
   await testTTS(message);
 }
 
