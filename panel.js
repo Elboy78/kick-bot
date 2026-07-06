@@ -437,24 +437,21 @@ app.delete('/api/admin/allowed-words/:id', requireAuth, async (req,res) => { try
 // ─── 🩸 Les 30 Coffres de l'Entité ────────────────────────────────────────────
 const chests = require('./chests');
 
-async function isChestChatEnabled() {
-  try { return await db.getSetting('chests_chat_enabled'); } catch(e) { return true; }
+// Annonce un résultat d'ouverture dans le chat + overlay
+async function chestChatEnabled() {
+  try { return await db.getSetting('chest_chat_enabled'); }
+  catch(e) { return true; }
 }
-
 async function sendChestChat(message) {
-  if (!(await isChestChatEnabled())) return;
+  if (!await chestChatEnabled()) return;
   const shared = require('./shared');
   try { await shared.sendChat(message); } catch(e) {}
 }
-
-// Annonce un résultat d'ouverture dans le chat + overlay
 async function broadcastChestResult(result) {
   const moneyStr = result.money > 0 && ['positive','epic','legendary'].includes(result.tier) ? ` (${result.money}€)` : '';
   let msg = `🧰 COFFRE ${result.number} → ${result.tierEmoji} ${result.tierName} : ${result.label}${moneyStr}`;
   await sendChestChat(msg);
-  for (const ev of result.events || []) {
-    await sendChestChat(ev);
-  }
+  for (const ev of result.events || []) await sendChestChat(ev);
   if (result.seasonEnd) {
     const s = result.seasonEnd;
     await sendChestChat(`🩸 SAISON TERMINÉE — ${s.bonuses} bonus, ${s.maluses} malus, ${s.jackpots} jackpot(s), ${s.challengesDone}/${s.challengesTotal} défis réussis, ${s.money}€ gagnés !`);
@@ -465,20 +462,6 @@ async function broadcastChestResult(result) {
 
 app.get('/api/chests', async (req, res) => {
   try { res.json(await chests.getPublicState()); } catch(e) { res.json({ season: null, chests: [] }); }
-});
-
-app.get('/api/chests/chat-enabled', async (req, res) => {
-  try { res.json({ enabled: await isChestChatEnabled() }); }
-  catch(e) { res.json({ enabled: true }); }
-});
-
-app.post('/api/admin/chests/chat-enabled', requireAuth, async (req, res) => {
-  try {
-    const enabled = !!req.body.enabled;
-    await db.setSetting('chests_chat_enabled', enabled);
-    io.emit('chests-update');
-    res.json({ success: true, enabled });
-  } catch(e) { res.status(500).json({ error: e.message }); }
 });
 app.post('/api/admin/chests/new-season', requireAuth, async (req, res) => {
   try {

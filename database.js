@@ -1018,7 +1018,7 @@ const DEFAULT_SETTINGS = {
   'uptime_enabled':     { label: 'Commande uptime', desc: 'Permet aux viewers de voir la duree du stream avec !uptime', category: 'Chat' },
   'clip_enabled':       { label: 'Commande !clip', desc: 'Permet aux viewers de marquer un moment avec !clip [description]', category: 'Chat' },
   'tts_enabled':        { label: 'TTS Donations', desc: 'Lit les messages de dons à voix haute sur l overlay', category: 'TTS' },
-  'chests_chat_enabled': { label: 'Annonces coffres dans le chat', desc: 'Autorise le bot à annoncer les ouvertures de coffres dans le chat Kick', category: 'Coffres' },
+  'chest_chat_enabled': { label: 'Messages coffres dans le chat', desc: 'Annonce les ouvertures de coffres dans le chat Kick', category: 'Coffres' },
 };
 
 async function getAllSettings() {
