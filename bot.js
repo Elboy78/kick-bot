@@ -680,14 +680,20 @@ async function cmdSubCheck(username, parts) {
 }
 
 async function cmdOpenChest(username, parts, isModOrBroadcaster, badges) {
+  // Toggle panel : quand il est OFF, le système de coffres reste testable mais le bot ne parle pas dans le chat.
+  let chestChatEnabled = true;
+  try { chestChatEnabled = await db.getSetting('chests_chat_enabled'); } catch(e) { chestChatEnabled = true; }
+
   // Réservé au broadcaster uniquement (c'est SON jeu, ses gains, ses malus)
   const isBroadcaster = (badges || []).some(b => b.type === 'broadcaster');
   if (!isBroadcaster) {
+    if (!chestChatEnabled) return;
     return sendChat(`@${username} Seul le streamer peut ouvrir les coffres de l'Entité ! 🩸`);
   }
 
   const number = parseInt(parts[1]);
   if (!number || number < 1 || number > 30) {
+    if (!chestChatEnabled) return;
     return sendChat(`@${username} Utilisation: !coffre <1-30>`);
   }
 
@@ -695,12 +701,13 @@ async function cmdOpenChest(username, parts, isModOrBroadcaster, badges) {
     const shared = require('./shared');
     const result = await shared.openChest(number);
     if (result?.error) {
+      if (!chestChatEnabled) return;
       return sendChat(`@${username} ${result.error}`);
     }
-    // Le résultat est déjà annoncé dans le chat + overlay par le panel (broadcastChestResult)
+    // Le résultat est annoncé par le panel uniquement si le toggle chat est ON.
   } catch(e) {
     console.error('[COFFRE] Erreur:', e.message);
-    sendChat(`@${username} Erreur lors de l'ouverture du coffre.`);
+    if (chestChatEnabled) sendChat(`@${username} Erreur lors de l'ouverture du coffre.`);
   }
 }
 
