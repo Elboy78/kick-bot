@@ -294,9 +294,9 @@ app.get('/api/viewer/:username/firstseen', async (req,res) => { try { res.json({
 // (bloquée depuis Render par Cloudflare, mais accessible depuis un navigateur)
 app.post('/api/viewer/following-since', async (req, res) => {
   try {
-    const { username, followingSince } = req.body;
+    const { username, followingSince, subscribedFor } = req.body;
     if (!username) return res.status(400).json({ error: 'username requis' });
-    await db.setViewerFollowingSince(username, followingSince || null);
+    await db.setViewerFollowingSince(username, followingSince || null, subscribedFor ?? null);
     res.json({ success: true });
   } catch(e) { res.status(500).json({ error: e.message }); }
 });
@@ -305,7 +305,7 @@ app.post('/api/viewer/following-since', async (req, res) => {
 app.get('/api/viewers/missing-follow', async (req, res) => {
   try {
     const rows = await db.getDB().execute(
-      `SELECT username FROM viewers WHERE following_since IS NULL AND last_seen >= datetime('now', '-2 hours') ORDER BY last_seen DESC LIMIT 10`
+      `SELECT username FROM viewers WHERE (following_since IS NULL OR subscribed_for IS NULL) AND last_seen >= datetime('now', '-2 hours') ORDER BY last_seen DESC LIMIT 10`
     );
     res.json({ data: rows.rows.map(r => r.username) });
   } catch(e) { res.json({ data: [] }); }

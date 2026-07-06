@@ -20,7 +20,7 @@ const CONFIG = {
 };
 
 const PUSHER_URL = 'wss://ws-us2.pusher.com/app/32cbd69e4b950bf97679?protocol=7&client=js&version=7.4.0&flash=false';
-const SYSTEM_COMMANDS = ['!points','!top','!rang','!niveau','!aide','!duel','!accepter','!refuser','!participer','!giveaway','!lobby','!quote','!addquote','!mort','!death','!score','!queue','!join','!leave','!pos','!vote','!sondage','!so','!uptime','!fc','!dice','!des','!rps','!pfc','!clip','!addcmd','!delcmd','!addword','!delword','!allowword','!disallowword'];
+const SYSTEM_COMMANDS = ['!points','!top','!rang','!niveau','!aide','!duel','!accepter','!refuser','!participer','!giveaway','!lobby','!quote','!addquote','!mort','!death','!score','!queue','!join','!leave','!pos','!vote','!sondage','!so','!uptime','!fc','!sc','!dice','!des','!rps','!pfc','!clip','!addcmd','!delcmd','!addword','!delword','!allowword','!disallowword'];
 
 let ws             = null;
 let reconnectDelay = 5000;
@@ -252,6 +252,7 @@ async function handleChatMessage(payload) {
       case '!so':        return (await db.getSetting('shoutout_enabled')) ? cmdShoutout(username, parts) : null;
       case '!uptime':    return (await db.getSetting('uptime_enabled')) ? cmdUptime(username) : null;
       case '!fc':        return cmdFollowage(username, parts);
+      case '!sc':        return cmdSubCheck(username, parts);
       case '!clip':      return (await db.getSetting('clip_enabled')) ? cmdClip(username, parts) : null;
       case '!addcmd':    return cmdAddCommand(username, parts, isModOrBroadcaster);
       case '!delcmd':    return cmdDelCommand(username, parts, isModOrBroadcaster);
@@ -628,6 +629,52 @@ async function cmdFollowage(username, parts) {
   } catch(e) {
     console.error('[FC] Erreur:', e.message);
     sendChat(`@${username} Impossible de récupérer les infos pour le moment.`);
+  }
+}
+
+async function cmdSubCheck(username, parts) {
+  // !sc → son propre statut sub | !sc pseudo → celui d'un autre
+  const target = parts[1] ? parts[1].replace(/^@/, '').toLowerCase() : username.toLowerCase();
+  const displayName = parts[1] ? parts[1].replace(/^@/, '') : username;
+  const self = target === username.toLowerCase();
+
+  try {
+    const viewer = await db.getViewerFirstSeen(target);
+
+    // 1) Valeur résolue par le navigateur du panel (stockée en DB)
+    let subscribedFor = viewer?.subscribed_for ?? null;
+
+    // 2) Sinon tentative directe (peut être bloquée par Cloudflare depuis Render)
+    if (subscribedFor === null) {
+      try {
+        const res = await axios.get(
+          `https://kick.com/api/v2/channels/${CONFIG.channel}/users/${encodeURIComponent(target)}`,
+          { headers: { 'Accept': 'application/json', 'Accept-Language': 'en-US', 'User-Agent': 'Mozilla/5.0' }, timeout: 5000 }
+        );
+        subscribedFor = res.data?.subscribed_for ?? 0;
+        // Stocker pour les prochaines fois (avec la date de follow si présente)
+        db.setViewerFollowingSince(target, res.data?.following_since || viewer?.following_since || 'NOT_FOLLOWING', subscribedFor).catch(()=>{});
+      } catch(apiErr) {
+        console.log(`[SC] API sub échouée pour ${target}: ${apiErr.response?.status || apiErr.message}`);
+      }
+    }
+
+    if (subscribedFor === null) {
+      // Ni DB ni API — le résolveur navigateur ne l'a pas encore traité
+      return sendChat(`@${username} Info sub pas encore disponible pour ${displayName} — réessaie dans 1-2 minutes (panel ouvert requis).`);
+    }
+
+    if (subscribedFor > 0) {
+      const label = subscribedFor === 1 ? '1 mois' : `${subscribedFor} mois`;
+      if (self) sendChat(`⭐ @${username} tu es sub de la chaîne depuis ${label} — merci pour le soutien ! 💜`);
+      else      sendChat(`⭐ ${displayName} est sub depuis ${label} !`);
+    } else {
+      if (self) sendChat(`@${username} tu n'es pas sub de la chaîne actuellement — rejoins-nous ! ⭐`);
+      else      sendChat(`${displayName} n'est pas sub de la chaîne actuellement.`);
+    }
+  } catch(e) {
+    console.error('[SC] Erreur:', e.message);
+    sendChat(`@${username} Impossible de vérifier le statut sub pour le moment.`);
   }
 }
 

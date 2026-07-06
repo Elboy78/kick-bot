@@ -72,6 +72,7 @@ async function initSchema() {
       username      TEXT    NOT NULL UNIQUE,
       kick_user_id  TEXT,
       following_since TEXT,
+      subscribed_for INTEGER,
       points        INTEGER NOT NULL DEFAULT 0,
       total_minutes INTEGER NOT NULL DEFAULT 0,
       sessions      INTEGER NOT NULL DEFAULT 0,
@@ -314,6 +315,7 @@ async function initSchema() {
     `ALTER TABLE stream_sessions ADD COLUMN viewer_samples INTEGER DEFAULT 0`,
     `ALTER TABLE vod_moments ADD COLUMN created_by TEXT DEFAULT ''`,
     `ALTER TABLE viewers ADD COLUMN following_since TEXT`,
+    `ALTER TABLE viewers ADD COLUMN subscribed_for INTEGER`,
   ];
   for (const sql of migrations) {
     try {
@@ -682,12 +684,17 @@ async function getChatHeatmap() {
 
 // Followage : date du premier message (proxy pour depuis quand il est là)
 async function getViewerFirstSeen(username) {
-  const row = await get(`SELECT first_seen, total_minutes, sessions, following_since FROM viewers WHERE username = ?`, [username.toLowerCase()]);
+  const row = await get(`SELECT first_seen, total_minutes, sessions, following_since, subscribed_for FROM viewers WHERE username = ?`, [username.toLowerCase()]);
   return row || null;
 }
 
-async function setViewerFollowingSince(username, followingSince) {
-  await run(`UPDATE viewers SET following_since = ? WHERE username = ?`, [followingSince, username.toLowerCase()]);
+async function setViewerFollowingSince(username, followingSince, subscribedFor) {
+  if (subscribedFor !== undefined) {
+    await run(`UPDATE viewers SET following_since = ?, subscribed_for = ? WHERE username = ?`,
+      [followingSince, subscribedFor, username.toLowerCase()]);
+  } else {
+    await run(`UPDATE viewers SET following_since = ? WHERE username = ?`, [followingSince, username.toLowerCase()]);
+  }
 }
 
 

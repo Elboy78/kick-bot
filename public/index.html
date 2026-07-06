@@ -4037,7 +4037,11 @@ async function resolveFollowDates() {
         // following_since = null si le viewer ne follow pas — on stocke 'NOT_FOLLOWING' pour ne pas re-résoudre
         await fetch('/api/viewer/following-since', {
           method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ username, followingSince: d.following_since || 'NOT_FOLLOWING' })
+          body: JSON.stringify({
+            username,
+            followingSince: d.following_since || 'NOT_FOLLOWING',
+            subscribedFor: d.subscribed_for ?? 0
+          })
         });
       } catch(e) { /* viewer suivant */ }
     }
