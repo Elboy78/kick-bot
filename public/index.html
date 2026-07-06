@@ -3964,6 +3964,30 @@ setInterval(loadAll,30000);
 setInterval(loadLiveStatus, 60000);
 setInterval(()=>{if(document.getElementById('page-lobby').classList.contains('active'))loadLobby();},10000);
 
+// Résolveur de dates de follow : le navigateur peut appeler l'API interne Kick
+// (bloquée depuis Render par Cloudflare) — il résout les viewers actifs sans date
+// de follow connue et renvoie les résultats au serveur pour !fc.
+async function resolveFollowDates() {
+  try {
+    const missing = await get('/api/viewers/missing-follow') || [];
+    for (const username of missing.slice(0, 5)) {  // max 5 par cycle pour rester léger
+      try {
+        const r = await fetch(`https://kick.com/api/v2/channels/${activeKickChannel||'fack7up'}/users/${encodeURIComponent(username)}`,
+          { headers: { 'Accept': 'application/json', 'Accept-Language': 'en-US' } });
+        if (!r.ok) continue;
+        const d = await r.json();
+        // following_since = null si le viewer ne follow pas — on stocke 'NOT_FOLLOWING' pour ne pas re-résoudre
+        await fetch('/api/viewer/following-since', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ username, followingSince: d.following_since || 'NOT_FOLLOWING' })
+        });
+      } catch(e) { /* viewer suivant */ }
+    }
+  } catch(e) {}
+}
+setInterval(resolveFollowDates, 60000);
+setTimeout(resolveFollowDates, 5000); // premier passage rapide après chargement
+
 
 
 </script>

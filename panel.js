@@ -289,6 +289,27 @@ app.get('/api/analytics/commands',  async (req,res) => { try { res.json({data: a
 app.get('/api/analytics/fidelity',  async (req,res) => { try { res.json({data: await db.getFidelityLeaderboard(50)}); } catch(e) { res.json({data:[]}); }});
 app.get('/api/analytics/heatmap',   async (req,res) => { try { res.json({data: await db.getChatHeatmap()}); } catch(e) { res.json({data:{}}); }});
 app.get('/api/viewer/:username/firstseen', async (req,res) => { try { res.json({data: await db.getViewerFirstSeen(req.params.username)}); } catch(e) { res.json({data:null}); }});
+
+// Le navigateur envoie les dates de follow qu'il récupère via l'API interne Kick
+// (bloquée depuis Render par Cloudflare, mais accessible depuis un navigateur)
+app.post('/api/viewer/following-since', async (req, res) => {
+  try {
+    const { username, followingSince } = req.body;
+    if (!username) return res.status(400).json({ error: 'username requis' });
+    await db.setViewerFollowingSince(username, followingSince || null);
+    res.json({ success: true });
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+// Liste des viewers actifs sans date de follow connue — le navigateur les résout
+app.get('/api/viewers/missing-follow', async (req, res) => {
+  try {
+    const rows = await db.getDB().execute(
+      `SELECT username FROM viewers WHERE following_since IS NULL AND last_seen >= datetime('now', '-2 hours') ORDER BY last_seen DESC LIMIT 10`
+    );
+    res.json({ data: rows.rows.map(r => r.username) });
+  } catch(e) { res.json({ data: [] }); }
+});
 app.get('/api/analytics/chat-week', async (req,res) => { try { res.json({data: await db.getChatActivityWeek()}); } catch(e) { res.json({data:[]}); }});
 app.get('/api/analytics/sessions-viewers', async (req,res) => { try { res.json({data: await db.getSessionsWithAvgViewers(14)}); } catch(e) { res.json({data:[]}); }});
 

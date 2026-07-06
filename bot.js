@@ -569,19 +569,40 @@ async function cmdFollowage(username, parts) {
   // !fc → ses propres stats | !fc pseudo → stats d'un autre
   const target = parts[1] ? parts[1].replace(/^@/, '').toLowerCase() : username.toLowerCase();
   const displayName = parts[1] ? parts[1].replace(/^@/, '') : username;
+  const self = target === username.toLowerCase();
 
   try {
     const viewer = await db.getViewerFirstSeen(target);
-    if (!viewer) {
-      return sendChat(`@${username} ${displayName} n'a jamais écrit dans le chat — impossible de calculer son ancienneté.`);
+
+    // 1) Date de follow résolue par le navigateur du panel (stockée en DB)
+    let followingSince = viewer?.following_since && viewer.following_since !== 'NOT_FOLLOWING'
+      ? viewer.following_since : null;
+
+    // 2) Sinon, tentative directe (peut être bloquée par Cloudflare depuis Render)
+    if (!followingSince) {
+      try {
+        const res = await axios.get(
+          `https://kick.com/api/v2/channels/${CONFIG.channel}/users/${encodeURIComponent(target)}`,
+          { headers: { 'Accept': 'application/json', 'Accept-Language': 'en-US', 'User-Agent': 'Mozilla/5.0' }, timeout: 5000 }
+        );
+        followingSince = res.data?.following_since || null;
+        // La stocker pour les prochaines fois
+        if (followingSince) db.setViewerFollowingSince(target, followingSince).catch(()=>{});
+      } catch(apiErr) {
+        console.log(`[FC] API follow échouée pour ${target}: ${apiErr.response?.status || apiErr.message}`);
+      }
     }
 
-    // Ancienneté depuis le premier message dans le chat
-    const firstSeen = new Date(viewer.first_seen + 'Z');
-    const now = new Date();
-    const diffMs = now - firstSeen;
-    const days  = Math.floor(diffMs / 86400000);
-    const h     = Math.floor((diffMs % 86400000) / 3600000);
+    if (!followingSince && !viewer) {
+      return sendChat(`@${username} ${displayName} n'a jamais été vu sur cette chaîne.`);
+    }
+
+    const isRealFollow = !!followingSince;
+    const refDate = isRealFollow ? new Date(followingSince) : new Date(viewer.first_seen + 'Z');
+
+    const diffMs = Date.now() - refDate.getTime();
+    const days   = Math.floor(diffMs / 86400000);
+    const h      = Math.floor((diffMs % 86400000) / 3600000);
 
     let duree;
     if (days >= 365) {
@@ -597,18 +618,17 @@ async function cmdFollowage(username, parts) {
       duree = `${h}h (tout frais !)`;
     }
 
-    const mins = viewer.total_minutes || 0;
+    const mins = viewer?.total_minutes || 0;
     const timeWatched = mins >= 60
       ? `${Math.floor(mins/60)}h${String(mins%60).padStart(2,'0')}min`
       : `${mins}min`;
 
-    const sessions = viewer.sessions || 0;
-    const self = target === username.toLowerCase();
-
-    if (self) {
-      sendChat(`📅 @${username} premier message il y a ${duree} — ${timeWatched} regardées sur cette chaîne !`);
+    if (isRealFollow) {
+      if (self) sendChat(`💜 @${username} tu follow la chaîne depuis ${duree} — ${timeWatched} regardées !`);
+      else      sendChat(`💜 ${displayName} follow la chaîne depuis ${duree} — ${timeWatched} regardées !`);
     } else {
-      sendChat(`📅 ${displayName} — premier message il y a ${duree}, ${timeWatched} regardées sur cette chaîne !`);
+      if (self) sendChat(`📅 @${username} premier message il y a ${duree} — ${timeWatched} regardées sur cette chaîne !`);
+      else      sendChat(`📅 ${displayName} — premier message il y a ${duree}, ${timeWatched} regardées sur cette chaîne !`);
     }
   } catch(e) {
     console.error('[FC] Erreur:', e.message);
