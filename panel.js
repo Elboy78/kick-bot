@@ -434,6 +434,87 @@ app.get('/api/allowed-words',            async (req,res) => { try { res.json({da
 app.post('/api/admin/allowed-words',     requireAuth, async (req,res) => { try { const {word,note}=req.body; if(!word) return res.status(400).json({error:'mot requis'}); await db.addAllowedWord(word,note||''); res.json({success:true}); } catch(e){res.status(500).json({error:e.message}); }});
 app.delete('/api/admin/allowed-words/:id', requireAuth, async (req,res) => { try { await db.deleteAllowedWord(req.params.id); res.json({success:true}); } catch(e){res.status(500).json({error:e.message}); }});
 
+// ─── 🩸 Les 30 Coffres de l'Entité ────────────────────────────────────────────
+const chests = require('./chests');
+
+// Annonce un résultat d'ouverture dans le chat + overlay
+async function broadcastChestResult(result) {
+  const shared = require('./shared');
+  const moneyStr = result.money > 0 && ['positive','epic','legendary'].includes(result.tier) ? ` (${result.money}€)` : '';
+  let msg = `🧰 COFFRE ${result.number} → ${result.tierEmoji} ${result.tierName} : ${result.label}${moneyStr}`;
+  try { await shared.sendChat(msg); } catch(e) {}
+  for (const ev of result.events || []) {
+    try { await shared.sendChat(ev); } catch(e) {}
+  }
+  if (result.seasonEnd) {
+    const s = result.seasonEnd;
+    try { await shared.sendChat(`🩸 SAISON TERMINÉE — ${s.bonuses} bonus, ${s.maluses} malus, ${s.jackpots} jackpot(s), ${s.challengesDone}/${s.challengesTotal} défis réussis, ${s.money}€ gagnés !`); } catch(e) {}
+  }
+  io.emit('chest-opened', result);
+  io.emit('chests-update');
+}
+
+app.get('/api/chests', async (req, res) => {
+  try { res.json(await chests.getPublicState()); } catch(e) { res.json({ season: null, chests: [] }); }
+});
+app.post('/api/admin/chests/new-season', requireAuth, async (req, res) => {
+  try {
+    const r = await chests.newSeason();
+    io.emit('chests-update');
+    const shared = require('./shared');
+    try { await shared.sendChat(`🩸 UNE NOUVELLE SAISON DES 30 COFFRES DE L'ENTITÉ COMMENCE ! Le contenu a été mélangé par le Brouillard…`); } catch(e) {}
+    res.json({ success: true, ...r });
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+app.post('/api/admin/chests/open', requireAuth, async (req, res) => {
+  try {
+    const number = parseInt(req.body.number);
+    if (!number || number < 1 || number > 30) return res.status(400).json({ error: 'Numéro invalide (1-30)' });
+    const result = await chests.openChest(number, 'panel');
+    if (result.error) return res.status(400).json(result);
+    await broadcastChestResult(result);
+    res.json(result);
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+app.post('/api/admin/chests/secure', requireAuth, async (req, res) => {
+  try {
+    const result = await chests.secureChest(parseInt(req.body.number));
+    if (result.error) return res.status(400).json(result);
+    io.emit('chests-update');
+    const shared = require('./shared');
+    if (result.moved) { try { await shared.sendChat(`🔒 La sécurité passe du coffre ${result.from} au coffre ${result.to} — DERNIER changement possible utilisé !`); } catch(e) {} }
+    else { try { await shared.sendChat(`🔒 Le coffre ${result.to} est maintenant SÉCURISÉ.`); } catch(e) {} }
+    res.json(result);
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+app.post('/api/admin/chests/unsecure', requireAuth, async (req, res) => {
+  try {
+    const result = await chests.unsecureChest();
+    io.emit('chests-update');
+    res.json(result);
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+app.post('/api/admin/chests/challenge-done', requireAuth, async (req, res) => {
+  try {
+    const { number, done } = req.body;
+    const season = await db.getActiveChestSeason();
+    if (!season) return res.status(400).json({ error: 'Aucune saison active' });
+    const chest = await db.getChest(season.id, parseInt(number));
+    if (!chest) return res.status(400).json({ error: 'Coffre introuvable' });
+    await db.setChestChallengeDone(chest.id, !!done);
+    io.emit('chests-update');
+    res.json({ success: true });
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+// Exposer l'ouverture au bot (commande !coffre) via shared
+require('./shared').registerOpenChest(async (number) => {
+  const result = await chests.openChest(number, 'chat');
+  if (result.error) return result;
+  await broadcastChestResult(result);
+  return result;
+});
+
 app.get('/api/moderation-logs', async (req,res) => {
   try {
     const limit = parseInt(req.query.limit) || 100;

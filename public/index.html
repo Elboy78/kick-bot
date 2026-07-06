@@ -274,6 +274,7 @@ hr.div{border:none;border-top:1px solid var(--brd);margin:12px 0}
     <a onclick="showPage('tts')">🔊 TTS</a>
     <a onclick="showPage('vods')">🎬 VODs &amp; Clips</a>
     <a onclick="showPage('subdon')">🎁 Sub/Don</a>
+    <a onclick="showPage('chests')">🩸 Coffres</a>
     <a onclick="showPage('logs')">📋 Logs</a>
     <a onclick="showPage('objectifs')">🎯 Objectifs</a>
     <a onclick="showPage('dbd')">🔪 DBD</a>
@@ -868,6 +869,75 @@ Option 3" rows="4"></textarea><div style="display:flex;gap:6px;margin-top:10px">
     <div id="moderation-logs-list"><div class="empty"><div class="ei">📋</div><p>Chargement…</p></div></div>
   </div>
 
+  <!-- ══ COFFRES DE L'ENTITÉ ══ -->
+  <div class="page" id="page-chests">
+    <div class="header">
+      <div><h1>🩸 Les 30 Coffres de l'Entité</h1><p>Une saison, 30 coffres, un seul destin</p></div>
+      <div class="header-right">
+        <button class="btn" onclick="loadChests()">↻</button>
+        <button class="btnx btn-red btn-sm" onclick="newChestSeason()">🩸 Nouvelle saison</button>
+      </div>
+    </div>
+
+    <div class="g2" style="grid-template-columns:2fr 1fr">
+      <div>
+        <div class="panel" style="margin-bottom:14px">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+            <h3 style="margin:0">🧰 Saison <span id="chest-season-num">—</span></h3>
+            <div style="display:flex;gap:14px;font-size:10px;color:var(--muted)">
+              <span>🌫️ Brouillard: <b id="chest-fog" style="color:var(--text)">0</b></span>
+              <span>🔒 Déplacement: <b id="chest-moves" style="color:var(--text)">0/1</b></span>
+            </div>
+          </div>
+          <div id="chest-grid" style="display:grid;grid-template-columns:repeat(6,1fr);gap:8px"></div>
+          <div style="display:flex;gap:14px;margin-top:12px;font-size:9px;color:var(--muted);flex-wrap:wrap">
+            <span>🟩 Fermé</span><span>🔒 Sécurisé</span><span>🟣 Légendaire</span><span>🟡 Épique</span><span>🔵 Bonus</span><span>🟠 Défi</span><span>🔴 Maudit</span><span>⚫ Piège</span>
+          </div>
+        </div>
+
+        <div class="panel">
+          <h3>📜 Historique des ouvertures</h3>
+          <div id="chest-history"><div class="empty"><div class="ei">🧰</div><p>Aucun coffre ouvert</p></div></div>
+        </div>
+      </div>
+
+      <div>
+        <div class="panel" style="margin-bottom:14px">
+          <h3>🔒 Coffre sécurisé</h3>
+          <div style="font-size:10px;color:var(--muted);margin-bottom:10px;line-height:1.6">
+            Choisis UN coffre à protéger. Il ne peut pas être ouvert tant qu'il est sécurisé.
+            Tu peux déplacer la sécurité <b>une seule fois</b> par saison — choisis bien.
+          </div>
+          <div style="display:flex;gap:6px">
+            <input type="number" class="inp" id="secure-number" min="1" max="30" placeholder="N°" style="width:80px">
+            <button class="btnx btn-primary btn-sm" style="flex:1;justify-content:center" onclick="secureChestBtn()">🔒 Sécuriser</button>
+          </div>
+          <button class="btnx btn-ghost btn-sm" style="width:100%;justify-content:center;margin-top:6px" onclick="unsecureChestBtn()">Retirer la sécurité (pour ouvrir ce coffre)</button>
+        </div>
+
+        <div class="panel" style="margin-bottom:14px">
+          <h3>📊 Stats de la saison</h3>
+          <ul class="info">
+            <li><span>Coffres ouverts</span><span id="cs-opened">0/30</span></li>
+            <li><span>Bonus obtenus</span><span id="cs-bonus" style="color:var(--accent)">0</span></li>
+            <li><span>Malus subis</span><span id="cs-malus" style="color:#ff3b5f">0</span></li>
+            <li><span>Jackpots</span><span id="cs-jackpot" style="color:#8b35ff">0</span></li>
+            <li><span>Défis réussis</span><span id="cs-challenges">0/0</span></li>
+            <li><span>💶 Gains</span><span id="cs-money" style="color:var(--accent);font-weight:700">0€</span></li>
+          </ul>
+        </div>
+
+        <div class="panel" style="padding:12px 16px;background:rgba(139,53,255,.06);border:1px solid rgba(139,53,255,.25)">
+          <div style="font-size:11px;color:var(--text);line-height:1.7">
+            <b>💡 Overlay OBS</b><br>
+            Ajoute une source navigateur avec l'URL <code style="background:var(--card2);padding:1px 6px;border-radius:4px;font-size:9px;word-break:break-all">https://kick-bot-agkk.onrender.com/chests.html</code> pour afficher la grille en stream avec les animations d'ouverture.<br><br>
+            <b>Commande chat</b> : <code style="background:var(--card2);padding:1px 6px;border-radius:4px">!coffre 17</code> (réservée au streamer)
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- ══ HISTORIQUE ══ -->
   <div class="page" id="page-historique">
     <div class="header"><div><h1>Historique</h1><p>Sessions, fidélité et activité du bot</p></div></div>
@@ -1019,6 +1089,7 @@ function showPage(name) {
   if(name==='vods') loadVods();
   if(name==='subdon') { loadFollowAnnounce(); loadSubAnnounce(); loadSubDonPreview(); }
   if(name==='logs') loadModerationLogs();
+  if(name==='chests') loadChests();
   if(name==='admin') { loadCmds(); loadAdminLevels(); loadAccessRequests(); }
   if(name==='commands') { loadCommandsPage(); loadSystemCommands(); }
   if(name==='dbd') initDBD();
@@ -2703,6 +2774,161 @@ function fmtVodDuration(ms) {
   const s=Math.floor(ms>10000?ms/1000:ms);
   const h=Math.floor(s/3600),m=Math.floor((s%3600)/60),sec=s%60;
   return h>0?`${h}h${String(m).padStart(2,'0')}m`:`${m}m${String(sec).padStart(2,'0')}s`;
+}
+
+// ── 🩸 Les 30 Coffres de l'Entité ────────────────────────────────────────────
+
+const CHEST_TIER_COLORS = {
+  legendary: '#8b35ff', epic: '#ffd700', positive: '#3b9dff',
+  challenge: '#ff8500', cursed: '#ff3b5f', fake: '#555',
+};
+
+async function loadChests() {
+  try {
+    const r = await fetch(API + '/api/chests');
+    const d = await r.json();
+    const grid = document.getElementById('chest-grid');
+    if (!grid) return;
+
+    if (!d.season) {
+      grid.innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:30px;color:var(--muted);font-size:12px">Aucune saison active — clique sur 🩸 Nouvelle saison pour commencer</div>';
+      document.getElementById('chest-season-num').textContent = '—';
+      document.getElementById('chest-history').innerHTML = '<div class="empty"><div class="ei">🧰</div><p>Aucun coffre ouvert</p></div>';
+      return;
+    }
+
+    document.getElementById('chest-season-num').textContent = d.season.num;
+    document.getElementById('chest-fog').textContent = d.season.fogMeter;
+    document.getElementById('chest-moves').textContent = d.season.secureMoves + '/1';
+
+    grid.innerHTML = d.chests.map(c => {
+      if (c.opened) {
+        const color = CHEST_TIER_COLORS[c.tier] || '#555';
+        return `<div style="aspect-ratio:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;background:${color}22;border:2px solid ${color};border-radius:10px;opacity:.75" title="${esc(c.label)}">
+          <div style="font-size:16px">${c.emoji}</div>
+          <div style="font-size:10px;font-weight:700;color:${color}">${String(c.number).padStart(2,'0')}</div>
+        </div>`;
+      }
+      if (c.secured) {
+        return `<div style="aspect-ratio:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;background:rgba(255,215,0,.12);border:2px solid #ffd700;border-radius:10px;box-shadow:0 0 12px rgba(255,215,0,.3)" title="Coffre sécurisé">
+          <div style="font-size:16px">🔒</div>
+          <div style="font-size:10px;font-weight:700;color:#ffd700">${String(c.number).padStart(2,'0')}</div>
+        </div>`;
+      }
+      return `<button onclick="openChestBtn(${c.number})" style="aspect-ratio:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;background:var(--card2);border:2px solid rgba(40,255,102,.4);border-radius:10px;cursor:pointer;transition:all .15s;font-family:inherit" onmouseover="this.style.borderColor='var(--accent)';this.style.transform='scale(1.05)'" onmouseout="this.style.borderColor='rgba(40,255,102,.4)';this.style.transform='scale(1)'">
+        <div style="font-size:16px">🧰</div>
+        <div style="font-size:10px;font-weight:700;color:var(--text)">${String(c.number).padStart(2,'0')}</div>
+      </button>`;
+    }).join('');
+
+    // Historique
+    const opened = d.chests.filter(c => c.opened).sort((a,b) => new Date(b.openedAt) - new Date(a.openedAt));
+    const hist = document.getElementById('chest-history');
+    if (!opened.length) {
+      hist.innerHTML = '<div class="empty"><div class="ei">🧰</div><p>Aucun coffre ouvert</p></div>';
+    } else {
+      hist.innerHTML = opened.map(c => {
+        const color = CHEST_TIER_COLORS[c.tier] || '#555';
+        const challengeToggle = c.tier === 'challenge'
+          ? `<button class="btnx btn-sm ${c.challengeDone ? 'btn-primary' : 'btn-ghost'}" style="flex-shrink:0" onclick="toggleChallengeDone(${c.number}, ${c.challengeDone ? 'false' : 'true'})">${c.challengeDone ? '✅ Réussi' : '⬜ Réussi ?'}</button>`
+          : '';
+        return `<div style="display:flex;align-items:center;gap:10px;padding:9px 12px;background:var(--card2);border-left:3px solid ${color};border-radius:8px;margin-bottom:5px">
+          <b style="color:${color};flex-shrink:0">${c.emoji} ${String(c.number).padStart(2,'0')}</b>
+          <span style="flex:1;font-size:12px">${esc(c.label)}</span>
+          ${challengeToggle}
+        </div>`;
+      }).join('');
+    }
+
+    // Stats
+    loadChestStats(d.chests);
+  } catch(e) { console.error('[CHESTS]', e); }
+}
+
+function loadChestStats(chestList) {
+  const opened = chestList.filter(c => c.opened);
+  const bonus = opened.filter(c => ['positive','epic','legendary'].includes(c.tier)).length;
+  const malus = opened.filter(c => ['cursed','fake'].includes(c.tier)).length;
+  const jackpot = opened.filter(c => c.tier === 'legendary').length;
+  const challenges = opened.filter(c => c.tier === 'challenge');
+  const challengesDone = challenges.filter(c => c.challengeDone).length;
+  const money = opened.reduce((s, c) => {
+    if (['positive','epic','legendary'].includes(c.tier)) return s + (c.money||0);
+    if (c.tier === 'challenge' && c.challengeDone) return s + (c.money||0);
+    return s;
+  }, 0);
+  document.getElementById('cs-opened').textContent = opened.length + '/30';
+  document.getElementById('cs-bonus').textContent = bonus;
+  document.getElementById('cs-malus').textContent = malus;
+  document.getElementById('cs-jackpot').textContent = jackpot;
+  document.getElementById('cs-challenges').textContent = challengesDone + '/' + challenges.length;
+  document.getElementById('cs-money').textContent = money + '€';
+}
+
+async function openChestBtn(number) {
+  if (!confirm(`Ouvrir le coffre ${number} ? C'est définitif !`)) return;
+  const r = await fetch(API + '/api/admin/chests/open', {
+    method: 'POST', headers: { 'Content-Type': 'application/json', 'x-panel-key': getKey() },
+    body: JSON.stringify({ number })
+  });
+  const d = await r.json();
+  if (!r.ok) return toast(d.error || 'Erreur', false);
+  toast(`${d.tierEmoji} Coffre ${number} : ${d.label}`);
+  loadChests();
+}
+
+async function newChestSeason() {
+  if (!confirm('Lancer une NOUVELLE saison ? La saison actuelle sera clôturée et 30 nouveaux coffres seront générés.')) return;
+  const r = await fetch(API + '/api/admin/chests/new-season', {
+    method: 'POST', headers: { 'Content-Type': 'application/json', 'x-panel-key': getKey() }, body: '{}'
+  });
+  if (!r.ok) { const d = await r.json(); return toast(d.error || 'Erreur', false); }
+  toast('🩸 Nouvelle saison générée !');
+  loadChests();
+}
+
+async function secureChestBtn() {
+  const number = parseInt(document.getElementById('secure-number').value);
+  if (!number || number < 1 || number > 30) return toast('Numéro invalide (1-30)', false);
+  const r = await fetch(API + '/api/admin/chests/secure', {
+    method: 'POST', headers: { 'Content-Type': 'application/json', 'x-panel-key': getKey() },
+    body: JSON.stringify({ number })
+  });
+  const d = await r.json();
+  if (!r.ok) return toast(d.error || 'Erreur', false);
+  toast(d.moved ? `🔒 Sécurité déplacée: ${d.from} → ${d.to} (dernier changement utilisé !)` : `🔒 Coffre ${d.to} sécurisé`);
+  loadChests();
+}
+
+async function unsecureChestBtn() {
+  if (!confirm('Retirer la sécurité ? Le coffre redeviendra ouvrable.')) return;
+  const r = await fetch(API + '/api/admin/chests/unsecure', {
+    method: 'POST', headers: { 'Content-Type': 'application/json', 'x-panel-key': getKey() }, body: '{}'
+  });
+  if (!r.ok) return toast('Erreur', false);
+  toast('Sécurité retirée');
+  loadChests();
+}
+
+async function toggleChallengeDone(number, done) {
+  // Retrouver le chestId via l'état public — on passe par le number côté serveur
+  const r = await fetch(API + '/api/chests');
+  const d = await r.json();
+  const chest = d.chests?.find(c => c.number === number);
+  if (!chest) return;
+  // L'API attend chestId mais l'état public ne l'expose pas — on envoie number et le serveur résout
+  await fetch(API + '/api/admin/chests/challenge-done', {
+    method: 'POST', headers: { 'Content-Type': 'application/json', 'x-panel-key': getKey() },
+    body: JSON.stringify({ number, done })
+  });
+  loadChests();
+}
+
+// Rafraîchissement temps réel via socket
+if (typeof socket !== 'undefined' && socket) {
+  socket.on('chests-update', () => {
+    if (document.getElementById('page-chests')?.classList.contains('active')) loadChests();
+  });
 }
 
 // ── Logs de modération ────────────────────────────────────────────────────────

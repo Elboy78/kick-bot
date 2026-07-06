@@ -20,7 +20,7 @@ const CONFIG = {
 };
 
 const PUSHER_URL = 'wss://ws-us2.pusher.com/app/32cbd69e4b950bf97679?protocol=7&client=js&version=7.4.0&flash=false';
-const SYSTEM_COMMANDS = ['!points','!top','!rang','!niveau','!aide','!duel','!accepter','!refuser','!participer','!giveaway','!lobby','!quote','!addquote','!mort','!death','!score','!queue','!join','!leave','!pos','!vote','!sondage','!so','!uptime','!fc','!sc','!dice','!des','!rps','!pfc','!clip','!addcmd','!delcmd','!addword','!delword','!allowword','!disallowword'];
+const SYSTEM_COMMANDS = ['!points','!top','!rang','!niveau','!aide','!duel','!accepter','!refuser','!participer','!giveaway','!lobby','!quote','!addquote','!mort','!death','!score','!queue','!join','!leave','!pos','!vote','!sondage','!so','!uptime','!fc','!sc','!coffre','!dice','!des','!rps','!pfc','!clip','!addcmd','!delcmd','!addword','!delword','!allowword','!disallowword'];
 
 let ws             = null;
 let reconnectDelay = 5000;
@@ -253,6 +253,7 @@ async function handleChatMessage(payload) {
       case '!uptime':    return (await db.getSetting('uptime_enabled')) ? cmdUptime(username) : null;
       case '!fc':        return cmdFollowage(username, parts);
       case '!sc':        return cmdSubCheck(username, parts);
+      case '!coffre':    return cmdOpenChest(username, parts, isModOrBroadcaster, badges);
       case '!clip':      return (await db.getSetting('clip_enabled')) ? cmdClip(username, parts) : null;
       case '!addcmd':    return cmdAddCommand(username, parts, isModOrBroadcaster);
       case '!delcmd':    return cmdDelCommand(username, parts, isModOrBroadcaster);
@@ -675,6 +676,31 @@ async function cmdSubCheck(username, parts) {
   } catch(e) {
     console.error('[SC] Erreur:', e.message);
     sendChat(`@${username} Impossible de vérifier le statut sub pour le moment.`);
+  }
+}
+
+async function cmdOpenChest(username, parts, isModOrBroadcaster, badges) {
+  // Réservé au broadcaster uniquement (c'est SON jeu, ses gains, ses malus)
+  const isBroadcaster = (badges || []).some(b => b.type === 'broadcaster');
+  if (!isBroadcaster) {
+    return sendChat(`@${username} Seul le streamer peut ouvrir les coffres de l'Entité ! 🩸`);
+  }
+
+  const number = parseInt(parts[1]);
+  if (!number || number < 1 || number > 30) {
+    return sendChat(`@${username} Utilisation: !coffre <1-30>`);
+  }
+
+  try {
+    const shared = require('./shared');
+    const result = await shared.openChest(number);
+    if (result?.error) {
+      return sendChat(`@${username} ${result.error}`);
+    }
+    // Le résultat est déjà annoncé dans le chat + overlay par le panel (broadcastChestResult)
+  } catch(e) {
+    console.error('[COFFRE] Erreur:', e.message);
+    sendChat(`@${username} Erreur lors de l'ouverture du coffre.`);
   }
 }
 

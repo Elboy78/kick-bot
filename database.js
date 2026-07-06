@@ -222,6 +222,30 @@ async function initSchema() {
       created_by  TEXT NOT NULL DEFAULT '',
       created_at  TEXT NOT NULL DEFAULT (datetime('now'))
     )`,
+    `CREATE TABLE IF NOT EXISTS chest_seasons (
+      id          INTEGER PRIMARY KEY AUTOINCREMENT,
+      season_num  INTEGER NOT NULL DEFAULT 1,
+      fog_meter   INTEGER NOT NULL DEFAULT 0,
+      started_at  TEXT NOT NULL DEFAULT (datetime('now')),
+      ended_at    TEXT,
+      secure_moves_used INTEGER NOT NULL DEFAULT 0
+    )`,
+    `CREATE TABLE IF NOT EXISTS chests (
+      id          INTEGER PRIMARY KEY AUTOINCREMENT,
+      season_id   INTEGER NOT NULL,
+      number      INTEGER NOT NULL,
+      tier        TEXT NOT NULL,
+      label       TEXT NOT NULL,
+      money       REAL NOT NULL DEFAULT 0,
+      fog_value   INTEGER NOT NULL DEFAULT 0,
+      twist       TEXT DEFAULT NULL,
+      secured     INTEGER NOT NULL DEFAULT 0,
+      opened      INTEGER NOT NULL DEFAULT 0,
+      opened_at   TEXT,
+      opened_via  TEXT,
+      result_note TEXT DEFAULT '',
+      challenge_done INTEGER DEFAULT NULL
+    )`,
     `CREATE TABLE IF NOT EXISTS moderation_logs (
       id           INTEGER PRIMARY KEY AUTOINCREMENT,
       type         TEXT NOT NULL DEFAULT 'ban',
@@ -567,6 +591,58 @@ async function linkMomentToVod(id, vodId, vodUrl) {
 }
 
 // ─── Analytics : usage des commandes & activité du chat ────────────────────────
+
+// ─── Les 30 Coffres de l'Entité ──────────────────────────────────────────────
+
+async function getActiveChestSeason() {
+  return get(`SELECT * FROM chest_seasons WHERE ended_at IS NULL ORDER BY id DESC LIMIT 1`);
+}
+async function createChestSeason(chestList) {
+  const last = await get(`SELECT MAX(season_num) as n FROM chest_seasons`);
+  const num = (last?.n || 0) + 1;
+  // Clore toute saison encore ouverte
+  await run(`UPDATE chest_seasons SET ended_at = datetime('now') WHERE ended_at IS NULL`);
+  const r = await run(`INSERT INTO chest_seasons (season_num) VALUES (?)`, [num]);
+  const seasonId = Number(r.lastInsertRowid);
+  for (const c of chestList) {
+    await run(`INSERT INTO chests (season_id, number, tier, label, money, fog_value, twist) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      [seasonId, c.number, c.tier, c.label, c.money || 0, c.fogValue || 0, c.twist || null]);
+  }
+  return { seasonId, seasonNum: num };
+}
+async function getChests(seasonId) {
+  return all(`SELECT * FROM chests WHERE season_id = ? ORDER BY number ASC`, [seasonId]);
+}
+async function getChest(seasonId, number) {
+  return get(`SELECT * FROM chests WHERE season_id = ? AND number = ?`, [seasonId, number]);
+}
+async function markChestOpened(id, via, resultNote) {
+  await run(`UPDATE chests SET opened = 1, opened_at = datetime('now'), opened_via = ?, result_note = ? WHERE id = ?`, [via, resultNote || '', id]);
+}
+async function updateChestContent(id, tier, label, money, fogValue) {
+  await run(`UPDATE chests SET tier = ?, label = ?, money = ?, fog_value = ? WHERE id = ?`, [tier, label, money, fogValue, id]);
+}
+async function setChestTwist(id, twist) {
+  await run(`UPDATE chests SET twist = ? WHERE id = ?`, [twist, id]);
+}
+async function setChestSecured(seasonId, number, secured) {
+  await run(`UPDATE chests SET secured = ? WHERE season_id = ? AND number = ?`, [secured ? 1 : 0, seasonId, number]);
+}
+async function clearAllSecured(seasonId) {
+  await run(`UPDATE chests SET secured = 0 WHERE season_id = ?`, [seasonId]);
+}
+async function incrementSecureMoves(seasonId) {
+  await run(`UPDATE chest_seasons SET secure_moves_used = secure_moves_used + 1 WHERE id = ?`, [seasonId]);
+}
+async function updateFogMeter(seasonId, delta) {
+  await run(`UPDATE chest_seasons SET fog_meter = fog_meter + ? WHERE id = ?`, [delta, seasonId]);
+}
+async function setChestChallengeDone(id, done) {
+  await run(`UPDATE chests SET challenge_done = ? WHERE id = ?`, [done ? 1 : 0, id]);
+}
+async function endChestSeason(seasonId) {
+  await run(`UPDATE chest_seasons SET ended_at = datetime('now') WHERE id = ?`, [seasonId]);
+}
 
 // ─── Logs de modération ───────────────────────────────────────────────────────
 
@@ -1195,6 +1271,9 @@ module.exports = {
   startSession, endSession, getStreamHistory, recordViewerSample, getSessionsWithAvgViewers,
   getFidelityLeaderboard, getChatHeatmap, getViewerFirstSeen, setViewerFollowingSince,
   addModerationLog, getModerationLogs, clearModerationLogs,
+  getActiveChestSeason, createChestSeason, getChests, getChest, markChestOpened, updateChestContent,
+  setChestTwist, setChestSecured, clearAllSecured, incrementSecureMoves, updateFogMeter,
+  setChestChallengeDone, endChestSeason,
   logCommandUsage, getCommandUsageStats, logChatActivity, getChatActivityWeek,
   getVodMoments, addVodMoment, deleteVodMoment, updateVodMomentLabel, getPendingLiveMoments, linkMomentToVod,
   createDuel, getPendingDuel, resolveDuel, cancelDuel, getRecentDuels,

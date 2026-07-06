@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<title>🩸 Les 30 Coffres de l'Entité</title>
+<style>
+  html, body { margin:0; padding:0; background:transparent; overflow:hidden; font-family:'Segoe UI',system-ui,sans-serif; }
+
+  #board {
+    position:fixed; top:20px; right:20px; width:340px;
+    background:rgba(8,10,22,.88); border:1px solid rgba(139,53,255,.5);
+    border-radius:14px; padding:14px; color:#fff;
+    box-shadow:0 8px 32px rgba(0,0,0,.5);
+  }
+  #board h2 { margin:0 0 10px; font-size:14px; text-align:center; color:#8b35ff; letter-spacing:.5px; }
+  #grid { display:grid; grid-template-columns:repeat(6,1fr); gap:5px; }
+  .chest {
+    aspect-ratio:1; display:flex; flex-direction:column; align-items:center; justify-content:center;
+    border-radius:7px; font-size:9px; font-weight:800; gap:1px;
+    background:rgba(40,255,102,.08); border:1.5px solid rgba(40,255,102,.45); color:#e8e8f0;
+  }
+  .chest .ic { font-size:12px; }
+  .chest.secured { background:rgba(255,215,0,.12); border-color:#ffd700; color:#ffd700; box-shadow:0 0 8px rgba(255,215,0,.35); }
+  .chest.opened { opacity:.7; }
+  .chest.t-legendary { background:rgba(139,53,255,.18); border-color:#8b35ff; color:#c99aff; }
+  .chest.t-epic      { background:rgba(255,215,0,.14);  border-color:#ffd700; color:#ffd700; }
+  .chest.t-positive  { background:rgba(59,157,255,.14); border-color:#3b9dff; color:#7fc0ff; }
+  .chest.t-challenge { background:rgba(255,133,0,.14);  border-color:#ff8500; color:#ffb060; }
+  .chest.t-cursed    { background:rgba(255,59,95,.14);  border-color:#ff3b5f; color:#ff7a95; }
+  .chest.t-fake      { background:rgba(120,120,120,.14);border-color:#666;   color:#999; }
+
+  #stats { display:flex; justify-content:space-between; margin-top:10px; font-size:10px; color:#9aa; }
+
+  /* Alerte d'ouverture plein écran */
+  #reveal {
+    position:fixed; inset:0; display:none; align-items:center; justify-content:center;
+    background:rgba(0,0,0,.65); backdrop-filter:blur(3px);
+  }
+  #reveal.show { display:flex; }
+  #reveal .card {
+    background:rgba(12,14,28,.97); border:2px solid var(--rc, #8b35ff);
+    border-radius:22px; padding:36px 48px; text-align:center; max-width:640px;
+    box-shadow:0 0 60px var(--rc, #8b35ff);
+    animation:pop .5s cubic-bezier(.34,1.56,.64,1);
+  }
+  @keyframes pop { from { transform:scale(.5); opacity:0; } to { transform:scale(1); opacity:1; } }
+  #reveal .num { font-size:16px; color:#9aa; margin-bottom:6px; letter-spacing:2px; }
+  #reveal .tier { font-size:30px; font-weight:900; color:var(--rc, #8b35ff); margin-bottom:12px; }
+  #reveal .content { font-size:22px; color:#fff; line-height:1.4; }
+  #reveal .events { margin-top:16px; font-size:15px; color:#ffb060; line-height:1.6; }
+
+  /* Effet maudit : écran rouge */
+  #curse-flash {
+    position:fixed; inset:0; display:none; background:rgba(200,0,30,.35);
+    animation:flash .4s ease-in-out 4;
+  }
+  @keyframes flash { 0%,100% { opacity:0; } 50% { opacity:1; } }
+</style>
+</head>
+<body>
+
+<div id="board">
+  <h2>🩸 LES 30 COFFRES DE L'ENTITÉ</h2>
+  <div id="grid"></div>
+  <div id="stats">
+    <span id="st-opened">0/30 ouverts</span>
+    <span id="st-money">0€</span>
+  </div>
+</div>
+
+<div id="reveal"><div class="card">
+  <div class="num" id="rv-num">COFFRE 00</div>
+  <div class="tier" id="rv-tier">—</div>
+  <div class="content" id="rv-label">—</div>
+  <div class="events" id="rv-events"></div>
+</div></div>
+
+<div id="curse-flash"></div>
+
+<script src="/socket.io/socket.io.js"></script>
+<script>
+const socket = io();
+const TIER_COLORS = { legendary:'#8b35ff', epic:'#ffd700', positive:'#3b9dff', challenge:'#ff8500', cursed:'#ff3b5f', fake:'#777' };
+const TIER_NAMES  = { legendary:'🟣 LÉGENDAIRE', epic:'🟡 ÉPIQUE', positive:'🔵 BONUS', challenge:'🟠 DÉFI', cursed:'🔴 MAUDIT', fake:'⚫ PIÈGE' };
+
+async function loadBoard() {
+  try {
+    const r = await fetch('/api/chests');
+    const d = await r.json();
+    const grid = document.getElementById('grid');
+    if (!d.season) { grid.innerHTML = '<div style="grid-column:1/-1;text-align:center;color:#889;font-size:11px;padding:16px">En attente d\u2019une saison…</div>'; return; }
+
+    grid.innerHTML = d.chests.map(c => {
+      if (c.opened) {
+        return `<div class="chest opened t-${c.tier}"><span class="ic">${c.emoji}</span>${String(c.number).padStart(2,'0')}</div>`;
+      }
+      if (c.secured) return `<div class="chest secured"><span class="ic">🔒</span>${String(c.number).padStart(2,'0')}</div>`;
+      return `<div class="chest"><span class="ic">🧰</span>${String(c.number).padStart(2,'0')}</div>`;
+    }).join('');
+
+    const opened = d.chests.filter(c => c.opened);
+    const money = opened.reduce((s,c) => {
+      if (['positive','epic','legendary'].includes(c.tier)) return s + (c.money||0);
+      if (c.tier === 'challenge' && c.challengeDone) return s + (c.money||0);
+      return s;
+    }, 0);
+    document.getElementById('st-opened').textContent = opened.length + '/30 ouverts';
+    document.getElementById('st-money').textContent = money + '€';
+  } catch(e) {}
+}
+
+socket.on('connect', loadBoard);
+socket.on('chests-update', loadBoard);
+
+socket.on('chest-opened', (data) => {
+  const color = TIER_COLORS[data.tier] || '#8b35ff';
+  const reveal = document.getElementById('reveal');
+  reveal.style.setProperty('--rc', color);
+  document.getElementById('rv-num').textContent = 'COFFRE ' + String(data.number).padStart(2,'0');
+  document.getElementById('rv-tier').textContent = TIER_NAMES[data.tier] || data.tierName;
+  document.getElementById('rv-label').textContent = data.label;
+  document.getElementById('rv-events').innerHTML = (data.events || []).map(e => `<div>${e}</div>`).join('');
+
+  // Effet écran rouge pour les coffres maudits/pièges
+  if (data.tier === 'cursed' || data.tier === 'fake') {
+    const flash = document.getElementById('curse-flash');
+    flash.style.display = 'block';
+    setTimeout(() => flash.style.display = 'none', 1700);
+  }
+
+  reveal.classList.add('show');
+  const showTime = (data.events?.length ? 9000 : 7000);
+  setTimeout(() => { reveal.classList.remove('show'); loadBoard(); }, showTime);
+
+  if (data.seasonEnd) {
+    setTimeout(() => {
+      const s = data.seasonEnd;
+      reveal.style.setProperty('--rc', '#8b35ff');
+      document.getElementById('rv-num').textContent = '🩸 SAISON TERMINÉE 🩸';
+      document.getElementById('rv-tier').textContent = s.money + '€ GAGNÉS';
+      document.getElementById('rv-label').textContent = `${s.bonuses} bonus · ${s.maluses} malus · ${s.jackpots} jackpot(s) · ${s.challengesDone}/${s.challengesTotal} défis`;
+      document.getElementById('rv-events').innerHTML = '';
+      reveal.classList.add('show');
+      setTimeout(() => reveal.classList.remove('show'), 12000);
+    }, showTime + 500);
+  }
+});
+
+loadBoard();
+setInterval(loadBoard, 60000);
+</script>
+</body>
+</html>
