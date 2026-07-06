@@ -618,17 +618,12 @@ async function cmdFollowage(username, parts) {
       duree = `${h}h (tout frais !)`;
     }
 
-    const mins = viewer?.total_minutes || 0;
-    const timeWatched = mins >= 60
-      ? `${Math.floor(mins/60)}h${String(mins%60).padStart(2,'0')}min`
-      : `${mins}min`;
-
     if (isRealFollow) {
-      if (self) sendChat(`💜 @${username} tu follow la chaîne depuis ${duree} — ${timeWatched} regardées !`);
-      else      sendChat(`💜 ${displayName} follow la chaîne depuis ${duree} — ${timeWatched} regardées !`);
+      if (self) sendChat(`💜 @${username} tu follow la chaîne depuis ${duree} !`);
+      else      sendChat(`💜 ${displayName} follow la chaîne depuis ${duree} !`);
     } else {
-      if (self) sendChat(`📅 @${username} premier message il y a ${duree} — ${timeWatched} regardées sur cette chaîne !`);
-      else      sendChat(`📅 ${displayName} — premier message il y a ${duree}, ${timeWatched} regardées sur cette chaîne !`);
+      if (self) sendChat(`📅 @${username} premier message il y a ${duree} !`);
+      else      sendChat(`📅 ${displayName} — premier message il y a ${duree} !`);
     }
   } catch(e) {
     console.error('[FC] Erreur:', e.message);
