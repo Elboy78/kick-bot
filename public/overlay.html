@@ -2,75 +2,84 @@
 <html lang="fr">
 <head>
 <meta charset="UTF-8">
-<title>Bot7uP — TTS Overlay</title>
+<title>Bot7uP — Overlay TTS</title>
 <style>
-  *{margin:0;padding:0;box-sizing:border-box}
-  html,body{background:transparent;width:100%;height:100%;overflow:hidden;font-family:Inter,Arial,sans-serif}
-  #tts-card{
-    position:fixed;bottom:30px;left:50%;transform:translateX(-50%) translateY(20px);
-    background:linear-gradient(145deg,rgba(18,24,45,.95),rgba(11,16,32,.92));
-    border:1px solid rgba(40,255,102,.4);border-radius:18px;padding:16px 22px;
-    min-width:320px;max-width:560px;box-shadow:0 20px 60px rgba(0,0,0,.5);
-    opacity:0;transition:all .35s ease;backdrop-filter:blur(10px);
+  /* Fond transparent pour OBS */
+  html, body { margin:0; padding:0; background:transparent; overflow:hidden; font-family:'Segoe UI',system-ui,sans-serif; }
+
+  #alert {
+    position:fixed; bottom:40px; left:50%; transform:translateX(-50%) translateY(150%);
+    background:rgba(10,14,30,.92); border:1px solid rgba(139,53,255,.6);
+    border-radius:16px; padding:18px 26px; min-width:320px; max-width:600px;
+    box-shadow:0 8px 40px rgba(139,53,255,.35);
+    transition:transform .45s cubic-bezier(.34,1.56,.64,1);
+    color:#fff;
   }
-  #tts-card.show{opacity:1;transform:translateX(-50%) translateY(0)}
-  #tts-top{display:flex;align-items:center;gap:10px;margin-bottom:8px}
-  #tts-icon{width:30px;height:30px;border-radius:50%;background:linear-gradient(135deg,#28ff66,#0a9e3f);display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0}
-  #tts-user{font-size:14px;font-weight:800;color:#fff}
-  #tts-amount{font-size:11px;font-weight:700;color:#28ff66;margin-left:auto}
-  #tts-msg{font-size:13px;color:#d8d8e8;line-height:1.4}
+  #alert.show { transform:translateX(-50%) translateY(0); }
+
+  .donor { display:flex; align-items:center; gap:10px; margin-bottom:8px; }
+  .donor .icon { font-size:26px; }
+  .donor .name { font-size:19px; font-weight:800; color:#8b35ff; }
+  .donor .amount { font-size:17px; font-weight:700; color:#28ff66; margin-left:auto; }
+  .msg { font-size:15px; line-height:1.5; color:#e8e8f0; word-wrap:break-word; }
 </style>
 </head>
 <body>
 
-<div id="tts-card">
-  <div id="tts-top">
-    <div id="tts-icon">🔊</div>
-    <div id="tts-user">—</div>
-    <div id="tts-amount"></div>
+<div id="alert">
+  <div class="donor">
+    <span class="icon">💸</span>
+    <span class="name" id="donor-name">—</span>
+    <span class="amount" id="donor-amount"></span>
   </div>
-  <div id="tts-msg"></div>
+  <div class="msg" id="donor-msg"></div>
 </div>
 
 <script src="/socket.io/socket.io.js"></script>
 <script>
 const socket = io();
-const card = document.getElementById('tts-card');
-let queue = [];
+const alertEl = document.getElementById('alert');
+const nameEl  = document.getElementById('donor-name');
+const amtEl   = document.getElementById('donor-amount');
+const msgEl   = document.getElementById('donor-msg');
+
+// File d'attente : si plusieurs dons arrivent en rafale, ils se jouent l'un après l'autre
+const queue = [];
 let playing = false;
 
-socket.on('play-tts', data => {
+socket.on('connect', () => console.log('[OVERLAY] Connecté au serveur ✓'));
+
+socket.on('play-tts', (data) => {
   queue.push(data);
-  if (!playing) processQueue();
+  if (!playing) playNext();
 });
 
-function processQueue() {
+function playNext() {
   if (!queue.length) { playing = false; return; }
   playing = true;
-  const data = queue.shift();
-  showCard(data);
+  const { username, message, amount, audio, volume } = queue.shift();
 
-  if (data.audio) {
-    const audio = new Audio('data:audio/mpeg;base64,' + data.audio);
-    audio.volume = (data.volume !== undefined && data.volume !== null) ? Math.max(0, Math.min(1, data.volume)) : 1;
-    audio.onended = () => { hideCard(); setTimeout(processQueue, 500); };
-    audio.onerror = () => { hideCard(); setTimeout(processQueue, 500); };
-    audio.play().catch(() => { hideCard(); setTimeout(processQueue, 500); });
+  // Affichage visuel
+  nameEl.textContent = username || 'Anonyme';
+  amtEl.textContent  = amount > 0 ? amount.toFixed(2) + ' €' : '';
+  msgEl.textContent  = message || '';
+  alertEl.classList.add('show');
+
+  const hide = () => {
+    alertEl.classList.remove('show');
+    setTimeout(playNext, 700); // petit délai entre deux alertes
+  };
+
+  if (audio) {
+    const player = new Audio('data:audio/mpeg;base64,' + audio);
+    player.volume = Math.min(1, Math.max(0, parseFloat(volume) || 1));
+    player.onended = () => setTimeout(hide, 1200); // l'alerte reste 1.2s après la fin de l'audio
+    player.onerror = () => setTimeout(hide, 5000);
+    player.play().catch(() => setTimeout(hide, 5000)); // autoplay bloqué → alerte visuelle seule 5s
   } else {
-    // Pas d'audio (clé API non configurée) — affiche juste le message quelques secondes
-    setTimeout(() => { hideCard(); setTimeout(processQueue, 500); }, 4000);
+    // Pas d'audio généré → alerte visuelle seule pendant 6 secondes
+    setTimeout(hide, 6000);
   }
-}
-
-function showCard(data) {
-  document.getElementById('tts-user').textContent = data.username || 'Anonyme';
-  document.getElementById('tts-amount').textContent = data.amount > 0 ? data.amount.toFixed(2) + ' €' : '';
-  document.getElementById('tts-msg').textContent = data.message || '';
-  card.classList.add('show');
-}
-
-function hideCard() {
-  card.classList.remove('show');
 }
 </script>
 </body>
