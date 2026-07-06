@@ -617,7 +617,11 @@ Option 3" rows="4"></textarea><div style="display:flex;gap:6px;margin-top:10px">
               <button class="btnx btn-outline btn-sm" onclick="saveManualVoiceId()" style="flex-shrink:0">✓ Utiliser</button>
             </div>
           </div>
-          <button class="btnx btn-purple btn-sm" style="width:100%;justify-content:center;margin-top:8px" onclick="previewVoice()">▶️ Écouter un aperçu</button>
+          <div style="margin-top:10px;padding:10px;background:var(--card2);border:1px solid var(--brd);border-radius:8px">
+            <label class="lbl" style="font-size:9px">🎧 Préécoute directe (dans ton navigateur, rien n'est envoyé à l'overlay)</label>
+            <textarea class="inp" id="tts-preview-text" rows="2" placeholder="Écris ce que tu veux entendre… (vide = phrase par défaut)" style="resize:vertical;min-height:48px;margin-bottom:6px"></textarea>
+            <button class="btnx btn-purple btn-sm" style="width:100%;justify-content:center" id="tts-preview-btn" onclick="previewVoiceLocal()">▶️ Écouter ici</button>
+          </div>
 
           <label class="lbl">Stabilité <span id="tts-stability-val" style="color:var(--accent)">50%</span></label>
           <input type="range" id="tts-stability" min="0" max="100" value="50" style="width:100%" oninput="document.getElementById('tts-stability-val').textContent=this.value+'%'">
@@ -3294,14 +3298,41 @@ async function saveTTSVoiceSettings() {
   toast('🎙️ Réglages voix enregistrés ✓');
 }
 
-async function previewVoice() {
-  const message = "Bonjour, ceci est un aperçu de ma voix sur le stream.";
-  const voiceId = document.getElementById('tts-voice-select').value
-               || document.getElementById('tts-voice-id-manual')?.value?.trim()
-               || window._ttsSelectedVoiceId;
-  if (!voiceId) return toast('Sélectionne une voix ou colle un ID d\u2019abord', false);
-  if (document.getElementById('tts-voice-select').value) await saveTTSVoiceSettings();
-  await testTTS(message);
+async function previewVoiceLocal() {
+  const btn = document.getElementById('tts-preview-btn');
+  const customText = document.getElementById('tts-preview-text')?.value?.trim();
+  const message = customText || "Bonjour, ceci est un aperçu de ma voix sur le stream.";
+
+  // S'assurer que la voix sélectionnée est bien sauvegardée avant de générer
+  const selectVal = document.getElementById('tts-voice-select')?.value;
+  const manualVal = document.getElementById('tts-voice-id-manual')?.value?.trim();
+  if (!selectVal && !manualVal && !window._ttsSelectedVoiceId) {
+    return toast('Sélectionne une voix ou colle un ID d\u2019abord', false);
+  }
+  if (selectVal) await saveTTSVoiceSettings();
+  else if (manualVal && manualVal !== window._ttsSelectedVoiceId) await saveManualVoiceId();
+
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ Génération…'; }
+  try {
+    const r = await fetch('/api/tts/preview', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ message })
+    });
+    const json = await r.json();
+    if (!r.ok || !json.audio) {
+      toast(json.error || 'Erreur de génération', false);
+      return;
+    }
+    // Lecture directe dans le navigateur
+    const audio = new Audio('data:audio/mpeg;base64,' + json.audio);
+    audio.volume = 1.0;
+    audio.play().catch(() => toast('Clique d\u2019abord quelque part sur la page puis réessaie (autoplay bloqué)', false));
+    toast('🔊 Lecture…');
+  } catch(e) {
+    toast('Erreur réseau', false);
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = '▶️ Écouter ici'; }
+  }
 }
 
 async function saveTTSLimits() {

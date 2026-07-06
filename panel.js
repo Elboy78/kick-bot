@@ -633,6 +633,20 @@ app.post('/api/tts/test', async (req, res) => {
   } catch(e) { res.status(500).json({ error: e.message }); }
 });
 
+// Préécoute locale : génère l'audio et le renvoie directement au navigateur
+// SANS diffuser sur l'overlay ni toucher l'historique — pour tester tranquillement.
+app.post('/api/tts/preview', async (req, res) => {
+  try {
+    const cfg = await getTTSSettings();
+    const message = String(req.body.message || '').trim().slice(0, cfg.maxTextLength);
+    if (!message) return res.status(400).json({ error: 'message requis' });
+
+    const audioBase64 = await generateTTSAudio(message);
+    if (!audioBase64) return res.status(500).json({ error: 'Génération audio échouée — vérifie la clé API et la voix' });
+    res.json({ success: true, audio: audioBase64 });
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
 app.get('/api/tts/history',        async (req,res) => { try { res.json({data: await db.getTTSHistory(30)}); } catch(e){res.json({data:[]}); }});
 app.post('/api/admin/tts/clear-history', async (req,res) => { try { await db.clearTTSHistory(); res.json({success:true}); } catch(e){res.status(500).json({error:e.message}); }});
 
