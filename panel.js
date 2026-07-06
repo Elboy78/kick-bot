@@ -665,7 +665,9 @@ app.post('/api/admin/tts/settings', async (req, res) => {
     const allowed = ['api_key','voice_id','min_donation','max_text_length','webhook_secret','stability','similarity_boost','volume'];
     const updates = {};
     for (const key of allowed) {
-      if (req.body[key] !== undefined && req.body[key] !== '') updates[key] = req.body[key];
+      if (req.body[key] !== undefined && req.body[key] !== '') {
+        updates[key] = typeof req.body[key] === 'string' ? req.body[key].trim() : req.body[key];
+      }
     }
     await db.setTTSConfigBulk(updates);
     res.json({ success: true });
@@ -677,13 +679,17 @@ app.get('/api/tts/voices', async (req, res) => {
   try {
     const cfg = await getTTSSettings();
     if (!cfg.apiKey) return res.json({ data: [], error: 'no_api_key' });
+    const key = cfg.apiKey.trim();
+    console.log(`[TTS] Test clé: ${key.slice(0,6)}...${key.slice(-4)} (longueur ${key.length})`);
     const r = await axios.get('https://api.elevenlabs.io/v1/voices', {
-      headers: { 'xi-api-key': cfg.apiKey },
+      headers: { 'xi-api-key': key },
       timeout: 10000,
     });
     const voices = (r.data?.voices || []).map(v => ({ id: v.voice_id, name: v.name, category: v.category }));
+    console.log(`[TTS] ${voices.length} voix chargées ✓`);
     res.json({ data: voices });
   } catch(e) {
+    console.error(`[TTS] Erreur voices: status=${e.response?.status} body=${JSON.stringify(e.response?.data)}`);
     res.json({ data: [], error: e.response?.status === 401 ? 'invalid_api_key' : e.message });
   }
 });
