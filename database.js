@@ -3,13 +3,13 @@
  * Persiste entre les redéploiements Render
  */
 
-const { createClient } = require('@libsql/client');
-
+let createClient = null;
 let client = null;
 
 function getDB() {
   if (!client) {
     if (process.env.TURSO_URL && process.env.TURSO_TOKEN) {
+      if (!createClient) ({ createClient } = require('@libsql/client'));
       client = createClient({
         url:       process.env.TURSO_URL,
         authToken: process.env.TURSO_TOKEN,
@@ -37,10 +37,10 @@ async function run(sql, params = []) {
   const db = getDB();
   if (db.execute) {
     // Turso
-    await db.execute({ sql, args: params });
+    return await db.execute({ sql, args: params });
   } else {
     // SQLite
-    db.prepare(sql).run(...params);
+    return db.prepare(sql).run(...params);
   }
 }
 
@@ -543,7 +543,7 @@ async function startSession() {
   const db = getDB();
   if (db.execute) {
     const r = await db.execute({ sql: `INSERT INTO stream_sessions (started_at) VALUES (datetime('now'))`, args: [] });
-    return Number(r.lastInsertRowid);
+    return Number(r?.lastInsertRowid ?? r?.lastInsertRowID ?? r?.lastInsertId);
   } else {
     return db.prepare(`INSERT INTO stream_sessions (started_at) VALUES (datetime('now'))`).run().lastInsertRowid;
   }
@@ -603,7 +603,7 @@ async function createChestSeason(chestList) {
   // Clore toute saison encore ouverte
   await run(`UPDATE chest_seasons SET ended_at = datetime('now') WHERE ended_at IS NULL`);
   const r = await run(`INSERT INTO chest_seasons (season_num) VALUES (?)`, [num]);
-  const seasonId = Number(r.lastInsertRowid);
+  const seasonId = Number(r?.lastInsertRowid ?? r?.lastInsertRowID ?? r?.lastInsertId);
   for (const c of chestList) {
     await run(`INSERT INTO chests (season_id, number, tier, label, money, fog_value, twist) VALUES (?, ?, ?, ?, ?, ?, ?)`,
       [seasonId, c.number, c.tier, c.label, c.money || 0, c.fogValue || 0, c.twist || null]);
@@ -779,7 +779,7 @@ async function createDuel(challenger, opponent, amount) {
   const db = getDB();
   if (db.execute) {
     const r = await db.execute({ sql: `INSERT INTO duels (challenger, opponent, amount) VALUES (?, ?, ?)`, args: [challenger.toLowerCase(), opponent.toLowerCase(), amount] });
-    return Number(r.lastInsertRowid);
+    return Number(r?.lastInsertRowid ?? r?.lastInsertRowID ?? r?.lastInsertId);
   } else {
     return db.prepare(`INSERT INTO duels (challenger, opponent, amount) VALUES (?, ?, ?)`).run(challenger.toLowerCase(), opponent.toLowerCase(), amount).lastInsertRowid;
   }
@@ -807,7 +807,7 @@ async function createGiveaway(title, prize, cost = 0) {
   const db = getDB();
   if (db.execute) {
     const r = await db.execute({ sql: `INSERT INTO giveaways (title, prize, cost) VALUES (?, ?, ?)`, args: [title, prize, cost] });
-    return Number(r.lastInsertRowid);
+    return Number(r?.lastInsertRowid ?? r?.lastInsertRowID ?? r?.lastInsertId);
   } else {
     return db.prepare(`INSERT INTO giveaways (title, prize, cost) VALUES (?, ?, ?)`).run(title, prize, cost).lastInsertRowid;
   }
@@ -993,7 +993,7 @@ async function addTTSHistory(username, message, amount, status) {
   const db = getDB();
   if (db.execute) {
     const r = await db.execute({ sql: `INSERT INTO tts_history (username, message, amount, status) VALUES (?, ?, ?, ?)`, args: [username||'', message, amount||0, status||'played'] });
-    return Number(r.lastInsertRowid);
+    return Number(r?.lastInsertRowid ?? r?.lastInsertRowID ?? r?.lastInsertId);
   } else {
     return db.prepare(`INSERT INTO tts_history (username, message, amount, status) VALUES (?, ?, ?, ?)`).run(username||'', message, amount||0, status||'played').lastInsertRowid;
   }
@@ -1072,7 +1072,7 @@ async function addQuote(text, author, addedBy) {
   const db = getDB();
   if (db.execute) {
     const r = await db.execute({ sql: `INSERT INTO quotes (text, author, added_by) VALUES (?, ?, ?)`, args: [text, author || '', addedBy || ''] });
-    return Number(r.lastInsertRowid);
+    return Number(r?.lastInsertRowid ?? r?.lastInsertRowID ?? r?.lastInsertId);
   } else {
     return db.prepare(`INSERT INTO quotes (text, author, added_by) VALUES (?, ?, ?)`).run(text, author || '', addedBy || '').lastInsertRowid;
   }
@@ -1132,7 +1132,7 @@ async function createPoll(question, options) {
   options.forEach((_, i) => votes[i] = 0);
   if (db.execute) {
     const r = await db.execute({ sql: `INSERT INTO polls (question, options, votes) VALUES (?, ?, ?)`, args: [question, JSON.stringify(options), JSON.stringify(votes)] });
-    return Number(r.lastInsertRowid);
+    return Number(r?.lastInsertRowid ?? r?.lastInsertRowID ?? r?.lastInsertId);
   } else {
     return db.prepare(`INSERT INTO polls (question, options, votes) VALUES (?, ?, ?)`).run(question, JSON.stringify(options), JSON.stringify(votes)).lastInsertRowid;
   }
@@ -1161,7 +1161,7 @@ async function addAnnouncement(message, interval_ms) {
   const db = getDB();
   if (db.execute) {
     const r = await db.execute({ sql: `INSERT INTO announcements (message, interval_ms) VALUES (?, ?)`, args: [message, interval_ms] });
-    return Number(r.lastInsertRowid);
+    return Number(r?.lastInsertRowid ?? r?.lastInsertRowID ?? r?.lastInsertId);
   } else {
     return db.prepare(`INSERT INTO announcements (message, interval_ms) VALUES (?, ?)`).run(message, interval_ms).lastInsertRowid;
   }
