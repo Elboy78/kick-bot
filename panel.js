@@ -437,24 +437,26 @@ app.delete('/api/admin/allowed-words/:id', requireAuth, async (req,res) => { try
 // ─── 🩸 Les 30 Coffres de l'Entité ────────────────────────────────────────────
 const chests = require('./chests');
 
+// Active/désactive les annonces des coffres dans le chat (utile pour tester le panel)
+async function isChestChatEnabled() {
+  try { return await db.getSetting('chests_chat_enabled'); } catch(e) { return true; }
+}
+
 // Annonce un résultat d'ouverture dans le chat + overlay
-async function chestChatEnabled() {
-  try { return await db.getSetting('chest_chat_enabled'); }
-  catch(e) { return true; }
-}
-async function sendChestChat(message) {
-  if (!await chestChatEnabled()) return;
-  const shared = require('./shared');
-  try { await shared.sendChat(message); } catch(e) {}
-}
 async function broadcastChestResult(result) {
+  const shared = require('./shared');
   const moneyStr = result.money > 0 && ['positive','epic','legendary'].includes(result.tier) ? ` (${result.money}€)` : '';
   let msg = `🧰 COFFRE ${result.number} → ${result.tierEmoji} ${result.tierName} : ${result.label}${moneyStr}`;
-  await sendChestChat(msg);
-  for (const ev of result.events || []) await sendChestChat(ev);
-  if (result.seasonEnd) {
-    const s = result.seasonEnd;
-    await sendChestChat(`🩸 SAISON TERMINÉE — ${s.bonuses} bonus, ${s.maluses} malus, ${s.jackpots} jackpot(s), ${s.challengesDone}/${s.challengesTotal} défis réussis, ${s.money}€ gagnés !`);
+  const chatEnabled = await isChestChatEnabled();
+  if (chatEnabled) {
+    try { await shared.sendChat(msg); } catch(e) {}
+    for (const ev of result.events || []) {
+      try { await shared.sendChat(ev); } catch(e) {}
+    }
+    if (result.seasonEnd) {
+      const s = result.seasonEnd;
+      try { await shared.sendChat(`🩸 SAISON TERMINÉE — ${s.bonuses} bonus, ${s.maluses} malus, ${s.jackpots} jackpot(s), ${s.challengesDone}/${s.challengesTotal} défis réussis, ${s.money}€ gagnés !`); } catch(e) {}
+    }
   }
   io.emit('chest-opened', result);
   io.emit('chests-update');
@@ -463,11 +465,23 @@ async function broadcastChestResult(result) {
 app.get('/api/chests', async (req, res) => {
   try { res.json(await chests.getPublicState()); } catch(e) { res.json({ season: null, chests: [] }); }
 });
+app.get('/api/chests/chat-enabled', async (req, res) => {
+  try { res.json({ enabled: await isChestChatEnabled() }); } catch(e) { res.json({ enabled: true }); }
+});
+app.post('/api/admin/chests/chat-enabled', requireAuth, async (req, res) => {
+  try {
+    await db.setSetting('chests_chat_enabled', req.body.enabled !== false);
+    res.json({ success: true, enabled: req.body.enabled !== false });
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
 app.post('/api/admin/chests/new-season', requireAuth, async (req, res) => {
   try {
     const r = await chests.newSeason();
     io.emit('chests-update');
-    await sendChestChat(`🩸 UNE NOUVELLE SAISON DES 30 COFFRES DE L'ENTITÉ COMMENCE ! Le contenu a été mélangé par le Brouillard…`);
+    if (await isChestChatEnabled()) {
+      const shared = require('./shared');
+      try { await shared.sendChat(`🩸 UNE NOUVELLE SAISON DES 30 COFFRES DE L'ENTITÉ COMMENCE ! Le contenu a été mélangé par le Brouillard…`); } catch(e) {}
+    }
     res.json({ success: true, ...r });
   } catch(e) { res.status(500).json({ error: e.message }); }
 });
@@ -486,8 +500,11 @@ app.post('/api/admin/chests/secure', requireAuth, async (req, res) => {
     const result = await chests.secureChest(parseInt(req.body.number));
     if (result.error) return res.status(400).json(result);
     io.emit('chests-update');
-    if (result.moved) await sendChestChat(`🔒 La sécurité passe du coffre ${result.from} au coffre ${result.to} — DERNIER changement possible utilisé !`);
-    else await sendChestChat(`🔒 Le coffre ${result.to} est maintenant SÉCURISÉ.`);
+    if (await isChestChatEnabled()) {
+      const shared = require('./shared');
+      if (result.moved) { try { await shared.sendChat(`🔒 La sécurité passe du coffre ${result.from} au coffre ${result.to} — DERNIER changement possible utilisé !`); } catch(e) {} }
+      else { try { await shared.sendChat(`🔒 Le coffre ${result.to} est maintenant SÉCURISÉ.`); } catch(e) {} }
+    }
     res.json(result);
   } catch(e) { res.status(500).json({ error: e.message }); }
 });
