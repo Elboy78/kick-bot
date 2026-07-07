@@ -39,17 +39,12 @@
   #reveal.show { display:flex; }
   #reveal .num { font-size:17px; color:#9aa; margin-bottom:20px; letter-spacing:3px; font-weight:700; }
 
-  .dbdchest{position:relative;width:260px;height:200px;perspective:750px}
-  .dbdchest .lid{position:absolute;top:0;left:0;right:0;height:40%;background:linear-gradient(180deg,#8a5a30,#5c3319);border:4px solid #8a8f96;border-bottom:3px solid #6a6f76;border-radius:18px 18px 0 0;transform-origin:top center;transition:transform 1.1s cubic-bezier(.34,1.15,.5,1);z-index:3;box-shadow:inset 0 -6px 12px rgba(0,0,0,.4)}
-  .dbdchest .lid::after{content:'';position:absolute;inset:5px;background:repeating-linear-gradient(90deg,transparent 0 34px,rgba(0,0,0,.28) 34px 37px);border-radius:13px 13px 0 0}
-  .dbdchest .cbody{position:absolute;bottom:0;left:0;right:0;height:64%;background:linear-gradient(180deg,#6b3d1f,#402210);border:4px solid #8a8f96;border-radius:0 0 14px 14px;box-shadow:inset 0 8px 16px rgba(0,0,0,.5)}
-  .dbdchest .cbody::after{content:'';position:absolute;inset:5px;background:repeating-linear-gradient(0deg,transparent 0 26px,rgba(0,0,0,.3) 26px 29px);border-radius:0 0 10px 10px}
-  .dbdchest .lock{position:absolute;top:34%;left:50%;transform:translateX(-50%);width:32px;height:42px;background:linear-gradient(180deg,#4a2c12,#2a1808);border:3px solid #9aa0a8;border-radius:7px;z-index:4;transition:opacity .4s}
-  .dbdchest .lock::after{content:'';position:absolute;top:9px;left:50%;transform:translateX(-50%);width:9px;height:14px;background:#151008;border-radius:3px}
-  .dbdchest .glow{position:absolute;top:6%;left:8%;right:8%;height:55%;background:radial-gradient(ellipse at center,var(--chestglow,rgba(255,220,120,.95)),transparent 70%);opacity:0;transition:opacity .9s ease .3s;z-index:2;filter:blur(12px)}
-  .dbdchest.open .lid{transform:rotateX(-118deg)}
-  .dbdchest.open .lock{opacity:0}
-  .dbdchest.open .glow{opacity:1}
+  .dbdchest{position:relative;width:340px;height:191px;border-radius:10px;overflow:hidden;background:#000;box-shadow:0 10px 40px rgba(0,0,0,.6)}
+  .dbdchest video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;mix-blend-mode:screen}
+  .dbdchest .punch{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;pointer-events:none}
+  .dbdchest .punch::before{content:'';width:40px;height:40px;border-radius:50%;background:radial-gradient(circle,#fff 0%,var(--chestglow,rgba(255,220,120,.95)) 35%,transparent 70%);opacity:0;transform:scale(.3);filter:blur(2px)}
+  .dbdchest.open .punch::before{animation:chestpop .9s cubic-bezier(.2,.8,.3,1) forwards}
+  @keyframes chestpop{0%{opacity:0;transform:scale(.2)}30%{opacity:1;transform:scale(2.4)}100%{opacity:0;transform:scale(7)}}
 
   #reveal .texts{opacity:0;transform:translateY(14px);transition:opacity .7s ease,transform .7s ease;text-align:center;margin-top:28px;max-width:680px;padding:0 20px}
   #reveal.textshow .texts{opacity:1;transform:translateY(0)}
@@ -79,10 +74,8 @@
 <div id="reveal">
   <div class="num" id="rv-num">COFFRE 00</div>
   <div class="dbdchest" id="rv-chest">
-    <div class="glow"></div>
-    <div class="cbody"></div>
-    <div class="lid"></div>
-    <div class="lock"></div>
+    <video id="rv-video" src="/assets/video/chest-glow.mp4" muted playsinline preload="auto"></video>
+    <div class="punch"></div>
   </div>
   <div class="texts">
     <div class="tier" id="rv-tier">—</div>
@@ -142,13 +135,17 @@ socket.on('chest-opened', (data) => {
   document.getElementById('rv-label').textContent = data.label;
   document.getElementById('rv-events').innerHTML = (data.events || []).map(e => `<div>${e}</div>`).join('');
 
+  const video = document.getElementById('rv-video');
   chest.classList.remove('open');
   reveal.classList.remove('textshow');
   reveal.classList.add('show');
 
-  // Le couvercle s'ouvre après 0.7s, le texte apparaît à 1.5s
-  setTimeout(() => chest.classList.add('open'), 700);
-  setTimeout(() => reveal.classList.add('textshow'), 1500);
+  video.currentTime = 0;
+  video.play().catch(() => {});
+
+  // Le flash d'ouverture apparaît à 1.2s (pendant que la lueur monte dans la vidéo), le texte à 1.9s
+  setTimeout(() => chest.classList.add('open'), 1200);
+  setTimeout(() => reveal.classList.add('textshow'), 1900);
 
   // Effet écran rouge pour les coffres maudits/pièges (au moment de l'ouverture)
   if (data.tier === 'cursed' || data.tier === 'fake') {
@@ -161,7 +158,7 @@ socket.on('chest-opened', (data) => {
 
   // Le texte reste affiché 10 secondes
   const showTime = 11500;
-  setTimeout(() => { reveal.classList.remove('show','textshow'); chest.classList.remove('open'); loadBoard(); }, showTime);
+  setTimeout(() => { reveal.classList.remove('show','textshow'); chest.classList.remove('open'); video.pause(); loadBoard(); }, showTime);
 
   if (data.seasonEnd) {
     setTimeout(() => {
