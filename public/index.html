@@ -317,35 +317,27 @@ hr.div{border:none;border-top:1px solid var(--brd);margin:12px 0}
 
 
 
-/* === REFONTE VISUELLE COFFRES — coffre SVG pro, proportions propres, animation 9 frames === */
-.chests-dbd-page{background:radial-gradient(circle at 72% 24%,rgba(137,55,255,.18),transparent 28%),radial-gradient(circle at 43% 55%,rgba(255,150,40,.10),transparent 32%),linear-gradient(180deg,#050509,#0a080b 55%,#030304)!important}
-.chests-layout{grid-template-columns:260px minmax(720px,1fr) 420px!important;gap:26px!important;align-items:start!important}
-.dbd-board{display:grid!important;grid-template-columns:repeat(5,minmax(132px,1fr))!important;gap:16px!important;align-items:stretch!important}
-.chestcell.dbd-case{height:126px!important;min-width:132px!important;border:1px solid rgba(255,192,92,.16)!important;border-radius:16px!important;background:radial-gradient(circle at 50% 65%,rgba(255,156,45,.12),transparent 45%),linear-gradient(180deg,rgba(20,17,19,.98),rgba(6,6,8,.98))!important;box-shadow:inset 0 0 0 1px rgba(255,255,255,.035),0 18px 34px rgba(0,0,0,.50)!important;overflow:hidden!important;padding:0!important;filter:none!important;display:block!important}
-.chestcell.dbd-case:before{content:'';position:absolute;inset:6px;border-radius:13px;background:linear-gradient(180deg,rgba(255,255,255,.045),transparent 42%);pointer-events:none;z-index:1}
-.chestcell.dbd-case:hover{transform:translateY(-5px) scale(1.035)!important;border-color:rgba(255,190,74,.55)!important;box-shadow:0 0 0 1px rgba(255,184,72,.38),0 0 32px rgba(255,147,32,.25),0 22px 40px rgba(0,0,0,.62)!important}
-.dbd-case .mini-chest{position:absolute!important;left:50%!important;bottom:2px!important;width:146px!important;height:98px!important;transform:translateX(-50%)!important;display:block!important;z-index:2!important;background:none!important;filter:drop-shadow(0 13px 10px rgba(0,0,0,.68))!important}
+/* === PATCH PRO COFFRES — images 100% code, bien proportionnées === */
+.chests-dbd-page{background:radial-gradient(circle at 82% 20%,rgba(125,40,255,.24),transparent 30%),radial-gradient(circle at 0 90%,rgba(255,143,30,.08),transparent 26%),linear-gradient(180deg,#050507,#08080b 58%,#030304)!important}
+.dbd-board{gap:10px!important;align-content:start!important}
+.chestcell.dbd-case{height:112px!important;min-width:0!important;border:1px solid rgba(255,255,255,.10)!important;border-radius:10px!important;background:linear-gradient(180deg,rgba(255,255,255,.035),rgba(0,0,0,.42))!important;box-shadow:inset 0 0 0 1px rgba(0,0,0,.5),0 13px 24px rgba(0,0,0,.42)!important;overflow:hidden!important;filter:none!important;display:block!important}
+.chestcell.dbd-case:hover{transform:translateY(-3px) scale(1.015)!important;box-shadow:inset 0 0 0 1px rgba(255,190,82,.28),0 0 24px rgba(158,67,255,.22),0 16px 28px rgba(0,0,0,.48)!important}
+.dbd-case .mini-chest{position:absolute!important;left:50%!important;bottom:8px!important;top:auto!important;right:auto!important;width:86%!important;height:72%!important;transform:translateX(-50%)!important;background:none!important;display:flex!important;align-items:flex-end!important;justify-content:center!important;z-index:2!important;filter:drop-shadow(0 10px 9px rgba(0,0,0,.62))!important}
 .dbd-case .mini-chest svg{width:100%!important;height:100%!important;display:block!important;overflow:visible!important}
-.dbd-case .cc-num{position:absolute!important;left:0!important;right:0!important;top:8px!important;height:32px!important;display:flex!important;align-items:center!important;justify-content:center!important;font-size:25px!important;font-weight:950!important;line-height:1!important;color:#f4f0e8!important;text-shadow:0 2px 0 #000,0 0 10px rgba(255,220,135,.32)!important;z-index:7!important;pointer-events:none!important;letter-spacing:.5px!important}
-.dbd-case .cc-tier,.dbd-case .cc-lock{right:10px!important;top:38px!important;z-index:8!important;font-size:19px!important;filter:drop-shadow(0 3px 5px #000)!important}
-.dbd-case.sec:after,.dbd-case.selected:after{inset:5px!important;border-radius:14px!important;border:2px solid #ffc858!important;box-shadow:0 0 16px rgba(255,200,88,.82),inset 0 0 18px rgba(255,200,88,.13)!important;z-index:9!important;pointer-events:none!important}
-.dbd-case.opened{opacity:.58!important;filter:grayscale(.55)!important}
-.dbd-case.opened .mini-chest{opacity:.74!important;transform:translateX(-50%) translateY(3px) scale(.96)!important}
-.showcase{display:grid!important;grid-template-rows:auto auto!important;gap:18px!important;align-items:start!important;justify-content:stretch!important;min-height:0!important}
-.anim-preview{border:1px solid rgba(255,190,74,.16)!important;border-radius:18px!important;background:linear-gradient(180deg,rgba(17,15,19,.98),rgba(5,5,8,.99))!important;box-shadow:0 20px 55px rgba(0,0,0,.45)!important;padding:16px 18px 18px!important;text-align:center!important;overflow:hidden!important;position:relative!important}
-.anim-preview:before{content:'';position:absolute;inset:-30%;background:radial-gradient(circle at 50% 62%,rgba(255,160,45,.20),transparent 34%),radial-gradient(circle at 50% 55%,rgba(139,53,255,.18),transparent 48%);pointer-events:none}
-.anim-preview h3{position:relative;z-index:2;color:#ffcb7a!important;font-size:15px!important;font-weight:950!important;letter-spacing:.7px!important;text-transform:uppercase!important;margin-bottom:10px!important}
-.anim-preview-box{height:250px!important;border-radius:14px!important;background:radial-gradient(circle at 50% 58%,rgba(255,184,76,.19),transparent 33%),radial-gradient(circle at 50% 62%,rgba(142,52,255,.18),transparent 52%),linear-gradient(180deg,#08080d,#020203)!important;display:flex!important;align-items:center!important;justify-content:center!important;position:relative!important;overflow:hidden!important;border:1px solid rgba(255,255,255,.06)!important}
-.anim-preview-box:before{content:'';position:absolute;inset:0;background-image:radial-gradient(circle,rgba(255,205,90,.75) 0 1.5px,transparent 2.5px);background-size:44px 44px;opacity:.22;animation:particlesRise 2.3s linear infinite}
-#sideFrameSvg{width:98%!important;height:98%!important;position:relative!important;z-index:2!important;display:flex!important;align-items:center!important;justify-content:center!important;filter:drop-shadow(0 22px 24px rgba(0,0,0,.78))!important}
-#sideFrameSvg svg{width:100%!important;height:100%!important;display:block!important;overflow:visible!important}
-.open-chest-bg{display:none!important}.frame-dots{display:flex!important;justify-content:center!important;gap:7px!important;margin-top:12px!important;position:relative!important;z-index:2}.frame-dots span{width:10px!important;height:10px!important;border-radius:50%!important;border:1px solid rgba(255,255,255,.35)!important;background:transparent!important}.frame-dots span.active{background:#ffcb7a!important;border-color:#ffcb7a!important;box-shadow:0 0 10px #ffcb7a!important}.frame-label{margin-top:8px!important;font-size:12px!important;color:#d8d8d8!important;position:relative!important;z-index:2}
-.side-reward{width:100%!important;min-height:300px!important;padding:28px 26px!important;border-radius:18px!important}.side-reward .reward-icon{width:72px!important;height:72px!important;font-size:40px!important}.side-reward span{font-size:30px!important}.side-reward h3{font-size:22px!important}
-.frame-player{width:min(820px,88vw)!important;height:min(540px,64vh)!important;position:relative!important;display:flex!important;align-items:center!important;justify-content:center!important;filter:drop-shadow(0 30px 42px rgba(0,0,0,.78))!important}.frame-player img{display:none!important}.frame-player svg{width:100%!important;height:100%!important;display:block!important;overflow:visible!important}.frame-player .frame-glow{z-index:0!important}.frame-player .pro-chest-svg{position:relative;z-index:2}.frame-player.burst .pro-chest-svg{animation:chestOpenPulse .8s ease-in-out infinite alternate}
-@keyframes chestOpenPulse{from{transform:scale(1)}to{transform:scale(1.025)}}
-@media(max-width:1500px){.chests-layout{grid-template-columns:230px minmax(620px,1fr) 370px!important}.dbd-board{grid-template-columns:repeat(5,minmax(116px,1fr))!important}.chestcell.dbd-case{height:112px!important}.dbd-case .mini-chest{width:128px!important;height:88px!important}.anim-preview-box{height:220px!important}}
-@media(max-width:1180px){.chests-layout{grid-template-columns:1fr!important}.dbd-board{grid-template-columns:repeat(5,minmax(96px,1fr))!important}.showcase{max-width:520px;margin:auto}.chestcell.dbd-case{height:104px!important}.dbd-case .mini-chest{width:116px!important;height:80px!important}}
+.dbd-case .cc-num{align-items:flex-start!important;padding-top:8px!important;font-size:24px!important;color:#f4f1ea!important;text-shadow:0 3px 8px #000,0 0 10px rgba(255,255,255,.18)!important;z-index:4!important;line-height:1!important}
+.dbd-case.opened{opacity:.44!important;filter:grayscale(.82)!important;background:linear-gradient(180deg,rgba(255,255,255,.02),rgba(0,0,0,.5))!important}
+.dbd-case.opened .mini-chest{opacity:.65!important}
+.dbd-case.sec:after,.dbd-case.selected:after{inset:3px!important;border-radius:10px!important;border:2px solid #ffbf55!important;box-shadow:0 0 0 1px rgba(255,191,85,.18),0 0 22px rgba(255,191,85,.55)!important;z-index:5!important;pointer-events:none!important}
+.dbd-case .cc-lock{right:7px!important;top:7px!important;font-size:18px!important;z-index:6!important}
+.dbd-case .cc-tier{right:7px!important;bottom:6px!important;top:auto!important;z-index:6!important}
+.showcase{flex-direction:column!important;gap:18px!important;align-items:stretch!important;min-height:520px!important}
+.open-chest-bg{position:relative!important;left:auto!important;right:auto!important;bottom:auto!important;height:245px!important;width:100%!important;background:none!important;display:flex!important;align-items:center!important;justify-content:center!important;border:1px solid rgba(255,255,255,.09)!important;border-radius:12px!important;background-color:rgba(0,0,0,.28)!important;overflow:hidden!important;order:0!important}
+.open-chest-bg:before{content:'OUVERTURE DU COFFRE';position:absolute;top:13px;left:0;right:0;text-align:center;color:#ff4b4b;font-weight:900;letter-spacing:.8px;font-size:14px;z-index:3}.open-chest-bg svg{width:86%!important;height:78%!important;margin-top:30px;filter:drop-shadow(0 0 30px rgba(165,65,255,.36)) drop-shadow(0 18px 18px rgba(0,0,0,.55))}
+.side-reward{order:1!important;width:auto!important;min-height:245px!important;padding:28px 26px!important;border-color:#a345ff!important;box-shadow:0 0 24px rgba(163,69,255,.75),0 0 90px rgba(163,69,255,.26)!important}
+.frame-player{width:min(760px,86vw)!important;height:min(470px,60vh)!important;background:radial-gradient(circle at 50% 55%,rgba(255,171,45,.12),transparent 37%),rgba(0,0,0,.18);border:1px solid rgba(255,255,255,.08);border-radius:14px;overflow:hidden}.frame-player svg{width:88%!important;height:88%!important;filter:drop-shadow(0 0 32px rgba(158,67,255,.26)) drop-shadow(0 22px 25px rgba(0,0,0,.7))}.frame-player.burst svg{animation:chestOpenPulse .9s ease-in-out infinite alternate}@keyframes chestOpenPulse{from{transform:scale(1)}to{transform:scale(1.025)}}
+@media(max-width:1280px){.chestcell.dbd-case{height:96px!important}.dbd-case .cc-num{font-size:21px!important}.chests-layout{grid-template-columns:210px minmax(480px,1fr) 350px!important}}
 
+.side-frame-dots{position:absolute;bottom:28px;left:0;right:0;display:flex;justify-content:center;gap:7px;z-index:4}.side-frame-dots span{width:10px;height:10px;border-radius:50%;border:1px solid rgba(255,255,255,.35);background:rgba(0,0,0,.35)}.side-frame-dots span.active{background:#a348ff;border-color:#d08cff;box-shadow:0 0 12px #a348ff}.side-frame-label{position:absolute;bottom:8px;left:0;right:0;text-align:center;color:#d8d1de;font-size:12px;font-weight:700}
 </style>
 </head>
 <body>
@@ -1037,15 +1029,6 @@ Option 3" rows="4"></textarea><div style="display:flex;gap:6px;margin-top:10px">
         <section id="chest-grid" class="dbd-board"></section>
 
         <aside class="showcase">
-          <div class="anim-preview">
-            <h3>🎬 Prévisualisation du coffre</h3>
-            <div class="anim-preview-box">
-              <div id="sideFrameSvg" class="side-frame-svg"></div>
-            </div>
-            <div id="sideFrameDots" class="frame-dots"></div>
-            <div id="sideFrameLabel" class="frame-label">Image 1 / 9</div>
-          </div>
-
           <article id="sideReward" class="side-reward idle">
             <div class="reward-icon" id="sideRewardIcon">☠</div>
             <span id="sideRewardType">EN ATTENTE</span>
@@ -1053,7 +1036,7 @@ Option 3" rows="4"></textarea><div style="display:flex;gap:6px;margin-top:10px">
             <p id="sideRewardText">Le bonus ou malus apparaîtra ici après l’animation.</p>
             <small>Bonne chance...</small>
           </article>
-          <div class="open-chest-bg"></div>
+          <div class="open-chest-bg"><div id="sideFrameSvg"></div><div id="sideFrameDots" class="side-frame-dots"></div><div id="sideFrameLabel" class="side-frame-label">Image 1 / 9</div></div>
         </aside>
       </section>
 
@@ -2927,69 +2910,46 @@ const CHEST_TIER_NAMES = {
 };
 
 
-
-let _chestSvgUid = 0;
+const CHEST_COLORS = ['#ba55ff','#f1d65a','#e8e8e8','#ff971c','#ff4545','#e8e8e8','#ff5b96','#4dd46b','#d4c661','#f0f0f0'];
 function chestSvgMarkup(open=0, glow=false){
-  const t = Math.max(0, Math.min(1, Number(open) || 0));
-  const uid = 'proChest' + (++_chestSvgUid);
-  const lidAngle = -8 - (t * 62);
-  const lidLift = -(t * 26);
-  const lockOpacity = Math.max(0, 1 - (t * 1.8));
-  const glowOpacity = glow ? Math.min(1, .18 + t * .95) : 0;
-  const beamOpacity = glow ? Math.min(.9, t * 1.05) : 0;
-  const sparks = glow ? `
-    <g class="svg-sparks" opacity="${0.35 + t*.55}">
-      <circle cx="102" cy="60" r="3" fill="#ffe59b"/>
-      <circle cx="222" cy="58" r="2.4" fill="#fff2b8"/>
-      <circle cx="250" cy="95" r="2.8" fill="#ffb247"/>
-      <circle cx="74" cy="98" r="2.2" fill="#fff"/>
-      <circle cx="172" cy="43" r="2" fill="#d777ff"/>
-      <circle cx="137" cy="83" r="1.8" fill="#fff3c4"/>
-    </g>` : '';
-
-  return `<svg class="pro-chest-svg" viewBox="0 0 320 215" xmlns="http://www.w3.org/2000/svg" role="img" aria-hidden="true">
+  const o = Math.max(0, Math.min(1, Number(open)||0));
+  const lidY = 48 - o*34;
+  const lidAngle = -o*19;
+  const shine = glow ? Math.min(1, .18 + o) : 0;
+  const id = 'c'+String(Math.round(o*100))+(glow?'g':'n');
+  return `<svg class="pro-chest-svg" viewBox="0 0 320 210" xmlns="http://www.w3.org/2000/svg" role="img" aria-hidden="true">
     <defs>
-      <linearGradient id="${uid}wood" x1="0" y1="0" x2="0" y2="1">
-        <stop offset="0" stop-color="#ff9b32"/><stop offset=".35" stop-color="#b95516"/><stop offset=".72" stop-color="#6f2b0d"/><stop offset="1" stop-color="#351207"/>
-      </linearGradient>
-      <linearGradient id="${uid}woodDark" x1="0" y1="0" x2="0" y2="1">
-        <stop offset="0" stop-color="#a64616"/><stop offset="1" stop-color="#2a0d05"/>
-      </linearGradient>
-      <linearGradient id="${uid}metal" x1="0" y1="0" x2="1" y2="1">
-        <stop offset="0" stop-color="#f7df9b"/><stop offset=".22" stop-color="#fff7d0"/><stop offset=".5" stop-color="#8a7340"/><stop offset=".78" stop-color="#e5a83a"/><stop offset="1" stop-color="#4c3920"/>
-      </linearGradient>
-      <radialGradient id="${uid}glow" cx="50%" cy="48%" r="56%">
-        <stop offset="0" stop-color="#fff3ad" stop-opacity="1"/><stop offset=".32" stop-color="#ffb642" stop-opacity=".92"/><stop offset=".62" stop-color="#9a35ff" stop-opacity=".42"/><stop offset="1" stop-color="#4f00b9" stop-opacity="0"/>
-      </radialGradient>
-      <filter id="${uid}shadow" x="-25%" y="-40%" width="150%" height="175%">
-        <feDropShadow dx="0" dy="14" stdDeviation="10" flood-color="#000" flood-opacity=".75"/>
-      </filter>
+      <linearGradient id="${id}wood" x1="0" x2="0" y1="0" y2="1"><stop offset="0" stop-color="#f19734"/><stop offset=".38" stop-color="#a94f18"/><stop offset="1" stop-color="#4b1d0b"/></linearGradient>
+      <linearGradient id="${id}wood2" x1="0" x2="1" y1="0" y2="1"><stop offset="0" stop-color="#321025"/><stop offset=".4" stop-color="#7a2ec5"/><stop offset=".55" stop-color="#b15fff"/><stop offset="1" stop-color="#170b22"/></linearGradient>
+      <linearGradient id="${id}gold" x1="0" x2="1"><stop offset="0" stop-color="#8c5b18"/><stop offset=".23" stop-color="#ffe18a"/><stop offset=".52" stop-color="#bf741d"/><stop offset=".74" stop-color="#fff0b8"/><stop offset="1" stop-color="#5a3410"/></linearGradient>
+      <linearGradient id="${id}iron" x1="0" x2="1"><stop offset="0" stop-color="#1c1e24"/><stop offset=".32" stop-color="#626773"/><stop offset=".62" stop-color="#e4d5b0"/><stop offset="1" stop-color="#26221e"/></linearGradient>
+      <radialGradient id="${id}glow" cx="50%" cy="48%" r="55%"><stop offset="0" stop-color="#fff4b6" stop-opacity="1"/><stop offset=".28" stop-color="#ffb642" stop-opacity=".96"/><stop offset=".58" stop-color="#a248ff" stop-opacity=".55"/><stop offset="1" stop-color="#000" stop-opacity="0"/></radialGradient>
+      <filter id="${id}shadow" x="-22%" y="-34%" width="144%" height="170%"><feDropShadow dx="0" dy="15" stdDeviation="10" flood-color="#000" flood-opacity=".68"/></filter>
     </defs>
-    <ellipse cx="160" cy="195" rx="118" ry="15" fill="#000" opacity=".52"/>
-    <ellipse cx="160" cy="106" rx="126" ry="76" fill="url(#${uid}glow)" opacity="${glowOpacity}"/>
-    <path d="M88 178 C112 98 208 98 232 178" fill="url(#${uid}glow)" opacity="${beamOpacity}"/>
-
-    <g filter="url(#${uid}shadow)">
-      <path d="M47 99 H273 V178 Q273 194 257 194 H63 Q47 194 47 178 Z" fill="url(#${uid}wood)" stroke="#210904" stroke-width="6"/>
-      <path d="M59 111 H261 M58 137 H262 M62 163 H258" stroke="#2b0c05" stroke-width="5" opacity=".42"/>
-      <path d="M47 99 H273" stroke="url(#${uid}metal)" stroke-width="13" stroke-linecap="round"/>
-      <path d="M66 103 V190 M254 103 V190" stroke="url(#${uid}metal)" stroke-width="12" stroke-linecap="round"/>
-      <path d="M118 101 V194 M202 101 V194" stroke="#331005" stroke-width="4" opacity=".5"/>
-      <path d="M118 104 V190 M202 104 V190" stroke="url(#${uid}metal)" stroke-width="7" opacity=".9"/>
-      <g transform="translate(160 102) translate(0 ${lidLift}) rotate(${lidAngle}) translate(-160 -102)">
-        <path d="M39 103 C42 50 83 28 128 26 H192 C237 28 278 50 281 103 Z" fill="url(#${uid}wood)" stroke="#210904" stroke-width="6"/>
-        <path d="M57 91 C68 54 98 43 130 42 H190 C222 43 252 54 263 91" fill="none" stroke="#ffbe61" stroke-width="5" opacity=".42"/>
-        <path d="M46 97 H274" stroke="url(#${uid}metal)" stroke-width="13" stroke-linecap="round"/>
-        <path d="M83 42 V100 M237 42 V100" stroke="url(#${uid}metal)" stroke-width="10" stroke-linecap="round"/>
-        <path d="M114 28 V100 M206 28 V100" stroke="#2f0e05" stroke-width="4" opacity=".38"/>
+    <ellipse cx="160" cy="184" rx="122" ry="16" fill="#000" opacity=".56"/>
+    <ellipse cx="160" cy="99" rx="123" ry="50" fill="url(#${id}glow)" opacity="${shine}"/>
+    <g filter="url(#${id}shadow)">
+      <path d="M48 88 H272 V166 Q272 184 254 184 H66 Q48 184 48 166 Z" fill="url(#${id}wood)" stroke="#160905" stroke-width="5"/>
+      <path d="M66 96 H254 M61 122 H259 M59 148 H261" stroke="#351204" stroke-width="5" opacity=".48"/>
+      <path d="M69 98 C102 114 128 110 157 96 C189 112 222 111 252 96" stroke="#ffb95c" stroke-width="3" opacity=".34" fill="none"/>
+      <rect x="48" y="84" width="224" height="14" rx="5" fill="url(#${id}iron)"/>
+      <rect x="54" y="88" width="16" height="94" rx="5" fill="url(#${id}iron)"/><rect x="250" y="88" width="16" height="94" rx="5" fill="url(#${id}iron)"/>
+      <rect x="103" y="88" width="12" height="93" rx="4" fill="url(#${id}gold)" opacity=".88"/><rect x="205" y="88" width="12" height="93" rx="4" fill="url(#${id}gold)" opacity=".88"/>
+      <g transform="rotate(${lidAngle} 160 ${lidY+45})">
+        <path d="M42 ${lidY+42} Q45 ${lidY-5} 92 ${lidY-20} H228 Q275 ${lidY-5} 278 ${lidY+42} Z" fill="url(#${id}wood)" stroke="#160905" stroke-width="5"/>
+        <path d="M63 ${lidY+19} C98 ${lidY+3} 125 ${lidY+7} 160 ${lidY+20} C195 ${lidY+7} 222 ${lidY+3} 257 ${lidY+19}" stroke="#ffb45c" stroke-width="4" opacity=".42" fill="none"/>
+        <path d="M53 ${lidY+37} H267" stroke="url(#${id}iron)" stroke-width="14" stroke-linecap="round"/>
+        <path d="M82 ${lidY-14} V${lidY+42} M238 ${lidY-14} V${lidY+42}" stroke="url(#${id}iron)" stroke-width="13" stroke-linecap="round"/>
+        <path d="M120 ${lidY-19} V${lidY+38} M200 ${lidY-19} V${lidY+38}" stroke="url(#${id}gold)" stroke-width="10" opacity=".92" stroke-linecap="round"/>
+        <path d="M142 ${lidY+10} h36 v28 h-36z" fill="url(#${id}wood2)" opacity=".45"/>
       </g>
-      <g opacity="${lockOpacity}">
-        <rect x="134" y="86" width="52" height="56" rx="8" fill="#2b1609" stroke="url(#${uid}metal)" stroke-width="7"/>
-        <circle cx="160" cy="108" r="8" fill="#060302"/>
-        <rect x="156" y="110" width="8" height="19" rx="3" fill="#060302"/>
+      <g opacity="${1-o*.75}">
+        <rect x="137" y="86" width="46" height="48" rx="8" fill="#201007" stroke="url(#${id}gold)" stroke-width="6"/>
+        <circle cx="160" cy="105" r="8" fill="#060301"/><rect x="156" y="105" width="8" height="16" rx="3" fill="#060301"/>
       </g>
+      <circle cx="75" cy="174" r="7" fill="url(#${id}gold)"/><circle cx="245" cy="174" r="7" fill="url(#${id}gold)"/>
     </g>
-    ${sparks}
+    ${glow?`<g class="chest-sparks" opacity=".9"><circle cx="115" cy="64" r="3" fill="#ffd76a"/><circle cx="205" cy="56" r="2.6" fill="#fff5c4"/><circle cx="233" cy="86" r="2.2" fill="#ffb442"/><circle cx="91" cy="91" r="2.1" fill="#fff"/><circle cx="176" cy="72" r="1.9" fill="#d16cff"/><circle cx="148" cy="48" r="2.2" fill="#ffd76a"/><circle cx="127" cy="105" r="1.7" fill="#fff"/></g>`:''}
   </svg>`;
 }
 function chestFrameSvgMarkup(n){
@@ -3224,16 +3184,16 @@ async function playChestAnimation(data) {
 
   setChestStage(3, 'LA SERRURE SAUTE', 'Clac !');
   box.classList.add('unlock');
-  await playChestFrames([3], 360);
+  await playChestFrames([3], 560);
 
   setChestStage(4, 'LE COUVERCLE S’OUVRE', 'La lumière apparaît...');
   box.classList.add('opening');
-  await playChestFrames([4,5,6,7], 260);
+  await playChestFrames([4,5], 520);
 
   setChestStage(5, 'OUVERTURE COMPLÈTE', 'Découvrons ce qu’il y a dedans !');
   box.classList.add('burst');
-  await playChestFrames([8,9], 260);
-  setChestFrame(9); // reste sur le coffre ouvert en fond
+  await playChestFrames([5,6,5,6], 210);
+  setChestFrame(6); // reste sur le coffre ouvert en fond, aucune frame carte anglaise
 
   document.getElementById('ca-reward-icon').textContent = isBonus ? '◆' : '☠';
   document.getElementById('ca-tier').textContent = type;
@@ -3255,7 +3215,7 @@ function closeChestAnimOnBg(event) {
   const modal = document.getElementById('chest-anim');
   const box = document.getElementById('ca-frame-box');
   modal.classList.remove('show','reward-wait');
-  if (box) { box.className = 'frame-player'; box.innerHTML = '<div class="frame-glow"></div>' + chestFrameSvgMarkup(9) + '<div class="frame-particles"></div>'; }
+  if (box) { box.className = 'frame-player'; box.innerHTML = '<div class="frame-glow"></div>' + chestFrameSvgMarkup(6) + '<div class="frame-particles"></div>'; }
   _chestAnimWaitingClose = false;
   loadChests();
 }
