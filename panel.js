@@ -499,6 +499,44 @@ app.post('/api/admin/chests/unsecure', requireAuth, async (req, res) => {
     res.json(result);
   } catch(e) { res.status(500).json({ error: e.message }); }
 });
+
+app.get('/api/admin/chests/list', requireAuth, async (req, res) => {
+  try {
+    const season = await db.getActiveChestSeason();
+    if (!season) return res.json({ success: true, season: null, chests: [] });
+    const rows = await db.getChests(season.id);
+    res.json({
+      success: true,
+      season: { id: season.id, num: season.season_num },
+      chests: rows.map(c => ({
+        number: c.number, tier: c.tier, label: c.label, money: c.money,
+        fogValue: c.fog_value, opened: !!c.opened, secured: !!c.secured
+      }))
+    });
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+app.post('/api/admin/chests/update-content', requireAuth, async (req, res) => {
+  try {
+    const season = await db.getActiveChestSeason();
+    if (!season) return res.status(400).json({ error: 'Aucune saison active' });
+    const number = parseInt(req.body.number);
+    const tier = String(req.body.tier || '').trim();
+    const label = String(req.body.label || '').trim();
+    const money = Number(req.body.money || 0);
+    const allowed = ['legendary','epic','positive','challenge','cursed','fake'];
+    if (!number || number < 1 || number > 30) return res.status(400).json({ error: 'Numéro invalide' });
+    if (!allowed.includes(tier)) return res.status(400).json({ error: 'Type invalide' });
+    if (!label) return res.status(400).json({ error: 'Texte obligatoire' });
+    const chest = await db.getChest(season.id, number);
+    if (!chest) return res.status(404).json({ error: 'Coffre introuvable' });
+    const fogByTier = { legendary:80, epic:50, positive:25, challenge:0, cursed:-30, fake:-60 };
+    await db.updateChestContent(chest.id, tier, label, Number.isFinite(money) ? money : 0, fogByTier[tier] || 0);
+    io.emit('chests-update');
+    res.json({ success: true });
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
 app.post('/api/admin/chests/challenge-done', requireAuth, async (req, res) => {
   try {
     const { number, done } = req.body;
