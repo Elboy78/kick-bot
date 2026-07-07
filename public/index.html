@@ -315,6 +315,37 @@ hr.div{border:none;border-top:1px solid var(--brd);margin:12px 0}
 @media(max-width:1500px){.chests-layout{grid-template-columns:230px minmax(620px,1fr) 370px!important}.dbd-board{grid-template-columns:repeat(5,minmax(112px,1fr))!important}.chestcell.dbd-case{height:105px!important}.dbd-case .mini-chest{width:96px!important;height:62px!important}.anim-preview-box{height:200px}}
 @media(max-width:1180px){.chests-layout{grid-template-columns:1fr!important}.dbd-board{grid-template-columns:repeat(5,1fr)!important}.showcase{max-width:520px;margin:auto}}
 
+
+
+/* === REFONTE VISUELLE COFFRES — coffre SVG pro, proportions propres, animation 9 frames === */
+.chests-dbd-page{background:radial-gradient(circle at 72% 24%,rgba(137,55,255,.18),transparent 28%),radial-gradient(circle at 43% 55%,rgba(255,150,40,.10),transparent 32%),linear-gradient(180deg,#050509,#0a080b 55%,#030304)!important}
+.chests-layout{grid-template-columns:260px minmax(720px,1fr) 420px!important;gap:26px!important;align-items:start!important}
+.dbd-board{display:grid!important;grid-template-columns:repeat(5,minmax(132px,1fr))!important;gap:16px!important;align-items:stretch!important}
+.chestcell.dbd-case{height:126px!important;min-width:132px!important;border:1px solid rgba(255,192,92,.16)!important;border-radius:16px!important;background:radial-gradient(circle at 50% 65%,rgba(255,156,45,.12),transparent 45%),linear-gradient(180deg,rgba(20,17,19,.98),rgba(6,6,8,.98))!important;box-shadow:inset 0 0 0 1px rgba(255,255,255,.035),0 18px 34px rgba(0,0,0,.50)!important;overflow:hidden!important;padding:0!important;filter:none!important;display:block!important}
+.chestcell.dbd-case:before{content:'';position:absolute;inset:6px;border-radius:13px;background:linear-gradient(180deg,rgba(255,255,255,.045),transparent 42%);pointer-events:none;z-index:1}
+.chestcell.dbd-case:hover{transform:translateY(-5px) scale(1.035)!important;border-color:rgba(255,190,74,.55)!important;box-shadow:0 0 0 1px rgba(255,184,72,.38),0 0 32px rgba(255,147,32,.25),0 22px 40px rgba(0,0,0,.62)!important}
+.dbd-case .mini-chest{position:absolute!important;left:50%!important;bottom:2px!important;width:146px!important;height:98px!important;transform:translateX(-50%)!important;display:block!important;z-index:2!important;background:none!important;filter:drop-shadow(0 13px 10px rgba(0,0,0,.68))!important}
+.dbd-case .mini-chest svg{width:100%!important;height:100%!important;display:block!important;overflow:visible!important}
+.dbd-case .cc-num{position:absolute!important;left:0!important;right:0!important;top:8px!important;height:32px!important;display:flex!important;align-items:center!important;justify-content:center!important;font-size:25px!important;font-weight:950!important;line-height:1!important;color:#f4f0e8!important;text-shadow:0 2px 0 #000,0 0 10px rgba(255,220,135,.32)!important;z-index:7!important;pointer-events:none!important;letter-spacing:.5px!important}
+.dbd-case .cc-tier,.dbd-case .cc-lock{right:10px!important;top:38px!important;z-index:8!important;font-size:19px!important;filter:drop-shadow(0 3px 5px #000)!important}
+.dbd-case.sec:after,.dbd-case.selected:after{inset:5px!important;border-radius:14px!important;border:2px solid #ffc858!important;box-shadow:0 0 16px rgba(255,200,88,.82),inset 0 0 18px rgba(255,200,88,.13)!important;z-index:9!important;pointer-events:none!important}
+.dbd-case.opened{opacity:.58!important;filter:grayscale(.55)!important}
+.dbd-case.opened .mini-chest{opacity:.74!important;transform:translateX(-50%) translateY(3px) scale(.96)!important}
+.showcase{display:grid!important;grid-template-rows:auto auto!important;gap:18px!important;align-items:start!important;justify-content:stretch!important;min-height:0!important}
+.anim-preview{border:1px solid rgba(255,190,74,.16)!important;border-radius:18px!important;background:linear-gradient(180deg,rgba(17,15,19,.98),rgba(5,5,8,.99))!important;box-shadow:0 20px 55px rgba(0,0,0,.45)!important;padding:16px 18px 18px!important;text-align:center!important;overflow:hidden!important;position:relative!important}
+.anim-preview:before{content:'';position:absolute;inset:-30%;background:radial-gradient(circle at 50% 62%,rgba(255,160,45,.20),transparent 34%),radial-gradient(circle at 50% 55%,rgba(139,53,255,.18),transparent 48%);pointer-events:none}
+.anim-preview h3{position:relative;z-index:2;color:#ffcb7a!important;font-size:15px!important;font-weight:950!important;letter-spacing:.7px!important;text-transform:uppercase!important;margin-bottom:10px!important}
+.anim-preview-box{height:250px!important;border-radius:14px!important;background:radial-gradient(circle at 50% 58%,rgba(255,184,76,.19),transparent 33%),radial-gradient(circle at 50% 62%,rgba(142,52,255,.18),transparent 52%),linear-gradient(180deg,#08080d,#020203)!important;display:flex!important;align-items:center!important;justify-content:center!important;position:relative!important;overflow:hidden!important;border:1px solid rgba(255,255,255,.06)!important}
+.anim-preview-box:before{content:'';position:absolute;inset:0;background-image:radial-gradient(circle,rgba(255,205,90,.75) 0 1.5px,transparent 2.5px);background-size:44px 44px;opacity:.22;animation:particlesRise 2.3s linear infinite}
+#sideFrameSvg{width:98%!important;height:98%!important;position:relative!important;z-index:2!important;display:flex!important;align-items:center!important;justify-content:center!important;filter:drop-shadow(0 22px 24px rgba(0,0,0,.78))!important}
+#sideFrameSvg svg{width:100%!important;height:100%!important;display:block!important;overflow:visible!important}
+.open-chest-bg{display:none!important}.frame-dots{display:flex!important;justify-content:center!important;gap:7px!important;margin-top:12px!important;position:relative!important;z-index:2}.frame-dots span{width:10px!important;height:10px!important;border-radius:50%!important;border:1px solid rgba(255,255,255,.35)!important;background:transparent!important}.frame-dots span.active{background:#ffcb7a!important;border-color:#ffcb7a!important;box-shadow:0 0 10px #ffcb7a!important}.frame-label{margin-top:8px!important;font-size:12px!important;color:#d8d8d8!important;position:relative!important;z-index:2}
+.side-reward{width:100%!important;min-height:300px!important;padding:28px 26px!important;border-radius:18px!important}.side-reward .reward-icon{width:72px!important;height:72px!important;font-size:40px!important}.side-reward span{font-size:30px!important}.side-reward h3{font-size:22px!important}
+.frame-player{width:min(820px,88vw)!important;height:min(540px,64vh)!important;position:relative!important;display:flex!important;align-items:center!important;justify-content:center!important;filter:drop-shadow(0 30px 42px rgba(0,0,0,.78))!important}.frame-player img{display:none!important}.frame-player svg{width:100%!important;height:100%!important;display:block!important;overflow:visible!important}.frame-player .frame-glow{z-index:0!important}.frame-player .pro-chest-svg{position:relative;z-index:2}.frame-player.burst .pro-chest-svg{animation:chestOpenPulse .8s ease-in-out infinite alternate}
+@keyframes chestOpenPulse{from{transform:scale(1)}to{transform:scale(1.025)}}
+@media(max-width:1500px){.chests-layout{grid-template-columns:230px minmax(620px,1fr) 370px!important}.dbd-board{grid-template-columns:repeat(5,minmax(116px,1fr))!important}.chestcell.dbd-case{height:112px!important}.dbd-case .mini-chest{width:128px!important;height:88px!important}.anim-preview-box{height:220px!important}}
+@media(max-width:1180px){.chests-layout{grid-template-columns:1fr!important}.dbd-board{grid-template-columns:repeat(5,minmax(96px,1fr))!important}.showcase{max-width:520px;margin:auto}.chestcell.dbd-case{height:104px!important}.dbd-case .mini-chest{width:116px!important;height:80px!important}}
+
 </style>
 </head>
 <body>
@@ -1006,6 +1037,15 @@ Option 3" rows="4"></textarea><div style="display:flex;gap:6px;margin-top:10px">
         <section id="chest-grid" class="dbd-board"></section>
 
         <aside class="showcase">
+          <div class="anim-preview">
+            <h3>🎬 Prévisualisation du coffre</h3>
+            <div class="anim-preview-box">
+              <div id="sideFrameSvg" class="side-frame-svg"></div>
+            </div>
+            <div id="sideFrameDots" class="frame-dots"></div>
+            <div id="sideFrameLabel" class="frame-label">Image 1 / 9</div>
+          </div>
+
           <article id="sideReward" class="side-reward idle">
             <div class="reward-icon" id="sideRewardIcon">☠</div>
             <span id="sideRewardType">EN ATTENTE</span>
@@ -2887,38 +2927,74 @@ const CHEST_TIER_NAMES = {
 };
 
 
-const CHEST_COLORS = ['#ba55ff','#f1d65a','#e8e8e8','#ff971c','#ff4545','#e8e8e8','#ff5b96','#4dd46b','#d4c661','#f0f0f0'];
+
+let _chestSvgUid = 0;
 function chestSvgMarkup(open=0, glow=false){
-  const lidY = 36 - open*20;
-  const lidRot = open*18;
-  const lightOpacity = glow ? Math.min(1, .18 + open) : 0;
-  return `<svg viewBox="0 0 220 140" xmlns="http://www.w3.org/2000/svg" role="img" aria-hidden="true">
+  const t = Math.max(0, Math.min(1, Number(open) || 0));
+  const uid = 'proChest' + (++_chestSvgUid);
+  const lidAngle = -8 - (t * 62);
+  const lidLift = -(t * 26);
+  const lockOpacity = Math.max(0, 1 - (t * 1.8));
+  const glowOpacity = glow ? Math.min(1, .18 + t * .95) : 0;
+  const beamOpacity = glow ? Math.min(.9, t * 1.05) : 0;
+  const sparks = glow ? `
+    <g class="svg-sparks" opacity="${0.35 + t*.55}">
+      <circle cx="102" cy="60" r="3" fill="#ffe59b"/>
+      <circle cx="222" cy="58" r="2.4" fill="#fff2b8"/>
+      <circle cx="250" cy="95" r="2.8" fill="#ffb247"/>
+      <circle cx="74" cy="98" r="2.2" fill="#fff"/>
+      <circle cx="172" cy="43" r="2" fill="#d777ff"/>
+      <circle cx="137" cy="83" r="1.8" fill="#fff3c4"/>
+    </g>` : '';
+
+  return `<svg class="pro-chest-svg" viewBox="0 0 320 215" xmlns="http://www.w3.org/2000/svg" role="img" aria-hidden="true">
     <defs>
-      <linearGradient id="wood${open}" x1="0" x2="0" y1="0" y2="1"><stop offset="0" stop-color="#d87923"/><stop offset=".45" stop-color="#9d4818"/><stop offset="1" stop-color="#57220d"/></linearGradient>
-      <linearGradient id="metal${open}" x1="0" x2="1"><stop offset="0" stop-color="#e0e0d6"/><stop offset=".35" stop-color="#7c7d79"/><stop offset=".7" stop-color="#f4d08b"/><stop offset="1" stop-color="#5a4a38"/></linearGradient>
-      <radialGradient id="glow${open}" cx="50%" cy="55%" r="52%"><stop offset="0" stop-color="#ffe28a" stop-opacity="1"/><stop offset=".35" stop-color="#ff9d1e" stop-opacity=".9"/><stop offset="1" stop-color="#8e34ff" stop-opacity="0"/></radialGradient>
-      <filter id="shadow${open}" x="-20%" y="-30%" width="140%" height="160%"><feDropShadow dx="0" dy="10" stdDeviation="8" flood-color="#000" flood-opacity=".65"/></filter>
+      <linearGradient id="${uid}wood" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0" stop-color="#ff9b32"/><stop offset=".35" stop-color="#b95516"/><stop offset=".72" stop-color="#6f2b0d"/><stop offset="1" stop-color="#351207"/>
+      </linearGradient>
+      <linearGradient id="${uid}woodDark" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0" stop-color="#a64616"/><stop offset="1" stop-color="#2a0d05"/>
+      </linearGradient>
+      <linearGradient id="${uid}metal" x1="0" y1="0" x2="1" y2="1">
+        <stop offset="0" stop-color="#f7df9b"/><stop offset=".22" stop-color="#fff7d0"/><stop offset=".5" stop-color="#8a7340"/><stop offset=".78" stop-color="#e5a83a"/><stop offset="1" stop-color="#4c3920"/>
+      </linearGradient>
+      <radialGradient id="${uid}glow" cx="50%" cy="48%" r="56%">
+        <stop offset="0" stop-color="#fff3ad" stop-opacity="1"/><stop offset=".32" stop-color="#ffb642" stop-opacity=".92"/><stop offset=".62" stop-color="#9a35ff" stop-opacity=".42"/><stop offset="1" stop-color="#4f00b9" stop-opacity="0"/>
+      </radialGradient>
+      <filter id="${uid}shadow" x="-25%" y="-40%" width="150%" height="175%">
+        <feDropShadow dx="0" dy="14" stdDeviation="10" flood-color="#000" flood-opacity=".75"/>
+      </filter>
     </defs>
-    <ellipse cx="110" cy="123" rx="86" ry="11" fill="#000" opacity=".45"/>
-    <g filter="url(#shadow${open})">
-      <path d="M30 70 H190 V118 Q190 128 180 128 H40 Q30 128 30 118 Z" fill="url(#wood${open})" stroke="#3a1608" stroke-width="4"/>
-      <path d="M38 80 H182 M38 98 H182 M38 115 H182" stroke="#351407" stroke-width="3" opacity=".45"/>
-      <path d="M30 70 H190" stroke="url(#metal${open})" stroke-width="8"/>
-      <path d="M36 70 V126 M184 70 V126" stroke="url(#metal${open})" stroke-width="8"/>
-      <path d="M26 ${lidY+28} Q26 ${lidY-8} 62 ${lidY-20} H158 Q194 ${lidY-8} 194 ${lidY+28} Z" fill="url(#wood${open})" stroke="#3a1608" stroke-width="4" transform="rotate(${-lidRot} 110 ${lidY+28})"/>
-      <path d="M42 ${lidY+18} H178" stroke="#ffb75a" stroke-width="3" opacity=".45" transform="rotate(${-lidRot} 110 ${lidY+28})"/>
-      <path d="M35 ${lidY+24} H185" stroke="url(#metal${open})" stroke-width="8" transform="rotate(${-lidRot} 110 ${lidY+28})"/>
-      <path d="M58 ${lidY-12} V${lidY+24} M162 ${lidY-12} V${lidY+24}" stroke="url(#metal${open})" stroke-width="7" transform="rotate(${-lidRot} 110 ${lidY+28})"/>
-      <rect x="93" y="68" width="34" height="36" rx="6" fill="#2a1609" stroke="#d69a31" stroke-width="4"/>
-      <circle cx="110" cy="83" r="6" fill="#090604"/><rect x="107" y="83" width="6" height="12" rx="2" fill="#090604"/>
+    <ellipse cx="160" cy="195" rx="118" ry="15" fill="#000" opacity=".52"/>
+    <ellipse cx="160" cy="106" rx="126" ry="76" fill="url(#${uid}glow)" opacity="${glowOpacity}"/>
+    <path d="M88 178 C112 98 208 98 232 178" fill="url(#${uid}glow)" opacity="${beamOpacity}"/>
+
+    <g filter="url(#${uid}shadow)">
+      <path d="M47 99 H273 V178 Q273 194 257 194 H63 Q47 194 47 178 Z" fill="url(#${uid}wood)" stroke="#210904" stroke-width="6"/>
+      <path d="M59 111 H261 M58 137 H262 M62 163 H258" stroke="#2b0c05" stroke-width="5" opacity=".42"/>
+      <path d="M47 99 H273" stroke="url(#${uid}metal)" stroke-width="13" stroke-linecap="round"/>
+      <path d="M66 103 V190 M254 103 V190" stroke="url(#${uid}metal)" stroke-width="12" stroke-linecap="round"/>
+      <path d="M118 101 V194 M202 101 V194" stroke="#331005" stroke-width="4" opacity=".5"/>
+      <path d="M118 104 V190 M202 104 V190" stroke="url(#${uid}metal)" stroke-width="7" opacity=".9"/>
+      <g transform="translate(160 102) translate(0 ${lidLift}) rotate(${lidAngle}) translate(-160 -102)">
+        <path d="M39 103 C42 50 83 28 128 26 H192 C237 28 278 50 281 103 Z" fill="url(#${uid}wood)" stroke="#210904" stroke-width="6"/>
+        <path d="M57 91 C68 54 98 43 130 42 H190 C222 43 252 54 263 91" fill="none" stroke="#ffbe61" stroke-width="5" opacity=".42"/>
+        <path d="M46 97 H274" stroke="url(#${uid}metal)" stroke-width="13" stroke-linecap="round"/>
+        <path d="M83 42 V100 M237 42 V100" stroke="url(#${uid}metal)" stroke-width="10" stroke-linecap="round"/>
+        <path d="M114 28 V100 M206 28 V100" stroke="#2f0e05" stroke-width="4" opacity=".38"/>
+      </g>
+      <g opacity="${lockOpacity}">
+        <rect x="134" y="86" width="52" height="56" rx="8" fill="#2b1609" stroke="url(#${uid}metal)" stroke-width="7"/>
+        <circle cx="160" cy="108" r="8" fill="#060302"/>
+        <rect x="156" y="110" width="8" height="19" rx="3" fill="#060302"/>
+      </g>
     </g>
-    <ellipse cx="110" cy="76" rx="82" ry="30" fill="url(#glow${open})" opacity="${lightOpacity}"/>
-    ${glow?`<g opacity=".85"><circle cx="75" cy="38" r="2" fill="#ffd66d"/><circle cx="142" cy="31" r="2.5" fill="#fff1aa"/><circle cx="160" cy="55" r="2" fill="#ffb444"/><circle cx="90" cy="50" r="1.7" fill="#fff"/><circle cx="127" cy="47" r="1.5" fill="#ffd66d"/></g>`:''}
+    ${sparks}
   </svg>`;
 }
 function chestFrameSvgMarkup(n){
-  const t = Math.max(0, Math.min(1, (n-1)/8));
-  return chestSvgMarkup(t, n>=4);
+  const t = Math.max(0, Math.min(1, (Number(n)-1)/8));
+  return chestSvgMarkup(t, Number(n)>=3);
 }
 function renderSideFrame(n=1){
   const box = document.getElementById('sideFrameSvg');
@@ -3148,16 +3224,16 @@ async function playChestAnimation(data) {
 
   setChestStage(3, 'LA SERRURE SAUTE', 'Clac !');
   box.classList.add('unlock');
-  await playChestFrames([3], 560);
+  await playChestFrames([3], 360);
 
   setChestStage(4, 'LE COUVERCLE S’OUVRE', 'La lumière apparaît...');
   box.classList.add('opening');
-  await playChestFrames([4,5], 520);
+  await playChestFrames([4,5,6,7], 260);
 
   setChestStage(5, 'OUVERTURE COMPLÈTE', 'Découvrons ce qu’il y a dedans !');
   box.classList.add('burst');
-  await playChestFrames([5,6,5,6], 210);
-  setChestFrame(6); // reste sur le coffre ouvert en fond, aucune frame carte anglaise
+  await playChestFrames([8,9], 260);
+  setChestFrame(9); // reste sur le coffre ouvert en fond
 
   document.getElementById('ca-reward-icon').textContent = isBonus ? '◆' : '☠';
   document.getElementById('ca-tier').textContent = type;
@@ -3179,7 +3255,7 @@ function closeChestAnimOnBg(event) {
   const modal = document.getElementById('chest-anim');
   const box = document.getElementById('ca-frame-box');
   modal.classList.remove('show','reward-wait');
-  if (box) { box.className = 'frame-player'; box.innerHTML = '<div class="frame-glow"></div>' + chestFrameSvgMarkup(6) + '<div class="frame-particles"></div>'; }
+  if (box) { box.className = 'frame-player'; box.innerHTML = '<div class="frame-glow"></div>' + chestFrameSvgMarkup(9) + '<div class="frame-particles"></div>'; }
   _chestAnimWaitingClose = false;
   loadChests();
 }
