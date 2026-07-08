@@ -178,12 +178,93 @@ function handleEvent(msg) {
       }
       break;
     }
+
+    // Récompense de points de chaîne rachetée — nom d'événement non confirmé sur ce bot,
+    // on tente plusieurs variantes plausibles en plus du logger générique ci-dessous.
+    case 'App\\Events\\RewardRedeemedEvent':
+    case 'RewardRedeemedEvent':
+    case 'reward-redeemed':
+    case 'RewardRedeemed': {
+      let p; try { p = typeof data === 'string' ? JSON.parse(data) : data; } catch { break; }
+      handleRewardRedeemed(p);
+      break;
+    }
+
+    default: {
+      // Logger générique : capture tout événement Kick pas encore géré, pour pouvoir
+      // découvrir le vrai nom/format des événements (ex: rachat de récompense) via les logs Render.
+      if (event && !event.startsWith('pusher:') && !event.startsWith('pusher_internal:')) {
+        let preview = data;
+        try { preview = typeof data === 'string' ? JSON.parse(data) : data; } catch {}
+        console.log(`[EVENT INCONNU] "${event}" —`, JSON.stringify(preview).slice(0, 1500));
+      }
+      break;
+    }
+  }
+}
+
+// ─── Rachat de récompense (points de chaîne Kick natifs) ─────────────────────
+
+async function handleRewardRedeemed(payload) {
+  try {
+    console.log('[REWARD] Payload brut reçu:', JSON.stringify(payload).slice(0, 1500));
+
+    // Chemins possibles selon la forme réelle du payload (à ajuster une fois confirmée en logs)
+    const redemption = payload?.redemption || payload;
+    const rewardTitle = redemption?.reward?.title || payload?.reward?.title || '';
+    const redeemerUsername = redemption?.user?.login || redemption?.user?.username || payload?.user?.username || payload?.username || '';
+    const userInput = redemption?.user_input || redemption?.input || payload?.user_input || payload?.input || '';
+
+    if (!rewardTitle || !redeemerUsername) {
+      console.log('[REWARD] Champs manquants — impossible de traiter (voir payload brut ci-dessus).');
+      return;
+    }
+
+    const toRewardName = await db.getSettingStr('to_reward_title', 'TO Quelqu\'un de ton choix');
+    if (!rewardTitle.toLowerCase().includes(toRewardName.toLowerCase().slice(0, 10))) {
+      console.log(`[REWARD] "${rewardTitle}" ne correspond pas à la récompense TO configurée ("${toRewardName}") — ignoré.`);
+      return;
+    }
+
+    const target = (userInput || '').replace('@', '').trim();
+    if (!target) {
+      sendChat(`@${redeemerUsername} Ta récompense TO a été rachetée mais aucun pseudo n'a été fourni !`);
+      return;
+    }
+    if (target.toLowerCase() === CONFIG.channel.toLowerCase()) {
+      sendChat(`@${redeemerUsername} Impossible de TO le streamer !`);
+      return;
+    }
+    if (target.toLowerCase() === CONFIG.botUsername.toLowerCase()) {
+      sendChat(`@${redeemerUsername} Impossible de TO le bot !`);
+      return;
+    }
+
+    const duration = parseInt(await db.getSettingStr('to_command_duration', '60')) || 60;
+    const targetViewer = await db.getViewer(target);
+    const ok = await moderateUser(target, targetViewer?.kick_user_id || null, 'timeout', duration, `TO (points de chaîne) acheté par ${redeemerUsername}`);
+
+    if (ok) {
+      sendChat(`⏱️ @${redeemerUsername} a racheté TO ${target} pendant ${duration}s avec ses points de chaîne ! 🩸`);
+    } else {
+      sendChat(`@${redeemerUsername} Le TO sur @${target} a échoué côté Kick.`);
+    }
+  } catch(e) {
+    console.error('[REWARD] Erreur traitement rachat:', e.message);
   }
 }
 
 // ─── Messages chat ────────────────────────────────────────────────────────────
 
 async function handleChatMessage(payload) {
+  // Filet de sécurité : Kick annonce parfois un rachat de récompense comme un message de chat
+  // "spécial" plutôt qu'un événement dédié — on le détecte ici avant le traitement normal.
+  if (payload?.type === 'reward_redeemed' || payload?.metadata?.reward || payload?.reward) {
+    console.log('[REWARD] Détecté via message de chat spécial:', JSON.stringify(payload).slice(0, 1500));
+    handleRewardRedeemed(payload);
+    return;
+  }
+
   const username = payload?.sender?.username || payload?.user?.username || payload?.username;
   const content  = payload?.content || payload?.message || '';
   const kickId   = payload?.sender?.id?.toString() || null;
