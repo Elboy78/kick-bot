@@ -3,6 +3,7 @@
 
 let _sendChat = null;
 let _openChest = null;
+let _markVictory = null;
 
 module.exports = {
   registerSendChat(fn) { _sendChat = fn; },
@@ -14,6 +15,12 @@ module.exports = {
   registerOpenChest(fn) { _openChest = fn; },
   openChest(number) {
     if (_openChest) return _openChest(number);
+    return { error: 'Système de coffres pas encore initialisé.' };
+  },
+
+  registerMarkVictory(fn) { _markVictory = fn; },
+  markVictory() {
+    if (_markVictory) return _markVictory();
     return { error: 'Système de coffres pas encore initialisé.' };
   },
 };

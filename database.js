@@ -340,6 +340,9 @@ async function initSchema() {
     `ALTER TABLE vod_moments ADD COLUMN created_by TEXT DEFAULT ''`,
     `ALTER TABLE viewers ADD COLUMN following_since TEXT`,
     `ALTER TABLE viewers ADD COLUMN subscribed_for INTEGER`,
+    `ALTER TABLE chest_seasons ADD COLUMN ever_secured INTEGER NOT NULL DEFAULT 0`,
+    `ALTER TABLE chest_seasons ADD COLUMN victory_pending INTEGER NOT NULL DEFAULT 0`,
+    `ALTER TABLE chest_seasons ADD COLUMN protected_number INTEGER DEFAULT NULL`,
   ];
   for (const sql of migrations) {
     try {
@@ -633,6 +636,15 @@ async function clearAllSecured(seasonId) {
 }
 async function incrementSecureMoves(seasonId) {
   await run(`UPDATE chest_seasons SET secure_moves_used = secure_moves_used + 1 WHERE id = ?`, [seasonId]);
+}
+async function markEverSecured(seasonId) {
+  await run(`UPDATE chest_seasons SET ever_secured = 1 WHERE id = ?`, [seasonId]);
+}
+async function setProtectedNumber(seasonId, number) {
+  await run(`UPDATE chest_seasons SET protected_number = ? WHERE id = ?`, [number, seasonId]);
+}
+async function setVictoryPending(seasonId, val) {
+  await run(`UPDATE chest_seasons SET victory_pending = ? WHERE id = ?`, [val ? 1 : 0, seasonId]);
 }
 async function updateFogMeter(seasonId, delta) {
   await run(`UPDATE chest_seasons SET fog_meter = fog_meter + ? WHERE id = ?`, [delta, seasonId]);
@@ -1274,6 +1286,7 @@ module.exports = {
   addModerationLog, getModerationLogs, clearModerationLogs,
   getActiveChestSeason, createChestSeason, getChests, getChest, markChestOpened, updateChestContent,
   setChestTwist, setChestSecured, clearAllSecured, incrementSecureMoves, updateFogMeter,
+  markEverSecured, setProtectedNumber, setVictoryPending,
   setChestChallengeDone, endChestSeason,
   logCommandUsage, getCommandUsageStats, logChatActivity, getChatActivityWeek,
   getVodMoments, addVodMoment, deleteVodMoment, updateVodMomentLabel, getPendingLiveMoments, linkMomentToVod,

@@ -15,7 +15,6 @@ const io     = new Server(server, { cors: { origin: '*' } });
 
 app.use(cors());
 app.use(express.json());
-app.use(express.static(path.join(__dirname, 'public')));
 
 function requireAuth(req, res, next) { next(); }
 
@@ -487,7 +486,7 @@ app.post('/api/admin/chests/secure', requireAuth, async (req, res) => {
     io.emit('chests-update');
     const shared = require('./shared');
     if (await db.getSetting('chests_chat_enabled')) {
-      if (result.moved) { try { await shared.sendChat(`🔒 La sécurité passe du coffre ${result.from} au coffre ${result.to} — DERNIER changement possible utilisé !`); } catch(e) {} }
+      if (result.moved) { try { await shared.sendChat(`🔒 La sécurité passe du coffre ${result.from ?? '?'} au coffre ${result.to} — DERNIER changement possible utilisé, plus aucune modification jusqu'à la prochaine saison !`); } catch(e) {} }
       else { try { await shared.sendChat(`🔒 Le coffre ${result.to} est maintenant SÉCURISÉ.`); } catch(e) {} }
     }
     res.json(result);
@@ -496,6 +495,25 @@ app.post('/api/admin/chests/secure', requireAuth, async (req, res) => {
 app.post('/api/admin/chests/unsecure', requireAuth, async (req, res) => {
   try {
     const result = await chests.unsecureChest();
+    io.emit('chests-update');
+    res.json(result);
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+app.post('/api/admin/chests/victory', requireAuth, async (req, res) => {
+  try {
+    const result = await chests.markVictory();
+    if (result.error) return res.status(400).json(result);
+    io.emit('chests-update');
+    const shared = require('./shared');
+    if (await db.getSetting('chests_chat_enabled')) {
+      try { await shared.sendChat(`🏆 VICTOIRE ! Le coffre sécurisé n°${result.protectedNumber} verra son contenu DOUBLÉ à l'ouverture !`); } catch(e) {}
+    }
+    res.json(result);
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+app.post('/api/admin/chests/victory/clear', requireAuth, async (req, res) => {
+  try {
+    const result = await chests.clearVictory();
     io.emit('chests-update');
     res.json(result);
   } catch(e) { res.status(500).json({ error: e.message }); }
@@ -556,6 +574,17 @@ require('./shared').registerOpenChest(async (number) => {
   const result = await chests.openChest(number, 'chat');
   if (result.error) return result;
   await broadcastChestResult(result);
+  return result;
+});
+
+// Exposer le bonus de victoire au bot (commande !victoire) via shared
+require('./shared').registerMarkVictory(async () => {
+  const result = await chests.markVictory();
+  if (result.error) return result;
+  io.emit('chests-update');
+  if (await db.getSetting('chests_chat_enabled')) {
+    try { await require('./shared').sendChat(`🏆 VICTOIRE ! Le coffre sécurisé n°${result.protectedNumber} verra son contenu DOUBLÉ à l'ouverture !`); } catch(e) {}
+  }
   return result;
 });
 

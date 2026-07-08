@@ -20,7 +20,7 @@ const CONFIG = {
 };
 
 const PUSHER_URL = 'wss://ws-us2.pusher.com/app/32cbd69e4b950bf97679?protocol=7&client=js&version=7.4.0&flash=false';
-const SYSTEM_COMMANDS = ['!points','!top','!rang','!niveau','!aide','!duel','!accepter','!refuser','!participer','!giveaway','!lobby','!quote','!addquote','!mort','!death','!score','!queue','!join','!leave','!pos','!vote','!sondage','!so','!uptime','!fc','!sc','!coffre','!dice','!des','!rps','!pfc','!clip','!addcmd','!delcmd','!addword','!delword','!allowword','!disallowword'];
+const SYSTEM_COMMANDS = ['!points','!top','!rang','!niveau','!aide','!duel','!accepter','!refuser','!participer','!giveaway','!lobby','!quote','!addquote','!mort','!death','!score','!queue','!join','!leave','!pos','!vote','!sondage','!so','!uptime','!fc','!sc','!coffre','!victoire','!dice','!des','!rps','!pfc','!clip','!addcmd','!delcmd','!addword','!delword','!allowword','!disallowword'];
 
 let ws             = null;
 let reconnectDelay = 5000;
@@ -254,6 +254,7 @@ async function handleChatMessage(payload) {
       case '!fc':        return cmdFollowage(username, parts);
       case '!sc':        return cmdSubCheck(username, parts);
       case '!coffre':    return cmdOpenChest(username, parts, isModOrBroadcaster, badges);
+      case '!victoire':  return cmdMarkVictory(username, isModOrBroadcaster);
       case '!clip':      return (await db.getSetting('clip_enabled')) ? cmdClip(username, parts) : null;
       case '!addcmd':    return cmdAddCommand(username, parts, isModOrBroadcaster);
       case '!delcmd':    return cmdDelCommand(username, parts, isModOrBroadcaster);
@@ -708,6 +709,21 @@ async function cmdOpenChest(username, parts, isModOrBroadcaster, badges) {
   } catch(e) {
     console.error('[COFFRE] Erreur:', e.message);
     if (chestChatEnabled) sendChat(`@${username} Erreur lors de l'ouverture du coffre.`);
+  }
+}
+
+async function cmdMarkVictory(username, isModOrBroadcaster) {
+  if (!isModOrBroadcaster) {
+    return sendChat(`@${username} Seuls les modérateurs ou le streamer peuvent déclarer une victoire ! 🩸`);
+  }
+  try {
+    const shared = require('./shared');
+    const result = await shared.markVictory();
+    if (result?.error) return sendChat(`@${username} ${result.error}`);
+    // Le message de confirmation est déjà envoyé par le panel (broadcastage centralisé).
+  } catch(e) {
+    console.error('[VICTOIRE] Erreur:', e.message);
+    sendChat(`@${username} Erreur lors du marquage de la victoire.`);
   }
 }
 

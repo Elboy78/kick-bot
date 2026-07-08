@@ -155,6 +155,7 @@ async function openChest(number, via) {
 
   let finalChest = { ...chest };
   const events = [];
+  let victoryDoubled = false;
 
   // Bénédiction active : garantit positif ou mieux
   if (runtimeEffects.blessCharge) {
@@ -179,6 +180,17 @@ async function openChest(number, via) {
         events.push('☠️ La Malédiction a corrompu ce coffre au moment de l\u2019ouvrir…');
       }
     }
+  }
+
+  // Bonus de victoire : si une victoire a été marquée pendant que ce coffre était/est le
+  // coffre protégé, son gain (ou malus) final est doublé — one-shot, consommé à l'ouverture.
+  // Placé APRÈS bénédiction/malédiction pour doubler le montant réellement final.
+  if (season.protected_number === number && season.victory_pending) {
+    finalChest = { ...finalChest, money: (finalChest.money || 0) * 2 };
+    victoryDoubled = true;
+    events.push('🏆 VICTOIRE ! Le contenu de ce coffre protégé est DOUBLÉ !');
+    await db.setVictoryPending(season.id, false);
+    await db.updateChestContent(chest.id, finalChest.tier, finalChest.label, finalChest.money, finalChest.fog_value);
   }
 
   // Marquer ouvert
@@ -240,6 +252,7 @@ async function openChest(number, via) {
     tierName: meta.name,
     label: finalChest.label,
     money: finalChest.money,
+    moneyDoubled: victoryDoubled,
     events,
     remaining,
     seasonEnd,
@@ -260,26 +273,56 @@ async function secureChest(number) {
   const chests = await db.getChests(season.id);
   const currentSecured = chests.find(c => c.secured);
 
-  if (currentSecured) {
-    // Déplacement — autorisé une seule fois par saison
-    if (season.secure_moves_used >= 1) {
-      return { error: 'Tu as déjà déplacé la sécurité une fois — plus de changement possible cette saison !' };
-    }
-    if (currentSecured.number === number) return { error: 'Ce coffre est déjà le coffre sécurisé.' };
-    await db.clearAllSecured(season.id);
+  // Toute première sécurisation de la saison : gratuite, ne consomme rien.
+  // (clearAllSecured en sécurité, au cas où une saison en cours aurait déjà un coffre
+  // sécurisé avant cette mise à jour, sans que ever_secured soit encore à 1)
+  if (!season.ever_secured) {
+    if (currentSecured) await db.clearAllSecured(season.id);
     await db.setChestSecured(season.id, number, true);
-    await db.incrementSecureMoves(season.id);
-    return { success: true, moved: true, from: currentSecured.number, to: number };
+    await db.markEverSecured(season.id);
+    await db.setProtectedNumber(season.id, number);
+    return { success: true, moved: false, to: number, firstTime: true };
   }
 
+  if (currentSecured && currentSecured.number === number) {
+    return { error: 'Ce coffre est déjà le coffre sécurisé.' };
+  }
+
+  // Après la première sécurisation (même si elle a été retirée depuis), il ne reste
+  // qu'UN SEUL changement possible pour le reste de la saison — que ce soit un
+  // déplacement direct ou un retrait suivi d'une nouvelle sécurisation.
+  if (season.secure_moves_used >= 1) {
+    return { error: 'Tu as déjà utilisé ton unique changement de sécurité — plus aucune modification possible jusqu\u2019à la prochaine saison !' };
+  }
+
+  if (currentSecured) await db.clearAllSecured(season.id);
   await db.setChestSecured(season.id, number, true);
-  return { success: true, moved: false, to: number };
+  await db.incrementSecureMoves(season.id);
+  await db.setProtectedNumber(season.id, number);
+  return { success: true, moved: true, from: currentSecured ? currentSecured.number : null, to: number, lastChange: true };
 }
 
 async function unsecureChest() {
   const season = await db.getActiveChestSeason();
   if (!season) return { error: 'Aucune saison active.' };
   await db.clearAllSecured(season.id);
+  return { success: true };
+}
+
+// ─── Bonus de victoire (x2 sur le coffre sécurisé) ────────────────────────────
+
+async function markVictory() {
+  const season = await db.getActiveChestSeason();
+  if (!season) return { error: 'Aucune saison active.' };
+  if (!season.protected_number) return { error: 'Aucun coffre sécurisé cette saison — rien à doubler.' };
+  await db.setVictoryPending(season.id, true);
+  return { success: true, protectedNumber: season.protected_number };
+}
+
+async function clearVictory() {
+  const season = await db.getActiveChestSeason();
+  if (!season) return { error: 'Aucune saison active.' };
+  await db.setVictoryPending(season.id, false);
   return { success: true };
 }
 
@@ -294,6 +337,9 @@ async function getPublicState() {
       num: season.season_num,
       fogMeter: season.fog_meter,
       secureMoves: season.secure_moves_used,
+      everSecured: !!season.ever_secured,
+      protectedNumber: season.protected_number || null,
+      victoryPending: !!season.victory_pending,
       startedAt: season.started_at,
     },
     chests: chests.map(c => c.opened ? {
@@ -326,4 +372,4 @@ async function getSeasonStats(seasonId) {
   return { bonuses, maluses, jackpots, challengesTotal: challenges.length, challengesDone, money, totalOpened: opened.length };
 }
 
-module.exports = { newSeason, openChest, secureChest, unsecureChest, getPublicState, getSeasonStats, TIER_META };
+module.exports = { newSeason, openChest, secureChest, unsecureChest, markVictory, clearVictory, getPublicState, getSeasonStats, TIER_META };
