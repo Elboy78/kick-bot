@@ -48,20 +48,7 @@ function waitDB(req, res, next) {
 }
 
 // ── API lecture ───────────────────────────────────────────────────────────────
-app.get('/api/leaderboard',    waitDB,    async (req,res) => {
-  try {
-    const limit = Math.min(parseInt(req.query.limit || 10), 100);
-    const ignoredBots = new Set(['botrix', 'botrixlive', 'botrixbot']);
-    const rows = await db.getLeaderboard(Math.min(limit + 10, 120));
-    const data = (rows || []).filter(u => {
-      const name = String(u.username || u.name || u.pseudo || '').trim().toLowerCase();
-      return name && !ignoredBots.has(name);
-    }).slice(0, limit);
-    res.json({ data });
-  } catch(e) {
-    res.json({ data: [] });
-  }
-});
+app.get('/api/leaderboard',    waitDB,    async (req,res) => { try { res.json({data: await db.getLeaderboard(Math.min(parseInt(req.query.limit||10),100))}); } catch(e){res.json({data:[]}); }});
 app.get('/api/viewer/:u',      waitDB,      async (req,res) => { try { const v=await db.getViewer(req.params.u); if(!v) return res.status(404).json({error:'Introuvable'}); res.json({data:{...v,rank:await db.getViewerRank(req.params.u)}}); } catch(e){res.status(500).json({error:e.message}); }});
 app.get('/api/stats',          waitDB,          async (req,res) => { try { res.json({data: await db.getGlobalStats()}); } catch(e){res.json({data:{}}); }});
 app.get('/api/logs',           waitDB,           async (req,res) => { try { res.json({data: await db.getRecentLogs(Math.min(parseInt(req.query.limit||50),500))}); } catch(e){res.json({data:[]}); }});
@@ -1681,6 +1668,105 @@ app.get('/api/bot-status', async (req, res) => {
   } catch(e) { res.json({ tokenExpired: false }); }
 });
 
+
+// ── Chat Overlay OBS ──────────────────────────────────────────────────────────
+
+const CHAT_OVERLAY_DEFAULTS = {
+  enabled: true,
+  hideBots: true,
+  ignoredUsers: 'BotRix,botrix',
+  hideCommands: true,
+  showPlatformIcon: true,
+  showTime: false,
+  fontSize: 21,
+  messageDuration: 10,
+  animation: 'pop',
+  design: 'glass',
+  maxMessages: 8
+};
+
+async function getChatOverlaySettings() {
+  return {
+    enabled: (await db.getSettingStr('chat_overlay_enabled', '1')) === '1',
+    hideBots: (await db.getSettingStr('chat_overlay_hide_bots', '1')) === '1',
+    ignoredUsers: await db.getSettingStr('chat_overlay_ignored_users', CHAT_OVERLAY_DEFAULTS.ignoredUsers),
+    hideCommands: (await db.getSettingStr('chat_overlay_hide_commands', '1')) === '1',
+    showPlatformIcon: (await db.getSettingStr('chat_overlay_show_platform_icon', '1')) === '1',
+    showTime: (await db.getSettingStr('chat_overlay_show_time', '0')) === '1',
+    fontSize: Math.min(42, Math.max(10, parseInt(await db.getSettingStr('chat_overlay_font_size', String(CHAT_OVERLAY_DEFAULTS.fontSize))) || CHAT_OVERLAY_DEFAULTS.fontSize)),
+    messageDuration: Math.min(60, Math.max(0, parseInt(await db.getSettingStr('chat_overlay_message_duration', String(CHAT_OVERLAY_DEFAULTS.messageDuration))) || CHAT_OVERLAY_DEFAULTS.messageDuration)),
+    animation: await db.getSettingStr('chat_overlay_animation', CHAT_OVERLAY_DEFAULTS.animation),
+    design: await db.getSettingStr('chat_overlay_design', CHAT_OVERLAY_DEFAULTS.design),
+    maxMessages: Math.min(30, Math.max(1, parseInt(await db.getSettingStr('chat_overlay_max_messages', String(CHAT_OVERLAY_DEFAULTS.maxMessages))) || CHAT_OVERLAY_DEFAULTS.maxMessages))
+  };
+}
+
+function normalizeIgnoredUsers(raw) {
+  return String(raw || '').split(',').map(x => x.trim().toLowerCase()).filter(Boolean);
+}
+
+async function emitChatOverlayMessage(msg = {}) {
+  try {
+    const cfg = await getChatOverlaySettings();
+    const username = String(msg.username || '').trim();
+    const content = String(msg.content || '').trim();
+    if (!cfg.enabled || !username || !content) return false;
+    const lower = username.toLowerCase();
+    const ignored = normalizeIgnoredUsers(cfg.ignoredUsers);
+    const badgeTypes = Array.isArray(msg.badges) ? msg.badges.map(b => String(b?.type || b?.name || '').toLowerCase()) : [];
+    const looksLikeBot = /bot$/i.test(username) || lower === 'botrix' || badgeTypes.includes('bot');
+    if (ignored.includes(lower)) return false;
+    if (cfg.hideBots && looksLikeBot) return false;
+    if (cfg.hideCommands && content.startsWith('!')) return false;
+    const payload = {
+      id: `${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+      username: username.slice(0, 40),
+      content: content.slice(0, 500),
+      platform: msg.platform || 'Kick',
+      color: msg.color || '',
+      at: msg.at || new Date().toISOString()
+    };
+    io.emit('chat-overlay-message', payload);
+    return true;
+  } catch(e) {
+    console.warn('[CHAT OVERLAY] Message ignoré:', e.message);
+    return false;
+  }
+}
+
+shared.registerChatOverlayEmitter(emitChatOverlayMessage);
+
+app.get('/api/widgets/chat-overlay', async (req, res) => {
+  try { res.json(await getChatOverlaySettings()); }
+  catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+app.post('/api/admin/widgets/chat-overlay/settings', requireAuth, async (req, res) => {
+  try {
+    const b = req.body || {};
+    if (typeof b.enabled === 'boolean') await db.setSettingStr('chat_overlay_enabled', b.enabled ? '1' : '0');
+    if (typeof b.hideBots === 'boolean') await db.setSettingStr('chat_overlay_hide_bots', b.hideBots ? '1' : '0');
+    if (typeof b.hideCommands === 'boolean') await db.setSettingStr('chat_overlay_hide_commands', b.hideCommands ? '1' : '0');
+    if (typeof b.showPlatformIcon === 'boolean') await db.setSettingStr('chat_overlay_show_platform_icon', b.showPlatformIcon ? '1' : '0');
+    if (typeof b.showTime === 'boolean') await db.setSettingStr('chat_overlay_show_time', b.showTime ? '1' : '0');
+    if (typeof b.ignoredUsers === 'string') await db.setSettingStr('chat_overlay_ignored_users', b.ignoredUsers.slice(0, 300));
+    if (b.fontSize !== undefined) await db.setSettingStr('chat_overlay_font_size', String(Math.min(42, Math.max(10, parseInt(b.fontSize) || CHAT_OVERLAY_DEFAULTS.fontSize))));
+    if (b.messageDuration !== undefined) await db.setSettingStr('chat_overlay_message_duration', String(Math.min(60, Math.max(0, parseInt(b.messageDuration) || CHAT_OVERLAY_DEFAULTS.messageDuration))));
+    if (b.maxMessages !== undefined) await db.setSettingStr('chat_overlay_max_messages', String(Math.min(30, Math.max(1, parseInt(b.maxMessages) || CHAT_OVERLAY_DEFAULTS.maxMessages))));
+    if (typeof b.animation === 'string') await db.setSettingStr('chat_overlay_animation', b.animation.slice(0, 30));
+    if (typeof b.design === 'string') await db.setSettingStr('chat_overlay_design', b.design.slice(0, 30));
+    const cfg = await getChatOverlaySettings();
+    io.emit('chat-overlay-settings', cfg);
+    res.json({ success: true, settings: cfg });
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+app.post('/api/admin/widgets/chat-overlay/test', requireAuth, async (req, res) => {
+  try {
+    await emitChatOverlayMessage({ username: 'TestChat', content: req.body?.message || 'Message test overlay chat ✨', platform: 'Kick', at: new Date().toISOString() });
+    res.json({ success: true });
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
 
 io.on('connection', (socket) => {
   console.log('[TTS] Overlay connecté:', socket.id);

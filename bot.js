@@ -20,7 +20,7 @@ const CONFIG = {
 };
 
 const PUSHER_URL = 'wss://ws-us2.pusher.com/app/32cbd69e4b950bf97679?protocol=7&client=js&version=7.4.0&flash=false';
-const SYSTEM_COMMANDS = ['!points','!top','!rang','!niveau','!aide','!duel','!accepter','!refuser','!participer','!giveaway','!lobby','!quote','!addquote','!mort','!death','!score','!queue','!join','!leave','!pos','!vote','!sondage','!so','!uptime','!fc','!sc','!coffre','!victoire','!to','!dice','!des','!rps','!pfc','!clip','!sr','!songrequest','!addcmd','!delcmd','!addword','!delword','!allowword','!disallowword'];
+const SYSTEM_COMMANDS = ['!points','!top','!rang','!niveau','!aide','!duel','!accepter','!refuser','!participer','!giveaway','!lobby','!quote','!addquote','!mort','!death','!score','!queue','!join','!leave','!pos','!vote','!sondage','!so','!uptime','!fc','!sc','!coffre','!victoire','!to','!dice','!des','!rps','!pfc','!clip','!addcmd','!delcmd','!addword','!delword','!allowword','!disallowword'];
 
 let ws             = null;
 let reconnectDelay = 5000;
@@ -192,18 +192,11 @@ function handleEvent(msg) {
 
     default: {
       // Logger générique : capture tout événement Kick pas encore géré, pour pouvoir
-      // découvrir le vrai nom/format des événements (ex: follow/sub natifs Kick) via les logs Render.
+      // découvrir le vrai nom/format des événements (ex: rachat de récompense) via les logs Render.
       if (event && !event.startsWith('pusher:') && !event.startsWith('pusher_internal:')) {
         let preview = data;
         try { preview = typeof data === 'string' ? JSON.parse(data) : data; } catch {}
         console.log(`[EVENT INCONNU] "${event}" —`, JSON.stringify(preview).slice(0, 1500));
-
-        // Si Kick envoie follow/sub via websocket Pusher, on les route vers le même système
-        // que le webhook officiel. Le système côté panel déduplique pour éviter les doubles annonces.
-        const e = String(event || '').toLowerCase();
-        if (e.includes('follow') || e.includes('sub') || e.includes('subscription')) {
-          shared.processKickEvent(event, preview).catch(err => console.warn('[KICK EVENT ROUTE] Erreur:', err.message));
-        }
       }
       break;
     }
@@ -287,6 +280,17 @@ async function handleChatMessage(payload) {
   if (recentMessages.size > 500) recentMessages.delete(recentMessages.keys().next().value);
   db.logChatActivity(username).catch(e => console.error('[CHAT ACTIVITY] Erreur ignorée:', e.message));
   console.log(`[CHAT] ${username}: ${content}`);
+  // Overlay Chat OBS : envoie chaque message reçu au panel/socket.io.
+  try {
+    shared.emitChatOverlayMessage({
+      username,
+      content,
+      badges,
+      color: payload?.sender?.identity?.color || payload?.sender?.color || '',
+      platform: 'Kick',
+      at: new Date().toISOString()
+    });
+  } catch(e) {}
 
   // Vérifier les mots bannis
   if (await db.getSetting('moderation_enabled')) {
@@ -304,19 +308,6 @@ async function handleChatMessage(payload) {
 
   const parts = content.trim().split(' ');
   const cmd   = parts[0].toLowerCase();
-
-  // Commande Song Request depuis Widget
-  // Important : on la traite AVANT le bloc SYSTEM_COMMANDS.
-  // Sinon !sr / !songrequest peuvent être bloquées par isSystemCmdEnabled(),
-  // et rien n'est ajouté dans la file d'attente.
-  try {
-    const srCommand = (await db.getSettingStr('songrequest_command', '!sr')).toLowerCase();
-    if (cmd === '!sr' || cmd === '!songrequest' || cmd === srCommand) {
-      return cmdSongRequest(username, parts);
-    }
-  } catch(e) {
-    console.error('[SONGREQUEST] Erreur détection commande:', e.message);
-  }
 
   // Commandes système
   if (SYSTEM_COMMANDS.includes(cmd)) {
@@ -358,8 +349,6 @@ async function handleChatMessage(payload) {
       case '!victoire':  return cmdMarkVictory(username, isModOrBroadcaster);
       case '!to':        return cmdTimeoutBuy(username, parts);
       case '!clip':      return (await db.getSetting('clip_enabled')) ? cmdClip(username, parts) : null;
-      case '!sr':
-      case '!songrequest': return cmdSongRequest(username, parts);
       case '!addcmd':    return cmdAddCommand(username, parts, isModOrBroadcaster);
       case '!delcmd':    return cmdDelCommand(username, parts, isModOrBroadcaster);
       case '!addword':   return cmdAddBannedWord(username, parts, isModOrBroadcaster);
@@ -1219,51 +1208,6 @@ async function getActiveToken() {
   return { token: CONFIG.token, official: false };
 }
 
-
-async function cmdSongRequest(username, parts) {
-  try {
-    const enabled = await db.getSetting('songrequest_enabled');
-    if (!enabled) return;
-
-    const customCommand = (await db.getSettingStr('songrequest_command', '!sr')).toLowerCase();
-    const usedCommand = String(parts[0] || '').toLowerCase();
-    if (usedCommand !== '!sr' && usedCommand !== '!songrequest' && usedCommand !== customCommand) return;
-
-    const song = parts.slice(1).join(' ').trim();
-    if (!song) return sendChat(`@${username} utilise ${customCommand} + lien/titre YouTube.`);
-
-    const raw = song.slice(0, 300);
-
-    // Important : on passe par panel.js via shared.js.
-    // Comme ça la file est sauvegardée ET le panel reçoit l'événement temps réel.
-    const added = await shared.addSongRequest(username, raw);
-    if (added && added.error) {
-      console.warn('[SONGREQUEST] Pont panel/bot indisponible, fallback DB direct:', added.error);
-      let queue = [];
-      try { queue = JSON.parse(await db.getSettingStr('songrequest_queue', '[]')); } catch(e) { queue = []; }
-      if (!Array.isArray(queue)) queue = [];
-      const maxQueue = parseInt(await db.getSettingStr('songrequest_max_queue', '30')) || 30;
-      if (queue.length >= maxQueue) return sendChat(`@${username} la file Song Request est pleine pour le moment.`);
-      const match = raw.match(/https?:\/\/[^\s]+/i);
-      queue.push({ id: `${Date.now()}_${Math.random().toString(36).slice(2, 8)}`, username, song: raw, url: match ? match[0] : '', status: 'queued', at: new Date().toISOString() });
-      await db.setSettingStr('songrequest_queue', JSON.stringify(queue.slice(0, 100)));
-    }
-
-    // Confirmation chat optionnelle : la musique est déjà ajoutée à la file.
-    // Si Kick bloque l'envoi des messages du bot (403/500), le Song Request ne doit pas paraître cassé.
-    const chatConfirmEnabled = (await db.getSettingStr('songrequest_chat_confirm_enabled', '0')) === '1';
-    if (chatConfirmEnabled) {
-      const msgTpl = await db.getSettingStr('songrequest_confirm', '🎵 @{username}, ta musique a été ajoutée à la file !');
-      const msg = String(msgTpl || '').replaceAll('@{username}', `@${username}`).replaceAll('{username}', username).replaceAll('{song}', raw);
-      if (msg.trim()) sendChat(msg.slice(0, 450));
-    } else {
-      console.log(`[SONGREQUEST] Ajouté à la file par ${username}: ${raw}`);
-    }
-  } catch(e) {
-    console.error('[SONGREQUEST] Erreur:', e.message);
-  }
-}
-
 // ─── Envoi messages ───────────────────────────────────────────────────────────
 
 async function sendChat(message) {
@@ -1548,7 +1492,7 @@ async function checkLiveStatus() {
     if (lastFollowerCount > 0 && fc > lastFollowerCount) {
       const newF = fc - lastFollowerCount;
       console.log(`[FOLLOW] +${newF} follower(s) ! Total: ${fc}`);
-      if (isLive && (await db.getSetting('follow_announce_enabled') || await db.getSetting('follow_alerts'))) {
+      if (isLive && await db.getSetting('follow_alerts')) {
         const msg = newF === 1
           ? `Merci pour le follow ! On est maintenant ${fc} followers !`
           : `+${newF} nouveaux followers ! On est maintenant ${fc} !`;

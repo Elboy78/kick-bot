@@ -6,6 +6,7 @@ let _openChest = null;
 let _markVictory = null;
 let _kickEventHandler = null;
 let _songRequestAdder = null;
+let _chatOverlayEmitter = null;
 
 module.exports = {
   registerSendChat(fn) { _sendChat = fn; },
@@ -26,6 +27,12 @@ module.exports = {
   addSongRequest(username, song) {
     if (_songRequestAdder) return _songRequestAdder(username, song);
     return Promise.resolve({ error: 'Song Request pas encore initialisé.' });
+  },
+
+  registerChatOverlayEmitter(fn) { _chatOverlayEmitter = fn; },
+  emitChatOverlayMessage(message) {
+    if (_chatOverlayEmitter) return _chatOverlayEmitter(message);
+    return Promise.resolve(false);
   },
 
   registerOpenChest(fn) { _openChest = fn; },
