@@ -3764,7 +3764,9 @@ try {
     if (document.getElementById('page-chests')?.classList.contains('active')) loadChests();
   });
   chestSocket.on('subcounter-update', (data) => {
-    if (document.getElementById('page-widgets')?.classList.contains('active')) renderSubCounter(data);
+    // Mise à jour directe du panel même si le widget n'est pas encore ouvert.
+    // Comme ça, quand tu arrives dans Widget > Sub Goal, les chiffres sont déjà corrects.
+    try { renderSubCounter(data); } catch(e) { console.warn('[SUBCOUNTER] render socket error', e); }
   });
   chestSocket.on('songrequest-update', (data) => {
     if (isSongRequestVisible()) renderSongRequestQueue((data && data.queue) || []);

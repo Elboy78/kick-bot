@@ -161,6 +161,7 @@ async function recordSubEvent(type, payload = {}) {
     await db.setSettingStr('subcounter_latest', JSON.stringify(state.latest));
     io.emit('subcounter-update', state);
     io.emit('subgoal-update', { current: state.total, target: state.target, label: state.label, textPosition: state.textPosition, countPosition: state.countPosition, progressDisplay: state.progressDisplay, textAlign: state.textAlign });
+    console.log(`[SUBCOUNTER] Update ${type} → total=${state.total} session=${state.session} gifts=${state.gifts} renewals=${state.renewals}`);
     return state;
   } catch(e) { console.error('[SUBCOUNTER] Erreur event:', e.message); }
 }
@@ -207,15 +208,42 @@ function normalizeKickEventType(type = '') {
   if (t.includes('subscription.new') || t.includes('subscribed') || t.includes('subscription') || t.includes('sub')) return 'channel.subscription.new';
   return String(type || '');
 }
-function getPayloadData(payload = {}) {
+function parsePayloadSafe(payload = {}) {
   if (typeof payload === 'string') {
     try { return JSON.parse(payload); } catch { return {}; }
   }
-  return payload?.data || payload || {};
+  return payload || {};
+}
+function getPayloadData(payload = {}) {
+  const root = parsePayloadSafe(payload);
+  // Kick peut envoyer les infos dans plusieurs formats selon webhook / websocket.
+  // On garde root en fallback pour ne pas perdre les champs event/type/id.
+  return root?.data || root?.event?.data || root?.payload?.data || root?.body?.data || root?.subscription || root || {};
 }
 function eventDedupeKey(eventType, payload = {}) {
-  const data = getPayloadData(payload);
-  return pick(payload?.id, data?.id, data?.event_id, data?.subscription?.id, data?.message?.id) || `${eventType}:${JSON.stringify(data).slice(0, 300)}`;
+  const root = parsePayloadSafe(payload);
+  const data = getPayloadData(root);
+  return pick(root?.id, root?.event_id, data?.id, data?.event_id, data?.subscription?.id, data?.message?.id, data?.created_at)
+    || `${eventType}:${JSON.stringify(data).slice(0, 300)}`;
+}
+function extractSubInfo(payload = {}) {
+  const root = parsePayloadSafe(payload);
+  const data = getPayloadData(root);
+  const sub = data?.subscription || data?.subscriber || data?.sub || root?.subscription || {};
+  const user = data?.subscriber || data?.user || data?.recipient || data?.viewer || sub?.user || root?.user || {};
+  const gifter = data?.gifter || data?.sender || data?.user || root?.gifter || {};
+  const username = pick(
+    data?.subscriber?.username, data?.subscriber?.name,
+    data?.recipient?.username, data?.recipient?.name,
+    sub?.username, sub?.name,
+    user?.username, user?.name,
+    data?.username, data?.name,
+    root?.username, root?.name
+  ) || 'quelqu\'un';
+  const gifterName = pick(gifter?.username, gifter?.name, data?.gifter_username, data?.gifter_name, root?.gifter_username, root?.gifter_name) || username;
+  const count = parseInt(data?.count || data?.amount || data?.quantity || data?.total || root?.count || root?.amount || 1) || 1;
+  const months = parseInt(data?.duration || data?.months || data?.month || sub?.months || sub?.duration || root?.months || 1) || 1;
+  return { username, gifter: gifterName, count: Math.max(1, count), months };
 }
 async function sendAnnouncementToChat(message, logLabel) {
   if (!message) return false;
@@ -259,28 +287,27 @@ async function processKickEvent(eventTypeRaw, payload = {}) {
   }
 
   if (eventType === 'channel.subscription.new') {
-    const username = pick(data?.subscriber?.username, data?.user?.username, data?.username, data?.subscriber?.name, data?.user?.name) || 'quelqu\'un';
-    await recordSubEvent('new', { username, count: 1 });
+    const info = extractSubInfo(payload);
+    await recordSubEvent('new', { username: info.username, count: 1 });
     const enabled = await db.getSetting('sub_announce_enabled');
     if (enabled) {
       const template = await db.getSettingStr('sub_announce_new', DEFAULT_SUB_NEW_MSG);
-      const message = template.replace(/\{username\}/gi, username);
-      await sendAnnouncementToChat(message, `SUB NEW ${username}`);
+      const message = template.replace(/\{username\}/gi, info.username);
+      await sendAnnouncementToChat(message, `SUB NEW ${info.username}`);
     }
-    return { ok: true, eventType, username };
+    return { ok: true, eventType, username: info.username };
   }
 
   if (eventType === 'channel.subscription.renewal') {
-    const username = pick(data?.subscriber?.username, data?.user?.username, data?.username, data?.subscriber?.name, data?.user?.name) || 'quelqu\'un';
-    const months = parseInt(data?.duration || data?.months || data?.subscription?.months || 1) || 1;
-    await recordSubEvent('renewal', { username, months });
+    const info = extractSubInfo(payload);
+    await recordSubEvent('renewal', { username: info.username, months: info.months });
     const enabled = await db.getSetting('sub_announce_enabled');
     if (enabled) {
       const template = await db.getSettingStr('sub_announce_renew', DEFAULT_SUB_RENEW_MSG);
-      const message = template.replace(/\{username\}/gi, username).replace(/\{months\}/gi, String(months));
-      await sendAnnouncementToChat(message, `SUB RENEW ${username} x${months}`);
+      const message = template.replace(/\{username\}/gi, info.username).replace(/\{months\}/gi, String(info.months));
+      await sendAnnouncementToChat(message, `SUB RENEW ${info.username} x${info.months}`);
     }
-    return { ok: true, eventType, username, months };
+    return { ok: true, eventType, username: info.username, months: info.months };
   }
 
   if (eventType === 'channel.subscription.gifts') {
@@ -601,6 +628,17 @@ app.get('/api/widgets/subgoal', async (req, res) => {
 app.get('/api/widgets/subcounter', async (req, res) => {
   try { res.json(await getSubCounterState()); }
   catch(e) { res.json(SUB_COUNTER_DEFAULTS); }
+});
+
+app.post('/api/admin/widgets/subcounter/test', requireAuth, async (req, res) => {
+  try {
+    const type = ['new','gift','renewal'].includes(req.body.type) ? req.body.type : 'new';
+    const username = String(req.body.username || 'TestSub').slice(0, 40);
+    const count = Math.max(1, parseInt(req.body.count || 1) || 1);
+    const months = Math.max(1, parseInt(req.body.months || 1) || 1);
+    const state = await recordSubEvent(type, { username, gifter: username, count, months });
+    res.json({ success: true, state });
+  } catch(e) { res.status(500).json({ error: e.message }); }
 });
 
 app.post('/api/admin/widgets/subcounter/total', requireAuth, async (req, res) => {
