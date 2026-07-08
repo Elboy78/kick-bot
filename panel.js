@@ -701,7 +701,7 @@ async function getSongRequestState() {
 async function saveSongRequestQueue(queue) {
   const clean = Array.isArray(queue) ? queue.slice(0, 100) : [];
   await db.setSettingStr('songrequest_queue', JSON.stringify(clean));
-  io.emit('songrequest-update', { queue: clean });
+  io.emit('songrequest-update', { queue: clean, enabled: (await db.getSetting('songrequest_enabled')) });
   return clean;
 }
 
@@ -745,7 +745,9 @@ app.post('/api/admin/widgets/songrequest/settings', requireAuth, async (req, res
     if (typeof req.body.confirmMessage === 'string') await db.setSettingStr('songrequest_confirm', req.body.confirmMessage.trim().slice(0,180));
     if (typeof req.body.chatConfirmEnabled === 'boolean') await db.setSettingStr('songrequest_chat_confirm_enabled', req.body.chatConfirmEnabled ? '1' : '0');
     if (req.body.maxQueue !== undefined) await db.setSettingStr('songrequest_max_queue', String(Math.min(100, Math.max(1, parseInt(req.body.maxQueue) || 30))));
-    res.json({ success:true, ...(await getSongRequestState()) });
+    const fresh = await getSongRequestState();
+    io.emit('songrequest-update', { queue: fresh.queue, enabled: fresh.enabled });
+    res.json({ success:true, ...fresh });
   } catch(e) { res.status(500).json({ error:e.message }); }
 });
 
