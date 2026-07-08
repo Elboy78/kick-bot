@@ -916,11 +916,7 @@ Option 3" rows="4"></textarea><div style="display:flex;gap:6px;margin-top:10px">
             <span style="margin-top:6px;display:block">Taille recommandée : 560×100. Fond transparent.</span>
           </div>
 
-          <div style="padding:10px;background:var(--card2);border:1px solid var(--brd);border-radius:8px;font-size:10px;color:var(--muted);line-height:1.7">
-            <b style="color:var(--text)">🔗 Lien overlay OBS Compteur compact</b><br>
-            <code style="background:var(--card);padding:2px 6px;border-radius:4px;color:var(--accent);font-size:9px;display:block;margin-top:4px;word-break:break-all" id="subcounter-obs-url">/widgets/subcounter.html</code>
-            <span style="margin-top:6px;display:block">Taille recommandée : 420×130.</span>
-          </div>
+
         </div>
       </div>
 
@@ -1553,8 +1549,6 @@ async function loadSubGoal() {
     renderSubCounter(d);
     const urlEl = document.getElementById('subgoal-obs-url');
     if (urlEl) urlEl.textContent = window.location.origin + '/widgets/subgoal.html';
-    const urlCounter = document.getElementById('subcounter-obs-url');
-    if (urlCounter) urlCounter.textContent = window.location.origin + '/widgets/subcounter.html';
   } catch(e) { console.error('[SUBCOUNTER]', e); }
 }
 

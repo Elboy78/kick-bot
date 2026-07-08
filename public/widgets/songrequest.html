@@ -54,11 +54,20 @@
 <script src="https://www.youtube.com/iframe_api"></script>
 <script>
 const songEl=document.getElementById('song'), byEl=document.getElementById('by'), nextEl=document.getElementById('next'), card=document.getElementById('card'), thumbEl=document.getElementById('thumb'), fillEl=document.getElementById('fill'), curEl=document.getElementById('current'), durEl=document.getElementById('duration'), stateEl=document.getElementById('state');
-let player=null, ytReady=false, currentId='', currentSongId='', latestState={enabled:false, queue:[], player:{status:'stopped',volume:100,currentTime:0,duration:0}, control:{seq:0}}, lastStatePost=0, desiredStatus='stopped', lastControlSeq=0, lastSeekAt=0;
+let player=null, ytReady=false, currentId='', currentSongId='', latestState={enabled:false, queue:[], player:{status:'stopped',volume:100,currentTime:0,duration:0}, control:{seq:0}}, lastStatePost=0, desiredStatus='stopped', lastControlSeq=0, lastSeekAt=0, pausedFreezeTime=null;
 function esc(v){return String(v||'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
 function fmt(seconds){ seconds=Math.max(0,Math.floor(Number(seconds||0))); const h=Math.floor(seconds/3600), m=Math.floor((seconds%3600)/60), s=seconds%60; return h?`${h}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`:`${m}:${String(s).padStart(2,'0')}`; }
 function youtubeId(input){ const raw=String(input||''); const patterns=[/youtu\.be\/([A-Za-z0-9_-]{6,})/i,/youtube\.com\/watch\?[^\s]*v=([A-Za-z0-9_-]{6,})/i,/youtube\.com\/embed\/([A-Za-z0-9_-]{6,})/i,/youtube\.com\/shorts\/([A-Za-z0-9_-]{6,})/i,/youtube\.com\/live\/([A-Za-z0-9_-]{6,})/i]; for(const p of patterns){ const m=raw.match(p); if(m) return m[1]; } return ''; }
 function itemVideoId(item){ return item?.videoId || youtubeId(item?.url || item?.song || ''); }
+function readPlayerTime(fallback=0){
+  try{ return player && player.getCurrentTime ? Number(player.getCurrentTime() || fallback) : Number(fallback||0); }catch(e){ return Number(fallback||0); }
+}
+function freezePauseTime(){
+  if(pausedFreezeTime === null) pausedFreezeTime = readPlayerTime(latestState.player?.currentTime || 0);
+  latestState.player.currentTime = pausedFreezeTime;
+  latestState.player.status = 'paused';
+}
+function unfreezePauseTime(){ pausedFreezeTime = null; }
 function normalizeLocalState(){
   const cur=(latestState.queue||[])[0] || null;
   if(!cur){
@@ -85,7 +94,23 @@ function postPlayerState(force=false){
   if(!player || !latestState.queue[0]) return;
   const now=Date.now(); if(!force && now-lastStatePost<1200) return; lastStatePost=now;
   let currentTime=Number(latestState.player.currentTime||0), duration=Number(latestState.player.duration||0), status=desiredStatus;
-  try{ currentTime=player.getCurrentTime?player.getCurrentTime():currentTime; duration=player.getDuration?player.getDuration():duration; const ps=player.getPlayerState(); if(ps===YT.PlayerState.PAUSED) status='paused'; if(ps===YT.PlayerState.PLAYING) status='playing'; if(ps===YT.PlayerState.ENDED) status='stopped'; }catch(e){}
+  try{
+    duration=player.getDuration?Number(player.getDuration()||duration):duration;
+    const ps=player.getPlayerState();
+    if(ps===YT.PlayerState.PAUSED || desiredStatus==='paused'){
+      status='paused';
+      if(pausedFreezeTime === null) pausedFreezeTime = currentTime || readPlayerTime(0);
+      currentTime = pausedFreezeTime;
+    } else if(ps===YT.PlayerState.PLAYING){
+      status='playing';
+      unfreezePauseTime();
+      currentTime=player.getCurrentTime?Number(player.getCurrentTime()||currentTime):currentTime;
+    } else if(ps===YT.PlayerState.ENDED){
+      status='stopped';
+    } else if(desiredStatus==='playing'){
+      currentTime=player.getCurrentTime?Number(player.getCurrentTime()||currentTime):currentTime;
+    }
+  }catch(e){}
   latestState.player={...(latestState.player||{}), currentTime, duration, status};
   fetch('/api/widgets/songrequest/player-state',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({ itemId: latestState.queue[0].id, status, currentTime, duration, volume: latestState.player?.volume ?? 100 })}).catch(()=>{});
 }
@@ -94,13 +119,13 @@ function onPlayerStateChange(e){
   if(!latestState.queue[0]) return;
   // L'état réel du lecteur OBS est envoyé au serveur, mais on ne force jamais PLAY quand le serveur/panel demande PAUSE.
   if(e.data===YT.PlayerState.PLAYING){
-    if(desiredStatus==='paused'){ try{player.pauseVideo();}catch(_){}; return; }
-    desiredStatus='playing'; latestState.player.status='playing'; postPlayerState(true);
+    if(desiredStatus==='paused'){ try{player.pauseVideo();}catch(_){}; freezePauseTime(); postPlayerState(true); return; }
+    unfreezePauseTime(); desiredStatus='playing'; latestState.player.status='playing'; postPlayerState(true);
   }
-  if(e.data===YT.PlayerState.PAUSED){ desiredStatus='paused'; latestState.player.status='paused'; postPlayerState(true); }
+  if(e.data===YT.PlayerState.PAUSED){ desiredStatus='paused'; freezePauseTime(); postPlayerState(true); }
   if(e.data===YT.PlayerState.ENDED){ desiredStatus='stopped'; latestState.player.status='stopped'; postPlayerState(true); nextPublic(); }
 }
-function stopPlayback(){ try{ if(player && player.stopVideo) player.stopVideo(); }catch(e){} currentId=''; currentSongId=''; desiredStatus='stopped'; latestState.player.status='stopped'; }
+function stopPlayback(){ try{ if(player && player.stopVideo) player.stopVideo(); }catch(e){} currentId=''; currentSongId=''; desiredStatus='stopped'; pausedFreezeTime=null; latestState.player.status='stopped'; }
 function enforcePlayback(){
   if(!player || !latestState.enabled || !latestState.queue[0]) return;
   try{
@@ -149,7 +174,19 @@ function render(state={}){
 }
 function updateProgress(){
   let current=Number(latestState.player?.currentTime||0), duration=Number(latestState.player?.duration||0);
-  try{ if(player && player.getCurrentTime){ current=player.getCurrentTime()||current; duration=player.getDuration()||duration; latestState.player.currentTime=current; latestState.player.duration=duration; } }catch(e){}
+  try{
+    if(player && player.getCurrentTime){
+      duration=player.getDuration?Number(player.getDuration()||duration):duration;
+      if(desiredStatus==='paused' || latestState.player?.status==='paused'){
+        if(pausedFreezeTime === null) pausedFreezeTime = current || readPlayerTime(0);
+        current = pausedFreezeTime;
+      } else {
+        unfreezePauseTime();
+        current=Number(player.getCurrentTime()||current);
+      }
+      latestState.player.currentTime=current; latestState.player.duration=duration;
+    }
+  }catch(e){}
   curEl.textContent=fmt(current); durEl.textContent=duration?fmt(duration):'?:??';
   fillEl.style.width=duration?Math.max(0,Math.min(100,(current/duration)*100))+'%':'0%';
 }
@@ -157,9 +194,9 @@ function applySongRequestControl(cmd){
   if(!cmd || !cmd.action) return;
   normalizeLocalState();
   const action=cmd.action;
-  if(action==='pause'){ desiredStatus='paused'; latestState.player.status='paused'; try{ if(player && player.pauseVideo) player.pauseVideo(); }catch(e){} }
-  if(action==='play'){ desiredStatus='playing'; latestState.player.status=latestState.queue[0]?'playing':'stopped'; try{ if(player && latestState.queue[0] && player.playVideo) player.playVideo(); }catch(e){} }
-  if(action==='seek'){ const seconds=Number(cmd.seconds||0); latestState.player.currentTime=seconds; lastSeekAt=Date.now(); try{ if(player && player.seekTo) player.seekTo(seconds, true); }catch(e){} }
+  if(action==='pause'){ desiredStatus='paused'; freezePauseTime(); try{ if(player && player.pauseVideo) player.pauseVideo(); }catch(e){} }
+  if(action==='play'){ unfreezePauseTime(); desiredStatus='playing'; latestState.player.status=latestState.queue[0]?'playing':'stopped'; try{ if(player && latestState.queue[0] && player.playVideo) player.playVideo(); }catch(e){} }
+  if(action==='seek'){ const seconds=Number(cmd.seconds||0); latestState.player.currentTime=seconds; if(desiredStatus==='paused') pausedFreezeTime=seconds; lastSeekAt=Date.now(); try{ if(player && player.seekTo) player.seekTo(seconds, true); }catch(e){} }
   if(action==='volume'){ latestState.player.volume=Number(cmd.volume ?? 100); try{ if(player && player.setVolume) player.setVolume(latestState.player.volume); }catch(e){} }
   if(action==='stop'){ stopPlayback(); }
   if(action==='next' || action==='load-current'){ load(true); return; }
@@ -181,7 +218,13 @@ try{ const socket=io({transports:['websocket','polling']}); socket.on('songreque
 }); socket.on('songrequest-player-state', p=>{
   const curId=latestState.queue?.[0]?.id || '';
   if(curId && p?.itemId && p.itemId !== curId) return;
-  latestState.player=Object.assign(latestState.player||{},p||{});
+  if((latestState.player?.status==='paused' || desiredStatus==='paused') && p?.status==='paused'){
+    const keep=pausedFreezeTime!==null ? pausedFreezeTime : Number(latestState.player?.currentTime||p.currentTime||0);
+    latestState.player=Object.assign(latestState.player||{},p||{}, {status:'paused', currentTime:keep});
+    pausedFreezeTime=keep;
+  } else {
+    latestState.player=Object.assign(latestState.player||{},p||{});
+  }
   normalizeLocalState();
   render(latestState);
   enforcePlayback();

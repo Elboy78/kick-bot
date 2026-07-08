@@ -48,7 +48,20 @@ function waitDB(req, res, next) {
 }
 
 // ── API lecture ───────────────────────────────────────────────────────────────
-app.get('/api/leaderboard',    waitDB,    async (req,res) => { try { res.json({data: await db.getLeaderboard(Math.min(parseInt(req.query.limit||10),100))}); } catch(e){res.json({data:[]}); }});
+app.get('/api/leaderboard',    waitDB,    async (req,res) => {
+  try {
+    const limit = Math.min(parseInt(req.query.limit || 10), 100);
+    const ignoredBots = new Set(['botrix', 'botrixlive', 'botrixbot']);
+    const rows = await db.getLeaderboard(Math.min(limit + 10, 120));
+    const data = (rows || []).filter(u => {
+      const name = String(u.username || u.name || u.pseudo || '').trim().toLowerCase();
+      return name && !ignoredBots.has(name);
+    }).slice(0, limit);
+    res.json({ data });
+  } catch(e) {
+    res.json({ data: [] });
+  }
+});
 app.get('/api/viewer/:u',      waitDB,      async (req,res) => { try { const v=await db.getViewer(req.params.u); if(!v) return res.status(404).json({error:'Introuvable'}); res.json({data:{...v,rank:await db.getViewerRank(req.params.u)}}); } catch(e){res.status(500).json({error:e.message}); }});
 app.get('/api/stats',          waitDB,          async (req,res) => { try { res.json({data: await db.getGlobalStats()}); } catch(e){res.json({data:{}}); }});
 app.get('/api/logs',           waitDB,           async (req,res) => { try { res.json({data: await db.getRecentLogs(Math.min(parseInt(req.query.limit||50),500))}); } catch(e){res.json({data:[]}); }});
