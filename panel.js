@@ -98,6 +98,10 @@ const SUB_COUNTER_DEFAULTS = {
   gifts: 0,
   target: 50,
   label: 'Sub Goal',
+  textPosition: 'inside',
+  countPosition: 'inside',
+  progressDisplay: 'count',
+  textAlign: 'center',
   latest: []
 };
 
@@ -112,6 +116,10 @@ async function getSubCounterState() {
     gifts: parseInt(await db.getSettingStr('subcounter_gifts', '0')) || 0,
     target: parseInt(await db.getSettingStr('subgoal_target', '50')) || 50,
     label: await db.getSettingStr('subgoal_label', 'Sub Goal'),
+    textPosition: await db.getSettingStr('subgoal_text_position', 'inside'),
+    countPosition: await db.getSettingStr('subgoal_count_position', 'inside'),
+    progressDisplay: await db.getSettingStr('subgoal_progress_display', 'count'),
+    textAlign: await db.getSettingStr('subgoal_text_align', 'center'),
     latest: Array.isArray(latest) ? latest.slice(0, 12) : []
   };
 }
@@ -119,7 +127,7 @@ async function getSubCounterState() {
 async function emitSubCounterState() {
   const state = await getSubCounterState();
   io.emit('subcounter-update', state);
-  io.emit('subgoal-update', { current: state.total, target: state.target, label: state.label });
+  io.emit('subgoal-update', { current: state.total, target: state.target, label: state.label, textPosition: state.textPosition, countPosition: state.countPosition, progressDisplay: state.progressDisplay, textAlign: state.textAlign });
   return state;
 }
 
@@ -151,7 +159,7 @@ async function recordSubEvent(type, payload = {}) {
     await db.setSettingStr('subgoal_current', String(state.total));
     await db.setSettingStr('subcounter_latest', JSON.stringify(state.latest));
     io.emit('subcounter-update', state);
-    io.emit('subgoal-update', { current: state.total, target: state.target, label: state.label });
+    io.emit('subgoal-update', { current: state.total, target: state.target, label: state.label, textPosition: state.textPosition, countPosition: state.countPosition, progressDisplay: state.progressDisplay, textAlign: state.textAlign });
     return state;
   } catch(e) { console.error('[SUBCOUNTER] Erreur event:', e.message); }
 }
@@ -529,8 +537,8 @@ async function broadcastChestResult(result) {
 app.get('/api/widgets/subgoal', async (req, res) => {
   try {
     const state = await getSubCounterState();
-    res.json({ current: state.total, target: state.target, label: state.label });
-  } catch(e) { res.json({ current: 0, target: 50, label: 'Sub Goal' }); }
+    res.json({ current: state.total, target: state.target, label: state.label, textPosition: state.textPosition, countPosition: state.countPosition, progressDisplay: state.progressDisplay, textAlign: state.textAlign });
+  } catch(e) { res.json({ current: 0, target: 50, label: 'Sub Goal', textPosition: 'inside', countPosition: 'inside', progressDisplay: 'count', textAlign: 'center' }); }
 });
 
 app.get('/api/widgets/subcounter', async (req, res) => {
@@ -562,6 +570,25 @@ app.post('/api/admin/widgets/subgoal/label', requireAuth, async (req, res) => {
   try {
     const label = String(req.body.label || 'Sub Goal').trim().slice(0, 40) || 'Sub Goal';
     await db.setSettingStr('subgoal_label', label);
+    res.json({ success: true, ...(await emitSubCounterState()) });
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+
+app.post('/api/admin/widgets/subgoal/layout', requireAuth, async (req, res) => {
+  try {
+    const allowedTextPositions = ['above','inside','hidden'];
+    const allowedCountPositions = ['above','inside','right','hidden'];
+    const allowedDisplays = ['count','progress','percent','hidden'];
+    const allowedAligns = ['left','center','right'];
+    const textPosition = allowedTextPositions.includes(req.body.textPosition) ? req.body.textPosition : 'inside';
+    const countPosition = allowedCountPositions.includes(req.body.countPosition) ? req.body.countPosition : 'inside';
+    const progressDisplay = allowedDisplays.includes(req.body.progressDisplay) ? req.body.progressDisplay : 'count';
+    const textAlign = allowedAligns.includes(req.body.textAlign) ? req.body.textAlign : 'center';
+    await db.setSettingStr('subgoal_text_position', textPosition);
+    await db.setSettingStr('subgoal_count_position', countPosition);
+    await db.setSettingStr('subgoal_progress_display', progressDisplay);
+    await db.setSettingStr('subgoal_text_align', textAlign);
     res.json({ success: true, ...(await emitSubCounterState()) });
   } catch(e) { res.status(500).json({ error: e.message }); }
 });

@@ -949,6 +949,44 @@ Option 3" rows="4"></textarea><div style="display:flex;gap:6px;margin-top:10px">
           </div>
           <div style="font-size:9px;color:var(--muted);margin-top:-6px;margin-bottom:14px">Exemples : Objectif subs, Road to 50 subs, Support le live.</div>
 
+          <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-bottom:12px">
+            <div>
+              <label class="lbl">Placement du texte</label>
+              <select class="inp" id="subgoal-text-position-input">
+                <option value="inside">Dans la barre</option>
+                <option value="above">Au-dessus de la barre</option>
+                <option value="hidden">Masqué</option>
+              </select>
+            </div>
+            <div>
+              <label class="lbl">Placement des chiffres</label>
+              <select class="inp" id="subgoal-count-position-input">
+                <option value="inside">Dans la barre</option>
+                <option value="above">Au-dessus de la barre</option>
+                <option value="right">À droite dans la barre</option>
+                <option value="hidden">Masqué</option>
+              </select>
+            </div>
+            <div>
+              <label class="lbl">Affichage dans la barre</label>
+              <select class="inp" id="subgoal-progress-display-input">
+                <option value="count">Nombre de subs</option>
+                <option value="progress">Nombre / objectif</option>
+                <option value="percent">Pourcentage</option>
+                <option value="hidden">Rien</option>
+              </select>
+            </div>
+            <div>
+              <label class="lbl">Alignement</label>
+              <select class="inp" id="subgoal-text-align-input">
+                <option value="left">Gauche</option>
+                <option value="center">Centre</option>
+                <option value="right">Droite</option>
+              </select>
+            </div>
+          </div>
+          <button class="dark-btn" onclick="saveSubGoalLayout()" style="width:100%;justify-content:center;margin-bottom:14px">ENREGISTRER LE PLACEMENT</button>
+
           <label class="lbl">Objectif</label>
           <div style="display:flex;gap:8px;margin-bottom:14px">
             <input type="number" class="inp" id="subgoal-target-input" min="1" placeholder="50">
@@ -1366,10 +1404,14 @@ function renderSubCounter(d) {
   set('subcounter-renewals-display', renewals);
   set('subgoal-current-display', total);
   set('subgoal-target-display', target);
-  set('subgoal-percent-display', pct + '%');
+  set('subgoal-percent-display', total + ' subs');
   setVal('subcounter-total-input', total);
   setVal('subgoal-target-input', target);
   setVal('subgoal-label-input', d.label || 'Sub Goal');
+  setVal('subgoal-text-position-input', d.textPosition || 'inside');
+  setVal('subgoal-count-position-input', d.countPosition || 'inside');
+  setVal('subgoal-progress-display-input', d.progressDisplay || 'count');
+  setVal('subgoal-text-align-input', d.textAlign || 'center');
   renderSubCounterLatest(d.latest || []);
 }
 
@@ -1411,6 +1453,23 @@ async function saveSubGoalLabel() {
   });
   if (!r.ok) return toast('Erreur', false);
   toast(`Texte overlay mis à jour : ${label}`);
+  loadSubGoal();
+}
+
+
+async function saveSubGoalLayout() {
+  const payload = {
+    textPosition: document.getElementById('subgoal-text-position-input')?.value || 'inside',
+    countPosition: document.getElementById('subgoal-count-position-input')?.value || 'inside',
+    progressDisplay: document.getElementById('subgoal-progress-display-input')?.value || 'count',
+    textAlign: document.getElementById('subgoal-text-align-input')?.value || 'center'
+  };
+  const r = await fetch(API + '/api/admin/widgets/subgoal/layout', {
+    method: 'POST', headers: { 'Content-Type': 'application/json', 'x-panel-key': getKey() },
+    body: JSON.stringify(payload)
+  });
+  if (!r.ok) return toast('Erreur', false);
+  toast('Placement overlay mis à jour');
   loadSubGoal();
 }
 

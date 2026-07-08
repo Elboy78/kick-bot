@@ -11,18 +11,18 @@
     display:flex; flex-direction:column; gap:8px;
   }
 
-  #label {
-    display:flex; align-items:baseline; justify-content:space-between;
+  #topLabel {
+    display:flex; align-items:baseline; justify-content:space-between; gap:12px;
     color:#fff; text-shadow:0 2px 6px rgba(0,0,0,.85);
-    font-weight:800; letter-spacing:.5px;
+    font-weight:850; letter-spacing:.5px;
   }
-  #label .title { font-size:18px; text-transform:uppercase; }
-  #label .count { font-size:22px; }
-  #label .count b { color:#3dff7a; }
-  #label .count span { color:#cfcfcf; font-weight:600; }
+  #topLabel .title { font-size:18px; text-transform:uppercase; }
+  #topLabel .count { font-size:22px; white-space:nowrap; }
+  .count b { color:#3dff7a; }
+  .count span { color:#cfcfcf; font-weight:700; }
 
   #track {
-    position:relative; width:100%; height:36px;
+    position:relative; width:100%; height:40px;
     background:rgba(10,10,14,.55); border:2px solid rgba(255,255,255,.18);
     border-radius:999px; overflow:hidden;
     box-shadow:inset 0 2px 6px rgba(0,0,0,.5), 0 6px 18px rgba(0,0,0,.35);
@@ -47,21 +47,34 @@
   }
   #glow.pop { opacity:1; }
 
-  #pct { position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
-    font-size:14px; font-weight:800; color:#fff; text-shadow:0 1px 4px rgba(0,0,0,.8); z-index:2; }
+  #inside {
+    position:absolute; inset:0; z-index:2;
+    display:flex; align-items:center; justify-content:center; gap:10px;
+    padding:0 18px; box-sizing:border-box;
+    font-size:14px; font-weight:950; color:#fff; text-shadow:0 1px 4px rgba(0,0,0,.85);
+    white-space:nowrap;
+  }
+  #inside.left { justify-content:flex-start; }
+  #inside.center { justify-content:center; }
+  #inside.right { justify-content:flex-end; }
+  #insideLabel { text-transform:uppercase; letter-spacing:.5px; overflow:hidden; text-overflow:ellipsis; }
+  #insideCount { font-size:15px; }
 </style>
 </head>
 <body>
 
 <div id="wrap">
-  <div id="label">
-    <span class="title" id="goal-label">🎯 Sub Goal</span>
-    <span class="count"><b id="cur">0</b><span> / <span id="tgt">50</span> subs</span></span>
+  <div id="topLabel">
+    <span class="title" id="top-title">🎯 Sub Goal</span>
+    <span class="count" id="top-count"><b id="top-cur">0</b><span> / <span id="top-tgt">50</span> subs</span></span>
   </div>
   <div id="track">
     <div id="fill"></div>
     <div id="glow"></div>
-    <div id="pct"><span id="pct-text">0%</span></div>
+    <div id="inside" class="center">
+      <span id="insideLabel">Sub Goal</span>
+      <span id="insideCount">0 subs</span>
+    </div>
   </div>
 </div>
 
@@ -70,21 +83,54 @@
 const socket = io();
 const fill = document.getElementById('fill');
 const glow = document.getElementById('glow');
-const curEl = document.getElementById('cur');
-const tgtEl = document.getElementById('tgt');
-const pctText = document.getElementById('pct-text');
-const labelEl = document.getElementById('goal-label');
+const topLabel = document.getElementById('topLabel');
+const topTitle = document.getElementById('top-title');
+const topCount = document.getElementById('top-count');
+const topCur = document.getElementById('top-cur');
+const topTgt = document.getElementById('top-tgt');
+const inside = document.getElementById('inside');
+const insideLabel = document.getElementById('insideLabel');
+const insideCount = document.getElementById('insideCount');
 
 let lastCurrent = null;
 
-function render(current, target, label) {
-  if (labelEl) labelEl.textContent = '🎯 ' + (label || 'Sub Goal');
+function clampChoice(value, allowed, fallback) {
+  return allowed.includes(value) ? value : fallback;
+}
+
+function countText(current, target, mode) {
   const pct = target > 0 ? Math.min(100, Math.round((current / target) * 100)) : 0;
-  curEl.textContent = current;
-  tgtEl.textContent = target;
+  if (mode === 'percent') return pct + '%';
+  if (mode === 'progress') return current + ' / ' + target + ' subs';
+  if (mode === 'hidden') return '';
+  return current + ' subs';
+}
+
+function render(current, target, options = {}) {
+  const label = options.label || 'Sub Goal';
+  const textPosition = clampChoice(options.textPosition, ['above','inside','hidden'], 'inside');
+  const countPosition = clampChoice(options.countPosition, ['above','inside','right','hidden'], 'inside');
+  const progressDisplay = clampChoice(options.progressDisplay, ['count','progress','percent','hidden'], 'count');
+  const textAlign = clampChoice(options.textAlign, ['left','center','right'], 'center');
+  const pct = target > 0 ? Math.min(100, Math.round((current / target) * 100)) : 0;
+  const txt = countText(current, target, progressDisplay);
+
+  topTitle.textContent = '🎯 ' + label;
+  topCur.textContent = current;
+  topTgt.textContent = target;
+  topTitle.style.display = textPosition === 'above' ? '' : 'none';
+  topCount.style.display = countPosition === 'above' ? '' : 'none';
+  topLabel.style.display = (textPosition === 'above' || countPosition === 'above') ? 'flex' : 'none';
+
+  inside.className = textAlign;
+  insideLabel.textContent = label;
+  insideLabel.style.display = textPosition === 'inside' ? '' : 'none';
+  insideCount.textContent = txt;
+  insideCount.style.display = (countPosition === 'inside' || countPosition === 'right') && txt ? '' : 'none';
+  if (countPosition === 'right') inside.style.justifyContent = 'space-between';
+
   fill.style.width = pct + '%';
   glow.style.width = pct + '%';
-  pctText.textContent = pct + '%';
 
   if (lastCurrent !== null && current > lastCurrent) {
     glow.classList.add('pop');
@@ -97,11 +143,11 @@ async function loadInitial() {
   try {
     const r = await fetch('/api/widgets/subgoal');
     const d = await r.json();
-    render(d.current || 0, d.target || 50, d.label || 'Sub Goal');
+    render(d.current || 0, d.target || 50, d);
   } catch(e) { console.error('[SUBGOAL] Erreur chargement initial', e); }
 }
 
-socket.on('subgoal-update', (d) => render(d.current || 0, d.target || 50, d.label || 'Sub Goal'));
+socket.on('subgoal-update', (d) => render(d.current || 0, d.target || 50, d));
 
 loadInitial();
 </script>
