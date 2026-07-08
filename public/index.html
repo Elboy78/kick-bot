@@ -374,7 +374,6 @@ hr.div{border:none;border-top:1px solid var(--brd);margin:12px 0}
     <a onclick="showPage('jeux')">🎁 Giveaways &amp; Jeux</a>
     <a onclick="showPage('lobby')">🎮 Lobby</a>
     <a onclick="showPage('outils')">🛠️ Outils Chat</a>
-    <a onclick="showPage('tts')">🔊 TTS</a>
     <a onclick="showPage('vods')">🎬 VODs &amp; Clips</a>
     <a onclick="showPage('subdon')">🎁 Sub/Don</a>
     <a onclick="showPage('widgets')">🧩 Widgets</a>
@@ -683,123 +682,6 @@ Option 3" rows="4"></textarea><div style="display:flex;gap:6px;margin-top:10px">
     </div>
   </div>
 
-  <!-- ══ TTS ══ -->
-  <div class="page" id="page-tts">
-    <div class="header"><div><h1>TTS Donations</h1><p>Lecture vocale des messages de dons sur l'overlay</p></div></div>
-    <div class="g2">
-      <div>
-        <div class="panel" style="margin-bottom:14px">
-          <h3>🔑 Clé API ElevenLabs <span id="tts-quota-badge" style="font-size:9px;font-weight:700;padding:3px 9px;border-radius:20px"></span></h3>
-          <div style="background:var(--card2);border:1px solid var(--brd);border-radius:8px;padding:7px 10px;margin-bottom:10px;font-size:10px;color:var(--muted)">
-            Récupère ta clé sur <span class="cpill">elevenlabs.io</span> → Profile → API Keys.
-          </div>
-          <label class="lbl">Clé API</label>
-          <div style="display:flex;gap:6px">
-            <input class="inp" id="tts-api-key" type="password" placeholder="sk_••••••••••••••••">
-            <button class="btnx btn-ghost btn-sm" onclick="toggleApiKeyVisibility()" style="flex-shrink:0">👁</button>
-          </div>
-          <div id="tts-api-key-current" style="font-size:10px;color:var(--muted2);margin-top:4px"></div>
-          <button class="btnx btn-outline" style="width:100%;justify-content:center;margin-top:10px" onclick="saveTTSApiKey()">💾 Enregistrer la clé</button>
-          <div id="tts-quota-info" style="margin-top:10px;display:none">
-            <div class="pb" style="height:6px"><div class="pbf" id="tts-quota-bar" style="width:0%"></div></div>
-            <div style="display:flex;justify-content:space-between;font-size:9px;color:var(--muted2);margin-top:4px">
-              <span id="tts-quota-used">—</span><span id="tts-quota-total">—</span>
-            </div>
-          </div>
-        </div>
-
-        <div class="panel" style="margin-bottom:14px">
-          <h3>🎙️ Voix &amp; réglages</h3>
-          <label class="lbl">Voix utilisée</label>
-          <div style="display:flex;gap:6px">
-            <select class="inp" id="tts-voice-select" style="flex:1"><option value="">— Sélectionner une voix —</option></select>
-            <button class="btnx btn-ghost btn-sm" onclick="loadTTSVoices()" style="flex-shrink:0">↻</button>
-          </div>
-          <div style="margin-top:8px">
-            <label class="lbl" style="font-size:9px">Ou saisis l'ID de voix manuellement <span style="color:var(--muted2)">(elevenlabs.io → Voices → ⋯ → Copy voice ID)</span></label>
-            <div style="display:flex;gap:6px">
-              <input class="inp inp-sm" id="tts-voice-id-manual" placeholder="Ex: EXAVITQu4vr4xnSDxMaL" style="flex:1;font-family:monospace;font-size:11px">
-              <button class="btnx btn-outline btn-sm" onclick="saveManualVoiceId()" style="flex-shrink:0">✓ Utiliser</button>
-            </div>
-          </div>
-          <div style="margin-top:10px;padding:10px;background:var(--card2);border:1px solid var(--brd);border-radius:8px">
-            <label class="lbl" style="font-size:9px">🎧 Préécoute directe (dans ton navigateur, rien n'est envoyé à l'overlay)</label>
-            <textarea class="inp" id="tts-preview-text" rows="2" placeholder="Écris ce que tu veux entendre… (vide = phrase par défaut)" style="resize:vertical;min-height:48px;margin-bottom:6px"></textarea>
-            <button class="btnx btn-purple btn-sm" style="width:100%;justify-content:center" id="tts-preview-btn" onclick="previewVoiceLocal()">▶️ Écouter ici</button>
-          </div>
-
-          <label class="lbl">Stabilité <span id="tts-stability-val" style="color:var(--accent)">50%</span></label>
-          <input type="range" id="tts-stability" min="0" max="100" value="50" style="width:100%" oninput="document.getElementById('tts-stability-val').textContent=this.value+'%'">
-
-          <label class="lbl">Similarité vocale <span id="tts-similarity-val" style="color:var(--accent)">75%</span></label>
-          <input type="range" id="tts-similarity" min="0" max="100" value="75" style="width:100%" oninput="document.getElementById('tts-similarity-val').textContent=this.value+'%'">
-
-          <label class="lbl">Volume overlay <span id="tts-volume-val" style="color:var(--accent)">100%</span></label>
-          <input type="range" id="tts-volume" min="0" max="100" value="100" style="width:100%" oninput="document.getElementById('tts-volume-val').textContent=this.value+'%'">
-
-          <button class="btnx btn-outline" style="width:100%;justify-content:center;margin-top:12px" onclick="saveTTSVoiceSettings()">💾 Enregistrer les réglages voix</button>
-          <div id="tts-voice-msg" style="margin-top:7px"></div>
-        </div>
-
-        <div class="panel">
-          <h3>🔊 Tester le TTS</h3>
-          <div style="background:var(--card2);border:1px solid var(--brd);border-radius:8px;padding:7px 10px;margin-bottom:10px;font-size:10px;color:var(--muted)">
-            Ajoute l'URL <span class="cpill">/overlay</span> comme source navigateur dans OBS pour afficher les dons à l'écran avec lecture vocale.
-          </div>
-          <label class="lbl">Message à tester</label>
-          <textarea class="inp" id="tts-test-message" placeholder="Ex: Merci pour le stream, continue comme ça !" rows="3"></textarea>
-          <button class="btnx btn-outline" style="width:100%;justify-content:center;margin-top:10px" onclick="testTTS()">🔊 Envoyer sur l'overlay</button>
-          <div id="tts-test-msg" style="margin-top:7px"></div>
-        </div>
-      </div>
-
-      <div>
-        <div class="panel" style="margin-bottom:14px">
-          <h3>⚙️ Seuils &amp; limites</h3>
-          <label class="lbl">Don minimum pour déclencher le TTS</label>
-          <div style="display:flex;align-items:center;gap:8px">
-            <input type="number" class="inp" id="tts-min-donation" placeholder="0" min="0" step="0.5" style="width:100px">
-            <span style="font-size:11px;color:var(--muted)">€</span>
-          </div>
-
-          <label class="lbl">Longueur maximale du message</label>
-          <div style="display:flex;align-items:center;gap:8px">
-            <input type="number" class="inp" id="tts-max-length" placeholder="180" min="20" max="500" style="width:100px">
-            <span style="font-size:11px;color:var(--muted)">caractères</span>
-          </div>
-
-          <label class="lbl">Secret du webhook (optionnel)</label>
-          <input class="inp" id="tts-webhook-secret" type="password" placeholder="Laisser vide = pas de vérification">
-          <div style="font-size:9px;color:var(--muted2);margin-top:3px">Si défini, ta plateforme de dons doit envoyer ce secret dans le header <span class="cpill" style="font-size:8px">x-webhook-secret</span>.</div>
-
-          <button class="btnx btn-outline" style="width:100%;justify-content:center;margin-top:12px" onclick="saveTTSLimits()">💾 Enregistrer</button>
-          <div id="tts-limits-msg" style="margin-top:7px"></div>
-        </div>
-
-        <div class="panel" style="margin-bottom:14px">
-          <h3>🚫 Mots bannis TTS (<span id="tts-blacklist-count">0</span>)</h3>
-          <div id="tts-blacklist-list"><div class="empty"><p>Aucun mot banni</p></div></div>
-          <div style="display:flex;gap:6px;margin-top:10px">
-            <input class="inp inp-sm" id="tts-blacklist-word" placeholder="Mot à bannir…" style="flex:1" onkeydown="if(event.key==='Enter')addTTSBlacklistWord()">
-            <button class="btnx btn-outline btn-sm" onclick="addTTSBlacklistWord()">Ajouter</button>
-          </div>
-        </div>
-
-        <div class="panel" style="margin-bottom:14px">
-          <h3>🔗 Webhook de dons</h3>
-          <div style="font-size:10px;color:var(--muted);margin-bottom:8px;line-height:1.6">Configure ta plateforme de dons pour envoyer une requête POST vers :</div>
-          <div class="cpill" style="display:block;padding:8px 10px;font-size:10px;word-break:break-all">/webhook/donation</div>
-          <div style="font-size:10px;color:var(--muted);margin-top:8px;line-height:1.6">Avec un JSON contenant <span class="cpill">username</span>, <span class="cpill">amount</span> et <span class="cpill">message</span>.</div>
-        </div>
-
-        <div class="panel">
-          <h3>📜 Historique des dons lus <button class="btnx btn-ghost btn-sm" onclick="clearTTSHistory()">Effacer</button></h3>
-          <div id="tts-history-list"><div class="empty"><div class="ei">🔊</div><p>Aucun don lu pour le moment</p></div></div>
-        </div>
-      </div>
-    </div>
-  </div>
-
   <!-- ══ VODs & CLIPS ══ -->
   <div class="page" id="page-vods">
     <div class="header">
@@ -879,6 +761,19 @@ Option 3" rows="4"></textarea><div style="display:flex;gap:6px;margin-top:10px">
             <div style="font-size:22px;font-weight:950;color:var(--text);letter-spacing:-.4px">Sub Goal</div>
             <div style="font-size:10px;color:var(--muted);line-height:1.6;margin-top:6px">Barre d’objectif subs, compteur live, session et derniers événements.</div>
             <div style="margin-top:16px;font-size:10px;font-weight:900;color:var(--accent)">Ouvrir les paramètres →</div>
+          </div>
+        </button>
+
+        <button onclick="openWidgetSettings('tts')" style="text-align:left;padding:0;border:0;background:transparent;cursor:pointer">
+          <div class="panel" style="min-height:150px;position:relative;overflow:hidden;border-color:rgba(168,85,247,.30);box-shadow:0 16px 38px rgba(0,0,0,.22)">
+            <div style="position:absolute;right:-34px;top:-42px;width:130px;height:130px;border-radius:50%;background:radial-gradient(circle,rgba(168,85,247,.24),transparent 68%)"></div>
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:18px">
+              <div style="width:46px;height:46px;border-radius:16px;background:rgba(168,85,247,.13);border:1px solid rgba(168,85,247,.30);display:flex;align-items:center;justify-content:center;font-size:24px">🔊</div>
+              <span style="font-size:9px;color:#c084fc;font-weight:900;letter-spacing:.7px;text-transform:uppercase">OBS Overlay</span>
+            </div>
+            <div style="font-size:22px;font-weight:950;color:var(--text);letter-spacing:-.4px">TTS</div>
+            <div style="font-size:10px;color:var(--muted);line-height:1.6;margin-top:6px">Lecture vocale ElevenLabs pour les dons, voix, seuil, blacklist et historique.</div>
+            <div style="margin-top:16px;font-size:10px;font-weight:900;color:#c084fc">Ouvrir les paramètres →</div>
           </div>
         </button>
 
@@ -1020,6 +915,128 @@ Option 3" rows="4"></textarea><div style="display:flex;gap:6px;margin-top:10px">
         <div id="subcounter-latest-list"><div class="empty"><div class="ei">⭐</div><p>Aucun sub détecté pour le moment</p></div></div>
       </div>
     </div>
+
+  <!-- ══ TTS WIDGET SETTINGS ══ -->
+  <div id="widget-tts-settings" style="display:none">
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:14px">
+      <button class="dark-btn" onclick="backToWidgetsHome()">← Retour aux widgets</button>
+      <div style="font-size:10px;color:var(--muted);font-weight:800;text-transform:uppercase;letter-spacing:.7px">Widget actif : TTS</div>
+    </div>
+    <div class="header"><div><h1>TTS Donations</h1><p>Lecture vocale des messages de dons sur l'overlay</p></div></div>
+    <div class="g2">
+      <div>
+        <div class="panel" style="margin-bottom:14px">
+          <h3>🔑 Clé API ElevenLabs <span id="tts-quota-badge" style="font-size:9px;font-weight:700;padding:3px 9px;border-radius:20px"></span></h3>
+          <div style="background:var(--card2);border:1px solid var(--brd);border-radius:8px;padding:7px 10px;margin-bottom:10px;font-size:10px;color:var(--muted)">
+            Récupère ta clé sur <span class="cpill">elevenlabs.io</span> → Profile → API Keys.
+          </div>
+          <label class="lbl">Clé API</label>
+          <div style="display:flex;gap:6px">
+            <input class="inp" id="tts-api-key" type="password" placeholder="sk_••••••••••••••••">
+            <button class="btnx btn-ghost btn-sm" onclick="toggleApiKeyVisibility()" style="flex-shrink:0">👁</button>
+          </div>
+          <div id="tts-api-key-current" style="font-size:10px;color:var(--muted2);margin-top:4px"></div>
+          <button class="btnx btn-outline" style="width:100%;justify-content:center;margin-top:10px" onclick="saveTTSApiKey()">💾 Enregistrer la clé</button>
+          <div id="tts-quota-info" style="margin-top:10px;display:none">
+            <div class="pb" style="height:6px"><div class="pbf" id="tts-quota-bar" style="width:0%"></div></div>
+            <div style="display:flex;justify-content:space-between;font-size:9px;color:var(--muted2);margin-top:4px">
+              <span id="tts-quota-used">—</span><span id="tts-quota-total">—</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="panel" style="margin-bottom:14px">
+          <h3>🎙️ Voix &amp; réglages</h3>
+          <label class="lbl">Voix utilisée</label>
+          <div style="display:flex;gap:6px">
+            <select class="inp" id="tts-voice-select" style="flex:1"><option value="">— Sélectionner une voix —</option></select>
+            <button class="btnx btn-ghost btn-sm" onclick="loadTTSVoices()" style="flex-shrink:0">↻</button>
+          </div>
+          <div style="margin-top:8px">
+            <label class="lbl" style="font-size:9px">Ou saisis l'ID de voix manuellement <span style="color:var(--muted2)">(elevenlabs.io → Voices → ⋯ → Copy voice ID)</span></label>
+            <div style="display:flex;gap:6px">
+              <input class="inp inp-sm" id="tts-voice-id-manual" placeholder="Ex: EXAVITQu4vr4xnSDxMaL" style="flex:1;font-family:monospace;font-size:11px">
+              <button class="btnx btn-outline btn-sm" onclick="saveManualVoiceId()" style="flex-shrink:0">✓ Utiliser</button>
+            </div>
+          </div>
+          <div style="margin-top:10px;padding:10px;background:var(--card2);border:1px solid var(--brd);border-radius:8px">
+            <label class="lbl" style="font-size:9px">🎧 Préécoute directe (dans ton navigateur, rien n'est envoyé à l'overlay)</label>
+            <textarea class="inp" id="tts-preview-text" rows="2" placeholder="Écris ce que tu veux entendre… (vide = phrase par défaut)" style="resize:vertical;min-height:48px;margin-bottom:6px"></textarea>
+            <button class="btnx btn-purple btn-sm" style="width:100%;justify-content:center" id="tts-preview-btn" onclick="previewVoiceLocal()">▶️ Écouter ici</button>
+          </div>
+
+          <label class="lbl">Stabilité <span id="tts-stability-val" style="color:var(--accent)">50%</span></label>
+          <input type="range" id="tts-stability" min="0" max="100" value="50" style="width:100%" oninput="document.getElementById('tts-stability-val').textContent=this.value+'%'">
+
+          <label class="lbl">Similarité vocale <span id="tts-similarity-val" style="color:var(--accent)">75%</span></label>
+          <input type="range" id="tts-similarity" min="0" max="100" value="75" style="width:100%" oninput="document.getElementById('tts-similarity-val').textContent=this.value+'%'">
+
+          <label class="lbl">Volume overlay <span id="tts-volume-val" style="color:var(--accent)">100%</span></label>
+          <input type="range" id="tts-volume" min="0" max="100" value="100" style="width:100%" oninput="document.getElementById('tts-volume-val').textContent=this.value+'%'">
+
+          <button class="btnx btn-outline" style="width:100%;justify-content:center;margin-top:12px" onclick="saveTTSVoiceSettings()">💾 Enregistrer les réglages voix</button>
+          <div id="tts-voice-msg" style="margin-top:7px"></div>
+        </div>
+
+        <div class="panel">
+          <h3>🔊 Tester le TTS</h3>
+          <div style="background:var(--card2);border:1px solid var(--brd);border-radius:8px;padding:7px 10px;margin-bottom:10px;font-size:10px;color:var(--muted)">
+            Ajoute l'URL <span class="cpill">/overlay</span> comme source navigateur dans OBS pour afficher les dons à l'écran avec lecture vocale.
+          </div>
+          <label class="lbl">Message à tester</label>
+          <textarea class="inp" id="tts-test-message" placeholder="Ex: Merci pour le stream, continue comme ça !" rows="3"></textarea>
+          <button class="btnx btn-outline" style="width:100%;justify-content:center;margin-top:10px" onclick="testTTS()">🔊 Envoyer sur l'overlay</button>
+          <div id="tts-test-msg" style="margin-top:7px"></div>
+        </div>
+      </div>
+
+      <div>
+        <div class="panel" style="margin-bottom:14px">
+          <h3>⚙️ Seuils &amp; limites</h3>
+          <label class="lbl">Don minimum pour déclencher le TTS</label>
+          <div style="display:flex;align-items:center;gap:8px">
+            <input type="number" class="inp" id="tts-min-donation" placeholder="0" min="0" step="0.5" style="width:100px">
+            <span style="font-size:11px;color:var(--muted)">€</span>
+          </div>
+
+          <label class="lbl">Longueur maximale du message</label>
+          <div style="display:flex;align-items:center;gap:8px">
+            <input type="number" class="inp" id="tts-max-length" placeholder="180" min="20" max="500" style="width:100px">
+            <span style="font-size:11px;color:var(--muted)">caractères</span>
+          </div>
+
+          <label class="lbl">Secret du webhook (optionnel)</label>
+          <input class="inp" id="tts-webhook-secret" type="password" placeholder="Laisser vide = pas de vérification">
+          <div style="font-size:9px;color:var(--muted2);margin-top:3px">Si défini, ta plateforme de dons doit envoyer ce secret dans le header <span class="cpill" style="font-size:8px">x-webhook-secret</span>.</div>
+
+          <button class="btnx btn-outline" style="width:100%;justify-content:center;margin-top:12px" onclick="saveTTSLimits()">💾 Enregistrer</button>
+          <div id="tts-limits-msg" style="margin-top:7px"></div>
+        </div>
+
+        <div class="panel" style="margin-bottom:14px">
+          <h3>🚫 Mots bannis TTS (<span id="tts-blacklist-count">0</span>)</h3>
+          <div id="tts-blacklist-list"><div class="empty"><p>Aucun mot banni</p></div></div>
+          <div style="display:flex;gap:6px;margin-top:10px">
+            <input class="inp inp-sm" id="tts-blacklist-word" placeholder="Mot à bannir…" style="flex:1" onkeydown="if(event.key==='Enter')addTTSBlacklistWord()">
+            <button class="btnx btn-outline btn-sm" onclick="addTTSBlacklistWord()">Ajouter</button>
+          </div>
+        </div>
+
+        <div class="panel" style="margin-bottom:14px">
+          <h3>🔗 Webhook de dons</h3>
+          <div style="font-size:10px;color:var(--muted);margin-bottom:8px;line-height:1.6">Configure ta plateforme de dons pour envoyer une requête POST vers :</div>
+          <div class="cpill" style="display:block;padding:8px 10px;font-size:10px;word-break:break-all">/webhook/donation</div>
+          <div style="font-size:10px;color:var(--muted);margin-top:8px;line-height:1.6">Avec un JSON contenant <span class="cpill">username</span>, <span class="cpill">amount</span> et <span class="cpill">message</span>.</div>
+        </div>
+
+        <div class="panel">
+          <h3>📜 Historique des dons lus <button class="btnx btn-ghost btn-sm" onclick="clearTTSHistory()">Effacer</button></h3>
+          <div id="tts-history-list"><div class="empty"><div class="ei">🔊</div><p>Aucun don lu pour le moment</p></div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
   </div>
 
   <!-- ══ SUB / DON ══ -->
@@ -1094,7 +1111,7 @@ Option 3" rows="4"></textarea><div style="display:flex;gap:6px;margin-top:10px">
             <span style="font-size:12px;color:var(--muted)">Statut TTS</span>
             <b id="subdon-tts-status-preview" style="color:var(--muted)">—</b>
           </div>
-          <button class="btnx btn-outline" style="width:100%;justify-content:center;margin-top:8px" onclick="showPage('tts')">🔊 Configurer le TTS &amp; seuil de don</button>
+          <button class="btnx btn-outline" style="width:100%;justify-content:center;margin-top:8px" onclick="openTTSWidgetFromAnywhere()">🔊 Configurer le TTS &amp; seuil de don</button>
         </div>
 
         <div class="panel" style="padding:12px 16px;background:rgba(40,255,102,.06);border:1px solid rgba(40,255,102,.2)">
@@ -1365,16 +1382,26 @@ const PAGE_TITLES = {dashboard:'Dashboard',classement:'Classement',lobby:'Lobby'
 function openWidgetSettings(name) {
   const home = document.getElementById('widgets-home');
   const subgoal = document.getElementById('widget-subgoal-settings');
+  const tts = document.getElementById('widget-tts-settings');
   if (home) home.style.display = 'none';
   if (subgoal) subgoal.style.display = name === 'subgoal' ? 'block' : 'none';
+  if (tts) tts.style.display = name === 'tts' ? 'block' : 'none';
   if (name === 'subgoal') loadSubGoal();
+  if (name === 'tts') loadTTS();
 }
 
 function backToWidgetsHome() {
   const home = document.getElementById('widgets-home');
   const subgoal = document.getElementById('widget-subgoal-settings');
+  const tts = document.getElementById('widget-tts-settings');
   if (home) home.style.display = 'block';
   if (subgoal) subgoal.style.display = 'none';
+  if (tts) tts.style.display = 'none';
+}
+
+function openTTSWidgetFromAnywhere() {
+  showPage('widgets');
+  setTimeout(() => openWidgetSettings('tts'), 0);
 }
 
 async function loadSubGoal() {
@@ -1538,7 +1565,6 @@ function showPage(name) {
   if(name==='moderation') { loadBannedWords(); loadAllowedWords(); }
   if(name==='settings') initSettings();
   if(name==='outils') loadOutils();
-  if(name==='tts') loadTTS();
   if(name==='lobby') { loadLobby(); renderWheelWinners(); }
 }
 
@@ -3900,7 +3926,6 @@ const SEARCH_PAGES = [
   { icon:'🎁', label:'Giveaways',        page:'jeux' },
   { icon:'🎮', label:'Lobby',            page:'lobby' },
   { icon:'🛠️', label:'Outils Chat',      page:'outils' },
-  { icon:'🔊', label:'TTS',              page:'tts' },
   { icon:'🎬', label:'VODs & Clips',     page:'vods' },
   { icon:'🎁', label:'Sub/Don',          page:'subdon' },
   { icon:'📋', label:'Logs modération',  page:'logs' },
