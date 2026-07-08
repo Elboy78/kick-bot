@@ -6,14 +6,21 @@
 <title>Song Request</title>
 <style>
   html,body{margin:0;background:transparent;font-family:Inter,Arial,sans-serif;color:#fff;overflow:hidden}
-  .wrap{width:560px;min-height:126px;padding:14px;box-sizing:border-box}
-  .card{position:relative;overflow:hidden;border-radius:22px;padding:16px 18px;background:linear-gradient(135deg,rgba(5,10,22,.92),rgba(10,22,48,.82));border:1px solid rgba(147,197,253,.35);box-shadow:0 18px 45px rgba(0,0,0,.45)}
+  .wrap{width:620px;min-height:148px;padding:14px;box-sizing:border-box}
+  .card{position:relative;overflow:hidden;border-radius:22px;padding:16px 18px;background:linear-gradient(135deg,rgba(5,10,22,.92),rgba(10,22,48,.84));border:1px solid rgba(147,197,253,.35);box-shadow:0 18px 45px rgba(0,0,0,.45)}
   .glow{position:absolute;right:-55px;top:-70px;width:180px;height:180px;border-radius:50%;background:radial-gradient(circle,rgba(59,130,246,.34),transparent 70%)}
-  .top{display:flex;align-items:center;gap:10px;margin-bottom:10px;position:relative;z-index:2}
-  .icon{width:36px;height:36px;border-radius:14px;display:flex;align-items:center;justify-content:center;background:rgba(59,130,246,.20);border:1px solid rgba(147,197,253,.32);font-size:18px}
-  .label{font-size:10px;font-weight:900;letter-spacing:.8px;text-transform:uppercase;color:#93c5fd}
-  .song{position:relative;z-index:2;font-size:20px;font-weight:950;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;letter-spacing:-.3px}
-  .by{position:relative;z-index:2;margin-top:5px;font-size:12px;color:rgba(226,232,240,.72);font-weight:700}
+  .row{display:flex;gap:12px;align-items:center;position:relative;z-index:2;min-width:0}
+  .thumb{width:104px;height:58px;border-radius:12px;background:rgba(148,163,184,.12);border:1px solid rgba(255,255,255,.13);overflow:hidden;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:22px}
+  .thumb img{width:100%;height:100%;object-fit:cover}
+  .content{min-width:0;flex:1}
+  .top{display:flex;align-items:center;gap:8px;margin-bottom:6px}
+  .label{font-size:10px;font-weight:950;letter-spacing:.8px;text-transform:uppercase;color:#93c5fd}
+  .state{font-size:9px;font-weight:950;color:rgba(226,232,240,.68);text-transform:uppercase}
+  .song{font-size:20px;font-weight:950;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;letter-spacing:-.3px}
+  .by{margin-top:5px;font-size:12px;color:rgba(226,232,240,.72);font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .bar{height:7px;background:rgba(255,255,255,.10);border-radius:999px;overflow:hidden;margin-top:11px;border:1px solid rgba(255,255,255,.08)}
+  .fill{height:100%;width:0%;background:linear-gradient(90deg,rgba(59,130,246,.95),rgba(147,197,253,.95));border-radius:999px;transition:width .25s linear}
+  .time{display:flex;justify-content:space-between;margin-top:5px;font-size:10px;color:rgba(226,232,240,.62);font-weight:800}
   .next{position:relative;z-index:2;margin-top:10px;padding-top:10px;border-top:1px solid rgba(255,255,255,.09);font-size:11px;color:rgba(226,232,240,.62);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .empty .song{color:rgba(226,232,240,.76)}
   #yt-holder{position:absolute;width:1px;height:1px;left:-9999px;top:-9999px;overflow:hidden;opacity:0;pointer-events:none}
@@ -24,64 +31,109 @@
   <div class="wrap">
     <div class="card" id="card">
       <div class="glow"></div>
-      <div class="top"><div class="icon">🎵</div><div><div class="label">Song Request</div></div></div>
-      <div class="song" id="song">Aucune musique en attente</div>
-      <div class="by" id="by">Utilise !sr + lien YouTube/titre dans le chat</div>
+      <div class="row">
+        <div class="thumb" id="thumb">🎵</div>
+        <div class="content">
+          <div class="top"><div class="label">Song Request</div><div class="state" id="state">STOP</div></div>
+          <div class="song" id="song">Aucune musique en attente</div>
+          <div class="by" id="by">Utilise !sr + lien YouTube ou titre dans le chat</div>
+          <div class="bar"><div class="fill" id="fill"></div></div>
+          <div class="time"><span id="current">0:00</span><span id="duration">0:00</span></div>
+        </div>
+      </div>
       <div class="next" id="next" style="display:none"></div>
     </div>
   </div>
 <script src="/socket.io/socket.io.js"></script>
 <script src="https://www.youtube.com/iframe_api"></script>
 <script>
-const songEl=document.getElementById('song'), byEl=document.getElementById('by'), nextEl=document.getElementById('next'), card=document.getElementById('card');
-let player=null, ytReady=false, currentId='', currentSongId='', latestState={enabled:false, queue:[]};
+const songEl=document.getElementById('song'), byEl=document.getElementById('by'), nextEl=document.getElementById('next'), card=document.getElementById('card'), thumbEl=document.getElementById('thumb'), fillEl=document.getElementById('fill'), curEl=document.getElementById('current'), durEl=document.getElementById('duration'), stateEl=document.getElementById('state');
+let player=null, ytReady=false, currentId='', currentSongId='', latestState={enabled:false, queue:[], player:{status:'stopped',volume:100}}, lastStatePost=0, desiredStatus='playing';
 function esc(v){return String(v||'').replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));}
+function fmt(seconds){ seconds=Math.max(0,Math.floor(Number(seconds||0))); const h=Math.floor(seconds/3600), m=Math.floor((seconds%3600)/60), s=seconds%60; return h?`${h}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`:`${m}:${String(s).padStart(2,'0')}`; }
 function youtubeId(input){
   const raw=String(input||'');
   const patterns=[/youtu\.be\/([A-Za-z0-9_-]{6,})/i,/youtube\.com\/watch\?[^\s]*v=([A-Za-z0-9_-]{6,})/i,/youtube\.com\/embed\/([A-Za-z0-9_-]{6,})/i,/youtube\.com\/shorts\/([A-Za-z0-9_-]{6,})/i,/youtube\.com\/live\/([A-Za-z0-9_-]{6,})/i];
   for(const p of patterns){ const m=raw.match(p); if(m) return m[1]; }
   return '';
 }
+function itemVideoId(item){ return item?.videoId || youtubeId(item?.url || item?.song || ''); }
 function ensurePlayer(){
   if(player || !ytReady) return;
   player = new YT.Player('yt-player', {
     height:'1', width:'1', videoId:'',
-    playerVars:{autoplay:1,controls:0,disablekb:1,fs:0,modestbranding:1,playsinline:1,rel:0},
-    events:{ onReady:()=>syncPlayback(), onStateChange:e=>{ if(e.data===YT.PlayerState.ENDED) console.log('[SONGREQUEST] Musique terminée'); } }
+    playerVars:{autoplay:1,controls:0,disablekb:1,fs:0,modestbranding:1,playsinline:1,rel:0,origin:location.origin},
+    events:{ onReady:()=>syncPlayback(), onStateChange:onPlayerStateChange, onError:e=>console.warn('[SONGREQUEST] Erreur YouTube', e.data) }
   });
 }
-function stopPlayback(){
-  try{ if(player && player.stopVideo) player.stopVideo(); }catch(e){}
-  currentId=''; currentSongId='';
+function postPlayerState(force=false){
+  if(!player || !latestState.queue[0]) return;
+  const now=Date.now(); if(!force && now-lastStatePost<1800) return; lastStatePost=now;
+  let currentTime=0, duration=0, status=desiredStatus;
+  try{ currentTime=player.getCurrentTime?player.getCurrentTime():0; duration=player.getDuration?player.getDuration():0; }catch(e){}
+  fetch('/api/widgets/songrequest/player-state',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({ itemId: latestState.queue[0].id, status, currentTime, duration, volume: latestState.player?.volume ?? 100 })}).catch(()=>{});
 }
+function onPlayerStateChange(e){
+  if(e.data===YT.PlayerState.PLAYING){ desiredStatus='playing'; postPlayerState(true); }
+  if(e.data===YT.PlayerState.PAUSED){ desiredStatus='paused'; postPlayerState(true); }
+  if(e.data===YT.PlayerState.ENDED){ desiredStatus='stopped'; postPlayerState(true); fetch('/api/admin/widgets/songrequest/next',{method:'POST'}).catch(()=>{}); }
+}
+function stopPlayback(){ try{ if(player && player.stopVideo) player.stopVideo(); }catch(e){} currentId=''; currentSongId=''; desiredStatus='stopped'; }
 function syncPlayback(){
   ensurePlayer();
   const cur=(latestState.queue||[])[0];
-  const id = latestState.enabled && cur ? youtubeId(cur.url || cur.song) : '';
-  if(!latestState.enabled || !cur){ stopPlayback(); return; }
-  if(!id){ stopPlayback(); return; }
+  const id = latestState.enabled && cur ? itemVideoId(cur) : '';
+  if(!latestState.enabled || !cur){ stopPlayback(); render(latestState); return; }
+  if(!id){ stopPlayback(); render(latestState); return; }
   if(!player || !player.loadVideoById) return;
   if(id!==currentId || cur.id!==currentSongId){
-    currentId=id; currentSongId=cur.id;
-    try{ player.loadVideoById(id); setTimeout(()=>{ try{ player.playVideo(); player.unMute(); player.setVolume(100); }catch(e){} }, 700); }catch(e){}
+    currentId=id; currentSongId=cur.id; desiredStatus='playing';
+    try{ player.loadVideoById(id); setTimeout(()=>{ try{ player.unMute(); player.setVolume(latestState.player?.volume ?? 100); player.playVideo(); }catch(e){} }, 700); }catch(e){}
+  } else {
+    try{ player.setVolume(latestState.player?.volume ?? 100); }catch(e){}
+    if((latestState.player?.status||'playing')==='paused') { try{ player.pauseVideo(); desiredStatus='paused'; }catch(e){} }
+    if((latestState.player?.status||'playing')==='playing') { try{ player.playVideo(); desiredStatus='playing'; }catch(e){} }
   }
 }
 function render(state={}){
-  latestState={ enabled:!!state.enabled, queue:Array.isArray(state.queue)?state.queue:[] };
+  latestState={ enabled:!!state.enabled, queue:Array.isArray(state.queue)?state.queue:(latestState.queue||[]), player:Object.assign(latestState.player||{}, state.player||{}) };
   const cur=latestState.queue[0], next=latestState.queue[1];
+  const status=latestState.player?.status || desiredStatus || 'stopped';
   card.classList.toggle('empty', !cur);
-  songEl.innerHTML=esc(cur?.song || 'Aucune musique en attente');
+  songEl.innerHTML=esc(cur?.title || cur?.song || 'Aucune musique en attente');
+  thumbEl.innerHTML=cur?.thumbnail?`<img src="${esc(cur.thumbnail)}" onerror="this.parentNode.textContent='🎵'">`:'🎵';
+  stateEl.textContent=status.toUpperCase();
   if(!latestState.enabled) byEl.innerHTML='Song Request désactivé dans le panel';
-  else if(cur && !youtubeId(cur.url || cur.song)) byEl.innerHTML='Demandé par '+esc(cur.username||'Anonyme')+' — lecture audio : lien YouTube requis';
-  else byEl.innerHTML=cur ? 'Demandé par '+esc(cur.username||'Anonyme') : 'Utilise !sr + lien YouTube dans le chat';
-  if(next){ nextEl.style.display='block'; nextEl.innerHTML='Prochaine : '+esc(next.song)+' — '+esc(next.username||'Anonyme'); }
+  else if(cur && !itemVideoId(cur)) byEl.innerHTML='Demandé par '+esc(cur.username||'Anonyme')+' — vidéo YouTube introuvable';
+  else byEl.innerHTML=cur ? 'Demandé par '+esc(cur.username||'Anonyme')+(cur.author?' · '+esc(cur.author):'') : 'Utilise !sr + lien YouTube ou titre dans le chat';
+  if(next){ nextEl.style.display='block'; nextEl.innerHTML='Prochaine : '+esc(next.title||next.song)+' — '+esc(next.username||'Anonyme'); }
   else nextEl.style.display='none';
-  syncPlayback();
+  updateProgress();
 }
-async function load(){try{const r=await fetch('/api/widgets/songrequest?ts='+Date.now(),{cache:'no-store'}); const d=await r.json(); render(d);}catch(e){}}
+function updateProgress(){
+  let current=Number(latestState.player?.currentTime||0), duration=Number(latestState.player?.duration||0);
+  try{ if(player && player.getCurrentTime){ current=player.getCurrentTime()||current; duration=player.getDuration()||duration; } }catch(e){}
+  curEl.textContent=fmt(current); durEl.textContent=duration?fmt(duration):'?:??';
+  fillEl.style.width=duration?Math.max(0,Math.min(100,(current/duration)*100))+'%':'0%';
+}
+async function load(){try{const r=await fetch('/api/widgets/songrequest?ts='+Date.now(),{cache:'no-store'}); const d=await r.json(); render(d); syncPlayback();}catch(e){}}
 window.onYouTubeIframeAPIReady=function(){ytReady=true; ensurePlayer(); syncPlayback();};
-load(); setInterval(load,3000);
-try{ const socket=io(); socket.on('songrequest-update', d=>render(Object.assign({}, latestState, d))); }catch(e){}
+load(); setInterval(load,5000); setInterval(()=>{ updateProgress(); postPlayerState(false); },1000);
+try{
+  const socket=io();
+  socket.on('songrequest-update', d=>{ latestState.queue=Array.isArray(d.queue)?d.queue:latestState.queue; render(latestState); syncPlayback(); });
+  socket.on('songrequest-player-state', p=>{ latestState.player=Object.assign(latestState.player||{},p||{}); render(latestState); });
+  socket.on('songrequest-control', cmd=>{
+    if(!cmd) return;
+    if(cmd.action==='pause'){ try{player.pauseVideo(); desiredStatus='paused';}catch(e){} }
+    if(cmd.action==='play'){ try{player.playVideo(); desiredStatus='playing';}catch(e){} }
+    if(cmd.action==='seek'){ try{player.seekTo(Number(cmd.seconds||0), true);}catch(e){} }
+    if(cmd.action==='volume'){ latestState.player.volume=Number(cmd.volume ?? 100); try{player.setVolume(latestState.player.volume);}catch(e){} }
+    if(cmd.action==='stop'){ stopPlayback(); }
+    if(cmd.action==='next' || cmd.action==='load-current'){ load(); }
+    postPlayerState(true); render(latestState);
+  });
+}catch(e){}
 </script>
 </body>
 </html>

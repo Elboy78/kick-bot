@@ -677,12 +677,139 @@ app.post('/api/admin/widgets/subgoal/reset', requireAuth, async (req, res) => {
 
 
 // ── Song Request ──────────────────────────────────────────────────────────────
-function cleanSongUrlOrTitle(song) {
+function extractYouTubeId(input) {
+  const raw = String(input || '');
+  const patterns = [
+    /youtu\.be\/([A-Za-z0-9_-]{6,})/i,
+    /youtube\.com\/watch\?[^\s]*v=([A-Za-z0-9_-]{6,})/i,
+    /youtube\.com\/embed\/([A-Za-z0-9_-]{6,})/i,
+    /youtube\.com\/shorts\/([A-Za-z0-9_-]{6,})/i,
+    /youtube\.com\/live\/([A-Za-z0-9_-]{6,})/i,
+    /youtube\.com\/v\/([A-Za-z0-9_-]{6,})/i
+  ];
+  for (const pattern of patterns) {
+    const match = raw.match(pattern);
+    if (match) return match[1];
+  }
+  return '';
+}
+function normalizeYouTubeUrl(videoId) {
+  return videoId ? `https://www.youtube.com/watch?v=${videoId}` : '';
+}
+function htmlEntityDecode(str = '') {
+  return String(str || '')
+    .replace(/&amp;/g, '&').replace(/&quot;/g, '"').replace(/&#39;/g, "'")
+    .replace(/&lt;/g, '<').replace(/&gt;/g, '>');
+}
+function parseDurationTextToSeconds(text = '') {
+  const parts = String(text || '').split(':').map(n => parseInt(n, 10)).filter(n => Number.isFinite(n));
+  if (!parts.length) return 0;
+  if (parts.length === 1) return parts[0];
+  if (parts.length === 2) return parts[0] * 60 + parts[1];
+  return parts[0] * 3600 + parts[1] * 60 + parts[2];
+}
+async function fetchYouTubeOEmbed(videoId) {
+  if (!videoId) return {};
+  try {
+    const { data } = await axios.get('https://www.youtube.com/oembed', {
+      params: { url: normalizeYouTubeUrl(videoId), format: 'json' },
+      timeout: 6000,
+      headers: { 'User-Agent': 'Mozilla/5.0' }
+    });
+    return {
+      title: data?.title || '',
+      author: data?.author_name || '',
+      thumbnail: data?.thumbnail_url || `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`
+    };
+  } catch(e) {
+    return { thumbnail: `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg` };
+  }
+}
+async function searchYouTubeFirst(query) {
+  const q = String(query || '').trim();
+  if (!q) return null;
+  try {
+    const { data: html } = await axios.get('https://www.youtube.com/results', {
+      params: { search_query: q },
+      timeout: 9000,
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120 Safari/537.36',
+        'Accept-Language': 'fr-FR,fr;q=0.9,en;q=0.8'
+      }
+    });
+    const ids = [...String(html).matchAll(/"videoId":"([A-Za-z0-9_-]{11})"/g)].map(m => m[1]);
+    const videoId = ids.find((id, idx) => ids.indexOf(id) === idx);
+    if (!videoId) return null;
+
+    let title = q;
+    let author = '';
+    let durationText = '';
+    const idx = String(html).indexOf(`"videoId":"${videoId}"`);
+    const around = idx >= 0 ? String(html).slice(Math.max(0, idx - 2000), idx + 6000) : String(html);
+    const titleMatch = around.match(/"title":\{"runs":\[\{"text":"([^"]+)"/) || around.match(/"title":\{"simpleText":"([^"]+)"/);
+    if (titleMatch) title = htmlEntityDecode(titleMatch[1]);
+    const ownerMatch = around.match(/"ownerText":\{"runs":\[\{"text":"([^"]+)"/) || around.match(/"longBylineText":\{"runs":\[\{"text":"([^"]+)"/);
+    if (ownerMatch) author = htmlEntityDecode(ownerMatch[1]);
+    const durMatch = around.match(/"lengthText":\{"accessibility":\{"accessibilityData":\{"label":"[^"]+"\}\},"simpleText":"([^"]+)"/) || around.match(/"lengthText":\{"simpleText":"([^"]+)"/);
+    if (durMatch) durationText = durMatch[1];
+
+    const embed = await fetchYouTubeOEmbed(videoId);
+    return {
+      videoId,
+      url: normalizeYouTubeUrl(videoId),
+      title: embed.title || title || q,
+      author: embed.author || author || '',
+      thumbnail: embed.thumbnail || `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`,
+      durationText,
+      duration: parseDurationTextToSeconds(durationText)
+    };
+  } catch(e) {
+    console.warn('[SONGREQUEST] Recherche YouTube impossible:', e.message);
+    return null;
+  }
+}
+async function resolveSongRequest(song) {
   const raw = String(song || '').trim().slice(0, 300);
-  if (!raw) return { song: '', url: '' };
-  const m = raw.match(/https?:\/\/[^\s]+/i);
-  const url = m ? m[0] : '';
-  return { song: raw, url };
+  if (!raw) return { song: '', url: '', videoId: '' };
+  const urlMatch = raw.match(/https?:\/\/[^\s]+/i);
+  const url = urlMatch ? urlMatch[0] : '';
+  const directId = extractYouTubeId(url || raw);
+  if (directId) {
+    const meta = await fetchYouTubeOEmbed(directId);
+    return {
+      song: meta.title || raw,
+      query: raw,
+      url: normalizeYouTubeUrl(directId),
+      videoId: directId,
+      title: meta.title || raw,
+      author: meta.author || '',
+      thumbnail: meta.thumbnail || `https://i.ytimg.com/vi/${directId}/hqdefault.jpg`,
+      duration: 0,
+      durationText: ''
+    };
+  }
+  const found = await searchYouTubeFirst(raw);
+  if (found) return { song: found.title || raw, query: raw, ...found };
+  return { song: raw, query: raw, url: '', videoId: '', title: raw, author: '', thumbnail: '', duration: 0, durationText: '' };
+}
+async function getSongRequestPlayerState() {
+  let state = {};
+  try { state = JSON.parse(await db.getSettingStr('songrequest_player_state', '{}')); } catch(e) { state = {}; }
+  return {
+    itemId: state.itemId || '',
+    status: state.status || 'stopped',
+    currentTime: Number(state.currentTime || 0),
+    duration: Number(state.duration || 0),
+    volume: Math.max(0, Math.min(100, parseInt(state.volume ?? 100) || 100)),
+    updatedAt: state.updatedAt || null
+  };
+}
+async function saveSongRequestPlayerState(patch = {}, emit = true) {
+  const prev = await getSongRequestPlayerState();
+  const next = { ...prev, ...patch, updatedAt: new Date().toISOString() };
+  await db.setSettingStr('songrequest_player_state', JSON.stringify(next));
+  if (emit) io.emit('songrequest-player-state', next);
+  return next;
 }
 
 async function getSongRequestState() {
@@ -694,25 +821,41 @@ async function getSongRequestState() {
     confirmMessage: await db.getSettingStr('songrequest_confirm', '🎵 @{username}, ta musique a été ajoutée à la file !'),
     chatConfirmEnabled: (await db.getSettingStr('songrequest_chat_confirm_enabled', '0')) === '1',
     maxQueue: parseInt(await db.getSettingStr('songrequest_max_queue', '30')) || 30,
-    queue: Array.isArray(queue) ? queue : []
+    queue: Array.isArray(queue) ? queue : [],
+    player: await getSongRequestPlayerState()
   };
 }
 
 async function saveSongRequestQueue(queue) {
   const clean = Array.isArray(queue) ? queue.slice(0, 100) : [];
   await db.setSettingStr('songrequest_queue', JSON.stringify(clean));
-  io.emit('songrequest-update', { queue: clean, enabled: (await db.getSetting('songrequest_enabled')) });
+  io.emit('songrequest-update', { queue: clean });
   return clean;
 }
 
 async function addSongRequest(username, song) {
   const state = await getSongRequestState();
-  const data = cleanSongUrlOrTitle(song);
+  const data = await resolveSongRequest(song);
   if (!data.song) throw new Error('Musique requise');
   if (state.queue.length >= state.maxQueue) throw new Error('File pleine');
-  const item = { id: `${Date.now()}_${Math.random().toString(36).slice(2,8)}`, username: String(username || 'Anonyme').slice(0,60), song: data.song, url: data.url, status: 'queued', at: new Date().toISOString() };
+  const item = {
+    id: `${Date.now()}_${Math.random().toString(36).slice(2,8)}`,
+    username: String(username || 'Anonyme').slice(0,60),
+    song: data.song,
+    query: data.query || song,
+    title: data.title || data.song,
+    author: data.author || '',
+    url: data.url || '',
+    videoId: data.videoId || extractYouTubeId(data.url || data.song),
+    thumbnail: data.thumbnail || (data.videoId ? `https://i.ytimg.com/vi/${data.videoId}/hqdefault.jpg` : ''),
+    duration: data.duration || 0,
+    durationText: data.durationText || '',
+    status: 'queued',
+    at: new Date().toISOString()
+  };
   state.queue.push(item);
   await saveSongRequestQueue(state.queue);
+  console.log(`[SONGREQUEST] Ajouté: ${item.title || item.song} (${item.videoId || 'sans vidéo'})`);
   return item;
 }
 
@@ -731,7 +874,7 @@ app.get('/api/widgets/songrequest', async (req, res) => {
   res.set('Pragma', 'no-cache');
   res.set('Expires', '0');
   try { res.json(await getSongRequestState()); }
-  catch(e) { res.json({ enabled:false, command:'!sr', confirmMessage:'', maxQueue:30, queue:[] }); }
+  catch(e) { res.json({ enabled:false, command:'!sr', confirmMessage:'', maxQueue:30, queue:[], player:{status:'stopped'} }); }
 });
 
 app.post('/api/admin/widgets/songrequest/settings', requireAuth, async (req, res) => {
@@ -745,9 +888,7 @@ app.post('/api/admin/widgets/songrequest/settings', requireAuth, async (req, res
     if (typeof req.body.confirmMessage === 'string') await db.setSettingStr('songrequest_confirm', req.body.confirmMessage.trim().slice(0,180));
     if (typeof req.body.chatConfirmEnabled === 'boolean') await db.setSettingStr('songrequest_chat_confirm_enabled', req.body.chatConfirmEnabled ? '1' : '0');
     if (req.body.maxQueue !== undefined) await db.setSettingStr('songrequest_max_queue', String(Math.min(100, Math.max(1, parseInt(req.body.maxQueue) || 30))));
-    const fresh = await getSongRequestState();
-    io.emit('songrequest-update', { queue: fresh.queue, enabled: fresh.enabled });
-    res.json({ success:true, ...fresh });
+    res.json({ success:true, ...(await getSongRequestState()) });
   } catch(e) { res.status(500).json({ error:e.message }); }
 });
 
@@ -759,7 +900,10 @@ app.post('/api/admin/widgets/songrequest/add', requireAuth, async (req, res) => 
 app.post('/api/admin/widgets/songrequest/delete', requireAuth, async (req, res) => {
   try {
     const state = await getSongRequestState();
-    await saveSongRequestQueue(state.queue.filter(x => x.id !== req.body.id));
+    const id = req.body.id;
+    const wasCurrent = state.queue[0]?.id === id;
+    await saveSongRequestQueue(state.queue.filter(x => x.id !== id));
+    if (wasCurrent) io.emit('songrequest-control', { action:'load-current' });
     res.json({ success:true, ...(await getSongRequestState()) });
   } catch(e) { res.status(500).json({ error:e.message }); }
 });
@@ -769,13 +913,65 @@ app.post('/api/admin/widgets/songrequest/next', requireAuth, async (req, res) =>
     const state = await getSongRequestState();
     state.queue.shift();
     await saveSongRequestQueue(state.queue);
+    await saveSongRequestPlayerState({ itemId: state.queue[0]?.id || '', status: state.queue[0] ? 'playing' : 'stopped', currentTime: 0, duration: state.queue[0]?.duration || 0 });
+    io.emit('songrequest-control', { action:'next' });
     res.json({ success:true, ...(await getSongRequestState()) });
   } catch(e) { res.status(500).json({ error:e.message }); }
 });
 
 app.post('/api/admin/widgets/songrequest/clear', requireAuth, async (req, res) => {
-  try { await saveSongRequestQueue([]); res.json({ success:true, ...(await getSongRequestState()) }); }
+  try {
+    await saveSongRequestQueue([]);
+    await saveSongRequestPlayerState({ itemId:'', status:'stopped', currentTime:0, duration:0 });
+    io.emit('songrequest-control', { action:'stop' });
+    res.json({ success:true, ...(await getSongRequestState()) });
+  }
   catch(e) { res.status(500).json({ error:e.message }); }
+});
+
+app.post('/api/admin/widgets/songrequest/play', requireAuth, async (req, res) => {
+  try {
+    const state = await getSongRequestState();
+    const cur = state.queue[0];
+    const next = await saveSongRequestPlayerState({ itemId: cur?.id || '', status: cur ? 'playing' : 'stopped' });
+    io.emit('songrequest-control', { action:'play' });
+    res.json({ success:true, player: next });
+  } catch(e) { res.status(500).json({ error:e.message }); }
+});
+app.post('/api/admin/widgets/songrequest/pause', requireAuth, async (req, res) => {
+  try {
+    const next = await saveSongRequestPlayerState({ status:'paused' });
+    io.emit('songrequest-control', { action:'pause' });
+    res.json({ success:true, player: next });
+  } catch(e) { res.status(500).json({ error:e.message }); }
+});
+app.post('/api/admin/widgets/songrequest/seek', requireAuth, async (req, res) => {
+  try {
+    const seconds = Math.max(0, parseFloat(req.body.seconds || 0) || 0);
+    const next = await saveSongRequestPlayerState({ currentTime: seconds });
+    io.emit('songrequest-control', { action:'seek', seconds });
+    res.json({ success:true, player: next });
+  } catch(e) { res.status(500).json({ error:e.message }); }
+});
+app.post('/api/admin/widgets/songrequest/volume', requireAuth, async (req, res) => {
+  try {
+    const volume = Math.max(0, Math.min(100, parseInt(req.body.volume ?? 100) || 100));
+    const next = await saveSongRequestPlayerState({ volume });
+    io.emit('songrequest-control', { action:'volume', volume });
+    res.json({ success:true, player: next });
+  } catch(e) { res.status(500).json({ error:e.message }); }
+});
+app.post('/api/widgets/songrequest/player-state', async (req, res) => {
+  try {
+    const patch = {};
+    if (typeof req.body.itemId === 'string') patch.itemId = req.body.itemId;
+    if (typeof req.body.status === 'string') patch.status = req.body.status;
+    if (req.body.currentTime !== undefined) patch.currentTime = Math.max(0, parseFloat(req.body.currentTime) || 0);
+    if (req.body.duration !== undefined) patch.duration = Math.max(0, parseFloat(req.body.duration) || 0);
+    if (req.body.volume !== undefined) patch.volume = Math.max(0, Math.min(100, parseInt(req.body.volume) || 100));
+    const next = await saveSongRequestPlayerState(patch, true);
+    res.json({ success:true, player: next });
+  } catch(e) { res.status(500).json({ error:e.message }); }
 });
 
 app.get('/api/chests', async (req, res) => {
