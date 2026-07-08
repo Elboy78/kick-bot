@@ -777,6 +777,20 @@ Option 3" rows="4"></textarea><div style="display:flex;gap:6px;margin-top:10px">
           </div>
         </button>
 
+
+        <button onclick="openWidgetSettings('songrequest')" style="text-align:left;padding:0;border:0;background:transparent;cursor:pointer">
+          <div class="panel" style="min-height:150px;position:relative;overflow:hidden;border-color:rgba(59,130,246,.30);box-shadow:0 16px 38px rgba(0,0,0,.22)">
+            <div style="position:absolute;right:-34px;top:-42px;width:130px;height:130px;border-radius:50%;background:radial-gradient(circle,rgba(59,130,246,.24),transparent 68%)"></div>
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:18px">
+              <div style="width:46px;height:46px;border-radius:16px;background:rgba(59,130,246,.13);border:1px solid rgba(59,130,246,.30);display:flex;align-items:center;justify-content:center;font-size:24px">🎵</div>
+              <span style="font-size:9px;color:#93c5fd;font-weight:900;letter-spacing:.7px;text-transform:uppercase">Chat Request</span>
+            </div>
+            <div style="font-size:22px;font-weight:950;color:var(--text);letter-spacing:-.4px">Song Request</div>
+            <div style="font-size:10px;color:var(--muted);line-height:1.6;margin-top:6px">Les viewers proposent des musiques avec !sr, tu acceptes/refuses depuis le panel.</div>
+            <div style="margin-top:16px;font-size:10px;font-weight:900;color:#93c5fd">Ouvrir les paramètres →</div>
+          </div>
+        </button>
+
         <div class="panel" style="min-height:150px;opacity:.55;border-style:dashed;display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center">
           <div style="font-size:28px;margin-bottom:8px">＋</div>
           <div style="font-size:14px;font-weight:900;color:var(--text)">Nouveau widget</div>
@@ -915,6 +929,50 @@ Option 3" rows="4"></textarea><div style="display:flex;gap:6px;margin-top:10px">
         <div id="subcounter-latest-list"><div class="empty"><div class="ei">⭐</div><p>Aucun sub détecté pour le moment</p></div></div>
       </div>
     </div>
+
+
+  <!-- ══ SONG REQUEST WIDGET SETTINGS ══ -->
+  <div id="widget-songrequest-settings" style="display:none">
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:14px">
+      <button class="dark-btn" onclick="backToWidgetsHome()">← Retour aux widgets</button>
+      <div style="font-size:10px;color:var(--muted);font-weight:800;text-transform:uppercase;letter-spacing:.7px">Widget actif : Song Request</div>
+    </div>
+    <div class="header"><div><h1>Song Request</h1><p>File d’attente musicale pilotée par le chat</p></div></div>
+    <div class="g2">
+      <div class="panel">
+        <h3>⚙️ Paramètres</h3>
+        <label class="row" style="margin:8px 0 12px"><input type="checkbox" id="sr-enabled"> Activer les song requests</label>
+        <label class="lbl">Commande chat</label>
+        <input class="inp" id="sr-command" placeholder="!sr" maxlength="20" style="margin-bottom:10px">
+        <label class="lbl">Message de confirmation</label>
+        <input class="inp" id="sr-confirm" placeholder="🎵 @{username}, ta musique a été ajoutée" maxlength="180" style="margin-bottom:10px">
+        <label class="lbl">Nombre maximum dans la file</label>
+        <input type="number" class="inp" id="sr-max" min="1" max="100" placeholder="30" style="margin-bottom:12px">
+        <button class="dark-btn" onclick="saveSongRequestSettings()" style="width:100%;justify-content:center">ENREGISTRER</button>
+        <div style="padding:10px;background:var(--card2);border:1px solid var(--brd);border-radius:8px;font-size:10px;color:var(--muted);line-height:1.7;margin-top:12px">
+          <b style="color:var(--text)">🔗 Lien overlay OBS Song Request</b><br>
+          <code style="background:var(--card);padding:2px 6px;border-radius:4px;color:#93c5fd;font-size:9px;display:block;margin-top:4px;word-break:break-all" id="songrequest-obs-url">/widgets/songrequest.html</code>
+          <span style="margin-top:6px;display:block">Affiche la musique en cours + la prochaine.</span>
+        </div>
+      </div>
+      <div class="panel">
+        <h3>➕ Ajouter manuellement</h3>
+        <label class="lbl">Pseudo</label>
+        <input class="inp" id="sr-manual-user" placeholder="Streamer" style="margin-bottom:10px">
+        <label class="lbl">Lien ou titre YouTube</label>
+        <input class="inp" id="sr-manual-song" placeholder="https://youtube.com/... ou titre" style="margin-bottom:12px">
+        <button class="dark-btn" onclick="addSongRequestManual()" style="width:100%;justify-content:center">AJOUTER À LA FILE</button>
+        <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap">
+          <button class="dark-btn" onclick="nextSongRequest()">Passer au suivant</button>
+          <button class="dark-btn" onclick="clearSongRequests()" style="border-color:#a72a22;color:#ff8a7a">Vider la file</button>
+        </div>
+      </div>
+    </div>
+    <div class="panel" style="margin-top:14px">
+      <h3>🎶 File d’attente</h3>
+      <div id="songrequest-queue"><div class="empty"><div class="ei">🎵</div><p>Aucune musique demandée</p></div></div>
+    </div>
+  </div>
 
   <!-- ══ TTS WIDGET SETTINGS ══ -->
   <div id="widget-tts-settings" style="display:none">
@@ -1383,20 +1441,25 @@ function openWidgetSettings(name) {
   const home = document.getElementById('widgets-home');
   const subgoal = document.getElementById('widget-subgoal-settings');
   const tts = document.getElementById('widget-tts-settings');
+  const songrequest = document.getElementById('widget-songrequest-settings');
   if (home) home.style.display = 'none';
   if (subgoal) subgoal.style.display = name === 'subgoal' ? 'block' : 'none';
   if (tts) tts.style.display = name === 'tts' ? 'block' : 'none';
+  if (songrequest) songrequest.style.display = name === 'songrequest' ? 'block' : 'none';
   if (name === 'subgoal') loadSubGoal();
   if (name === 'tts') loadTTS();
+  if (name === 'songrequest') loadSongRequest();
 }
 
 function backToWidgetsHome() {
   const home = document.getElementById('widgets-home');
   const subgoal = document.getElementById('widget-subgoal-settings');
   const tts = document.getElementById('widget-tts-settings');
+  const songrequest = document.getElementById('widget-songrequest-settings');
   if (home) home.style.display = 'block';
   if (subgoal) subgoal.style.display = 'none';
   if (tts) tts.style.display = 'none';
+  if (songrequest) songrequest.style.display = 'none';
 }
 
 function openTTSWidgetFromAnywhere() {
@@ -4154,6 +4217,85 @@ function copyDetectedToken() {
     toast('📋 Token copié');
   });
 }
+
+
+// ── Song Request ─────────────────────────────────────────────────────────────
+async function loadSongRequest() {
+  try {
+    const r = await fetch(API + '/api/widgets/songrequest?ts=' + Date.now(), { cache: 'no-store' });
+    const d = await r.json();
+    setChecked('sr-enabled', !!d.enabled);
+    setVal('sr-command', d.command || '!sr');
+    setVal('sr-confirm', d.confirmMessage || '🎵 @{username}, ta musique a été ajoutée à la file !');
+    setVal('sr-max', d.maxQueue || 30);
+    const url = document.getElementById('songrequest-obs-url');
+    if (url) url.textContent = window.location.origin + '/widgets/songrequest.html';
+    renderSongRequestQueue(d.queue || []);
+  } catch(e) { console.error(e); }
+}
+
+function renderSongRequestQueue(queue) {
+  const box = document.getElementById('songrequest-queue');
+  if (!box) return;
+  if (!queue.length) {
+    box.innerHTML = '<div class="empty"><div class="ei">🎵</div><p>Aucune musique demandée</p></div>';
+    return;
+  }
+  box.innerHTML = queue.map((s, i) => `
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px;border-bottom:1px solid var(--brd)">
+      <div style="min-width:0">
+        <div style="font-size:9px;color:${i===0?'#93c5fd':'var(--muted)'};font-weight:900;text-transform:uppercase">${i===0?'En cours':'En attente #' + (i+1)}</div>
+        <div style="font-size:13px;font-weight:900;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${escapeHtml(s.song || '')}</div>
+        <div style="font-size:10px;color:var(--muted);margin-top:3px">Demandé par ${escapeHtml(s.username || 'Anonyme')}</div>
+      </div>
+      <div style="display:flex;gap:6px;flex-shrink:0">
+        ${s.url ? `<button class="btnx btn-ghost btn-xs" onclick="window.open('${escapeAttr(s.url)}','_blank')">Ouvrir</button>` : ''}
+        <button class="btnx btn-red btn-xs" onclick="deleteSongRequest('${escapeAttr(s.id)}')">✕</button>
+      </div>
+    </div>`).join('');
+}
+
+async function saveSongRequestSettings() {
+  const body = {
+    enabled: document.getElementById('sr-enabled')?.checked === true,
+    command: (document.getElementById('sr-command')?.value || '!sr').trim(),
+    confirmMessage: (document.getElementById('sr-confirm')?.value || '').trim(),
+    maxQueue: parseInt(document.getElementById('sr-max')?.value || '30') || 30
+  };
+  await fetch(API + '/api/admin/widgets/songrequest/settings', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body) });
+  toast('Song Request enregistré ✓');
+  loadSongRequest();
+}
+
+async function addSongRequestManual() {
+  const username = (document.getElementById('sr-manual-user')?.value || 'Streamer').trim();
+  const song = (document.getElementById('sr-manual-song')?.value || '').trim();
+  if (!song) return toast('Ajoute un titre ou un lien');
+  await fetch(API + '/api/admin/widgets/songrequest/add', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ username, song }) });
+  setVal('sr-manual-song', '');
+  toast('Musique ajoutée ✓');
+  loadSongRequest();
+}
+
+async function deleteSongRequest(id) {
+  await fetch(API + '/api/admin/widgets/songrequest/delete', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ id }) });
+  loadSongRequest();
+}
+
+async function nextSongRequest() {
+  await fetch(API + '/api/admin/widgets/songrequest/next', { method:'POST' });
+  loadSongRequest();
+}
+
+async function clearSongRequests() {
+  if (!confirm('Vider toute la file Song Request ?')) return;
+  await fetch(API + '/api/admin/widgets/songrequest/clear', { method:'POST' });
+  toast('File vidée ✓');
+  loadSongRequest();
+}
+
+function escapeHtml(v) { return String(v || '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','\"':'&quot;',"'":'&#39;'}[c] || c)); }
+function escapeAttr(v) { return escapeHtml(v); }
 
 // ── TTS ───────────────────────────────────────────────────────────────────────
 

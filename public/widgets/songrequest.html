@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Song Request</title>
+<style>
+  html,body{margin:0;background:transparent;font-family:Inter,Arial,sans-serif;color:#fff;overflow:hidden}
+  .wrap{width:520px;min-height:116px;padding:14px;box-sizing:border-box}
+  .card{position:relative;overflow:hidden;border-radius:22px;padding:16px 18px;background:linear-gradient(135deg,rgba(5,10,22,.92),rgba(10,22,48,.82));border:1px solid rgba(147,197,253,.35);box-shadow:0 18px 45px rgba(0,0,0,.45)}
+  .glow{position:absolute;right:-55px;top:-70px;width:180px;height:180px;border-radius:50%;background:radial-gradient(circle,rgba(59,130,246,.34),transparent 70%)}
+  .top{display:flex;align-items:center;gap:10px;margin-bottom:10px;position:relative;z-index:2}
+  .icon{width:36px;height:36px;border-radius:14px;display:flex;align-items:center;justify-content:center;background:rgba(59,130,246,.20);border:1px solid rgba(147,197,253,.32);font-size:18px}
+  .label{font-size:10px;font-weight:900;letter-spacing:.8px;text-transform:uppercase;color:#93c5fd}
+  .song{position:relative;z-index:2;font-size:20px;font-weight:950;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;letter-spacing:-.3px}
+  .by{position:relative;z-index:2;margin-top:5px;font-size:12px;color:rgba(226,232,240,.72);font-weight:700}
+  .next{position:relative;z-index:2;margin-top:10px;padding-top:10px;border-top:1px solid rgba(255,255,255,.09);font-size:11px;color:rgba(226,232,240,.62);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .empty .song{color:rgba(226,232,240,.76)}
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="card" id="card">
+      <div class="glow"></div>
+      <div class="top"><div class="icon">🎵</div><div><div class="label">Song Request</div></div></div>
+      <div class="song" id="song">Aucune musique en attente</div>
+      <div class="by" id="by">Utilise !sr + lien/titre dans le chat</div>
+      <div class="next" id="next" style="display:none"></div>
+    </div>
+  </div>
+<script src="/socket.io/socket.io.js"></script>
+<script>
+const songEl=document.getElementById('song'), byEl=document.getElementById('by'), nextEl=document.getElementById('next'), card=document.getElementById('card');
+function esc(v){return String(v||'').replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));}
+function render(queue=[]){
+  const cur=queue[0], next=queue[1];
+  card.classList.toggle('empty', !cur);
+  songEl.innerHTML=esc(cur?.song || 'Aucune musique en attente');
+  byEl.innerHTML=cur ? 'Demandé par '+esc(cur.username||'Anonyme') : 'Utilise !sr + lien/titre dans le chat';
+  if(next){ nextEl.style.display='block'; nextEl.innerHTML='Prochaine : '+esc(next.song)+' — '+esc(next.username||'Anonyme'); }
+  else nextEl.style.display='none';
+}
+async function load(){try{const r=await fetch('/api/widgets/songrequest?ts='+Date.now(),{cache:'no-store'}); const d=await r.json(); render(d.queue||[]);}catch(e){}}
+load(); setInterval(load,5000);
+try{ const socket=io(); socket.on('songrequest-update', d=>render(d.queue||[])); }catch(e){}
+</script>
+</body>
+</html>

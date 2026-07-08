@@ -20,7 +20,7 @@ const CONFIG = {
 };
 
 const PUSHER_URL = 'wss://ws-us2.pusher.com/app/32cbd69e4b950bf97679?protocol=7&client=js&version=7.4.0&flash=false';
-const SYSTEM_COMMANDS = ['!points','!top','!rang','!niveau','!aide','!duel','!accepter','!refuser','!participer','!giveaway','!lobby','!quote','!addquote','!mort','!death','!score','!queue','!join','!leave','!pos','!vote','!sondage','!so','!uptime','!fc','!sc','!coffre','!victoire','!to','!dice','!des','!rps','!pfc','!clip','!addcmd','!delcmd','!addword','!delword','!allowword','!disallowword'];
+const SYSTEM_COMMANDS = ['!points','!top','!rang','!niveau','!aide','!duel','!accepter','!refuser','!participer','!giveaway','!lobby','!quote','!addquote','!mort','!death','!score','!queue','!join','!leave','!pos','!vote','!sondage','!so','!uptime','!fc','!sc','!coffre','!victoire','!to','!dice','!des','!rps','!pfc','!clip','!sr','!songrequest','!addcmd','!delcmd','!addword','!delword','!allowword','!disallowword'];
 
 let ws             = null;
 let reconnectDelay = 5000;
@@ -305,6 +305,12 @@ async function handleChatMessage(payload) {
   const parts = content.trim().split(' ');
   const cmd   = parts[0].toLowerCase();
 
+  // Commande Song Request personnalisable depuis Widget
+  try {
+    const srCommand = (await db.getSettingStr('songrequest_command', '!sr')).toLowerCase();
+    if (cmd === srCommand && !SYSTEM_COMMANDS.includes(cmd)) return cmdSongRequest(username, parts);
+  } catch(e) {}
+
   // Commandes système
   if (SYSTEM_COMMANDS.includes(cmd)) {
     const enabled = await db.isSystemCmdEnabled(cmd);
@@ -345,6 +351,8 @@ async function handleChatMessage(payload) {
       case '!victoire':  return cmdMarkVictory(username, isModOrBroadcaster);
       case '!to':        return cmdTimeoutBuy(username, parts);
       case '!clip':      return (await db.getSetting('clip_enabled')) ? cmdClip(username, parts) : null;
+      case '!sr':
+      case '!songrequest': return cmdSongRequest(username, parts);
       case '!addcmd':    return cmdAddCommand(username, parts, isModOrBroadcaster);
       case '!delcmd':    return cmdDelCommand(username, parts, isModOrBroadcaster);
       case '!addword':   return cmdAddBannedWord(username, parts, isModOrBroadcaster);
@@ -1202,6 +1210,47 @@ async function getActiveToken() {
     if (oauthToken) return { token: oauthToken, official: true };
   }
   return { token: CONFIG.token, official: false };
+}
+
+
+async function cmdSongRequest(username, parts) {
+  try {
+    const enabled = await db.getSetting('songrequest_enabled');
+    if (!enabled) return;
+
+    const customCommand = (await db.getSettingStr('songrequest_command', '!sr')).toLowerCase();
+    const usedCommand = String(parts[0] || '').toLowerCase();
+    if (usedCommand !== '!sr' && usedCommand !== '!songrequest' && usedCommand !== customCommand) return;
+
+    const song = parts.slice(1).join(' ').trim();
+    if (!song) return sendChat(`@${username} utilise ${customCommand} + lien/titre YouTube.`);
+
+    let queue = [];
+    try { queue = JSON.parse(await db.getSettingStr('songrequest_queue', '[]')); } catch(e) { queue = []; }
+    if (!Array.isArray(queue)) queue = [];
+
+    const maxQueue = parseInt(await db.getSettingStr('songrequest_max_queue', '30')) || 30;
+    if (queue.length >= maxQueue) return sendChat(`@${username} la file Song Request est pleine pour le moment.`);
+
+    const raw = song.slice(0, 300);
+    const match = raw.match(/https?:\/\/[^\s]+/i);
+    const item = {
+      id: `${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+      username,
+      song: raw,
+      url: match ? match[0] : '',
+      status: 'queued',
+      at: new Date().toISOString()
+    };
+    queue.push(item);
+    await db.setSettingStr('songrequest_queue', JSON.stringify(queue.slice(0, 100)));
+
+    const msgTpl = await db.getSettingStr('songrequest_confirm', '🎵 @{username}, ta musique a été ajoutée à la file !');
+    const msg = String(msgTpl || '').replaceAll('@{username}', `@${username}`).replaceAll('{username}', username).replaceAll('{song}', raw);
+    if (msg.trim()) sendChat(msg.slice(0, 450));
+  } catch(e) {
+    console.error('[SONGREQUEST] Erreur:', e.message);
+  }
 }
 
 // ─── Envoi messages ───────────────────────────────────────────────────────────

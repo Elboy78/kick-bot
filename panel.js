@@ -675,6 +675,92 @@ app.post('/api/admin/widgets/subgoal/reset', requireAuth, async (req, res) => {
   } catch(e) { res.status(500).json({ error: e.message }); }
 });
 
+
+// ── Song Request ──────────────────────────────────────────────────────────────
+function cleanSongUrlOrTitle(song) {
+  const raw = String(song || '').trim().slice(0, 300);
+  if (!raw) return { song: '', url: '' };
+  const m = raw.match(/https?:\/\/[^\s]+/i);
+  const url = m ? m[0] : '';
+  return { song: raw, url };
+}
+
+async function getSongRequestState() {
+  let queue = [];
+  try { queue = JSON.parse(await db.getSettingStr('songrequest_queue', '[]')); } catch(e) { queue = []; }
+  return {
+    enabled: await db.getSetting('songrequest_enabled'),
+    command: await db.getSettingStr('songrequest_command', '!sr'),
+    confirmMessage: await db.getSettingStr('songrequest_confirm', '🎵 @{username}, ta musique a été ajoutée à la file !'),
+    maxQueue: parseInt(await db.getSettingStr('songrequest_max_queue', '30')) || 30,
+    queue: Array.isArray(queue) ? queue : []
+  };
+}
+
+async function saveSongRequestQueue(queue) {
+  const clean = Array.isArray(queue) ? queue.slice(0, 100) : [];
+  await db.setSettingStr('songrequest_queue', JSON.stringify(clean));
+  io.emit('songrequest-update', { queue: clean });
+  return clean;
+}
+
+async function addSongRequest(username, song) {
+  const state = await getSongRequestState();
+  const data = cleanSongUrlOrTitle(song);
+  if (!data.song) throw new Error('Musique requise');
+  if (state.queue.length >= state.maxQueue) throw new Error('File pleine');
+  const item = { id: `${Date.now()}_${Math.random().toString(36).slice(2,8)}`, username: String(username || 'Anonyme').slice(0,60), song: data.song, url: data.url, status: 'queued', at: new Date().toISOString() };
+  state.queue.push(item);
+  await saveSongRequestQueue(state.queue);
+  return item;
+}
+
+app.get('/api/widgets/songrequest', async (req, res) => {
+  try { res.json(await getSongRequestState()); }
+  catch(e) { res.json({ enabled:false, command:'!sr', confirmMessage:'', maxQueue:30, queue:[] }); }
+});
+
+app.post('/api/admin/widgets/songrequest/settings', requireAuth, async (req, res) => {
+  try {
+    if (typeof req.body.enabled === 'boolean') await db.setSetting('songrequest_enabled', req.body.enabled);
+    if (typeof req.body.command === 'string') {
+      let command = req.body.command.trim().slice(0,20) || '!sr';
+      if (!command.startsWith('!')) command = '!' + command;
+      await db.setSettingStr('songrequest_command', command.toLowerCase());
+    }
+    if (typeof req.body.confirmMessage === 'string') await db.setSettingStr('songrequest_confirm', req.body.confirmMessage.trim().slice(0,180));
+    if (req.body.maxQueue !== undefined) await db.setSettingStr('songrequest_max_queue', String(Math.min(100, Math.max(1, parseInt(req.body.maxQueue) || 30))));
+    res.json({ success:true, ...(await getSongRequestState()) });
+  } catch(e) { res.status(500).json({ error:e.message }); }
+});
+
+app.post('/api/admin/widgets/songrequest/add', requireAuth, async (req, res) => {
+  try { const item = await addSongRequest(req.body.username || 'Streamer', req.body.song || ''); res.json({ success:true, item, ...(await getSongRequestState()) }); }
+  catch(e) { res.status(400).json({ error:e.message }); }
+});
+
+app.post('/api/admin/widgets/songrequest/delete', requireAuth, async (req, res) => {
+  try {
+    const state = await getSongRequestState();
+    await saveSongRequestQueue(state.queue.filter(x => x.id !== req.body.id));
+    res.json({ success:true, ...(await getSongRequestState()) });
+  } catch(e) { res.status(500).json({ error:e.message }); }
+});
+
+app.post('/api/admin/widgets/songrequest/next', requireAuth, async (req, res) => {
+  try {
+    const state = await getSongRequestState();
+    state.queue.shift();
+    await saveSongRequestQueue(state.queue);
+    res.json({ success:true, ...(await getSongRequestState()) });
+  } catch(e) { res.status(500).json({ error:e.message }); }
+});
+
+app.post('/api/admin/widgets/songrequest/clear', requireAuth, async (req, res) => {
+  try { await saveSongRequestQueue([]); res.json({ success:true, ...(await getSongRequestState()) }); }
+  catch(e) { res.status(500).json({ error:e.message }); }
+});
+
 app.get('/api/chests', async (req, res) => {
   try { res.json(await chests.getPublicState()); } catch(e) { res.json({ season: null, chests: [] }); }
 });
