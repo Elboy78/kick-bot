@@ -565,6 +565,17 @@ hr.div{border:none;border-top:1px solid var(--brd);margin:12px 0}
           <div id="cfg-points-msg" style="margin-top:7px"></div>
         </div>
 
+        <div class="panel" style="margin-bottom:14px">
+          <h3>🤖 Pseudos masqués du classement</h3>
+          <div style="font-size:10px;color:var(--muted);margin-bottom:10px;line-height:1.6">
+            Mets ici les bots ou comptes à ignorer pour ne pas fausser le classement public et le panel. Sépare par virgule ou retour à la ligne.
+          </div>
+          <label class="lbl">Pseudos ignorés</label>
+          <textarea class="inp" id="cfg-leaderboard-ignored" rows="3" placeholder="BotRix, autrebot"></textarea>
+          <button class="btnx btn-outline" style="width:100%;justify-content:center;margin-top:12px" onclick="saveLeaderboardIgnoredUsers()">💾 Enregistrer les pseudos masqués</button>
+          <div id="cfg-leaderboard-msg" style="margin-top:7px"></div>
+        </div>
+
         <div class="panel">
           <h3>➕ Ajouter un niveau</h3>
           <label class="lbl">Nom du niveau</label>
@@ -1759,6 +1770,7 @@ async function resetSubCounterSession() {
 }
 
 function showPage(name) {
+  hydrateAllObsLinks();
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
   document.querySelectorAll('.menu a').forEach(t => t.classList.remove('active'));
   const page = document.getElementById('page-'+name);
@@ -4624,7 +4636,14 @@ async function copyObsUrl(id) {
 
 function setObsUrl(id, path) {
   const el = document.getElementById(id);
-  if (el) el.textContent = window.location.origin + path;
+  if (!el) return;
+  const p = String(path || '');
+  el.textContent = /^https?:\/\//i.test(p) ? p : (window.location.origin + p);
+}
+function hydrateAllObsLinks() {
+  setObsUrl('subgoal-obs-url', '/widgets/subgoal.html');
+  setObsUrl('songrequest-obs-url', '/widgets/songrequest.html');
+  setObsUrl('chat-obs-url', '/widgets/chat.html');
 }
 
 function escapeHtml(v) { return String(v || '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c] || c)); }
@@ -5111,7 +5130,7 @@ async function savePointsConfig() {
 // ── Config Classement (page dédiée) ─────────────────────────────────────────────
 
 async function loadConfigClassement() {
-  await Promise.all([loadConfigPoints(), loadConfigLevels()]);
+  await Promise.all([loadConfigPoints(), loadConfigLevels(), loadLeaderboardIgnoredUsers()]);
 }
 
 async function loadConfigPoints() {
@@ -5136,6 +5155,30 @@ async function saveConfigPoints() {
   if (!r.ok) return showInline('cfg-points-msg', json.error || 'Erreur', false);
   toast('⭐ Système de points mis à jour ✓ (effectif sous 2 min)');
   loadPointsConfig(); // garde l'ancienne carte settings en phase si elle existe
+}
+
+async function loadLeaderboardIgnoredUsers() {
+  try {
+    const r = await fetch('/api/leaderboard/config?ts=' + Date.now(), { cache:'no-store' });
+    const j = await r.json();
+    const el = document.getElementById('cfg-leaderboard-ignored');
+    if (el) el.value = j?.data?.ignoredUsers || 'BotRix,botrix';
+  } catch(e) {
+    const el = document.getElementById('cfg-leaderboard-ignored');
+    if (el && !el.value) el.value = 'BotRix,botrix';
+  }
+}
+
+async function saveLeaderboardIgnoredUsers() {
+  const ignoredUsers = document.getElementById('cfg-leaderboard-ignored')?.value || '';
+  const r = await fetch('/api/admin/leaderboard/config', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ ignoredUsers })
+  });
+  const json = await r.json().catch(() => ({}));
+  if (!r.ok) return showInline('cfg-leaderboard-msg', json.error || 'Erreur', false);
+  toast('🤖 Pseudos masqués mis à jour ✓');
+  loadLeaderboard();
 }
 
 async function loadConfigLevels() {
@@ -5565,7 +5608,8 @@ function logout() {
 
 // Vérifier auth puis charger
 applyStoredPrefs();
-checkPanelAuth().then(ok => { if (ok) { loadAll(); } });
+checkPanelAuth().then(ok => { if (ok) { hydrateAllObsLinks(); loadAll(); } });
+setTimeout(hydrateAllObsLinks, 250);
 setInterval(loadAll,30000);
 setInterval(loadLiveStatus, 60000);
 setInterval(()=>{if(document.getElementById('page-lobby').classList.contains('active'))loadLobby();},10000);

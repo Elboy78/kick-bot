@@ -48,7 +48,43 @@ function waitDB(req, res, next) {
 }
 
 // ── API lecture ───────────────────────────────────────────────────────────────
-app.get('/api/leaderboard',    waitDB,    async (req,res) => { try { res.json({data: await db.getLeaderboard(Math.min(parseInt(req.query.limit||10),100))}); } catch(e){res.json({data:[]}); }});
+
+async function getLeaderboardIgnoredUsers() {
+  try {
+    const raw = await db.getSettingStr('leaderboard_ignored_users', 'BotRix,botrix');
+    return String(raw || '')
+      .split(/[\n,;]+/)
+      .map(v => v.trim().replace(/^@+/, '').toLowerCase())
+      .filter(Boolean);
+  } catch(e) { return ['botrix']; }
+}
+function filterLeaderboardUsers(rows, ignored) {
+  const block = new Set((ignored || []).map(v => String(v || '').trim().replace(/^@+/, '').toLowerCase()).filter(Boolean));
+  return (Array.isArray(rows) ? rows : []).filter(v => !block.has(String(v.username || '').trim().replace(/^@+/, '').toLowerCase()));
+}
+app.get('/api/leaderboard',    waitDB,    async (req,res) => {
+  try {
+    const limit = Math.min(parseInt(req.query.limit||10),100);
+    const ignored = await getLeaderboardIgnoredUsers();
+    const data = filterLeaderboardUsers(await db.getLeaderboard(Math.max(limit + ignored.length + 20, limit)), ignored).slice(0, limit);
+    res.json({data});
+  } catch(e){res.json({data:[]}); }
+});
+app.get('/api/leaderboard/config', waitDB, async (req, res) => {
+  try { res.json({ data: { ignoredUsers: (await db.getSettingStr('leaderboard_ignored_users', 'BotRix,botrix')) || '' } }); }
+  catch(e) { res.json({ data: { ignoredUsers: 'BotRix,botrix' } }); }
+});
+app.post('/api/admin/leaderboard/config', requireAuth, waitDB, async (req, res) => {
+  try {
+    const ignoredUsers = String(req.body?.ignoredUsers || '')
+      .split(/[\n,;]+/)
+      .map(v => v.trim().replace(/^@+/, ''))
+      .filter(Boolean)
+      .join(',');
+    await db.setSettingStr('leaderboard_ignored_users', ignoredUsers);
+    res.json({ success: true, ignoredUsers });
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
 app.get('/api/viewer/:u',      waitDB,      async (req,res) => { try { const v=await db.getViewer(req.params.u); if(!v) return res.status(404).json({error:'Introuvable'}); res.json({data:{...v,rank:await db.getViewerRank(req.params.u)}}); } catch(e){res.status(500).json({error:e.message}); }});
 app.get('/api/stats',          waitDB,          async (req,res) => { try { res.json({data: await db.getGlobalStats()}); } catch(e){res.json({data:{}}); }});
 app.get('/api/logs',           waitDB,           async (req,res) => { try { res.json({data: await db.getRecentLogs(Math.min(parseInt(req.query.limit||50),500))}); } catch(e){res.json({data:[]}); }});
