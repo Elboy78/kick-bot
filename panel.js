@@ -144,6 +144,7 @@ app.post('/webhook/kick', async (req, res) => {
     // ── Sub nouveau ─────────────────────────────────────────────────────────────
     else if (eventType === 'channel.subscription.new') {
       const username = event?.data?.subscriber?.username || 'quelqu\'un';
+      subGoalIncrement(1).catch(()=>{});
       const enabled  = await db.getSetting('sub_announce_enabled');
       if (enabled) {
         const template = await db.getSettingStr('sub_announce_new', DEFAULT_SUB_NEW_MSG);
@@ -169,6 +170,7 @@ app.post('/webhook/kick', async (req, res) => {
       const gifter  = event?.data?.gifter?.username || 'Anonyme';
       const isAnon  = event?.data?.gifter?.is_anonymous || false;
       const count   = event?.data?.giftees?.length || 1;
+      subGoalIncrement(count).catch(()=>{});
       const enabled = await db.getSetting('sub_announce_enabled');
       if (enabled) {
         const template = await db.getSettingStr('sub_announce_gift', DEFAULT_SUB_GIFT_MSG);
@@ -458,6 +460,41 @@ async function broadcastChestResult(result) {
   io.emit('chests-update');
 }
 
+app.get('/api/widgets/subgoal', async (req, res) => {
+  try {
+    const current = parseInt(await db.getSettingStr('subgoal_current', '0')) || 0;
+    const target = parseInt(await db.getSettingStr('subgoal_target', '50')) || 50;
+    res.json({ current, target });
+  } catch(e) { res.json({ current: 0, target: 50 }); }
+});
+app.post('/api/admin/widgets/subgoal/target', requireAuth, async (req, res) => {
+  try {
+    const target = Math.max(1, parseInt(req.body.target) || 50);
+    await db.setSettingStr('subgoal_target', String(target));
+    const current = parseInt(await db.getSettingStr('subgoal_current', '0')) || 0;
+    io.emit('subgoal-update', { current, target });
+    res.json({ success: true, current, target });
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+app.post('/api/admin/widgets/subgoal/adjust', requireAuth, async (req, res) => {
+  try {
+    const delta = parseInt(req.body.delta) || 0;
+    const current = Math.max(0, (parseInt(await db.getSettingStr('subgoal_current', '0')) || 0) + delta);
+    const target = parseInt(await db.getSettingStr('subgoal_target', '50')) || 50;
+    await db.setSettingStr('subgoal_current', String(current));
+    io.emit('subgoal-update', { current, target });
+    res.json({ success: true, current, target });
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+app.post('/api/admin/widgets/subgoal/reset', requireAuth, async (req, res) => {
+  try {
+    await db.setSettingStr('subgoal_current', '0');
+    const target = parseInt(await db.getSettingStr('subgoal_target', '50')) || 50;
+    io.emit('subgoal-update', { current: 0, target });
+    res.json({ success: true, current: 0, target });
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
 app.get('/api/chests', async (req, res) => {
   try { res.json(await chests.getPublicState()); } catch(e) { res.json({ season: null, chests: [] }); }
 });
@@ -588,6 +625,17 @@ require('./shared').registerMarkVictory(async () => {
   }
   return result;
 });
+
+// Sub Goal widget : incrémente le compteur et notifie l'overlay en temps réel
+async function subGoalIncrement(count) {
+  try {
+    const current = parseInt(await db.getSettingStr('subgoal_current', '0')) || 0;
+    const target = parseInt(await db.getSettingStr('subgoal_target', '50')) || 50;
+    const newCurrent = current + count;
+    await db.setSettingStr('subgoal_current', String(newCurrent));
+    io.emit('subgoal-update', { current: newCurrent, target });
+  } catch(e) { console.error('[SUBGOAL] Erreur incrémentation:', e.message); }
+}
 
 app.get('/api/moderation-logs', async (req,res) => {
   try {

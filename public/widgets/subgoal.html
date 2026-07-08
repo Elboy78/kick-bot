@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<title>🎯 Sub Goal</title>
+<style>
+  html, body { margin:0; padding:0; background:transparent; overflow:hidden; font-family:'Segoe UI',system-ui,sans-serif; }
+
+  #wrap {
+    position:fixed; top:0; left:0; width:520px; padding:20px;
+    display:flex; flex-direction:column; gap:8px;
+  }
+
+  #label {
+    display:flex; align-items:baseline; justify-content:space-between;
+    color:#fff; text-shadow:0 2px 6px rgba(0,0,0,.85);
+    font-weight:800; letter-spacing:.5px;
+  }
+  #label .title { font-size:18px; text-transform:uppercase; }
+  #label .count { font-size:22px; }
+  #label .count b { color:#3dff7a; }
+  #label .count span { color:#cfcfcf; font-weight:600; }
+
+  #track {
+    position:relative; width:100%; height:36px;
+    background:rgba(10,10,14,.55); border:2px solid rgba(255,255,255,.18);
+    border-radius:999px; overflow:hidden;
+    box-shadow:inset 0 2px 6px rgba(0,0,0,.5), 0 6px 18px rgba(0,0,0,.35);
+  }
+  #fill {
+    position:absolute; top:0; left:0; height:100%; width:0%;
+    border-radius:999px;
+    background:linear-gradient(90deg,#0f8a34,#2ee85f 55%,#7dffa6);
+    box-shadow:0 0 18px rgba(46,232,95,.65), inset 0 2px 4px rgba(255,255,255,.35);
+    transition:width .6s cubic-bezier(.22,.8,.3,1);
+  }
+  #fill::after {
+    content:''; position:absolute; inset:0;
+    background:repeating-linear-gradient(120deg, rgba(255,255,255,.12) 0 10px, transparent 10px 20px);
+    opacity:.5;
+  }
+  #glow {
+    position:absolute; top:0; left:0; height:100%; width:0%;
+    border-radius:999px; pointer-events:none; opacity:0;
+    box-shadow:0 0 30px 6px rgba(120,255,160,.9);
+    transition:opacity .4s ease;
+  }
+  #glow.pop { opacity:1; }
+
+  #pct { position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
+    font-size:14px; font-weight:800; color:#fff; text-shadow:0 1px 4px rgba(0,0,0,.8); z-index:2; }
+</style>
+</head>
+<body>
+
+<div id="wrap">
+  <div id="label">
+    <span class="title">🎯 Sub Goal</span>
+    <span class="count"><b id="cur">0</b><span> / <span id="tgt">50</span> subs</span></span>
+  </div>
+  <div id="track">
+    <div id="fill"></div>
+    <div id="glow"></div>
+    <div id="pct"><span id="pct-text">0%</span></div>
+  </div>
+</div>
+
+<script src="/socket.io/socket.io.js"></script>
+<script>
+const socket = io();
+const fill = document.getElementById('fill');
+const glow = document.getElementById('glow');
+const curEl = document.getElementById('cur');
+const tgtEl = document.getElementById('tgt');
+const pctText = document.getElementById('pct-text');
+
+let lastCurrent = null;
+
+function render(current, target) {
+  const pct = target > 0 ? Math.min(100, Math.round((current / target) * 100)) : 0;
+  curEl.textContent = current;
+  tgtEl.textContent = target;
+  fill.style.width = pct + '%';
+  glow.style.width = pct + '%';
+  pctText.textContent = pct + '%';
+
+  if (lastCurrent !== null && current > lastCurrent) {
+    glow.classList.add('pop');
+    setTimeout(() => glow.classList.remove('pop'), 700);
+  }
+  lastCurrent = current;
+}
+
+async function loadInitial() {
+  try {
+    const r = await fetch('/api/widgets/subgoal');
+    const d = await r.json();
+    render(d.current || 0, d.target || 50);
+  } catch(e) { console.error('[SUBGOAL] Erreur chargement initial', e); }
+}
+
+socket.on('subgoal-update', (d) => render(d.current || 0, d.target || 50));
+
+loadInitial();
+</script>
+</body>
+</html>

@@ -377,6 +377,7 @@ hr.div{border:none;border-top:1px solid var(--brd);margin:12px 0}
     <a onclick="showPage('tts')">🔊 TTS</a>
     <a onclick="showPage('vods')">🎬 VODs &amp; Clips</a>
     <a onclick="showPage('subdon')">🎁 Sub/Don</a>
+    <a onclick="showPage('widgets')">🧩 Widgets</a>
     <a onclick="showPage('chests')">🩸 Defis</a>
     <a onclick="showPage('logs')">📋 Logs</a>
     <a onclick="showPage('objectifs')">🎯 Objectifs</a>
@@ -862,6 +863,42 @@ Option 3" rows="4"></textarea><div style="display:flex;gap:6px;margin-top:10px">
     </div>
   </div>
 
+  <!-- ══ WIDGETS ══ -->
+  <div class="page" id="page-widgets">
+    <div class="header"><div><h1>Widgets</h1><p>Overlays OBS pilotés en temps réel</p></div></div>
+    <div class="panel" style="max-width:520px">
+      <h3>🎯 Sub Goal</h3>
+      <div style="font-size:10px;color:var(--muted);margin-bottom:12px;line-height:1.6">
+        Barre de progression du nombre d'abonnés, mise à jour en temps réel via le webhook officiel Kick (nouveaux subs + subs gift). Les renouvellements ne sont pas comptés.
+      </div>
+
+      <label class="lbl">Objectif (nombre de subs)</label>
+      <div style="display:flex;gap:8px;margin-bottom:14px">
+        <input type="number" class="inp" id="subgoal-target-input" min="1" placeholder="50">
+        <button class="dark-btn" onclick="saveSubGoalTarget()">ENREGISTRER</button>
+      </div>
+
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-top:1px solid var(--brd);border-bottom:1px solid var(--brd);margin-bottom:12px">
+        <div>
+          <div style="font-size:10px;color:var(--muted)">PROGRESSION ACTUELLE</div>
+          <div style="font-size:22px;font-weight:800"><span id="subgoal-current-display">0</span> / <span id="subgoal-target-display">50</span></div>
+        </div>
+        <div style="display:flex;gap:6px">
+          <button class="dark-btn" onclick="adjustSubGoal(-1)">−1</button>
+          <button class="dark-btn" onclick="adjustSubGoal(1)">+1</button>
+          <button class="dark-btn" onclick="resetSubGoal()" style="border-color:#a72a22;color:#ff8a7a">RESET</button>
+        </div>
+      </div>
+
+      <div style="padding:10px;background:var(--card2);border:1px solid var(--brd);border-radius:8px;font-size:10px;color:var(--muted);line-height:1.7">
+        <b style="color:var(--text)">🔗 Lien overlay OBS</b><br>
+        Ajoute une source navigateur dans OBS avec cette URL :<br>
+        <code style="background:var(--card);padding:2px 6px;border-radius:4px;color:var(--accent);font-size:9px;display:block;margin-top:4px;word-break:break-all" id="subgoal-obs-url">https://kick-bot-agkk.onrender.com/widgets/subgoal.html</code>
+        <span style="margin-top:6px;display:block">Taille recommandée : 560×100. Fond transparent, prêt à l'emploi.</span>
+      </div>
+    </div>
+  </div>
+
   <!-- ══ SUB / DON ══ -->
   <div class="page" id="page-subdon">
     <div class="header"><div><h1>Sub / Don</h1><p>Alertes de follow, sub et donation dans le chat</p></div></div>
@@ -1202,6 +1239,49 @@ let lbData = [], levels = [];
 const PAGE_TITLES = {dashboard:'Dashboard',classement:'Classement',lobby:'Lobby',jeux:'Jeux',objectifs:'Objectifs',dbd:'Dead by Daylight',moderation:'Modération',commands:'Commandes',historique:'Historique',admin:'Administration',settings:'Paramètres',outils:'Outils Chat'};
 
 // ── Navigation ─────────────────────────────────────────────────────────────────
+async function loadSubGoal() {
+  try {
+    const r = await fetch(API + '/api/widgets/subgoal');
+    const d = await r.json();
+    document.getElementById('subgoal-current-display').textContent = d.current;
+    document.getElementById('subgoal-target-display').textContent = d.target;
+    document.getElementById('subgoal-target-input').value = d.target;
+    const urlEl = document.getElementById('subgoal-obs-url');
+    if (urlEl) urlEl.textContent = window.location.origin + '/widgets/subgoal.html';
+  } catch(e) { console.error('[SUBGOAL]', e); }
+}
+
+async function saveSubGoalTarget() {
+  const target = parseInt(document.getElementById('subgoal-target-input').value);
+  if (!target || target < 1) return toast('Objectif invalide', false);
+  const r = await fetch(API + '/api/admin/widgets/subgoal/target', {
+    method: 'POST', headers: { 'Content-Type': 'application/json', 'x-panel-key': getKey() },
+    body: JSON.stringify({ target })
+  });
+  if (!r.ok) return toast('Erreur', false);
+  toast(`🎯 Objectif fixé à ${target} subs`);
+  loadSubGoal();
+}
+
+async function adjustSubGoal(delta) {
+  const r = await fetch(API + '/api/admin/widgets/subgoal/adjust', {
+    method: 'POST', headers: { 'Content-Type': 'application/json', 'x-panel-key': getKey() },
+    body: JSON.stringify({ delta })
+  });
+  if (!r.ok) return toast('Erreur', false);
+  loadSubGoal();
+}
+
+async function resetSubGoal() {
+  if (!confirm('Remettre le compteur de subs à 0 ?')) return;
+  const r = await fetch(API + '/api/admin/widgets/subgoal/reset', {
+    method: 'POST', headers: { 'Content-Type': 'application/json', 'x-panel-key': getKey() }, body: '{}'
+  });
+  if (!r.ok) return toast('Erreur', false);
+  toast('Compteur remis à zéro');
+  loadSubGoal();
+}
+
 function showPage(name) {
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
   document.querySelectorAll('.menu a').forEach(t => t.classList.remove('active'));
@@ -1219,6 +1299,7 @@ function showPage(name) {
   if(name==='subdon') { loadFollowAnnounce(); loadSubAnnounce(); loadSubDonPreview(); }
   if(name==='logs') loadModerationLogs();
   if(name==='chests') loadChests();
+  if(name==='widgets') loadSubGoal();
   if(name==='admin') { loadCmds(); loadAdminLevels(); loadAccessRequests(); }
   if(name==='commands') { loadCommandsPage(); loadSystemCommands(); }
   if(name==='dbd') initDBD();
