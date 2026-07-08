@@ -495,22 +495,48 @@ app.get('/api/viewers/missing-follow', async (req, res) => {
 app.get('/api/analytics/chat-week', async (req,res) => { try { res.json({data: await db.getChatActivityWeek()}); } catch(e) { res.json({data:[]}); }});
 app.get('/api/analytics/sessions-viewers', async (req,res) => { try { res.json({data: await db.getSessionsWithAvgViewers(14)}); } catch(e) { res.json({data:[]}); }});
 
-app.get('/api/levels', async (req,res) => { try { res.json({data: await db.getLevels()}); } catch(e) { res.json({data:[]}); }});
+function levelImageKey(name) {
+  return String(name || '').trim().toLowerCase();
+}
+async function getLevelImagesMap() {
+  try {
+    const raw = await db.getSettingStr('leaderboard_level_images', '{}');
+    const parsed = JSON.parse(raw || '{}');
+    return parsed && typeof parsed === 'object' ? parsed : {};
+  } catch(e) { return {}; }
+}
+async function saveLevelImage(name, imageUrl) {
+  const map = await getLevelImagesMap();
+  const key = levelImageKey(name);
+  if (!key) return;
+  const clean = String(imageUrl || '').trim();
+  if (clean) map[key] = clean.slice(0, 1000);
+  else delete map[key];
+  await db.setSettingStr('leaderboard_level_images', JSON.stringify(map));
+}
+async function getLevelsWithImages() {
+  const [levels, images] = await Promise.all([db.getLevels(), getLevelImagesMap()]);
+  return (levels || []).map(l => ({ ...l, imageUrl: images[levelImageKey(l.name)] || '' }));
+}
+
+app.get('/api/levels', async (req,res) => { try { res.json({data: await getLevelsWithImages()}); } catch(e) { res.json({data:[]}); }});
 
 app.post('/api/admin/levels', async (req, res) => {
   try {
-    const { name, min, emoji } = req.body;
+    const { name, min, emoji, imageUrl } = req.body;
     if (!name || min === undefined) return res.status(400).json({ error: 'name et min requis' });
     await db.addLevel(name, parseInt(min), emoji || '⭐');
+    await saveLevelImage(name, imageUrl || '');
     res.json({ success: true });
   } catch(e) { res.status(500).json({ error: e.message }); }
 });
 
 app.put('/api/admin/levels/:id', async (req, res) => {
   try {
-    const { name, min, emoji } = req.body;
+    const { name, min, emoji, imageUrl } = req.body;
     if (!name || min === undefined) return res.status(400).json({ error: 'name et min requis' });
     await db.updateLevel(req.params.id, name, parseInt(min), emoji || '⭐');
+    await saveLevelImage(name, imageUrl || '');
     res.json({ success: true });
   } catch(e) { res.status(500).json({ error: e.message }); }
 });
