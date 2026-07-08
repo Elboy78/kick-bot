@@ -205,28 +205,6 @@ async function recordSubEvent(type, payload = {}) {
   } catch(e) { console.error('[SUBCOUNTER] Erreur event:', e.message); }
 }
 
-app.get('/api/sub-announce', async (req, res) => {
-  try {
-    res.json({
-      enabled:     await db.getSetting('sub_announce_enabled'),
-      message_new:   await db.getSettingStr('sub_announce_new',   DEFAULT_SUB_NEW_MSG),
-      message_renew: await db.getSettingStr('sub_announce_renew', DEFAULT_SUB_RENEW_MSG),
-      message_gift:  await db.getSettingStr('sub_announce_gift',  DEFAULT_SUB_GIFT_MSG),
-    });
-  } catch(e) { res.status(500).json({ error: e.message }); }
-});
-
-app.post('/api/admin/sub-announce', async (req, res) => {
-  try {
-    const { enabled, message_new, message_renew, message_gift } = req.body;
-    if (typeof enabled === 'boolean') await db.setSetting('sub_announce_enabled', enabled);
-    if (typeof message_new   === 'string' && message_new.trim())   await db.setSettingStr('sub_announce_new',   message_new.trim());
-    if (typeof message_renew === 'string' && message_renew.trim()) await db.setSettingStr('sub_announce_renew', message_renew.trim());
-    if (typeof message_gift  === 'string' && message_gift.trim())  await db.setSettingStr('sub_announce_gift',  message_gift.trim());
-    res.json({ success: true });
-  } catch(e) { res.status(500).json({ error: e.message }); }
-});
-
 // ── Traitement commun events Kick : webhook + websocket bot ────────────────────
 
 const processedKickEvents = new Map();

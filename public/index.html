@@ -1586,10 +1586,6 @@ function stopSongRequestRefresh() {
   }
 }
 
-function openTTSWidgetFromAnywhere() {
-  showPage('widgets');
-  setTimeout(() => openWidgetSettings('tts'), 0);
-}
 
 async function loadSubGoal() {
   try {
@@ -5045,67 +5041,6 @@ async function saveFollowAnnounce() {
   });
   if (r.ok) showInline('follow-announce-msg', '✅ Sauvegardé', true);
   else showInline('follow-announce-msg', 'Erreur lors de la sauvegarde', false);
-}
-
-async function loadSubAnnounce() {
-  try {
-    const r = await fetch('/api/sub-announce');
-    const d = await r.json();
-    const toggle = document.getElementById('sub-announce-toggle');
-    if (toggle) toggle.checked = d.enabled !== false;
-    const newEl   = document.getElementById('sub-announce-new');
-    const renewEl = document.getElementById('sub-announce-renew');
-    const giftEl  = document.getElementById('sub-announce-gift');
-    if (newEl)   newEl.value   = d.message_new   || '🎉 Merci pour le sub {username} ! Bienvenue dans les subs 🔥';
-    if (renewEl) renewEl.value = d.message_renew || '🔄 {username} renouvelle son sub pour {months} mois, merci ! ❤️';
-    if (giftEl)  giftEl.value  = d.message_gift  || '🎁 {gifter} offre {count} sub(s) à la communauté, incroyable !';
-    updateSubPreviews();
-  } catch(e) {}
-}
-
-async function loadSubDonPreview() {
-  try {
-    const r = await fetch('/api/tts/settings');
-    const d = await r.json();
-    const minEl = document.getElementById('subdon-min-donation-preview');
-    const statusEl = document.getElementById('subdon-tts-status-preview');
-    if (minEl) minEl.textContent = (d.minDonation || 0) + ' €';
-    if (statusEl) {
-      statusEl.textContent = d.configured ? '✅ Configuré' : '⚠️ Non configuré';
-      statusEl.style.color = d.configured ? 'var(--accent)' : '#ff8500';
-    }
-  } catch(e) {}
-}
-
-function updateSubPreviews() {
-  const newEl   = document.getElementById('sub-announce-new');
-  const renewEl = document.getElementById('sub-announce-renew');
-  const giftEl  = document.getElementById('sub-announce-gift');
-  const pNew   = document.getElementById('sub-preview-new');
-  const pRenew = document.getElementById('sub-preview-renew');
-  const pGift  = document.getElementById('sub-preview-gift');
-  if (pNew && newEl)     pNew.textContent   = newEl.value.replace(/\{username\}/gi, 'PseudoExemple');
-  if (pRenew && renewEl) pRenew.textContent = renewEl.value.replace(/\{username\}/gi, 'PseudoExemple').replace(/\{months\}/gi, '3');
-  if (pGift && giftEl)   pGift.textContent  = giftEl.value.replace(/\{gifter\}/gi, 'GifterExemple').replace(/\{count\}/gi, '5');
-}
-
-async function saveSubAnnounce() {
-  updateSubPreviews();
-  const toggle  = document.getElementById('sub-announce-toggle');
-  const newEl   = document.getElementById('sub-announce-new');
-  const renewEl = document.getElementById('sub-announce-renew');
-  const giftEl  = document.getElementById('sub-announce-gift');
-  const r = await fetch('/api/admin/sub-announce', {
-    method: 'POST', headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      enabled:       toggle?.checked ?? true,
-      message_new:   newEl?.value.trim()   || '',
-      message_renew: renewEl?.value.trim() || '',
-      message_gift:  giftEl?.value.trim()  || '',
-    })
-  });
-  if (r.ok) showInline('sub-announce-msg', '✅ Sauvegardé', true);
-  else showInline('sub-announce-msg', 'Erreur lors de la sauvegarde', false);
 }
 
 async function loadPointsConfig() {
