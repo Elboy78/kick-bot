@@ -335,7 +335,7 @@ hr.div{border:none;border-top:1px solid var(--brd);margin:12px 0}
       <div><strong id="ca-stage-title">COFFRE FERMÉ</strong><span id="ca-stage-text">En attente d'ouverture...</span></div>
     </div>
     <div class="frame-player" id="ca-frame-box">
-      <video id="ca-video" src="assets/video/chest-opening-v2.mp4?v=1" muted playsinline preload="auto"></video>
+      <video id="ca-video" src="/assets/video/chest-opening-v2.mp4?v=2" muted playsinline preload="auto"></video>
       <div class="frame-glow"></div>
       <div class="frame-particles"></div>
     </div>
@@ -3030,7 +3030,7 @@ async function loadChests() {
 function renderChestCase(c) {
   const num = String(c.number).padStart(2,'0');
   const color = CHEST_TIER_COLORS[c.tier] || '#9c35ff';
-  const closedImg = '<img src="assets/chest-closed-v2.png?v=1" alt="" draggable="false">';
+  const closedImg = '<img src="/assets/chest-closed-v2.png?v=2" alt="" draggable="false">';
   if (c.opened) {
     return `<button class="chestcell dbd-case opened" style="--tier-color:${color}" title="${esc(c.label || '')}" disabled>
       <span class="mini-chest">${closedImg}</span><span class="cc-tier">${c.emoji || '◆'}</span><span class="cc-num">${num}</span>
