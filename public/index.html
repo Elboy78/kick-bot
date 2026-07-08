@@ -952,7 +952,7 @@ Option 3" rows="4"></textarea><div style="display:flex;gap:6px;margin-top:10px">
           <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-bottom:12px">
             <div>
               <label class="lbl">Placement du texte</label>
-              <select class="inp" id="subgoal-text-position-input">
+              <select class="inp" id="subgoal-text-position-input" onchange="saveSubGoalLayout()">
                 <option value="inside">Dans la barre</option>
                 <option value="above">Au-dessus de la barre</option>
                 <option value="hidden">Masqué</option>
@@ -960,7 +960,7 @@ Option 3" rows="4"></textarea><div style="display:flex;gap:6px;margin-top:10px">
             </div>
             <div>
               <label class="lbl">Placement des chiffres</label>
-              <select class="inp" id="subgoal-count-position-input">
+              <select class="inp" id="subgoal-count-position-input" onchange="saveSubGoalLayout()">
                 <option value="inside">Dans la barre</option>
                 <option value="above">Au-dessus de la barre</option>
                 <option value="right">À droite dans la barre</option>
@@ -969,7 +969,7 @@ Option 3" rows="4"></textarea><div style="display:flex;gap:6px;margin-top:10px">
             </div>
             <div>
               <label class="lbl">Affichage dans la barre</label>
-              <select class="inp" id="subgoal-progress-display-input">
+              <select class="inp" id="subgoal-progress-display-input" onchange="saveSubGoalLayout()">
                 <option value="count">Nombre de subs</option>
                 <option value="progress">Nombre / objectif</option>
                 <option value="percent">Pourcentage</option>
@@ -978,7 +978,7 @@ Option 3" rows="4"></textarea><div style="display:flex;gap:6px;margin-top:10px">
             </div>
             <div>
               <label class="lbl">Alignement</label>
-              <select class="inp" id="subgoal-text-align-input">
+              <select class="inp" id="subgoal-text-align-input" onchange="saveSubGoalLayout()">
                 <option value="left">Gauche</option>
                 <option value="center">Centre</option>
                 <option value="right">Droite</option>
@@ -1379,7 +1379,7 @@ function backToWidgetsHome() {
 
 async function loadSubGoal() {
   try {
-    const r = await fetch(API + '/api/widgets/subcounter');
+    const r = await fetch(API + '/api/widgets/subcounter?ts=' + Date.now(), { cache: 'no-store' });
     const d = await r.json();
     renderSubCounter(d);
     const urlEl = document.getElementById('subgoal-obs-url');

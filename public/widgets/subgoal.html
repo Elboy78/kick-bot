@@ -12,7 +12,7 @@
   }
 
   #topLabel {
-    display:flex; align-items:baseline; justify-content:space-between; gap:12px;
+    display:none; align-items:baseline; justify-content:space-between; gap:12px;
     color:#fff; text-shadow:0 2px 6px rgba(0,0,0,.85);
     font-weight:850; letter-spacing:.5px;
   }
@@ -57,7 +57,8 @@
   #inside.left { justify-content:flex-start; }
   #inside.center { justify-content:center; }
   #inside.right { justify-content:flex-end; }
-  #insideLabel { text-transform:uppercase; letter-spacing:.5px; overflow:hidden; text-overflow:ellipsis; }
+  #inside.split { justify-content:space-between; }
+  #insideLabel { text-transform:uppercase; letter-spacing:.5px; overflow:hidden; text-overflow:ellipsis; min-width:0; }
   #insideCount { font-size:15px; }
 </style>
 </head>
@@ -79,6 +80,84 @@
 </div>
 
 <script src="/socket.io/socket.io.js"></script>
+<script>
+const socket = io();
+const fill = document.getElementById('fill');
+const glow = document.getElementById('glow');
+const topLabel = document.getElementById('topLabel');
+const topTitle = document.getElementById('top-title');
+const topCount = document.getElementById('top-count');
+const topCur = document.getElementById('top-cur');
+const topTgt = document.getElementById('top-tgt');
+const inside = document.getElementById('inside');
+const insideLabel = document.getElementById('insideLabel');
+const insideCount = document.getElementById('insideCount');
+
+let lastCurrent = null;
+
+function clampChoice(value, allowed, fallback) {
+  return allowed.includes(value) ? value : fallback;
+}
+
+function countText(current, target, mode) {
+  const pct = target > 0 ? Math.min(100, Math.round((current / target) * 100)) : 0;
+  if (mode === 'percent') return pct + '%';
+  if (mode === 'progress') return current + ' / ' + target + ' subs';
+  if (mode === 'hidden') return '';
+  return current + ' subs';
+}
+
+function render(current, target, options = {}) {
+  current = parseInt(current || 0) || 0;
+  target = Math.max(1, parseInt(target || 50) || 50);
+
+  const label = options.label || 'Sub Goal';
+  const textPosition = clampChoice(options.textPosition, ['above','inside','hidden'], 'inside');
+  const countPosition = clampChoice(options.countPosition, ['above','inside','right','hidden'], 'inside');
+  const progressDisplay = clampChoice(options.progressDisplay, ['count','progress','percent','hidden'], 'count');
+  const textAlign = clampChoice(options.textAlign, ['left','center','right'], 'center');
+  const pct = Math.min(100, Math.round((current / target) * 100));
+  const txt = countText(current, target, progressDisplay);
+
+  topTitle.textContent = '🎯 ' + label;
+  topCur.textContent = current;
+  topTgt.textContent = target;
+  topTitle.style.display = textPosition === 'above' ? '' : 'none';
+  topCount.style.display = countPosition === 'above' ? '' : 'none';
+  topLabel.style.display = (textPosition === 'above' || countPosition === 'above') ? 'flex' : 'none';
+
+  inside.className = textAlign;
+  inside.style.justifyContent = '';
+  insideLabel.textContent = label;
+  insideLabel.style.display = textPosition === 'inside' ? '' : 'none';
+  insideCount.textContent = txt;
+  insideCount.style.display = (countPosition === 'inside' || countPosition === 'right') && txt ? '' : 'none';
+
+  if (textPosition === 'inside' && countPosition === 'right') inside.className = 'split';
+  if (textPosition !== 'inside' && countPosition === 'right') inside.className = 'right';
+
+  fill.style.width = pct + '%';
+  glow.style.width = pct + '%';
+
+  if (lastCurrent !== null && current > lastCurrent) {
+    glow.classList.add('pop');
+    setTimeout(() => glow.classList.remove('pop'), 700);
+  }
+  lastCurrent = current;
+}
+
+async function loadInitial() {
+  try {
+    const r = await fetch('/api/widgets/subgoal?ts=' + Date.now(), { cache: 'no-store' });
+    const d = await r.json();
+    render(d.current || 0, d.target || 50, d);
+  } catch(e) { console.error('[SUBGOAL] Erreur chargement initial', e); }
+}
+
+socket.on('subgoal-update', (d) => render(d.current || 0, d.target || 50, d));
+loadInitial();
+setInterval(loadInitial, 2000);
+</script>
 <script>
 const socket = io();
 const fill = document.getElementById('fill');
