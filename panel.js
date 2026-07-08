@@ -877,14 +877,32 @@ async function issueSongRequestControl(action, payload = {}) {
 async function getSongRequestState() {
   let queue = [];
   try { queue = JSON.parse(await db.getSettingStr('songrequest_queue', '[]')); } catch(e) { queue = []; }
+  queue = Array.isArray(queue) ? queue : [];
+  const player = await getSongRequestPlayerState();
+  const currentItem = queue[0] || null;
+  // Sécurité anti état fantôme : si la file est vide, le panel ne doit jamais afficher PLAYING.
+  if (!currentItem) {
+    player.itemId = '';
+    player.status = 'stopped';
+    player.currentTime = 0;
+    player.duration = 0;
+  } else if (player.itemId && player.itemId !== currentItem.id) {
+    // Si le lecteur OBS remonte un ancien item, on garde la file comme vérité.
+    player.itemId = currentItem.id;
+    player.currentTime = 0;
+    player.duration = currentItem.duration || 0;
+    if (player.status === 'stopped') player.status = 'playing';
+  } else if (!player.itemId) {
+    player.itemId = currentItem.id;
+  }
   return {
     enabled: await db.getSetting('songrequest_enabled'),
     command: await db.getSettingStr('songrequest_command', '!sr'),
     confirmMessage: await db.getSettingStr('songrequest_confirm', '🎵 @{username}, ta musique a été ajoutée à la file !'),
     chatConfirmEnabled: (await db.getSettingStr('songrequest_chat_confirm_enabled', '0')) === '1',
     maxQueue: parseInt(await db.getSettingStr('songrequest_max_queue', '30')) || 30,
-    queue: Array.isArray(queue) ? queue : [],
-    player: await getSongRequestPlayerState(),
+    queue,
+    player,
     control: await getSongRequestControl()
   };
 }
@@ -892,6 +910,9 @@ async function getSongRequestState() {
 async function saveSongRequestQueue(queue) {
   const clean = Array.isArray(queue) ? queue.slice(0, 100) : [];
   await db.setSettingStr('songrequest_queue', JSON.stringify(clean));
+  if (!clean.length) {
+    await saveSongRequestPlayerState({ itemId:'', status:'stopped', currentTime:0, duration:0 }, false);
+  }
   io.emit('songrequest-update', { queue: clean });
   return clean;
 }
@@ -1038,9 +1059,20 @@ app.post('/api/admin/widgets/songrequest/volume', requireAuth, async (req, res) 
 });
 app.post('/api/widgets/songrequest/player-state', async (req, res) => {
   try {
-    const patch = {};
-    if (typeof req.body.itemId === 'string') patch.itemId = req.body.itemId;
-    if (typeof req.body.status === 'string') patch.status = req.body.status;
+    const state = await getSongRequestState();
+    const currentItem = state.queue[0] || null;
+    const bodyItemId = typeof req.body.itemId === 'string' ? req.body.itemId : '';
+    // Ignore les retours d'un ancien overlay/lecteur OBS, sinon il peut remettre PLAY tout seul
+    // ou afficher une ancienne musique alors que la file a changé.
+    if (!currentItem) {
+      const next = await saveSongRequestPlayerState({ itemId:'', status:'stopped', currentTime:0, duration:0 }, true);
+      return res.json({ success:true, ignored:true, player: next });
+    }
+    if (bodyItemId && bodyItemId !== currentItem.id) {
+      return res.json({ success:true, ignored:true, player: state.player });
+    }
+    const patch = { itemId: currentItem.id };
+    if (typeof req.body.status === 'string' && ['playing','paused','stopped','buffering'].includes(req.body.status)) patch.status = req.body.status;
     if (req.body.currentTime !== undefined) patch.currentTime = Math.max(0, parseFloat(req.body.currentTime) || 0);
     if (req.body.duration !== undefined) patch.duration = Math.max(0, parseFloat(req.body.duration) || 0);
     if (req.body.volume !== undefined) patch.volume = Math.max(0, Math.min(100, parseInt(req.body.volume) || 100));

@@ -3788,7 +3788,12 @@ try {
     try { renderSubCounter(data); } catch(e) { console.warn('[SUBCOUNTER] render socket error', e); }
   });
   chestSocket.on('songrequest-update', (data) => {
-    if (isSongRequestVisible()) renderSongRequestQueue((data && data.queue) || []);
+    if (Array.isArray(data?.queue)) srLastQueue = data.queue;
+    if (!srLastQueue.length) srPlayer = Object.assign(srPlayer, { status:'stopped', currentTime:0, duration:0, itemId:'' });
+    if (isSongRequestVisible()) {
+      renderSongRequestQueue(srLastQueue);
+      renderSongRequestPlayer(srLastQueue, srPlayer);
+    }
   });
 } catch(e) { console.warn('[CHESTS] socket indisponible', e); }
 
@@ -4320,8 +4325,10 @@ async function loadSongRequest(silent = false) {
     if (url) url.textContent = window.location.origin + '/widgets/songrequest.html';
     setupSongRequestMacroUrls();
     loadSongRequestHotkeys();
-    srLastQueue = d.queue || [];
+    srLastQueue = Array.isArray(d.queue) ? d.queue : [];
     srPlayer = Object.assign(srPlayer, d.player || {});
+    if (!srLastQueue.length) srPlayer = Object.assign(srPlayer, { status:'stopped', currentTime:0, duration:0, itemId:'' });
+    else if (srPlayer.itemId && srPlayer.itemId !== srLastQueue[0].id) srPlayer = Object.assign(srPlayer, { itemId: srLastQueue[0].id, currentTime:0, duration:srLastQueue[0].duration || 0 });
     renderSongRequestPlayer(srLastQueue, srPlayer);
     renderSongRequestQueue(srLastQueue);
   } catch(e) { if (!silent) console.error(e); }
@@ -4513,11 +4520,14 @@ try {
   if (srSocket) {
     srSocket.on('songrequest-update', (data) => {
       if (Array.isArray(data.queue)) srLastQueue = data.queue;
+      if (!srLastQueue.length) srPlayer = Object.assign(srPlayer, { status:'stopped', currentTime:0, duration:0, itemId:'' });
       renderSongRequestQueue(srLastQueue);
       renderSongRequestPlayer(srLastQueue, srPlayer);
     });
     srSocket.on('songrequest-player-state', (player) => {
+      if (srLastQueue[0]?.id && player?.itemId && player.itemId !== srLastQueue[0].id) return;
       srPlayer = Object.assign(srPlayer, player || {});
+      if (!srLastQueue.length) srPlayer = Object.assign(srPlayer, { status:'stopped', currentTime:0, duration:0, itemId:'' });
       renderSongRequestPlayer(srLastQueue, srPlayer);
     });
   }

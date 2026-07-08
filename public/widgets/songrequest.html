@@ -59,6 +59,20 @@ function esc(v){return String(v||'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&l
 function fmt(seconds){ seconds=Math.max(0,Math.floor(Number(seconds||0))); const h=Math.floor(seconds/3600), m=Math.floor((seconds%3600)/60), s=seconds%60; return h?`${h}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`:`${m}:${String(s).padStart(2,'0')}`; }
 function youtubeId(input){ const raw=String(input||''); const patterns=[/youtu\.be\/([A-Za-z0-9_-]{6,})/i,/youtube\.com\/watch\?[^\s]*v=([A-Za-z0-9_-]{6,})/i,/youtube\.com\/embed\/([A-Za-z0-9_-]{6,})/i,/youtube\.com\/shorts\/([A-Za-z0-9_-]{6,})/i,/youtube\.com\/live\/([A-Za-z0-9_-]{6,})/i]; for(const p of patterns){ const m=raw.match(p); if(m) return m[1]; } return ''; }
 function itemVideoId(item){ return item?.videoId || youtubeId(item?.url || item?.song || ''); }
+function normalizeLocalState(){
+  const cur=(latestState.queue||[])[0] || null;
+  if(!cur){
+    latestState.player={...(latestState.player||{}), itemId:'', status:'stopped', currentTime:0, duration:0};
+    desiredStatus='stopped';
+    return;
+  }
+  if(latestState.player?.itemId && latestState.player.itemId !== cur.id){
+    latestState.player={...(latestState.player||{}), itemId:cur.id, currentTime:0, duration:cur.duration||0, status: latestState.player.status==='paused'?'paused':'playing'};
+  } else if(!latestState.player?.itemId) {
+    latestState.player={...(latestState.player||{}), itemId:cur.id};
+  }
+}
+
 function ensurePlayer(){
   if(player || !ytReady) return;
   player = new YT.Player('yt-player', {
@@ -77,7 +91,12 @@ function postPlayerState(force=false){
 }
 function nextPublic(){ fetch('/api/widgets/songrequest/next',{method:'POST'}).catch(()=>{}); }
 function onPlayerStateChange(e){
-  if(e.data===YT.PlayerState.PLAYING){ desiredStatus='playing'; latestState.player.status='playing'; postPlayerState(true); }
+  if(!latestState.queue[0]) return;
+  // L'état réel du lecteur OBS est envoyé au serveur, mais on ne force jamais PLAY quand le serveur/panel demande PAUSE.
+  if(e.data===YT.PlayerState.PLAYING){
+    if(desiredStatus==='paused'){ try{player.pauseVideo();}catch(_){}; return; }
+    desiredStatus='playing'; latestState.player.status='playing'; postPlayerState(true);
+  }
   if(e.data===YT.PlayerState.PAUSED){ desiredStatus='paused'; latestState.player.status='paused'; postPlayerState(true); }
   if(e.data===YT.PlayerState.ENDED){ desiredStatus='stopped'; latestState.player.status='stopped'; postPlayerState(true); nextPublic(); }
 }
@@ -93,6 +112,7 @@ function enforcePlayback(){
 }
 function syncPlayback(force=false){
   ensurePlayer();
+  normalizeLocalState();
   const cur=(latestState.queue||[])[0];
   const id = latestState.enabled && cur ? itemVideoId(cur) : '';
   if(!latestState.enabled || !cur || !id){ stopPlayback(); render(latestState); return; }
@@ -105,13 +125,16 @@ function syncPlayback(force=false){
       setTimeout(()=>{ try{ player.unMute(); player.setVolume(latestState.player?.volume ?? 100); desiredStatus==='paused' ? player.pauseVideo() : player.playVideo(); }catch(e){} }, 500);
     }catch(e){}
   } else {
-    if(latestState.player?.status==='paused') desiredStatus='paused';
-    if(latestState.player?.status==='playing') desiredStatus='playing';
+    if(latestState.player?.itemId === cur.id){
+      if(latestState.player?.status==='paused') desiredStatus='paused';
+      if(latestState.player?.status==='playing') desiredStatus='playing';
+    }
     enforcePlayback();
   }
 }
 function render(state={}){
   latestState={ enabled:!!state.enabled, queue:Array.isArray(state.queue)?state.queue:(latestState.queue||[]), player:Object.assign(latestState.player||{}, state.player||{}), control: state.control || latestState.control || {seq:0} };
+  normalizeLocalState();
   const cur=latestState.queue[0], next=latestState.queue[1];
   const status=latestState.player?.status || desiredStatus || 'stopped';
   card.classList.toggle('empty', !cur); card.classList.toggle('paused', status==='paused'); card.classList.toggle('stopped', !cur || status==='stopped');
@@ -132,9 +155,10 @@ function updateProgress(){
 }
 function applySongRequestControl(cmd){
   if(!cmd || !cmd.action) return;
+  normalizeLocalState();
   const action=cmd.action;
   if(action==='pause'){ desiredStatus='paused'; latestState.player.status='paused'; try{ if(player && player.pauseVideo) player.pauseVideo(); }catch(e){} }
-  if(action==='play'){ desiredStatus='playing'; latestState.player.status='playing'; try{ if(player && player.playVideo) player.playVideo(); }catch(e){} }
+  if(action==='play'){ desiredStatus='playing'; latestState.player.status=latestState.queue[0]?'playing':'stopped'; try{ if(player && latestState.queue[0] && player.playVideo) player.playVideo(); }catch(e){} }
   if(action==='seek'){ const seconds=Number(cmd.seconds||0); latestState.player.currentTime=seconds; lastSeekAt=Date.now(); try{ if(player && player.seekTo) player.seekTo(seconds, true); }catch(e){} }
   if(action==='volume'){ latestState.player.volume=Number(cmd.volume ?? 100); try{ if(player && player.setVolume) player.setVolume(latestState.player.volume); }catch(e){} }
   if(action==='stop'){ stopPlayback(); }
@@ -148,12 +172,20 @@ load(true); setInterval(()=>load(false),2000); setInterval(()=>{ updateProgress(
 try{ const socket=io({transports:['websocket','polling']}); socket.on('songrequest-update', d=>{
   const beforeId = latestState.queue?.[0]?.id || '';
   latestState.queue = Array.isArray(d.queue) ? d.queue : latestState.queue;
+  normalizeLocalState();
   render(latestState);
   const afterId = latestState.queue?.[0]?.id || '';
   // Ne jamais recharger le lecteur quand on ajoute simplement une musique dans la file.
-  // On force seulement si la musique en cours change réellement.
-  syncPlayback(beforeId && beforeId !== afterId);
-}); socket.on('songrequest-player-state', p=>{ latestState.player=Object.assign(latestState.player||{},p||{}); render(latestState); enforcePlayback(); }); socket.on('songrequest-control', cmd=>handleSongRequestControl(cmd)); }catch(e){}
+  // On force seulement si la musique en cours change réellement ou si la file vient de démarrer.
+  syncPlayback((!beforeId && !!afterId) || (!!beforeId && beforeId !== afterId));
+}); socket.on('songrequest-player-state', p=>{
+  const curId=latestState.queue?.[0]?.id || '';
+  if(curId && p?.itemId && p.itemId !== curId) return;
+  latestState.player=Object.assign(latestState.player||{},p||{});
+  normalizeLocalState();
+  render(latestState);
+  enforcePlayback();
+}); socket.on('songrequest-control', cmd=>handleSongRequestControl(cmd)); }catch(e){}
 </script>
 </body>
 </html>
