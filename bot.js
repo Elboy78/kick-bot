@@ -192,11 +192,18 @@ function handleEvent(msg) {
 
     default: {
       // Logger générique : capture tout événement Kick pas encore géré, pour pouvoir
-      // découvrir le vrai nom/format des événements (ex: rachat de récompense) via les logs Render.
+      // découvrir le vrai nom/format des événements (ex: follow/sub natifs Kick) via les logs Render.
       if (event && !event.startsWith('pusher:') && !event.startsWith('pusher_internal:')) {
         let preview = data;
         try { preview = typeof data === 'string' ? JSON.parse(data) : data; } catch {}
         console.log(`[EVENT INCONNU] "${event}" —`, JSON.stringify(preview).slice(0, 1500));
+
+        // Si Kick envoie follow/sub via websocket Pusher, on les route vers le même système
+        // que le webhook officiel. Le système côté panel déduplique pour éviter les doubles annonces.
+        const e = String(event || '').toLowerCase();
+        if (e.includes('follow') || e.includes('sub') || e.includes('subscription')) {
+          shared.processKickEvent(event, preview).catch(err => console.warn('[KICK EVENT ROUTE] Erreur:', err.message));
+        }
       }
       break;
     }
@@ -1481,7 +1488,7 @@ async function checkLiveStatus() {
     if (lastFollowerCount > 0 && fc > lastFollowerCount) {
       const newF = fc - lastFollowerCount;
       console.log(`[FOLLOW] +${newF} follower(s) ! Total: ${fc}`);
-      if (isLive && await db.getSetting('follow_alerts')) {
+      if (isLive && (await db.getSetting('follow_announce_enabled') || await db.getSetting('follow_alerts'))) {
         const msg = newF === 1
           ? `Merci pour le follow ! On est maintenant ${fc} followers !`
           : `+${newF} nouveaux followers ! On est maintenant ${fc} !`;

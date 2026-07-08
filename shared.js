@@ -4,12 +4,21 @@
 let _sendChat = null;
 let _openChest = null;
 let _markVictory = null;
+let _kickEventHandler = null;
 
 module.exports = {
   registerSendChat(fn) { _sendChat = fn; },
   sendChat(msg) {
     if (_sendChat) return _sendChat(msg);
     console.warn('[SHARED] sendChat appelé avant enregistrement');
+    return Promise.resolve(false);
+  },
+  hasSendChat() { return typeof _sendChat === 'function'; },
+
+  registerKickEventHandler(fn) { _kickEventHandler = fn; },
+  processKickEvent(eventType, payload) {
+    if (_kickEventHandler) return _kickEventHandler(eventType, payload);
+    return Promise.resolve(false);
   },
 
   registerOpenChest(fn) { _openChest = fn; },

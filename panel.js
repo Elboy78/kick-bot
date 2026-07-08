@@ -7,6 +7,7 @@ const { Server } = require('socket.io');
 const axios   = require('axios');
 const db      = require('./database');
 const kickOAuth = require('./kick-oauth');
+const shared = require('./shared');
 
 const app    = express();
 const PORT   = parseInt(process.env.PANEL_PORT || '3000');
@@ -186,76 +187,132 @@ app.post('/api/admin/sub-announce', async (req, res) => {
   } catch(e) { res.status(500).json({ error: e.message }); }
 });
 
-// Webhook officiel Kick — reçu à chaque nouveau follow
-// À configurer sur : kick.com/settings/developer → Event Subscriptions → channel.followed
-// URL à renseigner : https://kick-bot-agkk.onrender.com/webhook/kick
+// ── Traitement commun events Kick : webhook + websocket bot ────────────────────
+
+const processedKickEvents = new Map();
+function cleanupProcessedKickEvents() {
+  const now = Date.now();
+  for (const [key, ts] of processedKickEvents.entries()) {
+    if (now - ts > 10 * 60 * 1000) processedKickEvents.delete(key);
+  }
+}
+function pick(...values) {
+  return values.find(v => typeof v === 'string' && v.trim())?.trim() || '';
+}
+function normalizeKickEventType(type = '') {
+  const t = String(type || '').toLowerCase();
+  if (t.includes('follow')) return 'channel.followed';
+  if (t.includes('subscription.gift') || t.includes('subgift') || (t.includes('gift') && t.includes('sub'))) return 'channel.subscription.gifts';
+  if (t.includes('subscription.renew') || t.includes('subrenew') || (t.includes('renew') && t.includes('sub'))) return 'channel.subscription.renewal';
+  if (t.includes('subscription.new') || t.includes('subscribed') || t.includes('subscription') || t.includes('sub')) return 'channel.subscription.new';
+  return String(type || '');
+}
+function getPayloadData(payload = {}) {
+  if (typeof payload === 'string') {
+    try { return JSON.parse(payload); } catch { return {}; }
+  }
+  return payload?.data || payload || {};
+}
+function eventDedupeKey(eventType, payload = {}) {
+  const data = getPayloadData(payload);
+  return pick(payload?.id, data?.id, data?.event_id, data?.subscription?.id, data?.message?.id) || `${eventType}:${JSON.stringify(data).slice(0, 300)}`;
+}
+async function sendAnnouncementToChat(message, logLabel) {
+  if (!message) return false;
+  if (!shared.hasSendChat()) {
+    console.warn(`[ANNONCE CHAT] Impossible d'envoyer (${logLabel}) : bot.js n'a pas encore enregistré sendChat. Lance bien npm start/server.js dans un seul process.`);
+    return false;
+  }
+  try {
+    await shared.sendChat(message);
+    console.log(`[ANNONCE CHAT] Envoyé : ${logLabel}`);
+    return true;
+  } catch (e) {
+    console.error(`[ANNONCE CHAT] Erreur ${logLabel}:`, e.message);
+    return false;
+  }
+}
+async function processKickEvent(eventTypeRaw, payload = {}) {
+  const eventType = normalizeKickEventType(eventTypeRaw || payload?.event || payload?.type || '');
+  const data = getPayloadData(payload);
+  const dedupe = eventDedupeKey(eventType, payload);
+  cleanupProcessedKickEvents();
+  if (processedKickEvents.has(dedupe)) return { ok: true, duplicate: true, eventType };
+  processedKickEvents.set(dedupe, Date.now());
+
+  if (eventType === 'channel.followed') {
+    const username = pick(
+      data?.user?.username, data?.follower?.username, data?.username,
+      data?.user?.name, data?.follower?.name,
+      payload?.user?.username, payload?.username
+    ) || 'quelqu\'un';
+
+    const enabled = await db.getSetting('follow_announce_enabled');
+    // Synchronise aussi l'ancien réglage utilisé par le tracker followers de bot.js
+    await db.setSetting('follow_alerts', enabled).catch(()=>{});
+    if (enabled) {
+      const template = await db.getSettingStr('follow_announce_message', DEFAULT_FOLLOW_MSG);
+      const message = template.replace(/\{username\}/gi, username).replace(/@\s*@/g, '@');
+      await sendAnnouncementToChat(message, `FOLLOW ${username}`);
+    }
+    return { ok: true, eventType, username };
+  }
+
+  if (eventType === 'channel.subscription.new') {
+    const username = pick(data?.subscriber?.username, data?.user?.username, data?.username, data?.subscriber?.name, data?.user?.name) || 'quelqu\'un';
+    await recordSubEvent('new', { username, count: 1 });
+    const enabled = await db.getSetting('sub_announce_enabled');
+    if (enabled) {
+      const template = await db.getSettingStr('sub_announce_new', DEFAULT_SUB_NEW_MSG);
+      const message = template.replace(/\{username\}/gi, username);
+      await sendAnnouncementToChat(message, `SUB NEW ${username}`);
+    }
+    return { ok: true, eventType, username };
+  }
+
+  if (eventType === 'channel.subscription.renewal') {
+    const username = pick(data?.subscriber?.username, data?.user?.username, data?.username, data?.subscriber?.name, data?.user?.name) || 'quelqu\'un';
+    const months = parseInt(data?.duration || data?.months || data?.subscription?.months || 1) || 1;
+    await recordSubEvent('renewal', { username, months });
+    const enabled = await db.getSetting('sub_announce_enabled');
+    if (enabled) {
+      const template = await db.getSettingStr('sub_announce_renew', DEFAULT_SUB_RENEW_MSG);
+      const message = template.replace(/\{username\}/gi, username).replace(/\{months\}/gi, String(months));
+      await sendAnnouncementToChat(message, `SUB RENEW ${username} x${months}`);
+    }
+    return { ok: true, eventType, username, months };
+  }
+
+  if (eventType === 'channel.subscription.gifts') {
+    const isAnon = !!(data?.gifter?.is_anonymous || data?.is_anonymous);
+    const gifterRaw = pick(data?.gifter?.username, data?.user?.username, data?.username, data?.gifter?.name, data?.user?.name);
+    const gifter = isAnon ? 'un anonyme' : (gifterRaw || 'Anonyme');
+    const count = parseInt(data?.count || data?.gift_count || data?.giftees?.length || data?.recipients?.length || 1) || 1;
+    await recordSubEvent('gift', { gifter, count });
+    const enabled = await db.getSetting('sub_announce_enabled');
+    if (enabled) {
+      const template = await db.getSettingStr('sub_announce_gift', DEFAULT_SUB_GIFT_MSG);
+      const message = template.replace(/\{gifter\}/gi, gifter).replace(/\{count\}/gi, String(count));
+      await sendAnnouncementToChat(message, `SUB GIFT ${gifter} x${count}`);
+    }
+    return { ok: true, eventType, gifter, count };
+  }
+
+  return { ok: true, ignored: true, eventType };
+}
+
+shared.registerKickEventHandler(processKickEvent);
+
+// Webhook officiel Kick — reçu à chaque nouveau follow/sub
+// À configurer sur : kick.com/settings/developer → Event Subscriptions
+// URL à renseigner : https://TON-LIEN-RENDER/webhook/kick
 app.post('/webhook/kick', async (req, res) => {
   try {
-    // Kick signe les webhooks avec un header — on accepte tous pour l'instant
-    const event = req.body;
-    // L'event type est dans le header Kick-Event-Type OU dans le body
+    const event = req.body || {};
     const eventType = req.headers['kick-event-type'] || event?.event || event?.type || '';
-    console.log('[WEBHOOK KICK]', eventType, JSON.stringify(event).slice(0, 200));
-
-    const shared = require('./shared');
-
-    // ── Follow ──────────────────────────────────────────────────────────────────
-    if (eventType === 'channel.followed' || eventType === 'ChannelFollowed') {
-      const username = event?.data?.user?.username
-                    || event?.data?.follower?.username
-                    || event?.data?.username
-                    || 'quelqu\'un';
-
-      const enabled = await db.getSetting('follow_announce_enabled');
-      if (enabled) {
-        const template = await db.getSettingStr('follow_announce_message', DEFAULT_FOLLOW_MSG);
-        const message  = template.replace(/\{username\}/gi, username);
-        { await shared.sendChat(message); console.log(`[FOLLOW] ${username}`); }
-      }
-    }
-
-    // ── Sub nouveau ─────────────────────────────────────────────────────────────
-    else if (eventType === 'channel.subscription.new') {
-      const username = event?.data?.subscriber?.username || 'quelqu\'un';
-      recordSubEvent('new', { username, count: 1 }).catch(()=>{});
-      const enabled  = await db.getSetting('sub_announce_enabled');
-      if (enabled) {
-        const template = await db.getSettingStr('sub_announce_new', DEFAULT_SUB_NEW_MSG);
-        const message  = template.replace(/\{username\}/gi, username);
-        { await shared.sendChat(message); console.log(`[SUB NEW] ${username}`); }
-      }
-    }
-
-    // ── Sub renouvellement ──────────────────────────────────────────────────────
-    else if (eventType === 'channel.subscription.renewal') {
-      const username = event?.data?.subscriber?.username || 'quelqu\'un';
-      const months   = event?.data?.duration || event?.data?.months || 1;
-      recordSubEvent('renewal', { username, months }).catch(()=>{});
-      const enabled  = await db.getSetting('sub_announce_enabled');
-      if (enabled) {
-        const template = await db.getSettingStr('sub_announce_renew', DEFAULT_SUB_RENEW_MSG);
-        const message  = template.replace(/\{username\}/gi, username).replace(/\{months\}/gi, months);
-        { await shared.sendChat(message); console.log(`[SUB RENEW] ${username} x${months}`); }
-      }
-    }
-
-    // ── Sub gift ────────────────────────────────────────────────────────────────
-    else if (eventType === 'channel.subscription.gifts') {
-      const gifter  = event?.data?.gifter?.username || 'Anonyme';
-      const isAnon  = event?.data?.gifter?.is_anonymous || false;
-      const count   = event?.data?.giftees?.length || 1;
-      recordSubEvent('gift', { gifter: isAnon ? 'un anonyme' : gifter, count }).catch(()=>{});
-      const enabled = await db.getSetting('sub_announce_enabled');
-      if (enabled) {
-        const template = await db.getSettingStr('sub_announce_gift', DEFAULT_SUB_GIFT_MSG);
-        const message  = template
-          .replace(/\{gifter\}/gi, isAnon ? 'un anonyme' : gifter)
-          .replace(/\{count\}/gi, count);
-        { await shared.sendChat(message); console.log(`[SUB GIFT] ${gifter} x${count}`); }
-      }
-    }
-
-    res.json({ ok: true });
+    console.log('[WEBHOOK KICK]', eventType, JSON.stringify(event).slice(0, 300));
+    const result = await processKickEvent(eventType, event);
+    res.json(result);
   } catch(e) {
     console.error('[WEBHOOK KICK] Erreur:', e.message);
     res.status(500).json({ error: e.message });
