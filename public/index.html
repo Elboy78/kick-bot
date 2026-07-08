@@ -299,9 +299,9 @@ hr.div{border:none;border-top:1px solid var(--brd);margin:12px 0}
 /* === FIX PRO COFFRES : rendu 100% visible, proportions propres, sans image cassée === */
 .chests-layout{grid-template-columns:260px minmax(720px,1fr) 430px!important;gap:26px!important;align-items:start!important}
 .dbd-board{display:grid!important;grid-template-columns:repeat(5,minmax(128px,1fr))!important;gap:14px!important;align-items:stretch!important}
-.chestcell.dbd-case{height:118px!important;min-width:128px!important;border:1px solid rgba(255,255,255,.10)!important;border-radius:10px!important;background:linear-gradient(180deg,rgba(15,15,18,.92),rgba(5,5,6,.96))!important;box-shadow:inset 0 0 0 1px rgba(255,255,255,.03),0 16px 30px rgba(0,0,0,.42)!important;overflow:hidden!important;padding:0!important;filter:none!important;display:block!important}
+.chestcell.dbd-case{height:150px!important;min-width:128px!important;border:1px solid rgba(255,255,255,.10)!important;border-radius:10px!important;background:linear-gradient(180deg,rgba(15,15,18,.92),rgba(5,5,6,.96))!important;box-shadow:inset 0 0 0 1px rgba(255,255,255,.03),0 16px 30px rgba(0,0,0,.42)!important;overflow:hidden!important;padding:0!important;filter:none!important;display:block!important}
 .chestcell.dbd-case:hover{transform:translateY(-3px) scale(1.025)!important;box-shadow:0 0 0 1px rgba(255,184,72,.45),0 0 28px rgba(255,147,32,.18),0 18px 34px rgba(0,0,0,.55)!important}
-.dbd-case .mini-chest{position:absolute!important;left:50%!important;bottom:8px!important;width:108px!important;height:70px!important;transform:translateX(-50%)!important;display:block!important;z-index:2!important;background:none!important;filter:drop-shadow(0 10px 8px rgba(0,0,0,.58))!important}
+.dbd-case .mini-chest{position:absolute!important;left:50%!important;bottom:6px!important;width:150px!important;height:128px!important;transform:translateX(-50%)!important;display:block!important;z-index:2!important;background:none!important;filter:drop-shadow(0 10px 8px rgba(0,0,0,.58))!important}
 .dbd-case .mini-chest svg{width:100%!important;height:100%!important;display:block!important;overflow:visible!important}.dbd-case .mini-chest img{width:100%!important;height:100%!important;object-fit:contain!important;display:block!important;pointer-events:none}
 .dbd-case .cc-num{position:absolute!important;inset:8px 0 auto 0!important;height:30px!important;display:flex!important;align-items:center!important;justify-content:center!important;font-size:25px!important;font-weight:950!important;line-height:1!important;color:#ececec!important;text-shadow:0 2px 0 #000,0 0 9px rgba(255,255,255,.22)!important;z-index:5!important;pointer-events:none!important}
 .dbd-case.opened{opacity:.42!important;filter:grayscale(.75)!important}
@@ -319,7 +319,7 @@ hr.div{border:none;border-top:1px solid var(--brd);margin:12px 0}
 .frame-dots{display:flex;justify-content:center;gap:7px;margin-top:12px}.frame-dots span{width:10px;height:10px;border-radius:50%;border:1px solid rgba(255,255,255,.35);background:transparent}.frame-dots span.active{background:#ff4848;border-color:#ff4848;box-shadow:0 0 10px #ff4848}.frame-label{margin-top:8px;font-size:12px;color:#d8d8d8}
 .side-reward{width:100%!important;min-height:300px!important;padding:28px 26px!important}.side-reward .reward-icon{width:72px!important;height:72px!important;font-size:40px!important}.side-reward span{font-size:30px!important}.side-reward h3{font-size:22px!important}
 .frame-player{width:min(780px,86vw)!important;height:min(500px,60vh)!important}.frame-player img{display:none!important}.frame-player svg{width:100%!important;height:100%!important;display:block!important;filter:drop-shadow(0 24px 28px rgba(0,0,0,.75))}
-@media(max-width:1500px){.chests-layout{grid-template-columns:230px minmax(620px,1fr) 370px!important}.dbd-board{grid-template-columns:repeat(5,minmax(112px,1fr))!important}.chestcell.dbd-case{height:105px!important}.dbd-case .mini-chest{width:96px!important;height:62px!important}.anim-preview-box{height:200px}}
+@media(max-width:1500px){.chests-layout{grid-template-columns:230px minmax(620px,1fr) 370px!important}.dbd-board{grid-template-columns:repeat(5,minmax(126px,1fr))!important}.chestcell.dbd-case{height:132px!important}.dbd-case .mini-chest{width:126px!important;height:108px!important}.anim-preview-box{height:200px}}
 @media(max-width:1180px){.chests-layout{grid-template-columns:1fr!important}.dbd-board{grid-template-columns:repeat(5,1fr)!important}.showcase{max-width:520px;margin:auto}}
 
 </style>
@@ -335,7 +335,7 @@ hr.div{border:none;border-top:1px solid var(--brd);margin:12px 0}
       <div><strong id="ca-stage-title">COFFRE FERMÉ</strong><span id="ca-stage-text">En attente d'ouverture...</span></div>
     </div>
     <div class="frame-player" id="ca-frame-box">
-      <video id="ca-video" src="/assets/video/chest-opening-v2.mp4?v=2" muted playsinline preload="auto"></video>
+      <video id="ca-video" src="/assets/video/chest-opening-v2.mp4?v=3" muted playsinline preload="auto"></video>
       <div class="frame-glow"></div>
       <div class="frame-particles"></div>
     </div>
@@ -3030,7 +3030,7 @@ async function loadChests() {
 function renderChestCase(c) {
   const num = String(c.number).padStart(2,'0');
   const color = CHEST_TIER_COLORS[c.tier] || '#9c35ff';
-  const closedImg = '<img src="/assets/chest-closed-v2.png?v=2" alt="" draggable="false">';
+  const closedImg = '<img src="/assets/chest-closed-v2.png?v=3" alt="" draggable="false">';
   if (c.opened) {
     return `<button class="chestcell dbd-case opened" style="--tier-color:${color}" title="${esc(c.label || '')}" disabled>
       <span class="mini-chest">${closedImg}</span><span class="cc-tier">${c.emoji || '◆'}</span><span class="cc-num">${num}</span>
