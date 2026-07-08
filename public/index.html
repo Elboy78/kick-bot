@@ -988,6 +988,25 @@ Option 3" rows="4"></textarea><div style="display:flex;gap:6px;margin-top:10px">
         <span id="sr-status" style="font-size:10px;color:var(--muted);font-weight:800">STOP</span>
       </div>
       <div style="font-size:10px;color:var(--muted);line-height:1.6;margin-top:8px">Le temps affiché vient de l’overlay OBS. La source navigateur doit être ouverte dans OBS pour que le lecteur soit actif.</div>
+      <div style="margin-top:14px;padding:12px;background:var(--card2);border:1px solid var(--brd);border-radius:10px">
+        <h4 style="margin:0 0 10px;color:var(--text);font-size:12px">⌨️ Macros / raccourcis Song Request</h4>
+        <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-bottom:10px">
+          <div>
+            <label class="lbl">Touche Play / Pause</label>
+            <button type="button" class="dark-btn" id="sr-hotkey-toggle" onclick="recordSongRequestHotkey('toggle')" style="width:100%;justify-content:center">Choisir une touche</button>
+          </div>
+          <div>
+            <label class="lbl">Touche Suivant</label>
+            <button type="button" class="dark-btn" id="sr-hotkey-next" onclick="recordSongRequestHotkey('next')" style="width:100%;justify-content:center">Choisir une touche</button>
+          </div>
+        </div>
+        <label class="row" style="margin:0 0 10px"><input type="checkbox" id="sr-hotkeys-enabled" onchange="saveSongRequestHotkeys()"> Activer les raccourcis clavier quand cette page est ouverte</label>
+        <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;font-size:9px;color:var(--muted);line-height:1.6">
+          <div><b style="color:var(--text)">URL macro Play/Pause</b><code id="sr-macro-toggle-url" style="display:block;margin-top:4px;background:var(--card);padding:5px;border-radius:6px;color:#93c5fd;word-break:break-all"></code></div>
+          <div><b style="color:var(--text)">URL macro Suivant</b><code id="sr-macro-next-url" style="display:block;margin-top:4px;background:var(--card);padding:5px;border-radius:6px;color:#93c5fd;word-break:break-all"></code></div>
+        </div>
+        <div style="font-size:9px;color:var(--muted);margin-top:8px;line-height:1.6">Pour une vraie macro sans ouvrir le panel, configure ton Stream Deck / clavier macro pour ouvrir l’URL ci-dessus.</div>
+      </div>
     </div>
     <div class="panel" style="margin-top:14px">
       <h3>🎶 File d’attente</h3>
@@ -4299,6 +4318,8 @@ async function loadSongRequest(silent = false) {
     if (vol && d.player?.volume !== undefined) vol.value = d.player.volume;
     const url = document.getElementById('songrequest-obs-url');
     if (url) url.textContent = window.location.origin + '/widgets/songrequest.html';
+    setupSongRequestMacroUrls();
+    loadSongRequestHotkeys();
     srLastQueue = d.queue || [];
     srPlayer = Object.assign(srPlayer, d.player || {});
     renderSongRequestPlayer(srLastQueue, srPlayer);
@@ -4412,6 +4433,77 @@ async function clearSongRequests() {
   toast('File vidée ✓');
   loadSongRequest();
 }
+
+
+function setupSongRequestMacroUrls() {
+  const base = window.location.origin + '/api/widgets/songrequest/macro/';
+  const toggle = document.getElementById('sr-macro-toggle-url');
+  const next = document.getElementById('sr-macro-next-url');
+  if (toggle) toggle.textContent = base + 'toggle';
+  if (next) next.textContent = base + 'next';
+}
+function getSongRequestHotkeys() {
+  try { return JSON.parse(localStorage.getItem('songrequest_hotkeys') || '{}') || {}; } catch(e) { return {}; }
+}
+function saveSongRequestHotkeyState(state) {
+  localStorage.setItem('songrequest_hotkeys', JSON.stringify(state || {}));
+}
+function formatSongRequestHotkey(h) {
+  if (!h || !h.code) return 'Choisir une touche';
+  const parts = [];
+  if (h.ctrl) parts.push('Ctrl');
+  if (h.alt) parts.push('Alt');
+  if (h.shift) parts.push('Shift');
+  if (h.meta) parts.push('Win');
+  parts.push((h.key || h.code || '').replace(/^Key/, '').replace(/^Digit/, ''));
+  return parts.join(' + ');
+}
+function loadSongRequestHotkeys() {
+  const h = getSongRequestHotkeys();
+  const enabled = document.getElementById('sr-hotkeys-enabled');
+  if (enabled) enabled.checked = h.enabled !== false;
+  const bToggle = document.getElementById('sr-hotkey-toggle');
+  const bNext = document.getElementById('sr-hotkey-next');
+  if (bToggle) bToggle.textContent = formatSongRequestHotkey(h.toggle);
+  if (bNext) bNext.textContent = formatSongRequestHotkey(h.next);
+}
+function saveSongRequestHotkeys() {
+  const h = getSongRequestHotkeys();
+  h.enabled = document.getElementById('sr-hotkeys-enabled')?.checked !== false;
+  saveSongRequestHotkeyState(h);
+  toast('Raccourcis Song Request enregistrés ✓');
+}
+function recordSongRequestHotkey(action) {
+  const btn = document.getElementById(action === 'next' ? 'sr-hotkey-next' : 'sr-hotkey-toggle');
+  if (btn) btn.textContent = 'Appuie sur une touche…';
+  const handler = (ev) => {
+    ev.preventDefault();
+    ev.stopPropagation();
+    const h = getSongRequestHotkeys();
+    h.enabled = document.getElementById('sr-hotkeys-enabled')?.checked !== false;
+    h[action] = { key: ev.key, code: ev.code, ctrl: ev.ctrlKey, alt: ev.altKey, shift: ev.shiftKey, meta: ev.metaKey };
+    saveSongRequestHotkeyState(h);
+    loadSongRequestHotkeys();
+    toast('Touche macro enregistrée ✓');
+  };
+  window.addEventListener('keydown', handler, { once:true, capture:true });
+}
+function matchSongRequestHotkey(ev, h) {
+  if (!h || !h.code) return false;
+  return ev.code === h.code && !!ev.ctrlKey === !!h.ctrl && !!ev.altKey === !!h.alt && !!ev.shiftKey === !!h.shift && !!ev.metaKey === !!h.meta;
+}
+async function triggerSongRequestMacro(action) {
+  await fetch(API + '/api/widgets/songrequest/macro/' + action, { method:'POST' });
+  loadSongRequest(true);
+}
+window.addEventListener('keydown', (ev) => {
+  const tag = String(ev.target?.tagName || '').toLowerCase();
+  if (['input','textarea','select'].includes(tag)) return;
+  const h = getSongRequestHotkeys();
+  if (h.enabled === false) return;
+  if (matchSongRequestHotkey(ev, h.toggle)) { ev.preventDefault(); triggerSongRequestMacro('toggle'); }
+  if (matchSongRequestHotkey(ev, h.next)) { ev.preventDefault(); triggerSongRequestMacro('next'); }
+});
 
 function escapeHtml(v) { return String(v || '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c] || c)); }
 function escapeAttr(v) { return escapeHtml(v); }

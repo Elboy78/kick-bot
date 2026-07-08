@@ -1049,6 +1049,49 @@ app.post('/api/widgets/songrequest/player-state', async (req, res) => {
   } catch(e) { res.status(500).json({ error:e.message }); }
 });
 
+
+
+async function runSongRequestMacro(action) {
+  const state = await getSongRequestState();
+  const cur = state.queue[0] || null;
+  if (action === 'toggle') action = state.player?.status === 'playing' ? 'pause' : 'play';
+  if (action === 'play') {
+    const next = await saveSongRequestPlayerState({ itemId: cur?.id || '', status: cur ? 'playing' : 'stopped' });
+    await issueSongRequestControl('play');
+    return { action:'play', player: next };
+  }
+  if (action === 'pause') {
+    const next = await saveSongRequestPlayerState({ status:'paused' });
+    await issueSongRequestControl('pause');
+    return { action:'pause', player: next };
+  }
+  if (action === 'next') {
+    state.queue.shift();
+    await saveSongRequestQueue(state.queue);
+    const nextItem = state.queue[0] || null;
+    const next = await saveSongRequestPlayerState({ itemId: nextItem?.id || '', status: nextItem ? 'playing' : 'stopped', currentTime: 0, duration: nextItem?.duration || 0 });
+    await issueSongRequestControl('next');
+    return { action:'next', player: next };
+  }
+  if (action === 'stop') {
+    const next = await saveSongRequestPlayerState({ status:'stopped', currentTime:0 });
+    await issueSongRequestControl('stop');
+    return { action:'stop', player: next };
+  }
+  throw new Error('Action macro invalide');
+}
+
+async function songRequestMacroHandler(req, res) {
+  try {
+    const action = String(req.params.action || req.body?.action || 'toggle').toLowerCase();
+    if (!['toggle','play','pause','next','stop'].includes(action)) return res.status(400).json({ error:'Action invalide' });
+    const result = await runSongRequestMacro(action);
+    res.json({ success:true, ...result, ...(await getSongRequestState()) });
+  } catch(e) { res.status(500).json({ error:e.message }); }
+}
+app.get('/api/widgets/songrequest/macro/:action', songRequestMacroHandler);
+app.post('/api/widgets/songrequest/macro/:action', songRequestMacroHandler);
+
 app.get('/api/chests', async (req, res) => {
   try { res.json(await chests.getPublicState()); } catch(e) { res.json({ season: null, chests: [] }); }
 });
