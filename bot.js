@@ -14,6 +14,7 @@ const CONFIG = {
   channelId:    process.env.KICK_CHANNEL_ID    || '0',
   token:        process.env.KICK_TOKEN         || '',
   botUsername:  process.env.BOT_USERNAME       || 'bot',
+  broadcasterUserId: process.env.KICK_BROADCASTER_USER_ID || '',
   pointsAmount: parseInt(process.env.POINTS_PER_INTERVAL || '10'),
   intervalMs:   parseInt(process.env.POINTS_INTERVAL_MS  || '300000'),
   debug:        process.env.DEBUG === 'true',
@@ -1218,6 +1219,36 @@ async function sendChat(message) {
   return sendChatVia(text, token, official, false);
 }
 
+async function getBroadcasterUserIdForChat(token) {
+  const envId = parseInt(CONFIG.broadcasterUserId);
+  if (envId) return envId;
+
+  try {
+    const stored = await db.getSettingStr('broadcaster_user_id', '');
+    const storedId = parseInt(stored);
+    if (storedId) return storedId;
+  } catch (_) {}
+
+  try {
+    const res = await axios.get('https://api.kick.com/public/v1/channels', {
+      params: { slug: CONFIG.channel },
+      timeout: 8000,
+      headers: { 'Authorization': `Bearer ${token}`, 'Accept': 'application/json' },
+    });
+    const channel = res.data?.data?.[0] || null;
+    const id = parseInt(channel?.broadcaster_user_id || channel?.user_id || channel?.id);
+    if (id) {
+      await db.setSettingStr('broadcaster_user_id', String(id)).catch(()=>{});
+      console.log(`[BOT] broadcaster_user_id détecté pour le chat: ${id}`);
+      return id;
+    }
+  } catch (e) {
+    console.warn('[BOT] Impossible de récupérer broadcaster_user_id pour le chat:', e.response?.status || e.message);
+  }
+
+  return 0;
+}
+
 function normalizeKickChatMessage(message) {
   return String(message ?? '')
     .replace(/\s+/g, ' ')
@@ -1238,21 +1269,25 @@ async function sendChatVia(message, token, official, isRetry) {
     let response;
     if (official) {
       // API officielle Kick.
-      // Selon le type de compte OAuth, Kick accepte soit type=bot sans broadcaster_user_id,
-      // soit type=user avec broadcaster_user_id. On tente les payloads propresment au lieu de
-      // rester bloqué sur un 500 silencieux.
-      const payloads = [
-        { content: text, type: 'bot' },
-        { content: text, type: 'user', broadcaster_user_id: parseInt(CONFIG.channelId) },
-        { content: text, type: 'bot', broadcaster_user_id: parseInt(CONFIG.channelId) },
-      ];
+      // IMPORTANT: broadcaster_user_id = ID UTILISATEUR du streamer, pas l'ID chatroom/channel.
+      // Sans ça, Kick renvoie souvent un 500 silencieux et aucune commande ne part.
+      const broadcasterId = await getBroadcasterUserIdForChat(token);
+      const payloads = [];
+
+      if (broadcasterId) {
+        payloads.push({ content: text, type: 'user', broadcaster_user_id: broadcasterId });
+      }
+
+      // Si le token est un vrai token bot/app, Kick accepte ce format sans broadcaster_user_id.
+      payloads.push({ content: text, type: 'bot' });
+
       let lastErr = null;
       for (const payload of payloads) {
         try {
           response = await axios.post(
             `https://api.kick.com/public/v1/chat`,
             payload,
-            { headers: {
+            { timeout: 10000, headers: {
               'Authorization': `Bearer ${token}`,
               'Content-Type': 'application/json',
               'Accept': 'application/json',
@@ -1264,7 +1299,8 @@ async function sendChatVia(message, token, official, isRetry) {
         } catch (err) {
           lastErr = err;
           const status = err.response?.status;
-          // Les 4xx ne seront pas corrigés par un autre payload sauf quelques 400/422.
+          const data = err.response?.data;
+          console.warn('[BOT] Essai envoi officiel échoué:', status || err.message, JSON.stringify(data || {}), 'payload=', JSON.stringify(payload));
           if (status === 401 || status === 403) throw err;
         }
       }
