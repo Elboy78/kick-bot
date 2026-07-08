@@ -21,6 +21,7 @@
   <div id="wrap"><div id="messages"></div></div>
 <script>
 const socket = io({ transports:['websocket','polling'] });
+const CHAT_OVERLAY_LOCAL_KEY = 'bot7up_chat_overlay_settings_backup';
 let settings = { enabled:true, hideBots:true, ignoredUsers:'BotRix,botrix', hideCommands:true, showPlatformIcon:true, showTime:false, fontSize:21, messageDuration:10, animation:'pop', design:'glass', maxMessages:8 };
 const messages = document.getElementById('messages');
 function esc(s){return String(s??'').replace(/[&<>'"]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[m]));}
@@ -42,12 +43,24 @@ function renderContentWithKickEmotes(content){
   return html;
 }
 function hhmm(iso){try{return new Date(iso||Date.now()).toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'});}catch(e){return ''}}
-async function loadSettings(){try{const r=await fetch('/api/widgets/chat-overlay?ts='+Date.now(),{cache:'no-store'});settings=Object.assign(settings,await r.json());applySettings();}catch(e){}}
+async function loadSettings(){
+  try {
+    const saved = JSON.parse(localStorage.getItem(CHAT_OVERLAY_LOCAL_KEY) || 'null');
+    if (saved) { settings = Object.assign(settings, saved); applySettings(); }
+  } catch(e) {}
+  try{
+    const r=await fetch('/api/widgets/chat-overlay?ts='+Date.now(),{cache:'no-store'});
+    const fresh = await r.json();
+    settings=Object.assign(settings,fresh);
+    try { localStorage.setItem(CHAT_OVERLAY_LOCAL_KEY, JSON.stringify(settings)); } catch(e) {}
+    applySettings();
+  }catch(e){}
+}
 function applySettings(){messages.style.fontSize=(settings.fontSize||21)+'px';document.querySelectorAll('.msg').forEach(el=>{el.className='msg '+(settings.design||'glass');el.style.animationName=settings.animation==='none'?'none':settings.animation;});trim();}
 function trim(){const max=Number(settings.maxMessages||8);while(messages.children.length>max) messages.firstElementChild?.remove();}
 function addMessage(m){if(!settings.enabled)return;const el=document.createElement('div');el.className='msg '+(settings.design||'glass');el.style.animationName=settings.animation==='none'?'none':(settings.animation||'pop');const platform=settings.showPlatformIcon?'<span class="platform">K</span>':'';const time=settings.showTime?`<span class="time">${hhmm(m.at)}</span>`:'';el.innerHTML=`${platform}${time}<span class="name">${esc(m.username)} :</span><span class="text">${renderContentWithKickEmotes(m.content)}</span>`;messages.appendChild(el);trim();const dur=Number(settings.messageDuration||0);if(dur>0){setTimeout(()=>{el.classList.add('fadeout');setTimeout(()=>el.remove(),260)},dur*1000);}}
 socket.on('chat-overlay-message', addMessage);
-socket.on('chat-overlay-settings', cfg=>{settings=Object.assign(settings,cfg||{});applySettings();});
+socket.on('chat-overlay-settings', cfg=>{settings=Object.assign(settings,cfg||{});try{localStorage.setItem(CHAT_OVERLAY_LOCAL_KEY, JSON.stringify(settings));}catch(e){}applySettings();});
 loadSettings();setInterval(loadSettings,15000);
 </script>
 </body>

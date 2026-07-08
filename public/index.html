@@ -186,6 +186,16 @@ body.light{
 .inp{background:var(--card);border:1px solid var(--brd3);border-radius:10px;padding:8px 12px;color:var(--text);font-size:12px;outline:none;transition:all .15s;font-family:inherit;width:100%}
 .inp:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-bg)}
 .inp::placeholder{color:var(--muted2)}
+
+.obs-link-box{padding:12px;background:var(--card2);border:1px solid var(--brd);border-radius:10px;font-size:10px;color:var(--muted);line-height:1.7;margin-top:12px}
+.obs-link-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:8px}
+.obs-link-head b{color:var(--text)}
+.obs-link-row{display:flex;gap:8px;align-items:center}
+.obs-link-code{background:var(--card);padding:7px 10px;border-radius:7px;color:var(--accent);font-size:10px;display:block;word-break:break-all;flex:1;filter:blur(5px);transition:filter .15s;user-select:none}
+.obs-link-code:hover,.obs-link-code:focus{filter:blur(0);user-select:text}
+.obs-copy-btn{border:1px solid rgba(40,255,102,.35);background:rgba(40,255,102,.12);color:var(--accent);border-radius:7px;padding:7px 10px;font-size:10px;font-weight:900;cursor:pointer;font-family:inherit;white-space:nowrap}
+.obs-copy-btn:hover{background:rgba(40,255,102,.2)}
+
 .inp-sm{padding:5px 9px;font-size:11px;border-radius:8px}
 .lbl{font-size:9px;font-weight:700;color:var(--muted);display:block;margin-bottom:4px;margin-top:10px;text-transform:uppercase;letter-spacing:.5px}
 .lbl:first-child{margin-top:0}
@@ -923,10 +933,10 @@ Option 3" rows="4"></textarea><div style="display:flex;gap:6px;margin-top:10px">
             <div style="font-size:22px;font-weight:900;color:var(--accent)" id="subgoal-percent-display">0%</div>
           </div>
 
-          <div style="padding:10px;background:var(--card2);border:1px solid var(--brd);border-radius:8px;font-size:10px;color:var(--muted);line-height:1.7;margin-bottom:10px">
-            <b style="color:var(--text)">🔗 Lien overlay OBS Sub Goal</b><br>
-            <code style="background:var(--card);padding:2px 6px;border-radius:4px;color:var(--accent);font-size:9px;display:block;margin-top:4px;word-break:break-all" id="subgoal-obs-url">/widgets/subgoal.html</code>
-            <span style="margin-top:6px;display:block">Taille recommandée : 560×100. Fond transparent.</span>
+          <div class="obs-link-box" style="margin-bottom:10px">
+            <div class="obs-link-head"><b>🔗 Lien overlay OBS Sub Goal</b><button class="obs-copy-btn" onclick="copyObsUrl('subgoal-obs-url')">Copier</button></div>
+            <div class="obs-link-row"><code class="obs-link-code" id="subgoal-obs-url">/widgets/subgoal.html</code></div>
+            <span style="margin-top:6px;display:block">Taille recommandée : 560×100. Fond transparent. Le lien est flouté pour éviter qu’il soit visible en live.</span>
           </div>
 
 
@@ -969,10 +979,10 @@ Option 3" rows="4"></textarea><div style="display:flex;gap:6px;margin-top:10px">
         <label class="lbl">Nombre maximum dans la file</label>
         <input type="number" class="inp" id="sr-max" min="1" max="100" placeholder="30" style="margin-bottom:12px">
         <button class="dark-btn" onclick="saveSongRequestSettings()" style="width:100%;justify-content:center">ENREGISTRER</button>
-        <div style="padding:10px;background:var(--card2);border:1px solid var(--brd);border-radius:8px;font-size:10px;color:var(--muted);line-height:1.7;margin-top:12px">
-          <b style="color:var(--text)">🔗 Lien overlay OBS Song Request</b><br>
-          <code style="background:var(--card);padding:2px 6px;border-radius:4px;color:#93c5fd;font-size:9px;display:block;margin-top:4px;word-break:break-all" id="songrequest-obs-url">/widgets/songrequest.html</code>
-          <span style="margin-top:6px;display:block">Affiche la musique en cours + la prochaine.</span>
+        <div class="obs-link-box">
+          <div class="obs-link-head"><b>🔗 Lien overlay OBS Song Request</b><button class="obs-copy-btn" onclick="copyObsUrl('songrequest-obs-url')">Copier</button></div>
+          <div class="obs-link-row"><code class="obs-link-code" id="songrequest-obs-url">/widgets/songrequest.html</code></div>
+          <span style="margin-top:6px;display:block">Affiche la musique en cours + la prochaine. Le lien est flouté pour éviter qu’il soit visible en live.</span>
         </div>
       </div>
       <div class="panel">
@@ -1068,10 +1078,10 @@ Option 3" rows="4"></textarea><div style="display:flex;gap:6px;margin-top:10px">
           <div style="grid-column:1/-1"><label class="lbl">Design</label><select class="inp" id="co-design"><option value="glass">Glass propre</option><option value="minimal">Minimal</option><option value="neon">Neon</option></select></div>
         </div>
         <button class="dark-btn" onclick="saveChatOverlaySettings()" style="width:100%;justify-content:center;margin-top:12px">ENREGISTRER</button>
-        <div style="padding:10px;background:var(--card2);border:1px solid var(--brd);border-radius:8px;font-size:10px;color:var(--muted);line-height:1.7;margin-top:12px">
-          <b style="color:var(--text)">🔗 Lien overlay OBS Chat</b><br>
-          <code style="background:var(--card);padding:2px 6px;border-radius:4px;color:#86efac;font-size:9px;display:block;margin-top:4px;word-break:break-all" id="chat-obs-url">/widgets/chat.html</code>
-          <span style="margin-top:6px;display:block">À mettre dans OBS en Source navigateur.</span>
+        <div class="obs-link-box">
+          <div class="obs-link-head"><b>🔗 Lien overlay OBS Chat</b><button class="obs-copy-btn" onclick="copyObsUrl('chat-obs-url')">Copier</button></div>
+          <div class="obs-link-row"><code class="obs-link-code" id="chat-obs-url">/widgets/chat.html</code></div>
+          <span style="margin-top:6px;display:block">À mettre dans OBS en Source navigateur. Le lien est flouté pour éviter qu’il soit visible en live.</span>
         </div>
       </div>
       <div class="panel">
@@ -1619,8 +1629,7 @@ async function loadSubGoal() {
     const r = await fetch(API + '/api/widgets/subcounter?ts=' + Date.now(), { cache: 'no-store' });
     const d = await r.json();
     renderSubCounter(d);
-    const urlEl = document.getElementById('subgoal-obs-url');
-    if (urlEl) urlEl.textContent = window.location.origin + '/widgets/subgoal.html';
+    setObsUrl('subgoal-obs-url', '/widgets/subgoal.html');
   } catch(e) { console.error('[SUBCOUNTER]', e); }
 }
 
@@ -4401,8 +4410,7 @@ async function loadSongRequest(silent = false) {
     srSetVal('sr-max', d.maxQueue || 30);
     const vol = document.getElementById('sr-volume');
     if (vol && d.player?.volume !== undefined) vol.value = d.player.volume;
-    const url = document.getElementById('songrequest-obs-url');
-    if (url) url.textContent = window.location.origin + '/widgets/songrequest.html';
+    setObsUrl('songrequest-obs-url', '/widgets/songrequest.html');
     setupSongRequestMacroUrls();
     loadSongRequestHotkeys();
     srLastQueue = Array.isArray(d.queue) ? d.queue : [];
@@ -4602,6 +4610,23 @@ window.addEventListener('keydown', (ev) => {
   if (matchSongRequestHotkey(ev, h.next)) { ev.preventDefault(); triggerSongRequestMacro('next'); }
 });
 
+async function copyObsUrl(id) {
+  const el = document.getElementById(id);
+  const value = (el?.textContent || '').trim();
+  if (!value) return;
+  try { await navigator.clipboard.writeText(value); toast('Lien OBS copié ✓'); }
+  catch(e) {
+    const ta = document.createElement('textarea');
+    ta.value = value; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); ta.remove();
+    toast('Lien OBS copié ✓');
+  }
+}
+
+function setObsUrl(id, path) {
+  const el = document.getElementById(id);
+  if (el) el.textContent = window.location.origin + path;
+}
+
 function escapeHtml(v) { return String(v || '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c] || c)); }
 function escapeAttr(v) { return escapeHtml(v); }
 
@@ -4625,9 +4650,8 @@ try {
 
 
 // ── Chat Overlay ──────────────────────────────────────────────────────────────
-async function loadChatOverlaySettings() {
-  const r = await fetch(API + '/api/widgets/chat-overlay?ts=' + Date.now(), { cache:'no-store' });
-  const d = await r.json();
+const CHAT_OVERLAY_LOCAL_KEY = 'bot7up_chat_overlay_settings_backup';
+function applyChatOverlaySettings(d) {
   setCheck('co-enabled', !!d.enabled);
   setCheck('co-hide-bots', !!d.hideBots);
   setCheck('co-hide-commands', !!d.hideCommands);
@@ -4639,8 +4663,20 @@ async function loadChatOverlaySettings() {
   setVal('co-max', d.maxMessages || 8);
   setVal('co-animation', d.animation || 'pop');
   setVal('co-design', d.design || 'glass');
-  const url = document.getElementById('chat-obs-url');
-  if (url) url.textContent = window.location.origin + '/widgets/chat.html';
+  setObsUrl('chat-obs-url', '/widgets/chat.html');
+}
+async function loadChatOverlaySettings() {
+  let backup = null;
+  try { backup = JSON.parse(localStorage.getItem(CHAT_OVERLAY_LOCAL_KEY) || 'null'); } catch(e) {}
+  if (backup) applyChatOverlaySettings(backup);
+  try {
+    const r = await fetch(API + '/api/widgets/chat-overlay?ts=' + Date.now(), { cache:'no-store' });
+    const d = await r.json();
+    applyChatOverlaySettings(d);
+    try { localStorage.setItem(CHAT_OVERLAY_LOCAL_KEY, JSON.stringify(d)); } catch(e) {}
+  } catch(e) {
+    if (!backup) applyChatOverlaySettings({ enabled:true, hideBots:true, hideCommands:true, showPlatformIcon:true, showTime:false, ignoredUsers:'BotRix,botrix', fontSize:21, messageDuration:10, maxMessages:8, animation:'pop', design:'glass' });
+  }
 }
 async function saveChatOverlaySettings() {
   const body = {
@@ -4656,6 +4692,7 @@ async function saveChatOverlaySettings() {
     animation: document.getElementById('co-animation')?.value || 'pop',
     design: document.getElementById('co-design')?.value || 'glass'
   };
+  try { localStorage.setItem(CHAT_OVERLAY_LOCAL_KEY, JSON.stringify(body)); } catch(e) {}
   await fetch(API + '/api/admin/widgets/chat-overlay/settings', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body) });
   toast('Chat Overlay enregistré ✓');
   loadChatOverlaySettings();
