@@ -812,6 +812,30 @@ async function saveSongRequestPlayerState(patch = {}, emit = true) {
   return next;
 }
 
+async function getSongRequestControl() {
+  let control = {};
+  try { control = JSON.parse(await db.getSettingStr('songrequest_control', '{}')); } catch(e) { control = {}; }
+  return {
+    seq: Number(control.seq || 0),
+    action: control.action || '',
+    seconds: Number(control.seconds || 0),
+    volume: Number(control.volume ?? 100),
+    at: control.at || null
+  };
+}
+async function issueSongRequestControl(action, payload = {}) {
+  const prev = await getSongRequestControl();
+  const control = {
+    seq: prev.seq + 1,
+    action,
+    ...payload,
+    at: new Date().toISOString()
+  };
+  await db.setSettingStr('songrequest_control', JSON.stringify(control));
+  io.emit('songrequest-control', control);
+  return control;
+}
+
 async function getSongRequestState() {
   let queue = [];
   try { queue = JSON.parse(await db.getSettingStr('songrequest_queue', '[]')); } catch(e) { queue = []; }
@@ -822,7 +846,8 @@ async function getSongRequestState() {
     chatConfirmEnabled: (await db.getSettingStr('songrequest_chat_confirm_enabled', '0')) === '1',
     maxQueue: parseInt(await db.getSettingStr('songrequest_max_queue', '30')) || 30,
     queue: Array.isArray(queue) ? queue : [],
-    player: await getSongRequestPlayerState()
+    player: await getSongRequestPlayerState(),
+    control: await getSongRequestControl()
   };
 }
 
@@ -903,7 +928,7 @@ app.post('/api/admin/widgets/songrequest/delete', requireAuth, async (req, res) 
     const id = req.body.id;
     const wasCurrent = state.queue[0]?.id === id;
     await saveSongRequestQueue(state.queue.filter(x => x.id !== id));
-    if (wasCurrent) io.emit('songrequest-control', { action:'load-current' });
+    if (wasCurrent) await issueSongRequestControl('load-current');
     res.json({ success:true, ...(await getSongRequestState()) });
   } catch(e) { res.status(500).json({ error:e.message }); }
 });
@@ -914,7 +939,7 @@ app.post('/api/admin/widgets/songrequest/next', requireAuth, async (req, res) =>
     state.queue.shift();
     await saveSongRequestQueue(state.queue);
     await saveSongRequestPlayerState({ itemId: state.queue[0]?.id || '', status: state.queue[0] ? 'playing' : 'stopped', currentTime: 0, duration: state.queue[0]?.duration || 0 });
-    io.emit('songrequest-control', { action:'next' });
+    await issueSongRequestControl('next');
     res.json({ success:true, ...(await getSongRequestState()) });
   } catch(e) { res.status(500).json({ error:e.message }); }
 });
@@ -923,7 +948,7 @@ app.post('/api/admin/widgets/songrequest/clear', requireAuth, async (req, res) =
   try {
     await saveSongRequestQueue([]);
     await saveSongRequestPlayerState({ itemId:'', status:'stopped', currentTime:0, duration:0 });
-    io.emit('songrequest-control', { action:'stop' });
+    await issueSongRequestControl('stop');
     res.json({ success:true, ...(await getSongRequestState()) });
   }
   catch(e) { res.status(500).json({ error:e.message }); }
@@ -934,14 +959,14 @@ app.post('/api/admin/widgets/songrequest/play', requireAuth, async (req, res) =>
     const state = await getSongRequestState();
     const cur = state.queue[0];
     const next = await saveSongRequestPlayerState({ itemId: cur?.id || '', status: cur ? 'playing' : 'stopped' });
-    io.emit('songrequest-control', { action:'play' });
+    await issueSongRequestControl('play');
     res.json({ success:true, player: next });
   } catch(e) { res.status(500).json({ error:e.message }); }
 });
 app.post('/api/admin/widgets/songrequest/pause', requireAuth, async (req, res) => {
   try {
     const next = await saveSongRequestPlayerState({ status:'paused' });
-    io.emit('songrequest-control', { action:'pause' });
+    await issueSongRequestControl('pause');
     res.json({ success:true, player: next });
   } catch(e) { res.status(500).json({ error:e.message }); }
 });
@@ -949,7 +974,7 @@ app.post('/api/admin/widgets/songrequest/seek', requireAuth, async (req, res) =>
   try {
     const seconds = Math.max(0, parseFloat(req.body.seconds || 0) || 0);
     const next = await saveSongRequestPlayerState({ currentTime: seconds });
-    io.emit('songrequest-control', { action:'seek', seconds });
+    await issueSongRequestControl('seek', { seconds });
     res.json({ success:true, player: next });
   } catch(e) { res.status(500).json({ error:e.message }); }
 });
@@ -957,7 +982,7 @@ app.post('/api/admin/widgets/songrequest/volume', requireAuth, async (req, res) 
   try {
     const volume = Math.max(0, Math.min(100, parseInt(req.body.volume ?? 100) || 100));
     const next = await saveSongRequestPlayerState({ volume });
-    io.emit('songrequest-control', { action:'volume', volume });
+    await issueSongRequestControl('volume', { volume });
     res.json({ success:true, player: next });
   } catch(e) { res.status(500).json({ error:e.message }); }
 });

@@ -48,7 +48,7 @@
 <script src="https://www.youtube.com/iframe_api"></script>
 <script>
 const songEl=document.getElementById('song'), byEl=document.getElementById('by'), nextEl=document.getElementById('next'), card=document.getElementById('card'), thumbEl=document.getElementById('thumb'), fillEl=document.getElementById('fill'), curEl=document.getElementById('current'), durEl=document.getElementById('duration'), stateEl=document.getElementById('state');
-let player=null, ytReady=false, currentId='', currentSongId='', latestState={enabled:false, queue:[], player:{status:'stopped',volume:100}}, lastStatePost=0, desiredStatus='playing';
+let player=null, ytReady=false, currentId='', currentSongId='', latestState={enabled:false, queue:[], player:{status:'stopped',volume:100}, control:{seq:0}}, lastStatePost=0, desiredStatus='playing', lastControlSeq=0;
 function esc(v){return String(v||'').replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));}
 function fmt(seconds){ seconds=Math.max(0,Math.floor(Number(seconds||0))); const h=Math.floor(seconds/3600), m=Math.floor((seconds%3600)/60), s=seconds%60; return h?`${h}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`:`${m}:${String(s).padStart(2,'0')}`; }
 function youtubeId(input){
@@ -87,8 +87,19 @@ function syncPlayback(){
   if(!id){ stopPlayback(); render(latestState); return; }
   if(!player || !player.loadVideoById) return;
   if(id!==currentId || cur.id!==currentSongId){
-    currentId=id; currentSongId=cur.id; desiredStatus='playing';
-    try{ player.loadVideoById(id); setTimeout(()=>{ try{ player.unMute(); player.setVolume(latestState.player?.volume ?? 100); player.playVideo(); }catch(e){} }, 700); }catch(e){}
+    currentId=id; currentSongId=cur.id;
+    desiredStatus=(latestState.player?.status === 'paused') ? 'paused' : 'playing';
+    try{
+      player.loadVideoById(id);
+      setTimeout(()=>{
+        try{
+          player.unMute();
+          player.setVolume(latestState.player?.volume ?? 100);
+          if(desiredStatus === 'paused') player.pauseVideo();
+          else player.playVideo();
+        }catch(e){}
+      }, 700);
+    }catch(e){}
   } else {
     try{ player.setVolume(latestState.player?.volume ?? 100); }catch(e){}
     if((latestState.player?.status||'playing')==='paused') { try{ player.pauseVideo(); desiredStatus='paused'; }catch(e){} }
@@ -96,7 +107,7 @@ function syncPlayback(){
   }
 }
 function render(state={}){
-  latestState={ enabled:!!state.enabled, queue:Array.isArray(state.queue)?state.queue:(latestState.queue||[]), player:Object.assign(latestState.player||{}, state.player||{}) };
+  latestState={ enabled:!!state.enabled, queue:Array.isArray(state.queue)?state.queue:(latestState.queue||[]), player:Object.assign(latestState.player||{}, state.player||{}), control: state.control || latestState.control || {seq:0} };
   const cur=latestState.queue[0], next=latestState.queue[1];
   const status=latestState.player?.status || desiredStatus || 'stopped';
   card.classList.toggle('empty', !cur);
@@ -116,23 +127,32 @@ function updateProgress(){
   curEl.textContent=fmt(current); durEl.textContent=duration?fmt(duration):'?:??';
   fillEl.style.width=duration?Math.max(0,Math.min(100,(current/duration)*100))+'%':'0%';
 }
-async function load(){try{const r=await fetch('/api/widgets/songrequest?ts='+Date.now(),{cache:'no-store'}); const d=await r.json(); render(d); syncPlayback();}catch(e){}}
+function applySongRequestControl(cmd){
+  if(!cmd || !cmd.action) return;
+  const action=cmd.action;
+  if(action==='pause'){ desiredStatus='paused'; latestState.player.status='paused'; try{ if(player && player.pauseVideo) player.pauseVideo(); }catch(e){} }
+  if(action==='play'){ desiredStatus='playing'; latestState.player.status='playing'; try{ if(player && player.playVideo) player.playVideo(); }catch(e){} }
+  if(action==='seek'){ const seconds=Number(cmd.seconds||0); latestState.player.currentTime=seconds; try{ if(player && player.seekTo) player.seekTo(seconds, true); }catch(e){} }
+  if(action==='volume'){ latestState.player.volume=Number(cmd.volume ?? 100); try{ if(player && player.setVolume) player.setVolume(latestState.player.volume); }catch(e){} }
+  if(action==='stop'){ stopPlayback(); latestState.player.status='stopped'; }
+  if(action==='next' || action==='load-current'){ load(); return; }
+  postPlayerState(true); render(latestState); syncPlayback();
+}
+function handleSongRequestControl(cmd){
+  if(!cmd) return;
+  const seq=Number(cmd.seq||0);
+  if(seq && seq<=lastControlSeq) return;
+  if(seq) lastControlSeq=seq;
+  applySongRequestControl(cmd);
+}
+async function load(){try{const r=await fetch('/api/widgets/songrequest?ts='+Date.now(),{cache:'no-store'}); const d=await r.json(); render(d); handleSongRequestControl(d.control); syncPlayback();}catch(e){}}
 window.onYouTubeIframeAPIReady=function(){ytReady=true; ensurePlayer(); syncPlayback();};
 load(); setInterval(load,5000); setInterval(()=>{ updateProgress(); postPlayerState(false); },1000);
 try{
   const socket=io();
   socket.on('songrequest-update', d=>{ latestState.queue=Array.isArray(d.queue)?d.queue:latestState.queue; render(latestState); syncPlayback(); });
   socket.on('songrequest-player-state', p=>{ latestState.player=Object.assign(latestState.player||{},p||{}); render(latestState); });
-  socket.on('songrequest-control', cmd=>{
-    if(!cmd) return;
-    if(cmd.action==='pause'){ try{player.pauseVideo(); desiredStatus='paused';}catch(e){} }
-    if(cmd.action==='play'){ try{player.playVideo(); desiredStatus='playing';}catch(e){} }
-    if(cmd.action==='seek'){ try{player.seekTo(Number(cmd.seconds||0), true);}catch(e){} }
-    if(cmd.action==='volume'){ latestState.player.volume=Number(cmd.volume ?? 100); try{player.setVolume(latestState.player.volume);}catch(e){} }
-    if(cmd.action==='stop'){ stopPlayback(); }
-    if(cmd.action==='next' || cmd.action==='load-current'){ load(); }
-    postPlayerState(true); render(latestState);
-  });
+  socket.on('songrequest-control', cmd=>{ handleSongRequestControl(cmd); });
 }catch(e){}
 </script>
 </body>
