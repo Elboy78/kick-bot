@@ -1254,7 +1254,7 @@ async function cmdSongRequest(username, parts) {
 
     // Confirmation chat optionnelle : la musique est déjà ajoutée à la file.
     // Si Kick bloque l'envoi des messages du bot (403/500), le Song Request ne doit pas paraître cassé.
-    const chatConfirmEnabled = await db.getSetting('songrequest_chat_confirm_enabled');
+    const chatConfirmEnabled = (await db.getSettingStr('songrequest_chat_confirm_enabled', '0')) === '1';
     if (chatConfirmEnabled) {
       const msgTpl = await db.getSettingStr('songrequest_confirm', '🎵 @{username}, ta musique a été ajoutée à la file !');
       const msg = String(msgTpl || '').replaceAll('@{username}', `@${username}`).replaceAll('{username}', username).replaceAll('{song}', raw);

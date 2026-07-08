@@ -4228,6 +4228,7 @@ async function loadSongRequest() {
     setChecked('sr-enabled', !!d.enabled);
     setVal('sr-command', d.command || '!sr');
     setVal('sr-confirm', d.confirmMessage || '🎵 @{username}, ta musique a été ajoutée à la file !');
+    setChecked('sr-chat-confirm', d.chatConfirmEnabled === true);
     setVal('sr-max', d.maxQueue || 30);
     const url = document.getElementById('songrequest-obs-url');
     if (url) url.textContent = window.location.origin + '/widgets/songrequest.html';
@@ -4261,6 +4262,7 @@ async function saveSongRequestSettings() {
     enabled: document.getElementById('sr-enabled')?.checked === true,
     command: (document.getElementById('sr-command')?.value || '!sr').trim(),
     confirmMessage: (document.getElementById('sr-confirm')?.value || '').trim(),
+    chatConfirmEnabled: document.getElementById('sr-chat-confirm')?.checked === true,
     maxQueue: parseInt(document.getElementById('sr-max')?.value || '30') || 30
   };
   await fetch(API + '/api/admin/widgets/songrequest/settings', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body) });

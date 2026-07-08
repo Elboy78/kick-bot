@@ -692,7 +692,7 @@ async function getSongRequestState() {
     enabled: await db.getSetting('songrequest_enabled'),
     command: await db.getSettingStr('songrequest_command', '!sr'),
     confirmMessage: await db.getSettingStr('songrequest_confirm', '🎵 @{username}, ta musique a été ajoutée à la file !'),
-    chatConfirmEnabled: await db.getSetting('songrequest_chat_confirm_enabled'),
+    chatConfirmEnabled: (await db.getSettingStr('songrequest_chat_confirm_enabled', '0')) === '1',
     maxQueue: parseInt(await db.getSettingStr('songrequest_max_queue', '30')) || 30,
     queue: Array.isArray(queue) ? queue : []
   };
@@ -730,7 +730,7 @@ app.post('/api/admin/widgets/songrequest/settings', requireAuth, async (req, res
       await db.setSettingStr('songrequest_command', command.toLowerCase());
     }
     if (typeof req.body.confirmMessage === 'string') await db.setSettingStr('songrequest_confirm', req.body.confirmMessage.trim().slice(0,180));
-    if (typeof req.body.chatConfirmEnabled === 'boolean') await db.setSetting('songrequest_chat_confirm_enabled', req.body.chatConfirmEnabled);
+    if (typeof req.body.chatConfirmEnabled === 'boolean') await db.setSettingStr('songrequest_chat_confirm_enabled', req.body.chatConfirmEnabled ? '1' : '0');
     if (req.body.maxQueue !== undefined) await db.setSettingStr('songrequest_max_queue', String(Math.min(100, Math.max(1, parseInt(req.body.maxQueue) || 30))));
     res.json({ success:true, ...(await getSongRequestState()) });
   } catch(e) { res.status(500).json({ error:e.message }); }
