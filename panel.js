@@ -317,6 +317,7 @@ async function processKickEvent(eventTypeRaw, payload = {}) {
     const enabled = await db.getSetting('follow_announce_enabled');
     // Synchronise aussi l'ancien réglage utilisé par le tracker followers de bot.js
     await db.setSetting('follow_alerts', enabled).catch(()=>{});
+    await pushObsAlert('follow', { username }).catch(e=>console.warn('[ALERT OBS] follow ignorée:', e.message));
     if (enabled) {
       const template = await db.getSettingStr('follow_announce_message', DEFAULT_FOLLOW_MSG);
       const message = template.replace(/\{username\}/gi, username).replace(/@\s*@/g, '@');
@@ -328,6 +329,7 @@ async function processKickEvent(eventTypeRaw, payload = {}) {
   if (eventType === 'channel.subscription.new') {
     const info = extractSubInfo(payload);
     await recordSubEvent('new', { username: info.username, count: 1 });
+    await pushObsAlert('sub', { username: info.username }).catch(e=>console.warn('[ALERT OBS] sub ignorée:', e.message));
     const enabled = await db.getSetting('sub_announce_enabled');
     if (enabled) {
       const template = await db.getSettingStr('sub_announce_new', DEFAULT_SUB_NEW_MSG);
@@ -340,6 +342,7 @@ async function processKickEvent(eventTypeRaw, payload = {}) {
   if (eventType === 'channel.subscription.renewal') {
     const info = extractSubInfo(payload);
     await recordSubEvent('renewal', { username: info.username, months: info.months });
+    await pushObsAlert('renew', { username: info.username, months: info.months }).catch(e=>console.warn('[ALERT OBS] renew ignorée:', e.message));
     const enabled = await db.getSetting('sub_announce_enabled');
     if (enabled) {
       const template = await db.getSettingStr('sub_announce_renew', DEFAULT_SUB_RENEW_MSG);
@@ -355,6 +358,7 @@ async function processKickEvent(eventTypeRaw, payload = {}) {
     const gifter = isAnon ? 'un anonyme' : (gifterRaw || 'Anonyme');
     const count = parseInt(data?.count || data?.gift_count || data?.giftees?.length || data?.recipients?.length || 1) || 1;
     await recordSubEvent('gift', { gifter, count });
+    await pushObsAlert('gift', { gifter, count }).catch(e=>console.warn('[ALERT OBS] gift ignorée:', e.message));
     const enabled = await db.getSetting('sub_announce_enabled');
     if (enabled) {
       const template = await db.getSettingStr('sub_announce_gift', DEFAULT_SUB_GIFT_MSG);
@@ -1707,6 +1711,108 @@ app.get('/api/bot-status', async (req, res) => {
   } catch(e) { res.json({ tokenExpired: false }); }
 });
 
+
+
+
+// ── Alertes OBS ───────────────────────────────────────────────────────────────
+const ALERT_TYPES = ['follow','sub','renew','gift','raid','donation','bits','custom'];
+const ALERT_LABELS = {
+  follow:'Follow', sub:'Abonnement', renew:'Renouvellement', gift:'Sub offerte', raid:'Raid', donation:'Don', bits:'Bits', custom:'Alerte personnalisée'
+};
+const ALERT_DEFAULTS = {
+  follow:   { enabled:true,  title:'Nouveau follow',       message:'{username} vient de follow !', image:'', sound:'', volume:35, duration:6, animation:'fade', layout:'image_top', textTop:'#ffffff', textBottom:'#22c55e' },
+  sub:      { enabled:true,  title:'Nouvel abonnement',    message:'{username} vient de s’abonner !', image:'', sound:'', volume:40, duration:7, animation:'pop', layout:'image_top', textTop:'#ffffff', textBottom:'#22c55e' },
+  renew:    { enabled:true,  title:'Renouvellement',       message:'{username} est sub depuis {months} mois !', image:'', sound:'', volume:40, duration:7, animation:'pop', layout:'image_top', textTop:'#ffffff', textBottom:'#22c55e' },
+  gift:     { enabled:true,  title:'Sub offerte',          message:'{gifter} offre {count} sub !', image:'', sound:'', volume:40, duration:7, animation:'pop', layout:'image_top', textTop:'#ffffff', textBottom:'#22c55e' },
+  raid:     { enabled:true,  title:'Raid',                 message:'{username} raid avec {count} viewers !', image:'', sound:'', volume:45, duration:8, animation:'slide', layout:'image_left', textTop:'#ffffff', textBottom:'#38bdf8' },
+  donation: { enabled:false, title:'Donation',             message:'{username} donne {amount}€ : {message}', image:'', sound:'', volume:40, duration:8, animation:'pop', layout:'image_top', textTop:'#ffffff', textBottom:'#f59e0b' },
+  bits:     { enabled:false, title:'Bits',                 message:'{username} envoie {amount} bits !', image:'', sound:'', volume:40, duration:7, animation:'pop', layout:'image_top', textTop:'#ffffff', textBottom:'#a78bfa' },
+  custom:   { enabled:true,  title:'Alerte personnalisée', message:'Alerte test pour {username}', image:'', sound:'', volume:35, duration:6, animation:'fade', layout:'image_top', textTop:'#ffffff', textBottom:'#22c55e' }
+};
+
+function sanitizeAlertType(type) {
+  const t = String(type || '').toLowerCase().trim();
+  return ALERT_TYPES.includes(t) ? t : 'custom';
+}
+function normalizeAlertCfg(type, raw={}) {
+  const d = ALERT_DEFAULTS[sanitizeAlertType(type)] || ALERT_DEFAULTS.custom;
+  return {
+    enabled: raw.enabled !== undefined ? !!raw.enabled : !!d.enabled,
+    title: String(raw.title ?? d.title).slice(0, 80),
+    message: String(raw.message ?? d.message).slice(0, 250),
+    image: String(raw.image ?? d.image).slice(0, 500),
+    sound: String(raw.sound ?? d.sound).slice(0, 500),
+    volume: Math.min(100, Math.max(0, parseInt(raw.volume ?? d.volume) || d.volume)),
+    duration: Math.min(30, Math.max(2, parseInt(raw.duration ?? d.duration) || d.duration)),
+    animation: ['fade','pop','slide','zoom'].includes(String(raw.animation ?? d.animation)) ? String(raw.animation ?? d.animation) : d.animation,
+    layout: ['image_top','image_left','text_only'].includes(String(raw.layout ?? d.layout)) ? String(raw.layout ?? d.layout) : d.layout,
+    textTop: /^#[0-9a-f]{6}$/i.test(String(raw.textTop ?? d.textTop)) ? String(raw.textTop ?? d.textTop) : d.textTop,
+    textBottom: /^#[0-9a-f]{6}$/i.test(String(raw.textBottom ?? d.textBottom)) ? String(raw.textBottom ?? d.textBottom) : d.textBottom
+  };
+}
+async function getAlertConfig(type) {
+  type = sanitizeAlertType(type);
+  const raw = await db.getSettingStr('alert_config_' + type, '');
+  let parsed = {};
+  if (raw) { try { parsed = JSON.parse(raw); } catch { parsed = {}; } }
+  return normalizeAlertCfg(type, parsed);
+}
+async function getAllAlertConfigs() {
+  const out = {};
+  for (const t of ALERT_TYPES) out[t] = await getAlertConfig(t);
+  return out;
+}
+function fillAlertTemplate(str, vars={}) {
+  return String(str || '').replace(/\{(username|months|gifter|count|amount|message)\}/gi, (_, k) => String(vars[String(k).toLowerCase()] ?? ''));
+}
+async function pushObsAlert(type, vars={}, force=false) {
+  type = sanitizeAlertType(type);
+  const cfg = await getAlertConfig(type);
+  if (!force && !cfg.enabled) return { success:true, ignored:true, reason:'disabled', type };
+  const payload = {
+    id: `${Date.now()}_${Math.random().toString(36).slice(2,8)}`,
+    type,
+    label: ALERT_LABELS[type] || type,
+    title: fillAlertTemplate(cfg.title, vars),
+    message: fillAlertTemplate(cfg.message, vars),
+    vars,
+    cfg,
+    createdAt: new Date().toISOString()
+  };
+  io.emit('alert-overlay-event', payload);
+  console.log('[ALERT OBS]', type, payload.message);
+  return { success:true, alert: payload };
+}
+function kickEventToAlertType(eventType) {
+  const t = normalizeKickEventType(eventType || '');
+  if (t === 'channel.followed') return 'follow';
+  if (t === 'channel.subscription.new') return 'sub';
+  if (t === 'channel.subscription.renewal') return 'renew';
+  if (t === 'channel.subscription.gifts') return 'gift';
+  if (String(eventType || '').toLowerCase().includes('raid')) return 'raid';
+  return '';
+}
+
+app.get('/api/widgets/alerts', async (req, res) => {
+  try { res.json({ types: ALERT_TYPES, labels: ALERT_LABELS, configs: await getAllAlertConfigs() }); }
+  catch(e) { res.status(500).json({ error: e.message }); }
+});
+app.post('/api/admin/widgets/alerts/:type', requireAuth, async (req, res) => {
+  try {
+    const type = sanitizeAlertType(req.params.type);
+    const cfg = normalizeAlertCfg(type, req.body || {});
+    await db.setSettingStr('alert_config_' + type, JSON.stringify(cfg));
+    io.emit('alert-overlay-settings', { configs: await getAllAlertConfigs() });
+    res.json({ success:true, type, cfg });
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+app.post('/api/admin/widgets/alerts/:type/test', requireAuth, async (req, res) => {
+  try {
+    const type = sanitizeAlertType(req.params.type);
+    const vars = Object.assign({ username:'Elboy78', months:3, gifter:'TestGift', count:5, amount:'10', message:'Message test' }, req.body || {});
+    res.json(await pushObsAlert(type, vars, true));
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
 
 // ── Chat Overlay OBS ──────────────────────────────────────────────────────────
 

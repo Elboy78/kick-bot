@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>OBS Alertes</title>
+<script src="/socket.io/socket.io.js"></script>
+<style>
+  html,body{margin:0;width:100%;height:100%;overflow:hidden;background:transparent;font-family:Inter,Arial,sans-serif}
+  #stage{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;pointer-events:none}
+  .alert{min-width:320px;max-width:720px;padding:26px 30px;border-radius:24px;background:linear-gradient(180deg,rgba(8,12,22,.86),rgba(6,8,14,.72));border:1px solid rgba(255,255,255,.18);box-shadow:0 24px 80px rgba(0,0,0,.55),0 0 48px rgba(34,197,94,.18);color:white;text-align:center;backdrop-filter:blur(8px);opacity:0;transform:translateY(18px) scale(.96)}
+  .alert.show.fade{animation:fadeIn .28s ease forwards}.alert.hide.fade{animation:fadeOut .25s ease forwards}.alert.show.pop{animation:popIn .34s cubic-bezier(.2,1.25,.35,1) forwards}.alert.hide.pop{animation:fadeOut .22s ease forwards}.alert.show.slide{animation:slideIn .34s ease forwards}.alert.hide.slide{animation:slideOut .25s ease forwards}.alert.show.zoom{animation:zoomIn .34s ease forwards}.alert.hide.zoom{animation:zoomOut .22s ease forwards}
+  .alert.layout-image_left{display:flex;align-items:center;gap:22px;text-align:left}.alert.layout-text_only .media{display:none}.media{display:block;max-width:180px;max-height:130px;object-fit:contain;margin:0 auto 16px;border-radius:16px;filter:drop-shadow(0 14px 28px rgba(0,0,0,.4))}.layout-image_left .media{margin:0;max-width:150px;max-height:120px}.title{font-size:34px;line-height:1.05;font-weight:950;text-shadow:0 4px 18px rgba(0,0,0,.7);letter-spacing:-.8px}.message{font-size:24px;line-height:1.22;font-weight:900;margin-top:10px;text-shadow:0 4px 18px rgba(0,0,0,.75)}.type{font-size:12px;text-transform:uppercase;letter-spacing:1.8px;color:#86efac;font-weight:950;margin-bottom:8px}
+  @keyframes fadeIn{to{opacity:1;transform:translateY(0) scale(1)}}@keyframes fadeOut{from{opacity:1;transform:translateY(0) scale(1)}to{opacity:0;transform:translateY(12px) scale(.97)}}@keyframes popIn{0%{opacity:0;transform:scale(.7)}70%{opacity:1;transform:scale(1.05)}100%{opacity:1;transform:scale(1)}}@keyframes slideIn{from{opacity:0;transform:translateX(-90px)}to{opacity:1;transform:translateX(0)}}@keyframes slideOut{from{opacity:1;transform:translateX(0)}to{opacity:0;transform:translateX(90px)}}@keyframes zoomIn{from{opacity:0;transform:scale(1.25);filter:blur(6px)}to{opacity:1;transform:scale(1);filter:blur(0)}}@keyframes zoomOut{from{opacity:1;transform:scale(1)}to{opacity:0;transform:scale(.88)}}
+</style>
+</head>
+<body>
+<div id="stage"></div>
+<script>
+const socket = io();
+const stage = document.getElementById('stage');
+let queue = [];
+let playing = false;
+function esc(v){return String(v||'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+function next(){ if(playing || !queue.length) return; play(queue.shift()); }
+function play(a){
+  playing = true;
+  const cfg = a.cfg || {};
+  const dur = Math.max(2, Math.min(30, parseInt(cfg.duration||6)))*1000;
+  const anim = cfg.animation || 'fade';
+  const layout = cfg.layout || 'image_top';
+  const el = document.createElement('div');
+  el.className = `alert show ${anim} layout-${layout}`;
+  el.innerHTML = `${cfg.image?`<img class="media" src="${esc(cfg.image)}">`:''}<div class="content"><div class="type">${esc(a.label||a.type||'Alerte')}</div><div class="title" style="color:${esc(cfg.textTop||'#fff')}">${esc(a.title||'')}</div><div class="message" style="color:${esc(cfg.textBottom||'#22c55e')}">${esc(a.message||'')}</div></div>`;
+  stage.innerHTML=''; stage.appendChild(el);
+  let audio = null;
+  if(cfg.sound){ audio = new Audio(cfg.sound); audio.volume = Math.max(0, Math.min(1, (parseInt(cfg.volume||35)||35)/100)); audio.play().catch(()=>{}); }
+  setTimeout(()=>{ el.classList.remove('show'); el.classList.add('hide'); if(audio){ try{audio.pause(); audio.currentTime=0;}catch{} } setTimeout(()=>{ stage.innerHTML=''; playing=false; next(); }, 320); }, dur);
+}
+socket.on('alert-overlay-event', a => { queue.push(a); next(); });
+</script>
+</body>
+</html>

@@ -387,6 +387,7 @@ hr.div{border:none;border-top:1px solid var(--brd);margin:12px 0}
     <a onclick="showPage('vods')">🎬 VODs &amp; Clips</a>
     <a onclick="showPage('subdon')">🎁 Sub/Don</a>
     <a onclick="showPage('widgets')">🧩 Widgets</a>
+    <a onclick="showPage('alertes')">🚨 Alertes</a>
     <a onclick="showPage('chests')">🩸 Defis</a>
     <a onclick="showPage('logs')">📋 Logs</a>
     <a onclick="showPage('objectifs')">🎯 Objectifs</a>
@@ -1231,6 +1232,47 @@ Option 3" rows="4"></textarea><div style="display:flex;gap:6px;margin-top:10px">
 
   </div>
 
+
+
+  <!-- ══ ALERTES OBS ══ -->
+  <div class="page" id="page-alertes">
+    <div class="header"><div><h1>Alertes</h1><p>Alertes OBS branchées sur les events Kick du bot</p></div><button class="btn" onclick="loadAlertsPanel()">↻ Actualiser</button></div>
+    <style>
+      .alert-tabs{display:flex;gap:8px;flex-wrap:wrap;margin:12px 0 18px}.alert-tab{border:1px solid var(--brd);background:#151824;color:var(--text);border-radius:10px;padding:10px 14px;font-weight:900;cursor:pointer}.alert-tab.active{border-color:#22c55e;background:rgba(34,197,94,.18)}
+      .alert-grid{display:grid;grid-template-columns:1fr 420px;gap:18px}.alert-form{display:grid;grid-template-columns:220px 1fr;gap:14px;align-items:center}.alert-form label{color:var(--muted);font-weight:800;font-size:12px}.alert-preview{min-height:250px;display:flex;align-items:center;justify-content:center;background:radial-gradient(circle at 50% 10%,rgba(34,197,94,.12),rgba(0,0,0,.25));border:1px solid var(--brd);border-radius:16px;overflow:hidden}.alert-preview-card{min-width:260px;text-align:center;padding:22px;border-radius:20px;background:rgba(5,8,15,.8);box-shadow:0 18px 50px rgba(0,0,0,.45);border:1px solid rgba(255,255,255,.12)}.alert-preview-card img{max-width:120px;max-height:90px;object-fit:contain;border-radius:12px;margin-bottom:12px}.alert-layout-left{display:flex;align-items:center;gap:16px;text-align:left}.alert-layout-left img{margin:0}.alert-text-only img{display:none}.alert-mini{font-size:11px;color:var(--muted);line-height:1.5}.alert-actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:16px}.alert-actions button{justify-content:center}.alert-switch{position:relative;width:46px;height:24px;display:inline-block}.alert-switch input{opacity:0;width:0;height:0;position:absolute}.alert-switch span{position:absolute;inset:0;background:#161827;border:1px solid var(--brd);border-radius:999px;transition:.18s}.alert-switch span:before{content:'';position:absolute;width:18px;height:18px;left:3px;top:2px;border-radius:50%;background:#6b7280;transition:.18s}.alert-switch input:checked+span{background:rgba(34,197,94,.35);border-color:#22c55e}.alert-switch input:checked+span:before{transform:translateX(21px);background:#86efac}@media(max-width:1000px){.alert-grid{grid-template-columns:1fr}.alert-form{grid-template-columns:1fr}}
+    </style>
+    <div class="card" style="margin-bottom:16px">
+      <div class="obs-link-head"><b>🔗 Lien overlay OBS Alertes</b><button class="obs-copy-btn" onclick="copyObsUrl('alerts-obs-url')">Copier</button></div>
+      <div class="obs-link-row"><code class="obs-link-code" id="alerts-obs-url">/widgets/alerts.html</code></div>
+      <div class="alert-mini">Ne partage pas ce lien en live. Ajoute-le comme source navigateur OBS.</div>
+    </div>
+    <div class="alert-tabs" id="alert-tabs"></div>
+    <div class="alert-grid">
+      <div class="card">
+        <h3 id="alert-edit-title">Configuration</h3>
+        <div class="alert-form">
+          <label>Alerte active</label><label class="alert-switch"><input type="checkbox" id="alert-enabled"><span></span></label>
+          <label>Nom affiché</label><input class="inp" id="alert-title" placeholder="Nouveau follow">
+          <label>Message</label><input class="inp" id="alert-message" placeholder="{username} vient de follow !">
+          <label>Image / GIF URL</label><input class="inp" id="alert-image" placeholder="https://...gif">
+          <label>Son URL</label><input class="inp" id="alert-sound" placeholder="https://...mp3">
+          <label>Volume</label><input class="inp" id="alert-volume" type="range" min="0" max="100">
+          <label>Durée</label><input class="inp" id="alert-duration" type="range" min="2" max="30">
+          <label>Animation</label><select class="inp" id="alert-animation"><option value="fade">Fade</option><option value="pop">Pop</option><option value="slide">Slide</option><option value="zoom">Zoom</option></select>
+          <label>Disposition</label><select class="inp" id="alert-layout"><option value="image_top">Image au-dessus</option><option value="image_left">Image à gauche</option><option value="text_only">Texte seul</option></select>
+          <label>Couleur titre</label><input class="inp" id="alert-textTop" type="color">
+          <label>Couleur message</label><input class="inp" id="alert-textBottom" type="color">
+        </div>
+        <div class="alert-mini" style="margin-top:14px">Variables : {username}, {months}, {gifter}, {count}, {amount}, {message}</div>
+        <div class="alert-actions"><button class="dark-btn" onclick="saveAlertConfig()">ENREGISTRER</button><button class="dark-btn" onclick="testAlertConfig()">TESTER DANS OBS</button></div>
+      </div>
+      <div class="card">
+        <h3>👁️ Aperçu</h3>
+        <div class="alert-preview"><div id="alert-preview-card" class="alert-preview-card"><img id="alert-preview-img" src=""><div id="alert-preview-title" style="font-size:22px;font-weight:950">Nouveau follow</div><div id="alert-preview-msg" style="font-size:16px;font-weight:900;margin-top:8px">Elboy78 vient de follow !</div></div></div>
+      </div>
+    </div>
+  </div>
+
   <!-- ══ SUB / DON ══ -->
   <div class="page" id="page-subdon">
     <div class="header"><div><h1>Sub / Don</h1><p>Alertes de follow, sub et donation dans le chat</p></div></div>
@@ -1568,7 +1610,7 @@ Option 3" rows="4"></textarea><div style="display:flex;gap:6px;margin-top:10px">
 const API = '';
 const MEDALS = ['🥇','🥈','🥉'];
 let lbData = [], levels = [];
-const PAGE_TITLES = {dashboard:'Dashboard',classement:'Classement',lobby:'Lobby',jeux:'Jeux',objectifs:'Objectifs',dbd:'Dead by Daylight',moderation:'Modération',commands:'Commandes',historique:'Historique',admin:'Administration',settings:'Paramètres',outils:'Outils Chat'};
+const PAGE_TITLES = {dashboard:'Dashboard',classement:'Classement',lobby:'Lobby',jeux:'Jeux',objectifs:'Objectifs',dbd:'Dead by Daylight',moderation:'Modération',commands:'Commandes',historique:'Historique',admin:'Administration',settings:'Paramètres',outils:'Outils Chat',alertes:'Alertes'};
 let songRequestRefreshTimer = null;
 
 // ── Navigation ─────────────────────────────────────────────────────────────────
@@ -1788,6 +1830,7 @@ function showPage(name) {
   if(name==='logs') loadModerationLogs();
   if(name==='chests') loadChests();
   if(name==='widgets') { backToWidgetsHome(); loadSubGoal(); }
+  if(name==='alertes') loadAlertsPanel();
   if(name==='admin') { loadCmds(); loadAdminLevels(); loadAccessRequests(); }
   if(name==='commands') { loadCommandsPage(); loadSystemCommands(); }
   if(name==='dbd') initDBD();
@@ -4644,10 +4687,58 @@ function hydrateAllObsLinks() {
   setObsUrl('subgoal-obs-url', '/widgets/subgoal.html');
   setObsUrl('songrequest-obs-url', '/widgets/songrequest.html');
   setObsUrl('chat-obs-url', '/widgets/chat.html');
+  setObsUrl('alerts-obs-url', '/widgets/alerts.html');
 }
 
 function escapeHtml(v) { return String(v || '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c] || c)); }
 function escapeAttr(v) { return escapeHtml(v); }
+
+
+
+// ── Alertes OBS ───────────────────────────────────────────────────────────────
+function alertSetVal(id, value){ const el=document.getElementById(id); if(el) el.value=value; }
+function alertSetChk(id, checked){ const el=document.getElementById(id); if(el) el.checked=!!checked; }
+function alertVal(id){ return document.getElementById(id)?.value || ''; }
+const ALERT_TYPES_UI = ['follow','sub','renew','gift','raid','donation','bits','custom'];
+const ALERT_LABELS_UI = {follow:'❤️ Follow',sub:'⭐ Abonnement',renew:'🔄 Renouvellement',gift:'🎁 Sub offerte',raid:'🚨 Raid',donation:'💸 Don',bits:'💎 Bits',custom:'🧪 Custom'};
+let alertsConfigs = {}, currentAlertType = 'follow';
+function showPageHookAlerts(page){ if(page==='alertes') setTimeout(loadAlertsPanel, 50); }
+async function loadAlertsPanel(){
+  setObsUrl('alerts-obs-url','/widgets/alerts.html');
+  const r = await fetch(API + '/api/widgets/alerts');
+  const d = await r.json();
+  alertsConfigs = d.configs || {};
+  renderAlertTabs();
+  selectAlertType(currentAlertType || 'follow');
+}
+function renderAlertTabs(){
+  const box = document.getElementById('alert-tabs'); if(!box) return;
+  box.innerHTML = ALERT_TYPES_UI.map(t=>`<button class="alert-tab ${t===currentAlertType?'active':''}" onclick="selectAlertType('${t}')">${ALERT_LABELS_UI[t]||t}</button>`).join('');
+}
+function selectAlertType(type){
+  currentAlertType = type;
+  renderAlertTabs();
+  const c = alertsConfigs[type] || {};
+  alertSetChk('alert-enabled', c.enabled !== false);
+  alertSetVal('alert-title', c.title || ''); alertSetVal('alert-message', c.message || ''); alertSetVal('alert-image', c.image || ''); alertSetVal('alert-sound', c.sound || '');
+  alertSetVal('alert-volume', c.volume ?? 35); alertSetVal('alert-duration', c.duration ?? 6); alertSetVal('alert-animation', c.animation || 'fade'); alertSetVal('alert-layout', c.layout || 'image_top');
+  alertSetVal('alert-textTop', c.textTop || '#ffffff'); alertSetVal('alert-textBottom', c.textBottom || '#22c55e');
+  const title = document.getElementById('alert-edit-title'); if(title) title.textContent = 'Configuration : ' + (ALERT_LABELS_UI[type] || type);
+  updateAlertPreview();
+}
+function getAlertFormData(){ return { enabled: !!document.getElementById('alert-enabled')?.checked, title: alertVal('alert-title'), message: alertVal('alert-message'), image: alertVal('alert-image'), sound: alertVal('alert-sound'), volume: parseInt(alertVal('alert-volume')||35), duration: parseInt(alertVal('alert-duration')||6), animation: alertVal('alert-animation'), layout: alertVal('alert-layout'), textTop: alertVal('alert-textTop') || '#ffffff', textBottom: alertVal('alert-textBottom') || '#22c55e' }; }
+function demoText(t){ return String(t||'').replaceAll('{username}','Elboy78').replaceAll('{months}','3').replaceAll('{gifter}','Nakel').replaceAll('{count}','5').replaceAll('{amount}','10').replaceAll('{message}','Message test'); }
+function updateAlertPreview(){
+  const c = getAlertFormData();
+  const card = document.getElementById('alert-preview-card'), img = document.getElementById('alert-preview-img'), ttl = document.getElementById('alert-preview-title'), msg = document.getElementById('alert-preview-msg');
+  if(!card) return; card.className = 'alert-preview-card ' + (c.layout==='image_left'?'alert-layout-left':'') + (c.layout==='text_only'?' alert-text-only':'');
+  if(img){ img.src = c.image || ''; img.style.display = c.image && c.layout!=='text_only' ? '' : 'none'; }
+  if(ttl){ ttl.textContent = demoText(c.title); ttl.style.color = c.textTop; }
+  if(msg){ msg.textContent = demoText(c.message); msg.style.color = c.textBottom; }
+}
+async function saveAlertConfig(){ const body = getAlertFormData(); const r = await fetch(API + '/api/admin/widgets/alerts/' + currentAlertType, { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body)}); if(r.ok){ alertsConfigs[currentAlertType]=body; toast('Alerte enregistrée ✓'); } else toast('Erreur sauvegarde alerte'); }
+async function testAlertConfig(){ await saveAlertConfig(); await fetch(API + '/api/admin/widgets/alerts/' + currentAlertType + '/test', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({})}); toast('Alerte test envoyée dans OBS'); }
+['alert-enabled','alert-title','alert-message','alert-image','alert-volume','alert-duration','alert-animation','alert-layout','alert-textTop','alert-textBottom'].forEach(id=>document.addEventListener('input', e=>{ if(e.target && e.target.id===id) updateAlertPreview(); }));
 
 try {
   const srSocket = window.chestSocket || (typeof io === 'function' ? io() : null);
@@ -4683,6 +4774,7 @@ function applyChatOverlaySettings(d) {
   setVal('co-animation', d.animation || 'pop');
   setVal('co-design', d.design || 'glass');
   setObsUrl('chat-obs-url', '/widgets/chat.html');
+  setObsUrl('alerts-obs-url', '/widgets/alerts.html');
 }
 async function loadChatOverlaySettings() {
   let backup = null;
