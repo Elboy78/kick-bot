@@ -938,15 +938,25 @@ Option 3" rows="4"></textarea><div style="display:flex;gap:6px;margin-top:10px">
       <div style="font-size:10px;color:var(--muted);font-weight:800;text-transform:uppercase;letter-spacing:.7px">Widget actif : Song Request</div>
     </div>
     <div class="header"><div><h1>Song Request</h1><p>File d’attente musicale pilotée par le chat</p></div></div>
+    <style>
+      #widget-songrequest-settings .sr-toggle-line{display:flex;align-items:center;gap:10px;margin:8px 0 12px;font-size:13px;color:var(--text);cursor:pointer;user-select:none}
+      #widget-songrequest-settings .sr-switch{position:relative;width:46px;height:24px;display:inline-block;flex:0 0 46px}
+      #widget-songrequest-settings .sr-switch input{opacity:0;width:0;height:0;position:absolute}
+      #widget-songrequest-settings .sr-switch span{position:absolute;inset:0;background:#161827;border:1px solid var(--brd);border-radius:999px;transition:.18s;box-shadow:inset 0 0 0 1px rgba(255,255,255,.03)}
+      #widget-songrequest-settings .sr-switch span:before{content:'';position:absolute;width:18px;height:18px;left:3px;top:2px;border-radius:50%;background:#6b7280;transition:.18s;box-shadow:0 2px 8px rgba(0,0,0,.35)}
+      #widget-songrequest-settings .sr-switch input:checked + span{background:rgba(124,58,237,.35);border-color:#8b5cf6}
+      #widget-songrequest-settings .sr-switch input:checked + span:before{transform:translateX(21px);background:#a78bfa}
+    </style>
+
     <div class="g2">
       <div class="panel">
         <h3>⚙️ Paramètres</h3>
-        <label class="row" style="margin:8px 0 12px"><input type="checkbox" id="sr-enabled"> Activer les song requests</label>
+        <label class="sr-toggle-line"><span class="sr-switch"><input type="checkbox" id="sr-enabled"><span></span></span><b>Activer les song requests</b></label>
         <label class="lbl">Commande chat</label>
         <input class="inp" id="sr-command" placeholder="!sr" maxlength="20" style="margin-bottom:10px">
         <label class="lbl">Message de confirmation</label>
         <input class="inp" id="sr-confirm" placeholder="🎵 @{username}, ta musique a été ajoutée" maxlength="180" style="margin-bottom:10px">
-        <label class="row" style="margin:0 0 10px"><input type="checkbox" id="sr-chat-confirm"> Envoyer le message de confirmation dans le chat</label>
+        <label class="sr-toggle-line"><span class="sr-switch"><input type="checkbox" id="sr-chat-confirm"><span></span></span><b>Envoyer le message de confirmation dans le chat</b></label>
         <label class="lbl">Nombre maximum dans la file</label>
         <input type="number" class="inp" id="sr-max" min="1" max="100" placeholder="30" style="margin-bottom:12px">
         <button class="dark-btn" onclick="saveSongRequestSettings()" style="width:100%;justify-content:center">ENREGISTRER</button>
@@ -4302,6 +4312,10 @@ function copyDetectedToken() {
 let srLastQueue = [];
 let srPlayer = { status:'stopped', currentTime:0, duration:0, volume:100, itemId:'' };
 let srProgressTimer = null;
+let srPollTimer = null;
+function srSetVal(id, val) { const el = document.getElementById(id); if (el && document.activeElement !== el) el.value = val; }
+function srSetChecked(id, val) { const el = document.getElementById(id); if (el) el.checked = !!val; }
+function isSongRequestOpen() { const el = document.getElementById('widget-songrequest-settings'); return !!el && el.style.display !== 'none'; }
 
 function fmtSongTime(seconds) {
   seconds = Math.max(0, Math.floor(Number(seconds || 0)));
@@ -4314,11 +4328,11 @@ async function loadSongRequest(silent = false) {
   try {
     const r = await fetch(API + '/api/widgets/songrequest?ts=' + Date.now(), { cache: 'no-store' });
     const d = await r.json();
-    setChecked('sr-enabled', !!d.enabled);
-    setVal('sr-command', d.command || '!sr');
-    setVal('sr-confirm', d.confirmMessage || '🎵 @{username}, ta musique a été ajoutée à la file !');
-    setChecked('sr-chat-confirm', d.chatConfirmEnabled === true);
-    setVal('sr-max', d.maxQueue || 30);
+    srSetChecked('sr-enabled', !!d.enabled);
+    srSetVal('sr-command', d.command || '!sr');
+    srSetVal('sr-confirm', d.confirmMessage || '🎵 @{username}, ta musique a été ajoutée à la file !');
+    srSetChecked('sr-chat-confirm', d.chatConfirmEnabled === true);
+    srSetVal('sr-max', d.maxQueue || 30);
     const vol = document.getElementById('sr-volume');
     if (vol && d.player?.volume !== undefined) vol.value = d.player.volume;
     const url = document.getElementById('songrequest-obs-url');
@@ -4340,6 +4354,7 @@ function renderSongRequestPlayer(queue = srLastQueue, player = srPlayer) {
   const meta = document.getElementById('sr-now-meta');
   const seek = document.getElementById('sr-seek');
   const status = document.getElementById('sr-status');
+  if (!cur) player = Object.assign({}, player, { status:'stopped', currentTime:0, duration:0, itemId:'' });
   const duration = Math.max(Number(player.duration || 0), Number(cur?.duration || 0), 0);
   const current = Math.max(0, Math.min(Number(player.currentTime || 0), duration || Number(player.currentTime || 0)));
   if (thumb) thumb.innerHTML = cur?.thumbnail ? `<img src="${escapeAttr(cur.thumbnail)}" style="width:100%;height:100%;object-fit:cover" onerror="this.parentNode.textContent='🎵'">` : '🎵';
@@ -4358,6 +4373,13 @@ function startSongRequestProgressTimer(){
   }, 1000);
 }
 startSongRequestProgressTimer();
+function startSongRequestPolling(){
+  if (srPollTimer) clearInterval(srPollTimer);
+  srPollTimer = setInterval(() => { if (isSongRequestOpen()) loadSongRequest(true); }, 2500);
+  window.addEventListener('focus', () => { if (isSongRequestOpen()) loadSongRequest(true); });
+  document.addEventListener('visibilitychange', () => { if (!document.hidden && isSongRequestOpen()) loadSongRequest(true); });
+}
+startSongRequestPolling();
 
 function renderSongRequestQueue(queue) {
   const box = document.getElementById('songrequest-queue');
@@ -4395,9 +4417,11 @@ async function saveSongRequestSettings() {
     chatConfirmEnabled: document.getElementById('sr-chat-confirm')?.checked === true,
     maxQueue: parseInt(document.getElementById('sr-max')?.value || '30') || 30
   };
-  await fetch(API + '/api/admin/widgets/songrequest/settings', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body) });
+  const r = await fetch(API + '/api/admin/widgets/songrequest/settings', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body) });
+  const d = await r.json().catch(()=>null);
   toast('Song Request enregistré ✓');
-  loadSongRequest();
+  if (d) { srLastQueue = Array.isArray(d.queue) ? d.queue : srLastQueue; srPlayer = Object.assign(srPlayer, d.player || {}); renderSongRequestQueue(srLastQueue); renderSongRequestPlayer(srLastQueue, srPlayer); }
+  loadSongRequest(true);
 }
 
 async function addSongRequestManual() {
@@ -4407,7 +4431,7 @@ async function addSongRequestManual() {
   const r = await fetch(API + '/api/admin/widgets/songrequest/add', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ username, song }) });
   const d = await r.json().catch(()=>({}));
   if (!r.ok) return toast(d.error || 'Impossible d’ajouter la musique');
-  setVal('sr-manual-song', '');
+  srSetVal('sr-manual-song', '');
   toast('Musique ajoutée ✓');
   loadSongRequest();
 }
@@ -4468,7 +4492,7 @@ function formatSongRequestHotkey(h) {
 function loadSongRequestHotkeys() {
   const h = getSongRequestHotkeys();
   const enabled = document.getElementById('sr-hotkeys-enabled');
-  if (enabled) enabled.checked = h.enabled !== false;
+  srSetChecked('sr-hotkeys-enabled', h.enabled !== false);
   const bToggle = document.getElementById('sr-hotkey-toggle');
   const bNext = document.getElementById('sr-hotkey-next');
   if (bToggle) bToggle.textContent = formatSongRequestHotkey(h.toggle);
