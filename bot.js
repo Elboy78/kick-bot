@@ -1252,9 +1252,16 @@ async function cmdSongRequest(username, parts) {
     queue.push(item);
     await db.setSettingStr('songrequest_queue', JSON.stringify(queue.slice(0, 100)));
 
-    const msgTpl = await db.getSettingStr('songrequest_confirm', '🎵 @{username}, ta musique a été ajoutée à la file !');
-    const msg = String(msgTpl || '').replaceAll('@{username}', `@${username}`).replaceAll('{username}', username).replaceAll('{song}', raw);
-    if (msg.trim()) sendChat(msg.slice(0, 450));
+    // Confirmation chat optionnelle : la musique est déjà ajoutée à la file.
+    // Si Kick bloque l'envoi des messages du bot (403/500), le Song Request ne doit pas paraître cassé.
+    const chatConfirmEnabled = await db.getSetting('songrequest_chat_confirm_enabled');
+    if (chatConfirmEnabled) {
+      const msgTpl = await db.getSettingStr('songrequest_confirm', '🎵 @{username}, ta musique a été ajoutée à la file !');
+      const msg = String(msgTpl || '').replaceAll('@{username}', `@${username}`).replaceAll('{username}', username).replaceAll('{song}', raw);
+      if (msg.trim()) sendChat(msg.slice(0, 450));
+    } else {
+      console.log(`[SONGREQUEST] Ajouté à la file par ${username}: ${raw}`);
+    }
   } catch(e) {
     console.error('[SONGREQUEST] Erreur:', e.message);
   }
