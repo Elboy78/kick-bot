@@ -377,7 +377,7 @@ hr.div{border:none;border-top:1px solid var(--brd);margin:12px 0}
     <a onclick="showPage('tts')">🔊 TTS</a>
     <a onclick="showPage('vods')">🎬 VODs &amp; Clips</a>
     <a onclick="showPage('subdon')">🎁 Sub/Don</a>
-    <a onclick="showPage('chests')">🩸 Coffres</a>
+    <a onclick="showPage('chests')">🩸 Defis</a>
     <a onclick="showPage('logs')">📋 Logs</a>
     <a onclick="showPage('objectifs')">🎯 Objectifs</a>
     <a onclick="showPage('dbd')">🔪 DBD</a>
@@ -3265,6 +3265,8 @@ async function playChestAnimation(data) {
   await sleepChest(250);
   setChestStage(2, 'LE COFFRE TREMBLE', 'Quelque chose se passe...');
   box.classList.add('tremble');
+  const video = document.getElementById('ca-video');
+  if (video) { video.currentTime = 6; video.play().catch(() => {}); }
   await playChestFrames([1,2,1,2], 150);
   box.classList.remove('tremble');
 
