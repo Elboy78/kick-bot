@@ -997,9 +997,8 @@ Option 3" rows="4"></textarea><div style="display:flex;gap:6px;margin-top:10px">
 
           <div class="victory-card" id="victory-card">
             <div class="chest-chat-title">🏆 BONUS VICTOIRE</div>
-            <p style="font-size:12px;color:#ccc;margin:4px 0 10px">Marque une victoire pour doubler le gain (ou le malus) du coffre protégé, à sa prochaine ouverture.</p>
-            <div id="victory-status" style="font-size:12px;color:#8fe08f;margin-bottom:8px;display:none">🏆 x2 ACTIF sur le coffre <b id="victory-chest-num">—</b></div>
-            <button class="dark-btn full" id="victory-btn" onclick="markVictoryBtn()">MARQUER UNE VICTOIRE (x2)</button>
+            <p style="font-size:12px;color:#ccc;margin:4px 0 10px">Une victoire (via <b>!victoire</b> en chat, réservé aux modérateurs) double le gain — ou le malus — du coffre protégé à sa prochaine ouverture. S'active aussi automatiquement sur le tout dernier coffre de la saison.</p>
+            <div id="victory-status" style="font-size:12px;color:#8fe08f;display:none">🏆 x2 ACTIF sur le coffre <b id="victory-chest-num">—</b></div>
           </div>
 
           <div class="chest-chat-card">
@@ -3042,17 +3041,12 @@ async function loadChests() {
 
     const victoryStatus = document.getElementById('victory-status');
     const victoryChestNum = document.getElementById('victory-chest-num');
-    const victoryBtn = document.getElementById('victory-btn');
-    if (victoryStatus && victoryBtn) {
+    if (victoryStatus) {
       if (d.season.victoryPending) {
         victoryStatus.style.display = 'block';
         victoryChestNum.textContent = String(d.season.protectedNumber || '—').padStart(2,'0');
-        victoryBtn.disabled = true;
-        victoryBtn.textContent = 'DÉJÀ ACTIF';
       } else {
         victoryStatus.style.display = 'none';
-        victoryBtn.disabled = !d.season.protectedNumber;
-        victoryBtn.textContent = 'MARQUER UNE VICTOIRE (x2)';
       }
     }
 
@@ -3363,17 +3357,6 @@ async function changeChestBtn() {
   const d = await r.json();
   if (!r.ok) return toast(d.error || 'Erreur', false);
   toast(`🔒 Coffre changé : ${d.from ?? '?'} → ${d.to} (dernier changement utilisé !)`);
-  loadChests();
-}
-
-async function markVictoryBtn() {
-  if (!confirm('Marquer une victoire ? Le contenu du coffre protégé sera DOUBLÉ à sa prochaine ouverture.')) return;
-  const r = await fetch(API + '/api/admin/chests/victory', {
-    method: 'POST', headers: { 'Content-Type': 'application/json', 'x-panel-key': getKey() }, body: '{}'
-  });
-  const d = await r.json();
-  if (!r.ok) return toast(d.error || 'Erreur', false);
-  toast(`🏆 Victoire marquée — coffre ${d.protectedNumber} doublé à l'ouverture !`);
   loadChests();
 }
 
