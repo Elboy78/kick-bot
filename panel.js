@@ -723,7 +723,7 @@ try {
   });
   console.log('[SONGREQUEST] Pont panel/bot enregistré ✓');
 } catch(e) {
-  console.warn('[SONGREQUEST] Impossible d'enregistrer le pont panel/bot:', e.message);
+  console.warn("[SONGREQUEST] Impossible d'enregistrer le pont panel/bot:", e.message);
 }
 
 app.get('/api/widgets/songrequest', async (req, res) => {
