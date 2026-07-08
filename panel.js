@@ -933,6 +933,18 @@ app.post('/api/admin/widgets/songrequest/delete', requireAuth, async (req, res) 
   } catch(e) { res.status(500).json({ error:e.message }); }
 });
 
+
+app.post('/api/widgets/songrequest/next', async (req, res) => {
+  try {
+    const state = await getSongRequestState();
+    state.queue.shift();
+    await saveSongRequestQueue(state.queue);
+    await saveSongRequestPlayerState({ itemId: state.queue[0]?.id || '', status: state.queue[0] ? 'playing' : 'stopped', currentTime: 0, duration: state.queue[0]?.duration || 0 });
+    await issueSongRequestControl('next');
+    res.json({ success:true, ...(await getSongRequestState()) });
+  } catch(e) { res.status(500).json({ error:e.message }); }
+});
+
 app.post('/api/admin/widgets/songrequest/next', requireAuth, async (req, res) => {
   try {
     const state = await getSongRequestState();
