@@ -145,7 +145,15 @@ function handleSongRequestControl(cmd){ const seq=Number(cmd?.seq||0); if(!cmd |
 async function load(force=false){try{const r=await fetch('/api/widgets/songrequest?ts='+Date.now(),{cache:'no-store'}); const d=await r.json(); render(d); handleSongRequestControl(d.control); syncPlayback(force);}catch(e){}}
 window.onYouTubeIframeAPIReady=function(){ytReady=true; ensurePlayer();};
 load(true); setInterval(()=>load(false),2000); setInterval(()=>{ updateProgress(); enforcePlayback(); postPlayerState(false); },1000);
-try{ const socket=io({transports:['websocket','polling']}); socket.on('songrequest-update', d=>{ latestState.queue=Array.isArray(d.queue)?d.queue:latestState.queue; render(latestState); syncPlayback(true); }); socket.on('songrequest-player-state', p=>{ latestState.player=Object.assign(latestState.player||{},p||{}); render(latestState); enforcePlayback(); }); socket.on('songrequest-control', cmd=>handleSongRequestControl(cmd)); }catch(e){}
+try{ const socket=io({transports:['websocket','polling']}); socket.on('songrequest-update', d=>{
+  const beforeId = latestState.queue?.[0]?.id || '';
+  latestState.queue = Array.isArray(d.queue) ? d.queue : latestState.queue;
+  render(latestState);
+  const afterId = latestState.queue?.[0]?.id || '';
+  // Ne jamais recharger le lecteur quand on ajoute simplement une musique dans la file.
+  // On force seulement si la musique en cours change réellement.
+  syncPlayback(beforeId && beforeId !== afterId);
+}); socket.on('songrequest-player-state', p=>{ latestState.player=Object.assign(latestState.player||{},p||{}); render(latestState); enforcePlayback(); }); socket.on('songrequest-control', cmd=>handleSongRequestControl(cmd)); }catch(e){}
 </script>
 </body>
 </html>
