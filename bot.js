@@ -317,8 +317,8 @@ async function handleChatMessage(payload) {
     db.logCommandUsage(cmd, username).catch(()=>{});
     switch(cmd) {
       case '!points':    return cmdPoints(username);
-      case '!top':
-      case '!topv':      return cmdTop(username);
+      case '!top':       return cmdTop(username);
+      case '!topv':      return cmdTopViewersLink(username);
       case '!rang':      return cmdRang(username);
       case '!niveau':    return cmdNiveau(username);
       case '!aide':      return cmdAide(username);
@@ -390,6 +390,26 @@ async function cmdTop(username) {
   if (!top.length) return sendChat('Pas encore de classement disponible.');
   const medals = ['🥇','🥈','🥉','4️⃣','5️⃣'];
   sendChat(`Top viewers : ${top.map((v,i) => `${medals[i]} ${v.username} (${v.points} pts)`).join(' | ')}`);
+}
+
+function getPublicBaseUrl() {
+  const raw = process.env.PUBLIC_BASE_URL
+    || process.env.PUBLIC_URL
+    || process.env.SITE_URL
+    || process.env.APP_URL
+    || process.env.BASE_URL
+    || process.env.RENDER_EXTERNAL_URL
+    || '';
+  const cleaned = String(raw || '').trim().replace(/\/+$/, '');
+  return cleaned;
+}
+
+async function cmdTopViewersLink(username) {
+  const baseUrl = getPublicBaseUrl();
+  const path = '/classement';
+  const url = baseUrl ? `${baseUrl}${path}` : path;
+  const prefix = username ? `@${username} ` : '';
+  return sendChat(`${prefix}Classement viewers : ${url}`);
 }
 
 async function cmdRang(username) {
