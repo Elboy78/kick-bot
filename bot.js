@@ -305,11 +305,18 @@ async function handleChatMessage(payload) {
   const parts = content.trim().split(' ');
   const cmd   = parts[0].toLowerCase();
 
-  // Commande Song Request personnalisable depuis Widget
+  // Commande Song Request depuis Widget
+  // Important : on la traite AVANT le bloc SYSTEM_COMMANDS.
+  // Sinon !sr / !songrequest peuvent être bloquées par isSystemCmdEnabled(),
+  // et rien n'est ajouté dans la file d'attente.
   try {
     const srCommand = (await db.getSettingStr('songrequest_command', '!sr')).toLowerCase();
-    if (cmd === srCommand && !SYSTEM_COMMANDS.includes(cmd)) return cmdSongRequest(username, parts);
-  } catch(e) {}
+    if (cmd === '!sr' || cmd === '!songrequest' || cmd === srCommand) {
+      return cmdSongRequest(username, parts);
+    }
+  } catch(e) {
+    console.error('[SONGREQUEST] Erreur détection commande:', e.message);
+  }
 
   // Commandes système
   if (SYSTEM_COMMANDS.includes(cmd)) {
