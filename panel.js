@@ -717,6 +717,9 @@ async function addSongRequest(username, song) {
 }
 
 app.get('/api/widgets/songrequest', async (req, res) => {
+  res.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+  res.set('Pragma', 'no-cache');
+  res.set('Expires', '0');
   try { res.json(await getSongRequestState()); }
   catch(e) { res.json({ enabled:false, command:'!sr', confirmMessage:'', maxQueue:30, queue:[] }); }
 });

@@ -1436,6 +1436,7 @@ const API = '';
 const MEDALS = ['🥇','🥈','🥉'];
 let lbData = [], levels = [];
 const PAGE_TITLES = {dashboard:'Dashboard',classement:'Classement',lobby:'Lobby',jeux:'Jeux',objectifs:'Objectifs',dbd:'Dead by Daylight',moderation:'Modération',commands:'Commandes',historique:'Historique',admin:'Administration',settings:'Paramètres',outils:'Outils Chat'};
+let songRequestRefreshTimer = null;
 
 // ── Navigation ─────────────────────────────────────────────────────────────────
 function openWidgetSettings(name) {
@@ -1449,7 +1450,12 @@ function openWidgetSettings(name) {
   if (songrequest) songrequest.style.display = name === 'songrequest' ? 'block' : 'none';
   if (name === 'subgoal') loadSubGoal();
   if (name === 'tts') loadTTS();
-  if (name === 'songrequest') loadSongRequest();
+  if (name === 'songrequest') {
+    loadSongRequest();
+    startSongRequestRefresh();
+  } else {
+    stopSongRequestRefresh();
+  }
 }
 
 function backToWidgetsHome() {
@@ -1461,6 +1467,29 @@ function backToWidgetsHome() {
   if (subgoal) subgoal.style.display = 'none';
   if (tts) tts.style.display = 'none';
   if (songrequest) songrequest.style.display = 'none';
+  stopSongRequestRefresh();
+}
+
+
+function isSongRequestVisible() {
+  const page = document.getElementById('page-widgets');
+  const section = document.getElementById('widget-songrequest-settings');
+  return !!(page && page.classList.contains('active') && section && section.style.display !== 'none');
+}
+
+function startSongRequestRefresh() {
+  stopSongRequestRefresh();
+  songRequestRefreshTimer = setInterval(() => {
+    if (isSongRequestVisible()) loadSongRequest(true);
+    else stopSongRequestRefresh();
+  }, 2000);
+}
+
+function stopSongRequestRefresh() {
+  if (songRequestRefreshTimer) {
+    clearInterval(songRequestRefreshTimer);
+    songRequestRefreshTimer = null;
+  }
 }
 
 function openTTSWidgetFromAnywhere() {
@@ -3717,6 +3746,9 @@ try {
   chestSocket.on('subcounter-update', (data) => {
     if (document.getElementById('page-widgets')?.classList.contains('active')) renderSubCounter(data);
   });
+  chestSocket.on('songrequest-update', (data) => {
+    if (isSongRequestVisible()) renderSongRequestQueue((data && data.queue) || []);
+  });
 } catch(e) { console.warn('[CHESTS] socket indisponible', e); }
 
 async function newChestSeason() {
@@ -4221,7 +4253,7 @@ function copyDetectedToken() {
 
 
 // ── Song Request ─────────────────────────────────────────────────────────────
-async function loadSongRequest() {
+async function loadSongRequest(silent = false) {
   try {
     const r = await fetch(API + '/api/widgets/songrequest?ts=' + Date.now(), { cache: 'no-store' });
     const d = await r.json();
@@ -4233,7 +4265,7 @@ async function loadSongRequest() {
     const url = document.getElementById('songrequest-obs-url');
     if (url) url.textContent = window.location.origin + '/widgets/songrequest.html';
     renderSongRequestQueue(d.queue || []);
-  } catch(e) { console.error(e); }
+  } catch(e) { if (!silent) console.error(e); }
 }
 
 function renderSongRequestQueue(queue) {
