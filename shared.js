@@ -5,6 +5,7 @@ let _sendChat = null;
 let _openChest = null;
 let _markVictory = null;
 let _kickEventHandler = null;
+let _songRequestAdder = null;
 
 module.exports = {
   registerSendChat(fn) { _sendChat = fn; },
@@ -19,6 +20,12 @@ module.exports = {
   processKickEvent(eventType, payload) {
     if (_kickEventHandler) return _kickEventHandler(eventType, payload);
     return Promise.resolve(false);
+  },
+
+  registerSongRequestAdder(fn) { _songRequestAdder = fn; },
+  addSongRequest(username, song) {
+    if (_songRequestAdder) return _songRequestAdder(username, song);
+    return Promise.resolve({ error: 'Song Request pas encore initialisé.' });
   },
 
   registerOpenChest(fn) { _openChest = fn; },

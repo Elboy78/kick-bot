@@ -716,6 +716,16 @@ async function addSongRequest(username, song) {
   return item;
 }
 
+try {
+  shared.registerSongRequestAdder(async (username, song) => {
+    const item = await addSongRequest(username, song);
+    return { ok: true, item };
+  });
+  console.log('[SONGREQUEST] Pont panel/bot enregistré ✓');
+} catch(e) {
+  console.warn('[SONGREQUEST] Impossible d'enregistrer le pont panel/bot:', e.message);
+}
+
 app.get('/api/widgets/songrequest', async (req, res) => {
   res.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
   res.set('Pragma', 'no-cache');

@@ -1232,25 +1232,22 @@ async function cmdSongRequest(username, parts) {
     const song = parts.slice(1).join(' ').trim();
     if (!song) return sendChat(`@${username} utilise ${customCommand} + lien/titre YouTube.`);
 
-    let queue = [];
-    try { queue = JSON.parse(await db.getSettingStr('songrequest_queue', '[]')); } catch(e) { queue = []; }
-    if (!Array.isArray(queue)) queue = [];
-
-    const maxQueue = parseInt(await db.getSettingStr('songrequest_max_queue', '30')) || 30;
-    if (queue.length >= maxQueue) return sendChat(`@${username} la file Song Request est pleine pour le moment.`);
-
     const raw = song.slice(0, 300);
-    const match = raw.match(/https?:\/\/[^\s]+/i);
-    const item = {
-      id: `${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
-      username,
-      song: raw,
-      url: match ? match[0] : '',
-      status: 'queued',
-      at: new Date().toISOString()
-    };
-    queue.push(item);
-    await db.setSettingStr('songrequest_queue', JSON.stringify(queue.slice(0, 100)));
+
+    // Important : on passe par panel.js via shared.js.
+    // Comme ça la file est sauvegardée ET le panel reçoit l'événement temps réel.
+    const added = await shared.addSongRequest(username, raw);
+    if (added && added.error) {
+      console.warn('[SONGREQUEST] Pont panel/bot indisponible, fallback DB direct:', added.error);
+      let queue = [];
+      try { queue = JSON.parse(await db.getSettingStr('songrequest_queue', '[]')); } catch(e) { queue = []; }
+      if (!Array.isArray(queue)) queue = [];
+      const maxQueue = parseInt(await db.getSettingStr('songrequest_max_queue', '30')) || 30;
+      if (queue.length >= maxQueue) return sendChat(`@${username} la file Song Request est pleine pour le moment.`);
+      const match = raw.match(/https?:\/\/[^\s]+/i);
+      queue.push({ id: `${Date.now()}_${Math.random().toString(36).slice(2, 8)}`, username, song: raw, url: match ? match[0] : '', status: 'queued', at: new Date().toISOString() });
+      await db.setSettingStr('songrequest_queue', JSON.stringify(queue.slice(0, 100)));
+    }
 
     // Confirmation chat optionnelle : la musique est déjà ajoutée à la file.
     // Si Kick bloque l'envoi des messages du bot (403/500), le Song Request ne doit pas paraître cassé.
