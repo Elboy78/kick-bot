@@ -986,13 +986,13 @@ Option 3" rows="4"></textarea><div style="display:flex;gap:6px;margin-top:10px">
       <section class="chests-layout">
         <aside class="safe-card">
           <div class="safe-head"><span>🛡️</span><strong>COFFRE SÉCURISÉ</strong></div>
-          <p>Choisis un coffre à protéger.<br>Sois certain de ton choix : après ta 1ère sécurisation, tu n'as droit qu'à <b>UN SEUL</b> changement (retirer + re-sécuriser, ou déplacer) pour toute la saison. Une fois utilisé, c'est bloqué jusqu'à la prochaine saison.</p>
+          <p>Choisis un coffre à protéger.<br>Sois certain de ton choix : après ta 1ère sécurisation, le bouton "Changement de coffre" ne sera utilisable qu'<b>UNE SEULE FOIS</b> pour toute la saison. Une fois utilisé, c'est bloqué jusqu'à la prochaine saison.</p>
           <div class="safe-number"><small>COFFRE PROTÉGÉ</small><b id="secured-current">Aucun</b></div>
           <div class="secure-controls">
             <input type="number" class="inp" id="secure-number" min="1" max="30" placeholder="N°">
             <button class="dark-btn" onclick="secureChestBtn()">SÉCURISER</button>
           </div>
-          <button class="dark-btn full" onclick="unsecureChestBtn()">RETIRER LA SÉCURITÉ</button>
+          <button class="dark-btn full" id="change-chest-btn" onclick="changeChestBtn()">CHANGEMENT DE COFFRE</button>
           <div class="safe-mini"><span>🌫️ Brouillard: <b id="chest-fog">0</b></span><span>🔒 Changement: <b id="chest-moves">0/1</b></span></div>
 
           <div class="victory-card" id="victory-card">
@@ -3024,6 +3024,22 @@ async function loadChests() {
     const securedLabel = document.getElementById('secured-current');
     if (securedLabel) securedLabel.textContent = secured ? String(secured.number).padStart(2,'0') : 'Aucun';
 
+    const secureBtn = document.querySelector('.secure-controls .dark-btn');
+    const changeBtn = document.getElementById('change-chest-btn');
+    if (secureBtn && changeBtn) {
+      const moveLeft = d.season.secureMoves < 1;
+      if (!d.season.everSecured) {
+        secureBtn.style.display = '';
+        secureBtn.disabled = false;
+        changeBtn.style.display = 'none';
+      } else {
+        secureBtn.style.display = 'none';
+        changeBtn.style.display = '';
+        changeBtn.disabled = !moveLeft;
+        changeBtn.textContent = moveLeft ? 'CHANGEMENT DE COFFRE' : 'CHANGEMENT DÉJÀ UTILISÉ';
+      }
+    }
+
     const victoryStatus = document.getElementById('victory-status');
     const victoryChestNum = document.getElementById('victory-chest-num');
     const victoryBtn = document.getElementById('victory-btn');
@@ -3325,30 +3341,28 @@ async function newChestSeason() {
 async function secureChestBtn() {
   const number = parseInt(document.getElementById('secure-number').value);
   if (!number || number < 1 || number > 30) return toast('Numéro invalide (1-30)', false);
-
-  const s = _chestState?.season;
-  if (s && s.everSecured && s.secureMoves < 1) {
-    const ok = confirm('⚠️ Attention : c\'est ton DERNIER changement possible pour cette saison. Après ça, tu ne pourras plus ni déplacer ni re-sécuriser un coffre jusqu\'à la prochaine saison. Confirmer ?');
-    if (!ok) return;
-  }
-
   const r = await fetch(API + '/api/admin/chests/secure', {
     method: 'POST', headers: { 'Content-Type': 'application/json', 'x-panel-key': getKey() },
     body: JSON.stringify({ number })
   });
   const d = await r.json();
   if (!r.ok) return toast(d.error || 'Erreur', false);
-  toast(d.moved ? `🔒 Sécurité déplacée: ${d.from ?? '?'} → ${d.to} (dernier changement utilisé !)` : `🔒 Coffre ${d.to} sécurisé`);
+  toast(`🔒 Coffre ${d.to} sécurisé`);
   loadChests();
 }
 
-async function unsecureChestBtn() {
-  if (!confirm('Retirer la sécurité ? Le coffre redeviendra ouvrable.')) return;
-  const r = await fetch(API + '/api/admin/chests/unsecure', {
-    method: 'POST', headers: { 'Content-Type': 'application/json', 'x-panel-key': getKey() }, body: '{}'
+async function changeChestBtn() {
+  const number = parseInt(document.getElementById('secure-number').value);
+  if (!number || number < 1 || number > 30) return toast('Numéro invalide (1-30)', false);
+  const ok = confirm('⚠️ Attention : c\'est ton DERNIER changement possible pour cette saison. Une fois confirmé, plus aucune modification ne sera possible jusqu\'à la prochaine saison. Confirmer ?');
+  if (!ok) return;
+  const r = await fetch(API + '/api/admin/chests/secure', {
+    method: 'POST', headers: { 'Content-Type': 'application/json', 'x-panel-key': getKey() },
+    body: JSON.stringify({ number })
   });
-  if (!r.ok) return toast('Erreur', false);
-  toast('Sécurité retirée');
+  const d = await r.json();
+  if (!r.ok) return toast(d.error || 'Erreur', false);
+  toast(`🔒 Coffre changé : ${d.from ?? '?'} → ${d.to} (dernier changement utilisé !)`);
   loadChests();
 }
 

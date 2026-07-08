@@ -153,6 +153,9 @@ async function openChest(number, via) {
   if (chest.opened) return { error: `Le coffre ${number} a déjà été ouvert !` };
   if (chest.secured) return { error: `Le coffre ${number} est SÉCURISÉ 🔒 — retire la sécurité d'abord (panel).` };
 
+  const preOpenChests = await db.getChests(season.id);
+  const isLastChest = preOpenChests.filter(c => !c.opened).length === 1;
+
   let finalChest = { ...chest };
   const events = [];
   let victoryDoubled = false;
@@ -182,13 +185,16 @@ async function openChest(number, via) {
     }
   }
 
-  // Bonus de victoire : si une victoire a été marquée pendant que ce coffre était/est le
-  // coffre protégé, son gain (ou malus) final est doublé — one-shot, consommé à l'ouverture.
-  // Placé APRÈS bénédiction/malédiction pour doubler le montant réellement final.
-  if (season.protected_number === number && season.victory_pending) {
+  // Bonus de victoire : doublé si une victoire a été marquée manuellement, OU
+  // automatiquement si ce coffre protégé se trouve être le tout dernier de la saison
+  // (mécaniquement, ça ne peut être que lui à ce stade).
+  const autoVictory = isLastChest && season.protected_number === number;
+  if (season.protected_number === number && (season.victory_pending || autoVictory)) {
     finalChest = { ...finalChest, money: (finalChest.money || 0) * 2 };
     victoryDoubled = true;
-    events.push('🏆 VICTOIRE ! Le contenu de ce coffre protégé est DOUBLÉ !');
+    events.push(autoVictory && !season.victory_pending
+      ? '🏆 SAISON TERMINÉE ! Le coffre protégé, ouvert en dernier, voit son contenu DOUBLÉ automatiquement !'
+      : '🏆 VICTOIRE ! Le contenu de ce coffre protégé est DOUBLÉ !');
     await db.setVictoryPending(season.id, false);
     await db.updateChestContent(chest.id, finalChest.tier, finalChest.label, finalChest.money, finalChest.fog_value);
   }
@@ -200,6 +206,14 @@ async function openChest(number, via) {
   // Appliquer le twist caché du coffre
   const allChests = await db.getChests(season.id);
   const closedUnsecured = allChests.filter(c => !c.opened && !c.secured && c.id !== chest.id);
+
+  // S'il ne reste plus qu'un seul coffre fermé et qu'il est sécurisé, c'est forcément
+  // le coffre protégé — sa sécurité est levée automatiquement pour permettre son ouverture finale.
+  const stillUnopened = allChests.filter(c => !c.opened);
+  if (stillUnopened.length === 1 && stillUnopened[0].secured) {
+    await db.clearAllSecured(season.id);
+    events.push(`🔓 Il ne reste que le coffre ${stillUnopened[0].number} — sa sécurité est levée automatiquement pour l'ouverture finale !`);
+  }
 
   if (chest.twist === 'move_jackpot') {
     const jackpot = allChests.find(c => c.tier === 'legendary' && !c.opened);
