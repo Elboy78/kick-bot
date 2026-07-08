@@ -1552,6 +1552,8 @@ app.get('/api/tts/quota', async (req, res) => {
 });
 
 app.get('/overlay', (req,res) => res.sendFile(path.join(__dirname,'public','overlay.html')));
+app.get('/classement', (req,res) => res.sendFile(path.join(__dirname,'public','classement.html')));
+
 
 
 // ════════════════════════════════════════════════════════════════════

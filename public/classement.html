@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Classement viewers</title>
+  <style>
+    :root{
+      --bg:#06070f; --bg2:#101323; --card:rgba(17,20,36,.86); --line:rgba(255,255,255,.13);
+      --txt:#f7f4e8; --muted:#b8b2a2; --gold:#f8c56a; --green:#30ff7a; --purple:#a77dff;
+    }
+    *{box-sizing:border-box}
+    body{margin:0;min-height:100vh;font-family:Inter,Arial,sans-serif;color:var(--txt);background:
+      radial-gradient(circle at 20% 0%,rgba(167,125,255,.22),transparent 34%),
+      radial-gradient(circle at 80% 10%,rgba(48,255,122,.12),transparent 28%),linear-gradient(180deg,var(--bg2),var(--bg));padding:24px}
+    .wrap{max-width:980px;margin:0 auto}.hero{text-align:center;margin:20px 0 28px}.badge{display:inline-flex;gap:8px;align-items:center;border:1px solid var(--line);background:rgba(0,0,0,.25);border-radius:999px;padding:8px 14px;color:var(--gold);font-weight:900;font-size:12px;text-transform:uppercase;letter-spacing:.08em}h1{font-size:clamp(34px,6vw,68px);line-height:.95;margin:18px 0 10px;text-shadow:0 10px 34px rgba(0,0,0,.55)}.sub{color:var(--muted);font-size:15px}.podium{display:grid;grid-template-columns:1fr 1.15fr 1fr;gap:14px;align-items:end;margin:28px 0}.pod{background:linear-gradient(180deg,rgba(255,255,255,.08),rgba(255,255,255,.03));border:1px solid var(--line);border-radius:24px;padding:18px;text-align:center;box-shadow:0 18px 50px rgba(0,0,0,.28)}.pod.first{min-height:210px;border-color:rgba(248,197,106,.45)}.pod.second{min-height:180px}.pod.third{min-height:160px}.rank{font-size:30px}.name{font-size:20px;font-weight:950;margin-top:10px;word-break:break-word}.pts{color:var(--green);font-weight:950;margin-top:8px;font-size:18px}.list{background:var(--card);border:1px solid var(--line);border-radius:24px;overflow:hidden;box-shadow:0 20px 70px rgba(0,0,0,.32)}.row{display:grid;grid-template-columns:70px 1fr 150px;gap:12px;align-items:center;padding:16px 18px;border-top:1px solid rgba(255,255,255,.08)}.row:first-child{border-top:0}.rnum{font-weight:950;color:var(--gold);font-size:18px}.rname{font-weight:850;word-break:break-word}.rpts{text-align:right;color:var(--green);font-weight:950}.empty{text-align:center;color:var(--muted);padding:38px}.foot{display:flex;justify-content:center;gap:12px;margin:18px 0;color:var(--muted);font-size:12px}.dot{width:8px;height:8px;border-radius:50%;background:var(--green);box-shadow:0 0 16px var(--green);display:inline-block;margin-right:6px}@media(max-width:720px){body{padding:14px}.podium{grid-template-columns:1fr}.pod.first,.pod.second,.pod.third{min-height:auto}.row{grid-template-columns:48px 1fr 96px;padding:14px 12px}}
+  </style>
+</head>
+<body>
+  <main class="wrap">
+    <section class="hero">
+      <div class="badge">🏆 Classement viewers</div>
+      <h1>Top de la communauté</h1>
+      <div class="sub">Classement public mis à jour automatiquement.</div>
+    </section>
+    <section class="podium" id="podium"></section>
+    <section class="list" id="list"><div class="empty">Chargement du classement...</div></section>
+    <div class="foot"><span><i class="dot"></i>Actualisation auto</span><span id="updated">—</span></div>
+  </main>
+<script>
+const fmt = n => new Intl.NumberFormat('fr-FR').format(Number(n||0));
+function esc(s){return String(s||'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m]));}
+async function loadLeaderboard(){
+  const podium = document.getElementById('podium');
+  const list = document.getElementById('list');
+  try{
+    const r = await fetch('/api/leaderboard?limit=50', { cache:'no-store' });
+    const j = await r.json();
+    const data = Array.isArray(j.data) ? j.data : [];
+    if(!data.length){ podium.innerHTML=''; list.innerHTML='<div class="empty">Aucun viewer classé pour le moment.</div>'; return; }
+    const top = [data[1], data[0], data[2]];
+    const cls = ['second','first','third'];
+    const medals = ['🥈','🥇','🥉'];
+    podium.innerHTML = top.map((v,i)=> v ? `<article class="pod ${cls[i]}"><div class="rank">${medals[i]}</div><div class="name">${esc(v.username)}</div><div class="pts">${fmt(v.points)} pts</div></article>` : `<article></article>`).join('');
+    list.innerHTML = data.map((v,i)=>`<div class="row"><div class="rnum">#${i+1}</div><div class="rname">${esc(v.username)}</div><div class="rpts">${fmt(v.points)} pts</div></div>`).join('');
+    document.getElementById('updated').textContent = 'Mis à jour à ' + new Date().toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'});
+  }catch(e){ list.innerHTML='<div class="empty">Impossible de charger le classement.</div>'; }
+}
+loadLeaderboard();
+setInterval(loadLeaderboard, 15000);
+</script>
+</body>
+</html>
