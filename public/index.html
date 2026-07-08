@@ -385,7 +385,6 @@ hr.div{border:none;border-top:1px solid var(--brd);margin:12px 0}
     <a onclick="showPage('lobby')">🎮 Lobby</a>
     <a onclick="showPage('outils')">🛠️ Outils Chat</a>
     <a onclick="showPage('vods')">🎬 VODs &amp; Clips</a>
-    <a onclick="showPage('subdon')">🎁 Sub/Don</a>
     <a onclick="showPage('widgets')">🧩 Widgets</a>
     <a onclick="showPage('alertes')">🚨 Alertes</a>
     <a onclick="showPage('chests')">🩸 Defis</a>
@@ -1273,91 +1272,6 @@ Option 3" rows="4"></textarea><div style="display:flex;gap:6px;margin-top:10px">
     </div>
   </div>
 
-  <!-- ══ SUB / DON ══ -->
-  <div class="page" id="page-subdon">
-    <div class="header"><div><h1>Sub / Don</h1><p>Alertes de follow, sub et donation dans le chat</p></div></div>
-    <div class="g2">
-      <div>
-        <div class="panel" style="margin-bottom:14px">
-          <h3>🔔 Annonce de follow</h3>
-          <div style="font-size:10px;color:var(--muted);margin-bottom:10px;line-height:1.6">
-            Quand quelqu'un follow ta chaîne, le bot envoie un message dans le chat. Utilise <code style="background:var(--card2);padding:1px 4px;border-radius:4px">{username}</code> pour mentionner le nouveau follower.
-          </div>
-          <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--brd);margin-bottom:10px">
-            <div>
-              <div style="font-size:12px;font-weight:600">Activer l'annonce de follow</div>
-              <div style="font-size:10px;color:var(--muted);margin-top:2px">Le bot annonce chaque nouveau follower dans le chat</div>
-            </div>
-            <label class="switch"><input type="checkbox" id="follow-announce-toggle" onchange="saveFollowAnnounce()"><span class="slider"></span></label>
-          </div>
-          <label class="lbl">Message d'annonce</label>
-          <textarea class="inp" id="follow-announce-message" rows="3" placeholder="Merci pour le follow @{username} ! Bienvenue 🎉" style="resize:vertical;min-height:64px" oninput="clearTimeout(this._t);this._t=setTimeout(()=>saveFollowAnnounce(),800)"></textarea>
-          <div style="font-size:9px;color:var(--muted);margin-top:4px">Aperçu : <span id="follow-preview" style="color:var(--text)"></span></div>
-          <div id="follow-announce-msg" style="margin-top:7px"></div>
-          <div style="margin-top:10px;padding:10px;background:var(--card2);border:1px solid var(--brd);border-radius:8px;font-size:10px;color:var(--muted);line-height:1.7">
-            <b style="color:var(--text)">⚙️ Configuration requise</b><br>
-            Pour recevoir les events de follow, ajoute ce webhook dans <a href="https://kick.com/settings/developer" target="_blank" style="color:var(--accent)">kick.com/settings/developer</a> → Event Subscriptions :<br>
-            <code style="background:var(--card);padding:2px 6px;border-radius:4px;color:var(--accent);font-size:9px;display:block;margin-top:4px;word-break:break-all">https://kick-bot-agkk.onrender.com/webhook/kick</code>
-            <span style="margin-top:4px;display:block">Événements à cocher : <b>channel.followed</b>, <b>channel.subscription.new</b>, <b>channel.subscription.renewal</b>, <b>channel.subscription.gifts</b></span>
-          </div>
-        </div>
-
-        <div class="panel" style="margin-bottom:14px">
-          <h3>⭐ Annonce de sub</h3>
-          <div style="font-size:10px;color:var(--muted);margin-bottom:10px;line-height:1.6">
-            Messages envoyés dans le chat pour les nouveaux subs, renouvellements et sub gifts.<br>
-            Variables : <code style="background:var(--card2);padding:1px 4px;border-radius:4px">{username}</code> <code style="background:var(--card2);padding:1px 4px;border-radius:4px">{months}</code> <code style="background:var(--card2);padding:1px 4px;border-radius:4px">{gifter}</code> <code style="background:var(--card2);padding:1px 4px;border-radius:4px">{count}</code>
-          </div>
-          <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--brd);margin-bottom:12px">
-            <div>
-              <div style="font-size:12px;font-weight:600">Activer les annonces de sub</div>
-              <div style="font-size:10px;color:var(--muted);margin-top:2px">Nouveau sub, renouvellement et sub gift</div>
-            </div>
-            <label class="switch"><input type="checkbox" id="sub-announce-toggle" onchange="saveSubAnnounce()"><span class="slider"></span></label>
-          </div>
-
-          <label class="lbl">🆕 Nouveau sub</label>
-          <textarea class="inp" id="sub-announce-new" rows="2" placeholder="🎉 Merci pour le sub @{username} !" style="resize:vertical;min-height:52px" oninput="clearTimeout(this._st);this._st=setTimeout(()=>saveSubAnnounce(),800)"></textarea>
-          <div style="font-size:9px;color:var(--muted);margin-top:2px;margin-bottom:10px">Aperçu : <span id="sub-preview-new" style="color:var(--text)"></span></div>
-
-          <label class="lbl">🔄 Renouvellement</label>
-          <textarea class="inp" id="sub-announce-renew" rows="2" placeholder="🔄 @{username} renouvelle pour {months} mois !" style="resize:vertical;min-height:52px" oninput="clearTimeout(this._st);this._st=setTimeout(()=>saveSubAnnounce(),800)"></textarea>
-          <div style="font-size:9px;color:var(--muted);margin-top:2px;margin-bottom:10px">Aperçu : <span id="sub-preview-renew" style="color:var(--text)"></span></div>
-
-          <label class="lbl">🎁 Sub gift</label>
-          <textarea class="inp" id="sub-announce-gift" rows="2" placeholder="🎁 @{gifter} offre {count} sub(s) !" style="resize:vertical;min-height:52px" oninput="clearTimeout(this._st);this._st=setTimeout(()=>saveSubAnnounce(),800)"></textarea>
-          <div style="font-size:9px;color:var(--muted);margin-top:2px;margin-bottom:10px">Aperçu : <span id="sub-preview-gift" style="color:var(--text)"></span></div>
-
-          <div id="sub-announce-msg" style="margin-top:4px"></div>
-        </div>
-      </div>
-      <div>
-        <div class="panel" style="margin-bottom:14px">
-          <h3>💰 Alertes de donation (TTS)</h3>
-          <div style="font-size:11px;color:var(--muted);margin-bottom:12px;line-height:1.6">
-            Les donations déclenchent une lecture vocale (TTS) sur l'overlay, avec un seuil minimum et une voix configurables.
-          </div>
-          <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid var(--brd)">
-            <span style="font-size:12px;color:var(--muted)">Seuil minimum actuel</span>
-            <b id="subdon-min-donation-preview" style="color:var(--accent)">—</b>
-          </div>
-          <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 0">
-            <span style="font-size:12px;color:var(--muted)">Statut TTS</span>
-            <b id="subdon-tts-status-preview" style="color:var(--muted)">—</b>
-          </div>
-          <button class="btnx btn-outline" style="width:100%;justify-content:center;margin-top:8px" onclick="openTTSWidgetFromAnywhere()">🔊 Configurer le TTS &amp; seuil de don</button>
-        </div>
-
-        <div class="panel" style="padding:12px 16px;background:rgba(40,255,102,.06);border:1px solid rgba(40,255,102,.2)">
-          <div style="font-size:11px;color:var(--text);line-height:1.7">
-            <b>💡 Astuce</b><br>
-            Utilise <code style="background:var(--card2);padding:1px 6px;border-radius:4px">{username}</code>, <code style="background:var(--card2);padding:1px 6px;border-radius:4px">{months}</code>, <code style="background:var(--card2);padding:1px 6px;border-radius:4px">{gifter}</code> et <code style="background:var(--card2);padding:1px 6px;border-radius:4px">{count}</code> dans tes messages pour les personnaliser dynamiquement.
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
-
   <!-- ══ LOGS ══ -->
   <div class="page" id="page-logs">
     <div class="header">
@@ -1546,9 +1460,9 @@ Option 3" rows="4"></textarea><div style="display:flex;gap:6px;margin-top:10px">
         </div>
 
         <div class="panel" style="margin-bottom:14px;padding:14px 16px">
-          <h3>🔔 Alertes Follow / Sub / Don</h3>
-          <div style="font-size:11px;color:var(--muted);margin-bottom:10px">Gérées dans leur propre onglet maintenant.</div>
-          <button class="btnx btn-outline" style="width:100%;justify-content:center" onclick="showPage('subdon')">🎁 Aller à Sub/Don</button>
+          <h3>🚨 Alertes</h3>
+          <div style="font-size:11px;color:var(--muted);margin-bottom:10px">Follow, sub, gift, raid et dons sont centralisés dans le nouvel onglet Alertes.</div>
+          <button class="btnx btn-outline" style="width:100%;justify-content:center" onclick="showPage('alertes')">🚨 Aller aux Alertes</button>
         </div>
 
         <div class="panel"><h3>🤖 Fonctionnalités du bot <button class="btnx btn-ghost btn-sm" onclick="loadBotFeatures()">↻</button></h3><div style="font-size:10px;color:#a1a1aa;margin-bottom:10px">Active ou désactive chaque fonctionnalité en un clic.</div><div id="bot-features-list"><div class="empty"><p>Chargement…</p></div></div></div>
@@ -1826,7 +1740,6 @@ function showPage(name) {
   if(name==='objectifs') loadObjectives();
   if(name==='historique') { loadHistory(); loadFullLogs(); loadViewersTrend(); loadFidelityList(); loadHeatmap(); }
   if(name==='vods') loadVods();
-  if(name==='subdon') { loadFollowAnnounce(); loadSubAnnounce(); loadSubDonPreview(); }
   if(name==='logs') loadModerationLogs();
   if(name==='chests') loadChests();
   if(name==='widgets') { backToWidgetsHome(); loadSubGoal(); }
@@ -4209,7 +4122,6 @@ const SEARCH_PAGES = [
   { icon:'🎮', label:'Lobby',            page:'lobby' },
   { icon:'🛠️', label:'Outils Chat',      page:'outils' },
   { icon:'🎬', label:'VODs & Clips',     page:'vods' },
-  { icon:'🎁', label:'Sub/Don',          page:'subdon' },
   { icon:'📋', label:'Logs modération',  page:'logs' },
   { icon:'🎯', label:'Objectifs',        page:'objectifs' },
   { icon:'📋', label:'Historique',       page:'historique' },
