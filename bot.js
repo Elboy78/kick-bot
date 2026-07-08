@@ -20,7 +20,7 @@ const CONFIG = {
 };
 
 const PUSHER_URL = 'wss://ws-us2.pusher.com/app/32cbd69e4b950bf97679?protocol=7&client=js&version=7.4.0&flash=false';
-const SYSTEM_COMMANDS = ['!points','!top','!rang','!niveau','!aide','!duel','!accepter','!refuser','!participer','!giveaway','!lobby','!quote','!addquote','!mort','!death','!score','!queue','!join','!leave','!pos','!vote','!sondage','!so','!uptime','!fc','!sc','!coffre','!victoire','!dice','!des','!rps','!pfc','!clip','!addcmd','!delcmd','!addword','!delword','!allowword','!disallowword'];
+const SYSTEM_COMMANDS = ['!points','!top','!rang','!niveau','!aide','!duel','!accepter','!refuser','!participer','!giveaway','!lobby','!quote','!addquote','!mort','!death','!score','!queue','!join','!leave','!pos','!vote','!sondage','!so','!uptime','!fc','!sc','!coffre','!victoire','!to','!dice','!des','!rps','!pfc','!clip','!addcmd','!delcmd','!addword','!delword','!allowword','!disallowword'];
 
 let ws             = null;
 let reconnectDelay = 5000;
@@ -255,6 +255,7 @@ async function handleChatMessage(payload) {
       case '!sc':        return cmdSubCheck(username, parts);
       case '!coffre':    return cmdOpenChest(username, parts, isModOrBroadcaster, badges);
       case '!victoire':  return cmdMarkVictory(username, isModOrBroadcaster);
+      case '!to':        return cmdTimeoutBuy(username, parts);
       case '!clip':      return (await db.getSetting('clip_enabled')) ? cmdClip(username, parts) : null;
       case '!addcmd':    return cmdAddCommand(username, parts, isModOrBroadcaster);
       case '!delcmd':    return cmdDelCommand(username, parts, isModOrBroadcaster);
@@ -727,6 +728,42 @@ async function cmdMarkVictory(username, isModOrBroadcaster) {
   }
 }
 
+async function cmdTimeoutBuy(username, parts) {
+  const target = (parts[1] || '').replace('@', '').trim();
+  if (!target) return sendChat(`@${username} Utilisation : !to <pseudo> — TO le pseudo de ton choix avec tes points !`);
+  if (target.toLowerCase() === username.toLowerCase())
+    return sendChat(`@${username} Tu ne peux pas te TO toi-même !`);
+  if (target.toLowerCase() === CONFIG.channel.toLowerCase())
+    return sendChat(`@${username} Impossible de TO le streamer !`);
+  if (target.toLowerCase() === CONFIG.botUsername.toLowerCase())
+    return sendChat(`@${username} Impossible de TO le bot !`);
+
+  const cost     = parseInt(await db.getSettingStr('to_command_cost', '500')) || 500;
+  const duration = parseInt(await db.getSettingStr('to_command_duration', '60')) || 60;
+
+  const buyer = await db.getViewer(username);
+  if (!buyer || buyer.points < cost)
+    return sendChat(`@${username} Il te faut ${cost} pts pour un TO (tu as ${buyer?.points || 0} pts).`);
+
+  const targetViewer = await db.getViewer(target);
+
+  await db.addPoints(username, -cost, 'to_purchase');
+
+  try {
+    const ok = await moderateUser(target, targetViewer?.kick_user_id || null, 'timeout', duration, `TO acheté par ${username}`);
+    if (ok) {
+      sendChat(`⏱️ @${username} a TO @${target} pendant ${duration}s pour ${cost} pts ! 🩸`);
+    } else {
+      await db.addPoints(username, cost, 'to_refund');
+      sendChat(`@${username} Le TO sur @${target} a échoué côté Kick — points remboursés.`);
+    }
+  } catch(e) {
+    console.error('[TO] Erreur:', e.message);
+    await db.addPoints(username, cost, 'to_refund');
+    sendChat(`@${username} Erreur lors du TO — points remboursés.`);
+  }
+}
+
 async function cmdClip(username, parts) {
   if (!isLive || !streamStartTime) {
     return sendChat(`@${username} Impossible de créer un clip — le stream n'est pas en ligne.`);
@@ -991,7 +1028,7 @@ async function startAnnouncements() {
 
 async function moderateUser(username, kickId, action, duration, word) {
   const { token, official } = await getActiveToken();
-  if (!token) { console.log(`[MOD] Simulation: ${action} ${username} pour "${word}"`); return; }
+  if (!token) { console.log(`[MOD] Simulation: ${action} ${username} pour "${word}"`); return false; }
 
   // Récupérer l'ID numérique Kick du viewer si on ne l'a pas déjà (requis par l'API officielle)
   let userId = kickId;
@@ -1013,7 +1050,7 @@ async function moderateUser(username, kickId, action, duration, word) {
         const body = {
           broadcaster_user_id: broadcasterId,
           user_id: userIdInt,
-          reason: 'Mot banni automatique',
+          reason: word || 'Modération automatique',
         };
         if (durationMinutes) body.duration = durationMinutes;
 
@@ -1034,12 +1071,12 @@ async function moderateUser(username, kickId, action, duration, word) {
           { headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json', 'Accept': 'application/json' } }
         );
         console.log(`[MOD] ${username} ${action === 'ban' ? 'banni' : `timeout ${duration}s`} (API officielle) pour "${word}"`);
-        return;
+        return true;
       } catch(err) {
         console.error('[MOD] Erreur API officielle — status:', err.response?.status,
           '| data:', JSON.stringify(err.response?.data),
           '| headers:', JSON.stringify(err.response?.headers));
-        if (!CONFIG.token) return;
+        if (!CONFIG.token) return false;
         console.log('[MOD] Tentative via endpoint legacy...');
       }
     }
@@ -1050,7 +1087,7 @@ async function moderateUser(username, kickId, action, duration, word) {
   // qu'avec un vrai token de session manuel).
   if (!CONFIG.token) {
     console.log('[MOD] Pas de fallback disponible (pas de token manuel configuré) — action ignorée.');
-    return;
+    return false;
   }
   try {
     const legacyBody = action === 'ban'
@@ -1062,8 +1099,10 @@ async function moderateUser(username, kickId, action, duration, word) {
       { headers: { 'Authorization': `Bearer ${CONFIG.token}`, 'Content-Type': 'application/json', 'Accept': 'application/json', 'User-Agent': 'Mozilla/5.0' } }
     );
     console.log(`[MOD] ${username} ${action === 'ban' ? 'banni' : `timeout ${duration}s`} (legacy) pour "${word}"`);
+    return true;
   } catch(err) {
     console.error('[MOD] Erreur modération (legacy):', err.response?.data || err.message);
+    return false;
   }
 }
 
