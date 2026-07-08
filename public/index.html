@@ -3265,27 +3265,18 @@ async function playChestAnimation(data) {
   await sleepChest(250);
   setChestStage(2, 'LE COFFRE TREMBLE', 'Quelque chose se passe...');
   box.classList.add('tremble');
-  await playChestFrames([1,2,1,2], 210);
+  await playChestFrames([1,2,1,2], 150);
   box.classList.remove('tremble');
 
-  setChestStage(3, 'LA SERRURE SAUTE', 'Clac !');
-  box.classList.add('unlock');
-  await playChestFrames([3], 560);
-
-  setChestStage(4, 'LE COUVERCLE S’OUVRE', 'La lumière apparaît...');
-  box.classList.add('opening');
-  await playChestFrames([4,5], 520);
-
-  setChestStage(5, 'OUVERTURE COMPLÈTE', 'Découvrons ce qu’il y a dedans !');
-  box.classList.add('burst');
-  await playChestFrames([5,6,5,6], 210);
-  setChestFrame(6); // reste sur le coffre ouvert en fond, aucune frame carte anglaise
+  setChestStage(3, 'OUVERTURE', 'Découvrons ce qu’il y a dedans !');
+  box.classList.add('opening', 'burst');
+  await playChestFrames([5,6], 400);
 
   document.getElementById('ca-reward-icon').textContent = isBonus ? '◆' : '☠';
   document.getElementById('ca-tier').textContent = type;
   document.getElementById('ca-label').textContent = data.label || '';
   document.getElementById('ca-events').textContent = (data.events || []).join('\n');
-  setChestStage(6, 'RÉCOMPENSE RÉVÉLÉE', `${type} obtenu !`);
+  setChestStage(4, 'RÉCOMPENSE RÉVÉLÉE', `${type} obtenu !`);
   modal.classList.add('reward-wait');
   card.classList.remove('hidden');
   _chestAnimWaitingClose = true;
