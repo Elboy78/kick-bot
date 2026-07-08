@@ -865,37 +865,85 @@ Option 3" rows="4"></textarea><div style="display:flex;gap:6px;margin-top:10px">
 
   <!-- ══ WIDGETS ══ -->
   <div class="page" id="page-widgets">
-    <div class="header"><div><h1>Widgets</h1><p>Overlays OBS pilotés en temps réel</p></div></div>
-    <div class="panel" style="max-width:520px">
-      <h3>🎯 Sub Goal</h3>
-      <div style="font-size:10px;color:var(--muted);margin-bottom:12px;line-height:1.6">
-        Barre de progression du nombre d'abonnés, mise à jour en temps réel via le webhook officiel Kick (nouveaux subs + subs gift). Les renouvellements ne sont pas comptés.
-      </div>
+    <div class="header"><div><h1>Widgets</h1><p>Compteur de subs Kick et overlays OBS en temps réel</p></div></div>
 
-      <label class="lbl">Objectif (nombre de subs)</label>
-      <div style="display:flex;gap:8px;margin-bottom:14px">
-        <input type="number" class="inp" id="subgoal-target-input" min="1" placeholder="50">
-        <button class="dark-btn" onclick="saveSubGoalTarget()">ENREGISTRER</button>
-      </div>
-
-      <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-top:1px solid var(--brd);border-bottom:1px solid var(--brd);margin-bottom:12px">
-        <div>
-          <div style="font-size:10px;color:var(--muted)">PROGRESSION ACTUELLE</div>
-          <div style="font-size:22px;font-weight:800"><span id="subgoal-current-display">0</span> / <span id="subgoal-target-display">50</span></div>
+    <div class="g2">
+      <div class="panel">
+        <h3>⭐ Compteur de subs live</h3>
+        <div style="font-size:10px;color:var(--muted);margin-bottom:12px;line-height:1.6">
+          Compteur connecté aux webhooks Kick : nouveau sub, sub gift et renouvellement. Le total et la session se mettent à jour automatiquement dès qu'un event arrive.
         </div>
-        <div style="display:flex;gap:6px">
-          <button class="dark-btn" onclick="adjustSubGoal(-1)">−1</button>
-          <button class="dark-btn" onclick="adjustSubGoal(1)">+1</button>
-          <button class="dark-btn" onclick="resetSubGoal()" style="border-color:#a72a22;color:#ff8a7a">RESET</button>
+
+        <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-bottom:14px">
+          <div style="padding:12px;background:var(--card2);border:1px solid var(--brd);border-radius:12px">
+            <div style="font-size:9px;color:var(--muted);font-weight:800;letter-spacing:.5px;text-transform:uppercase">Total subs</div>
+            <div style="font-size:30px;font-weight:900;margin-top:4px" id="subcounter-total-display">0</div>
+          </div>
+          <div style="padding:12px;background:var(--card2);border:1px solid var(--brd);border-radius:12px">
+            <div style="font-size:9px;color:var(--muted);font-weight:800;letter-spacing:.5px;text-transform:uppercase">Session live</div>
+            <div style="font-size:30px;font-weight:900;margin-top:4px;color:var(--accent)" id="subcounter-session-display">0</div>
+          </div>
+          <div style="padding:12px;background:var(--card2);border:1px solid var(--brd);border-radius:12px">
+            <div style="font-size:9px;color:var(--muted);font-weight:800;letter-spacing:.5px;text-transform:uppercase">Subs gift</div>
+            <div style="font-size:22px;font-weight:900;margin-top:4px" id="subcounter-gifts-display">0</div>
+          </div>
+          <div style="padding:12px;background:var(--card2);border:1px solid var(--brd);border-radius:12px">
+            <div style="font-size:9px;color:var(--muted);font-weight:800;letter-spacing:.5px;text-transform:uppercase">Renouvellements</div>
+            <div style="font-size:22px;font-weight:900;margin-top:4px" id="subcounter-renewals-display">0</div>
+          </div>
+        </div>
+
+        <label class="lbl">Corriger le total actuel</label>
+        <div style="display:flex;gap:8px;margin-bottom:12px">
+          <input type="number" class="inp" id="subcounter-total-input" min="0" placeholder="0">
+          <button class="dark-btn" onclick="saveSubCounterTotal()">ENREGISTRER</button>
+        </div>
+
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <button class="dark-btn" onclick="adjustSubGoal(-1)">−1 total</button>
+          <button class="dark-btn" onclick="adjustSubGoal(1)">+1 total</button>
+          <button class="dark-btn" onclick="resetSubCounterSession()">Reset session</button>
+          <button class="dark-btn" onclick="resetSubGoal()" style="border-color:#a72a22;color:#ff8a7a">Reset total</button>
         </div>
       </div>
 
-      <div style="padding:10px;background:var(--card2);border:1px solid var(--brd);border-radius:8px;font-size:10px;color:var(--muted);line-height:1.7">
-        <b style="color:var(--text)">🔗 Lien overlay OBS</b><br>
-        Ajoute une source navigateur dans OBS avec cette URL :<br>
-        <code style="background:var(--card);padding:2px 6px;border-radius:4px;color:var(--accent);font-size:9px;display:block;margin-top:4px;word-break:break-all" id="subgoal-obs-url">https://kick-bot-agkk.onrender.com/widgets/subgoal.html</code>
-        <span style="margin-top:6px;display:block">Taille recommandée : 560×100. Fond transparent, prêt à l'emploi.</span>
+      <div class="panel">
+        <h3>🎯 Objectif de subs</h3>
+        <div style="font-size:10px;color:var(--muted);margin-bottom:12px;line-height:1.6">
+          Barre de progression OBS basée sur le total de subs. Les nouveaux subs et subs gifts augmentent le compteur automatiquement.
+        </div>
+
+        <label class="lbl">Objectif</label>
+        <div style="display:flex;gap:8px;margin-bottom:14px">
+          <input type="number" class="inp" id="subgoal-target-input" min="1" placeholder="50">
+          <button class="dark-btn" onclick="saveSubGoalTarget()">ENREGISTRER</button>
+        </div>
+
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-top:1px solid var(--brd);border-bottom:1px solid var(--brd);margin-bottom:12px">
+          <div>
+            <div style="font-size:10px;color:var(--muted)">PROGRESSION ACTUELLE</div>
+            <div style="font-size:22px;font-weight:800"><span id="subgoal-current-display">0</span> / <span id="subgoal-target-display">50</span></div>
+          </div>
+          <div style="font-size:22px;font-weight:900;color:var(--accent)" id="subgoal-percent-display">0%</div>
+        </div>
+
+        <div style="padding:10px;background:var(--card2);border:1px solid var(--brd);border-radius:8px;font-size:10px;color:var(--muted);line-height:1.7;margin-bottom:10px">
+          <b style="color:var(--text)">🔗 Lien overlay OBS Sub Goal</b><br>
+          <code style="background:var(--card);padding:2px 6px;border-radius:4px;color:var(--accent);font-size:9px;display:block;margin-top:4px;word-break:break-all" id="subgoal-obs-url">/widgets/subgoal.html</code>
+          <span style="margin-top:6px;display:block">Taille recommandée : 560×100. Fond transparent.</span>
+        </div>
+
+        <div style="padding:10px;background:var(--card2);border:1px solid var(--brd);border-radius:8px;font-size:10px;color:var(--muted);line-height:1.7">
+          <b style="color:var(--text)">🔗 Lien overlay OBS Compteur compact</b><br>
+          <code style="background:var(--card);padding:2px 6px;border-radius:4px;color:var(--accent);font-size:9px;display:block;margin-top:4px;word-break:break-all" id="subcounter-obs-url">/widgets/subcounter.html</code>
+          <span style="margin-top:6px;display:block">Taille recommandée : 420×130.</span>
+        </div>
       </div>
+    </div>
+
+    <div class="panel" style="margin-top:14px">
+      <h3>🕘 Derniers événements subs</h3>
+      <div id="subcounter-latest-list"><div class="empty"><div class="ei">⭐</div><p>Aucun sub détecté pour le moment</p></div></div>
     </div>
   </div>
 
@@ -1241,14 +1289,63 @@ const PAGE_TITLES = {dashboard:'Dashboard',classement:'Classement',lobby:'Lobby'
 // ── Navigation ─────────────────────────────────────────────────────────────────
 async function loadSubGoal() {
   try {
-    const r = await fetch(API + '/api/widgets/subgoal');
+    const r = await fetch(API + '/api/widgets/subcounter');
     const d = await r.json();
-    document.getElementById('subgoal-current-display').textContent = d.current;
-    document.getElementById('subgoal-target-display').textContent = d.target;
-    document.getElementById('subgoal-target-input').value = d.target;
+    renderSubCounter(d);
     const urlEl = document.getElementById('subgoal-obs-url');
     if (urlEl) urlEl.textContent = window.location.origin + '/widgets/subgoal.html';
-  } catch(e) { console.error('[SUBGOAL]', e); }
+    const urlCounter = document.getElementById('subcounter-obs-url');
+    if (urlCounter) urlCounter.textContent = window.location.origin + '/widgets/subcounter.html';
+  } catch(e) { console.error('[SUBCOUNTER]', e); }
+}
+
+function renderSubCounter(d) {
+  const total = parseInt(d.total || d.current || 0) || 0;
+  const target = parseInt(d.target || 50) || 50;
+  const session = parseInt(d.session || 0) || 0;
+  const gifts = parseInt(d.gifts || 0) || 0;
+  const renewals = parseInt(d.renewals || 0) || 0;
+  const pct = target > 0 ? Math.min(100, Math.round((total / target) * 100)) : 0;
+  const set = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = val; };
+  const setVal = (id, val) => { const el = document.getElementById(id); if (el) el.value = val; };
+  set('subcounter-total-display', total);
+  set('subcounter-session-display', session);
+  set('subcounter-gifts-display', gifts);
+  set('subcounter-renewals-display', renewals);
+  set('subgoal-current-display', total);
+  set('subgoal-target-display', target);
+  set('subgoal-percent-display', pct + '%');
+  setVal('subcounter-total-input', total);
+  setVal('subgoal-target-input', target);
+  renderSubCounterLatest(d.latest || []);
+}
+
+function renderSubCounterLatest(items) {
+  const box = document.getElementById('subcounter-latest-list');
+  if (!box) return;
+  if (!items.length) {
+    box.innerHTML = '<div class="empty"><div class="ei">⭐</div><p>Aucun sub détecté pour le moment</p></div>';
+    return;
+  }
+  box.innerHTML = items.map(ev => {
+    const date = ev.at ? new Date(ev.at).toLocaleTimeString('fr-FR', { hour:'2-digit', minute:'2-digit' }) : '—';
+    const label = ev.type === 'gift' ? `🎁 ${esc(ev.username || ev.gifter || 'Anonyme')} a offert ${ev.count || 1} sub(s)`
+      : ev.type === 'renewal' ? `🔄 ${esc(ev.username || 'Quelqu\'un')} renouvelle ${ev.months ? `(${ev.months} mois)` : ''}`
+      : `⭐ Nouveau sub : ${esc(ev.username || 'Quelqu\'un')}`;
+    return `<div style="display:flex;align-items:center;justify-content:space-between;padding:9px 0;border-bottom:1px solid var(--brd);font-size:12px"><span>${label}</span><b style="color:var(--muted);font-size:10px">${date}</b></div>`;
+  }).join('');
+}
+
+async function saveSubCounterTotal() {
+  const total = parseInt(document.getElementById('subcounter-total-input').value);
+  if (Number.isNaN(total) || total < 0) return toast('Total invalide', false);
+  const r = await fetch(API + '/api/admin/widgets/subcounter/total', {
+    method: 'POST', headers: { 'Content-Type': 'application/json', 'x-panel-key': getKey() },
+    body: JSON.stringify({ total })
+  });
+  if (!r.ok) return toast('Erreur', false);
+  toast(`⭐ Total subs corrigé à ${total}`);
+  loadSubGoal();
 }
 
 async function saveSubGoalTarget() {
@@ -1273,12 +1370,22 @@ async function adjustSubGoal(delta) {
 }
 
 async function resetSubGoal() {
-  if (!confirm('Remettre le compteur de subs à 0 ?')) return;
+  if (!confirm('Remettre le total de subs à 0 ?')) return;
   const r = await fetch(API + '/api/admin/widgets/subgoal/reset', {
     method: 'POST', headers: { 'Content-Type': 'application/json', 'x-panel-key': getKey() }, body: '{}'
   });
   if (!r.ok) return toast('Erreur', false);
-  toast('Compteur remis à zéro');
+  toast('Total subs remis à zéro');
+  loadSubGoal();
+}
+
+async function resetSubCounterSession() {
+  if (!confirm('Remettre uniquement la session live et les derniers events à 0 ?')) return;
+  const r = await fetch(API + '/api/admin/widgets/subcounter/session/reset', {
+    method: 'POST', headers: { 'Content-Type': 'application/json', 'x-panel-key': getKey() }, body: '{}'
+  });
+  if (!r.ok) return toast('Erreur', false);
+  toast('Session subs remise à zéro');
   loadSubGoal();
 }
 
@@ -3391,6 +3498,9 @@ try {
   });
   chestSocket.on('chests-update', () => {
     if (document.getElementById('page-chests')?.classList.contains('active')) loadChests();
+  });
+  chestSocket.on('subcounter-update', (data) => {
+    if (document.getElementById('page-widgets')?.classList.contains('active')) renderSubCounter(data);
   });
 } catch(e) { console.warn('[CHESTS] socket indisponible', e); }
 

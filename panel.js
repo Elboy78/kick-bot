@@ -91,6 +91,69 @@ const DEFAULT_SUB_NEW_MSG   = '🎉 Merci pour le sub @{username} ! Bienvenue da
 const DEFAULT_SUB_RENEW_MSG = '🔄 @{username} renouvelle son sub pour {months} mois, merci ! ❤️';
 const DEFAULT_SUB_GIFT_MSG  = '🎁 @{gifter} offre {count} sub(s) à la communauté, incroyable !';
 
+const SUB_COUNTER_DEFAULTS = {
+  total: 0,
+  session: 0,
+  renewals: 0,
+  gifts: 0,
+  target: 50,
+  latest: []
+};
+
+async function getSubCounterState() {
+  const latestRaw = await db.getSettingStr('subcounter_latest', '[]');
+  let latest = [];
+  try { latest = JSON.parse(latestRaw); } catch(e) { latest = []; }
+  return {
+    total: parseInt(await db.getSettingStr('subcounter_total', await db.getSettingStr('subgoal_current', '0'))) || 0,
+    session: parseInt(await db.getSettingStr('subcounter_session', '0')) || 0,
+    renewals: parseInt(await db.getSettingStr('subcounter_renewals', '0')) || 0,
+    gifts: parseInt(await db.getSettingStr('subcounter_gifts', '0')) || 0,
+    target: parseInt(await db.getSettingStr('subgoal_target', '50')) || 50,
+    latest: Array.isArray(latest) ? latest.slice(0, 12) : []
+  };
+}
+
+async function emitSubCounterState() {
+  const state = await getSubCounterState();
+  io.emit('subcounter-update', state);
+  io.emit('subgoal-update', { current: state.total, target: state.target });
+  return state;
+}
+
+async function recordSubEvent(type, payload = {}) {
+  try {
+    const state = await getSubCounterState();
+    const amount = Math.max(1, parseInt(payload.count || 1) || 1);
+    const event = {
+      type,
+      username: payload.username || payload.gifter || 'Anonyme',
+      gifter: payload.gifter || null,
+      count: amount,
+      months: payload.months || null,
+      at: new Date().toISOString()
+    };
+
+    if (type === 'new' || type === 'gift') {
+      state.total += amount;
+      state.session += amount;
+    }
+    if (type === 'gift') state.gifts += amount;
+    if (type === 'renewal') state.renewals += 1;
+
+    state.latest = [event, ...state.latest].slice(0, 12);
+    await db.setSettingStr('subcounter_total', String(state.total));
+    await db.setSettingStr('subcounter_session', String(state.session));
+    await db.setSettingStr('subcounter_renewals', String(state.renewals));
+    await db.setSettingStr('subcounter_gifts', String(state.gifts));
+    await db.setSettingStr('subgoal_current', String(state.total));
+    await db.setSettingStr('subcounter_latest', JSON.stringify(state.latest));
+    io.emit('subcounter-update', state);
+    io.emit('subgoal-update', { current: state.total, target: state.target });
+    return state;
+  } catch(e) { console.error('[SUBCOUNTER] Erreur event:', e.message); }
+}
+
 app.get('/api/sub-announce', async (req, res) => {
   try {
     res.json({
@@ -144,7 +207,7 @@ app.post('/webhook/kick', async (req, res) => {
     // ── Sub nouveau ─────────────────────────────────────────────────────────────
     else if (eventType === 'channel.subscription.new') {
       const username = event?.data?.subscriber?.username || 'quelqu\'un';
-      subGoalIncrement(1).catch(()=>{});
+      recordSubEvent('new', { username, count: 1 }).catch(()=>{});
       const enabled  = await db.getSetting('sub_announce_enabled');
       if (enabled) {
         const template = await db.getSettingStr('sub_announce_new', DEFAULT_SUB_NEW_MSG);
@@ -156,7 +219,8 @@ app.post('/webhook/kick', async (req, res) => {
     // ── Sub renouvellement ──────────────────────────────────────────────────────
     else if (eventType === 'channel.subscription.renewal') {
       const username = event?.data?.subscriber?.username || 'quelqu\'un';
-      const months   = event?.data?.duration || 1;
+      const months   = event?.data?.duration || event?.data?.months || 1;
+      recordSubEvent('renewal', { username, months }).catch(()=>{});
       const enabled  = await db.getSetting('sub_announce_enabled');
       if (enabled) {
         const template = await db.getSettingStr('sub_announce_renew', DEFAULT_SUB_RENEW_MSG);
@@ -170,7 +234,7 @@ app.post('/webhook/kick', async (req, res) => {
       const gifter  = event?.data?.gifter?.username || 'Anonyme';
       const isAnon  = event?.data?.gifter?.is_anonymous || false;
       const count   = event?.data?.giftees?.length || 1;
-      subGoalIncrement(count).catch(()=>{});
+      recordSubEvent('gift', { gifter: isAnon ? 'un anonyme' : gifter, count }).catch(()=>{});
       const enabled = await db.getSetting('sub_announce_enabled');
       if (enabled) {
         const template = await db.getSettingStr('sub_announce_gift', DEFAULT_SUB_GIFT_MSG);
@@ -462,36 +526,57 @@ async function broadcastChestResult(result) {
 
 app.get('/api/widgets/subgoal', async (req, res) => {
   try {
-    const current = parseInt(await db.getSettingStr('subgoal_current', '0')) || 0;
-    const target = parseInt(await db.getSettingStr('subgoal_target', '50')) || 50;
-    res.json({ current, target });
+    const state = await getSubCounterState();
+    res.json({ current: state.total, target: state.target });
   } catch(e) { res.json({ current: 0, target: 50 }); }
 });
+
+app.get('/api/widgets/subcounter', async (req, res) => {
+  try { res.json(await getSubCounterState()); }
+  catch(e) { res.json(SUB_COUNTER_DEFAULTS); }
+});
+
+app.post('/api/admin/widgets/subcounter/total', requireAuth, async (req, res) => {
+  try {
+    const total = Math.max(0, parseInt(req.body.total) || 0);
+    await db.setSettingStr('subcounter_total', String(total));
+    await db.setSettingStr('subgoal_current', String(total));
+    res.json({ success: true, ...(await emitSubCounterState()) });
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+app.post('/api/admin/widgets/subcounter/session/reset', requireAuth, async (req, res) => {
+  try {
+    await db.setSettingStr('subcounter_session', '0');
+    await db.setSettingStr('subcounter_renewals', '0');
+    await db.setSettingStr('subcounter_gifts', '0');
+    await db.setSettingStr('subcounter_latest', '[]');
+    res.json({ success: true, ...(await emitSubCounterState()) });
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
 app.post('/api/admin/widgets/subgoal/target', requireAuth, async (req, res) => {
   try {
     const target = Math.max(1, parseInt(req.body.target) || 50);
     await db.setSettingStr('subgoal_target', String(target));
-    const current = parseInt(await db.getSettingStr('subgoal_current', '0')) || 0;
-    io.emit('subgoal-update', { current, target });
-    res.json({ success: true, current, target });
+    res.json({ success: true, ...(await emitSubCounterState()) });
   } catch(e) { res.status(500).json({ error: e.message }); }
 });
 app.post('/api/admin/widgets/subgoal/adjust', requireAuth, async (req, res) => {
   try {
     const delta = parseInt(req.body.delta) || 0;
-    const current = Math.max(0, (parseInt(await db.getSettingStr('subgoal_current', '0')) || 0) + delta);
-    const target = parseInt(await db.getSettingStr('subgoal_target', '50')) || 50;
-    await db.setSettingStr('subgoal_current', String(current));
-    io.emit('subgoal-update', { current, target });
-    res.json({ success: true, current, target });
+    const state = await getSubCounterState();
+    const total = Math.max(0, state.total + delta);
+    await db.setSettingStr('subcounter_total', String(total));
+    await db.setSettingStr('subgoal_current', String(total));
+    res.json({ success: true, ...(await emitSubCounterState()) });
   } catch(e) { res.status(500).json({ error: e.message }); }
 });
 app.post('/api/admin/widgets/subgoal/reset', requireAuth, async (req, res) => {
   try {
+    await db.setSettingStr('subcounter_total', '0');
     await db.setSettingStr('subgoal_current', '0');
-    const target = parseInt(await db.getSettingStr('subgoal_target', '50')) || 50;
-    io.emit('subgoal-update', { current: 0, target });
-    res.json({ success: true, current: 0, target });
+    res.json({ success: true, ...(await emitSubCounterState()) });
   } catch(e) { res.status(500).json({ error: e.message }); }
 });
 
@@ -626,16 +711,7 @@ require('./shared').registerMarkVictory(async () => {
   return result;
 });
 
-// Sub Goal widget : incrémente le compteur et notifie l'overlay en temps réel
-async function subGoalIncrement(count) {
-  try {
-    const current = parseInt(await db.getSettingStr('subgoal_current', '0')) || 0;
-    const target = parseInt(await db.getSettingStr('subgoal_target', '50')) || 50;
-    const newCurrent = current + count;
-    await db.setSettingStr('subgoal_current', String(newCurrent));
-    io.emit('subgoal-update', { current: newCurrent, target });
-  } catch(e) { console.error('[SUBGOAL] Erreur incrémentation:', e.message); }
-}
+// Sub Counter widget : géré par recordSubEvent() + emitSubCounterState()
 
 app.get('/api/moderation-logs', async (req,res) => {
   try {
