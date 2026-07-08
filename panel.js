@@ -66,7 +66,10 @@ app.get('/api/leaderboard',    waitDB,    async (req,res) => {
   try {
     const limit = Math.min(parseInt(req.query.limit||10),100);
     const ignored = await getLeaderboardIgnoredUsers();
-    const data = filterLeaderboardUsers(await db.getLeaderboard(Math.max(limit + ignored.length + 20, limit)), ignored).slice(0, limit);
+    const rawRows = await db.getLeaderboard(Math.max(limit + ignored.length + 50, limit));
+    const data = filterLeaderboardUsers(rawRows, ignored)
+      .slice(0, limit)
+      .map((v, i) => ({ ...v, original_rank: v.rank, rank: i + 1 }));
     res.json({data});
   } catch(e){res.json({data:[]}); }
 });
