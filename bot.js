@@ -20,7 +20,7 @@ const CONFIG = {
 };
 
 const PUSHER_URL = 'wss://ws-us2.pusher.com/app/32cbd69e4b950bf97679?protocol=7&client=js&version=7.4.0&flash=false';
-const SYSTEM_COMMANDS = ['!points','!top','!rang','!niveau','!aide','!duel','!accepter','!refuser','!participer','!giveaway','!lobby','!quote','!addquote','!mort','!death','!score','!queue','!join','!leave','!pos','!vote','!sondage','!so','!uptime','!fc','!sc','!coffre','!victoire','!to','!dice','!des','!rps','!pfc','!clip','!addcmd','!delcmd','!addword','!delword','!allowword','!disallowword'];
+const SYSTEM_COMMANDS = ['!points','!top','!topv','!rang','!niveau','!aide','!duel','!accepter','!refuser','!participer','!giveaway','!lobby','!quote','!addquote','!mort','!death','!score','!queue','!join','!leave','!pos','!vote','!sondage','!so','!uptime','!fc','!sc','!coffre','!victoire','!to','!dice','!des','!rps','!pfc','!clip','!addcmd','!delcmd','!addword','!delword','!allowword','!disallowword'];
 
 let ws             = null;
 let reconnectDelay = 5000;
@@ -316,7 +316,8 @@ async function handleChatMessage(payload) {
     db.logCommandUsage(cmd, username).catch(()=>{});
     switch(cmd) {
       case '!points':    return cmdPoints(username);
-      case '!top':       return cmdTop(username);
+      case '!top':
+      case '!topv':      return cmdTop(username);
       case '!rang':      return cmdRang(username);
       case '!niveau':    return cmdNiveau(username);
       case '!aide':      return cmdAide(username);
@@ -1211,31 +1212,68 @@ async function getActiveToken() {
 // ─── Envoi messages ───────────────────────────────────────────────────────────
 
 async function sendChat(message) {
+  const text = normalizeKickChatMessage(message);
   const { token, official } = await getActiveToken();
-  if (!token) { console.log(`[BOT → CHAT] ${message}`); return; }
-  return sendChatVia(message, token, official, false);
+  if (!token) { console.log(`[BOT → CHAT] ${text}`); return false; }
+  return sendChatVia(text, token, official, false);
+}
+
+function normalizeKickChatMessage(message) {
+  return String(message ?? '')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, 450);
+}
+
+function stripUnsupportedForKick(message) {
+  return normalizeKickChatMessage(message)
+    .replace(/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}]/gu, '')
+    .replace(/\s+/g, ' ')
+    .trim();
 }
 
 async function sendChatVia(message, token, official, isRetry) {
+  const text = normalizeKickChatMessage(message);
   try {
     let response;
     if (official) {
-      // API officielle Kick — endpoint public
-      response = await axios.post(
-        `https://api.kick.com/public/v1/chat`,
-        { content: message, type: 'bot', broadcaster_user_id: parseInt(CONFIG.channelId) },
-        { headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-          'Accept-Language': 'en-US',
-        }}
-      );
+      // API officielle Kick.
+      // Selon le type de compte OAuth, Kick accepte soit type=bot sans broadcaster_user_id,
+      // soit type=user avec broadcaster_user_id. On tente les payloads propresment au lieu de
+      // rester bloqué sur un 500 silencieux.
+      const payloads = [
+        { content: text, type: 'bot' },
+        { content: text, type: 'user', broadcaster_user_id: parseInt(CONFIG.channelId) },
+        { content: text, type: 'bot', broadcaster_user_id: parseInt(CONFIG.channelId) },
+      ];
+      let lastErr = null;
+      for (const payload of payloads) {
+        try {
+          response = await axios.post(
+            `https://api.kick.com/public/v1/chat`,
+            payload,
+            { headers: {
+              'Authorization': `Bearer ${token}`,
+              'Content-Type': 'application/json',
+              'Accept': 'application/json',
+              'Accept-Language': 'en-US',
+            }}
+          );
+          lastErr = null;
+          break;
+        } catch (err) {
+          lastErr = err;
+          const status = err.response?.status;
+          // Les 4xx ne seront pas corrigés par un autre payload sauf quelques 400/422.
+          if (status === 401 || status === 403) throw err;
+        }
+      }
+      if (lastErr) throw lastErr;
     } else {
       // Ancien endpoint interne (token manuel, fallback legacy)
       response = await axios.post(
         `https://kick.com/api/v2/messages/send/${CONFIG.channelId}`,
-        { content: message, type: 'message' },
+        { content: text, type: 'message' },
         { headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',
@@ -1247,24 +1285,28 @@ async function sendChatVia(message, token, official, isRetry) {
     }
     console.log(`[BOT] Message envoyé (${response.status}) via ${official ? 'OAuth officiel' : 'token manuel'}${isRetry ? ' (retry)' : ''}`);
     db.setBotStatus('token_expired', '0').catch(()=>{});
+    return true;
   } catch(err) {
     const status = err.response?.status;
     const body   = err.response?.data;
     console.error(`[BOT] Erreur envoi (${status || 'réseau'}):`, typeof body === 'string' ? body : JSON.stringify(body) || err.message);
-    console.error(`[BOT] Message qui a échoué (longueur ${message.length}):`, JSON.stringify(message));
+    console.error(`[BOT] Message qui a échoué (longueur ${text.length}):`, JSON.stringify(text));
 
-    // L'API officielle Kick peut renvoyer un 500 de façon erratique (bug connu côté Kick,
-    // pas forcément lié au contenu du message). On bascule vers le token legacy si dispo,
-    // sans jamais relancer plus d'une fois pour éviter une boucle infinie.
+    // Fallback 1 : message sans emoji/caractères potentiellement refusés.
+    const safeText = stripUnsupportedForKick(text);
+    if (!isRetry && safeText && safeText !== text) {
+      console.log('[BOT] Retry avec message simplifié...');
+      return sendChatVia(safeText, token, official, true);
+    }
+
+    // Fallback 2 : si l'API officielle bug en 500, tenter le token manuel s'il existe.
     if (status === 500 && official && !isRetry && CONFIG.token) {
       console.log('[BOT] 500 sur API officielle → tentative via token manuel (fallback)...');
-      return sendChatVia(message, CONFIG.token, false, true);
+      return sendChatVia(safeText || text, CONFIG.token, false, true);
     }
 
     if (status === 401) {
       if (official) {
-        // L'OAuth officiel se rafraîchit normalement tout seul — un 401 ici
-        // signifie un vrai problème (déconnexion, scope manquant, etc.)
         console.warn('[AUTH] Token OAuth invalide malgré refresh — reconnecte-toi via /auth/login');
         db.setBotStatus('token_expired', '1').catch(()=>{});
       } else {
@@ -1273,9 +1315,10 @@ async function sendChatVia(message, token, official, isRetry) {
         db.setBotStatus('token_expired', '1').catch(()=>{});
       }
     } else if (status === 403) {
-      console.warn(`[AUTH] 403 Forbidden — ${official ? 'le scope chat:write est probablement manquant sur ton app Kick, ou le compte connecté n\u2019est pas modérateur/streamer du salon' : 'le compte du bot n\u2019est probablement pas modérateur de la chaîne'}`);
+      console.warn(`[AUTH] 403 Forbidden — ${official ? 'le scope chat:write est probablement manquant ou le compte connecté n’est pas autorisé à parler dans ce salon' : 'le compte du bot n’est probablement pas modérateur/authentifié sur la chaîne'}`);
       db.setBotStatus('last_403_at', Date.now().toString()).catch(()=>{});
     }
+    return false;
   }
 }
 
