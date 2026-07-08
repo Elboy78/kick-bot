@@ -865,85 +865,122 @@ Option 3" rows="4"></textarea><div style="display:flex;gap:6px;margin-top:10px">
 
   <!-- ══ WIDGETS ══ -->
   <div class="page" id="page-widgets">
-    <div class="header"><div><h1>Widgets</h1><p>Compteur de subs Kick et overlays OBS en temps réel</p></div></div>
+    <div class="header"><div><h1>Widgets</h1><p>Choisis un widget puis règle son overlay OBS</p></div></div>
 
-    <div class="g2">
-      <div class="panel">
-        <h3>⭐ Compteur de subs live</h3>
-        <div style="font-size:10px;color:var(--muted);margin-bottom:12px;line-height:1.6">
-          Compteur connecté aux webhooks Kick : nouveau sub, sub gift et renouvellement. Le total et la session se mettent à jour automatiquement dès qu'un event arrive.
-        </div>
-
-        <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-bottom:14px">
-          <div style="padding:12px;background:var(--card2);border:1px solid var(--brd);border-radius:12px">
-            <div style="font-size:9px;color:var(--muted);font-weight:800;letter-spacing:.5px;text-transform:uppercase">Total subs</div>
-            <div style="font-size:30px;font-weight:900;margin-top:4px" id="subcounter-total-display">0</div>
+    <div id="widgets-home">
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:14px">
+        <button onclick="openWidgetSettings('subgoal')" style="text-align:left;padding:0;border:0;background:transparent;cursor:pointer">
+          <div class="panel" style="min-height:150px;position:relative;overflow:hidden;border-color:rgba(40,255,102,.28);box-shadow:0 16px 38px rgba(0,0,0,.22)">
+            <div style="position:absolute;right:-34px;top:-42px;width:130px;height:130px;border-radius:50%;background:radial-gradient(circle,rgba(40,255,102,.22),transparent 68%)"></div>
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:18px">
+              <div style="width:46px;height:46px;border-radius:16px;background:rgba(40,255,102,.12);border:1px solid rgba(40,255,102,.28);display:flex;align-items:center;justify-content:center;font-size:24px">🎯</div>
+              <span style="font-size:9px;color:var(--accent);font-weight:900;letter-spacing:.7px;text-transform:uppercase">OBS Overlay</span>
+            </div>
+            <div style="font-size:22px;font-weight:950;color:var(--text);letter-spacing:-.4px">Sub Goal</div>
+            <div style="font-size:10px;color:var(--muted);line-height:1.6;margin-top:6px">Barre d’objectif subs, compteur live, session et derniers événements.</div>
+            <div style="margin-top:16px;font-size:10px;font-weight:900;color:var(--accent)">Ouvrir les paramètres →</div>
           </div>
-          <div style="padding:12px;background:var(--card2);border:1px solid var(--brd);border-radius:12px">
-            <div style="font-size:9px;color:var(--muted);font-weight:800;letter-spacing:.5px;text-transform:uppercase">Session live</div>
-            <div style="font-size:30px;font-weight:900;margin-top:4px;color:var(--accent)" id="subcounter-session-display">0</div>
-          </div>
-          <div style="padding:12px;background:var(--card2);border:1px solid var(--brd);border-radius:12px">
-            <div style="font-size:9px;color:var(--muted);font-weight:800;letter-spacing:.5px;text-transform:uppercase">Subs gift</div>
-            <div style="font-size:22px;font-weight:900;margin-top:4px" id="subcounter-gifts-display">0</div>
-          </div>
-          <div style="padding:12px;background:var(--card2);border:1px solid var(--brd);border-radius:12px">
-            <div style="font-size:9px;color:var(--muted);font-weight:800;letter-spacing:.5px;text-transform:uppercase">Renouvellements</div>
-            <div style="font-size:22px;font-weight:900;margin-top:4px" id="subcounter-renewals-display">0</div>
-          </div>
-        </div>
+        </button>
 
-        <label class="lbl">Corriger le total actuel</label>
-        <div style="display:flex;gap:8px;margin-bottom:12px">
-          <input type="number" class="inp" id="subcounter-total-input" min="0" placeholder="0">
-          <button class="dark-btn" onclick="saveSubCounterTotal()">ENREGISTRER</button>
-        </div>
-
-        <div style="display:flex;gap:8px;flex-wrap:wrap">
-          <button class="dark-btn" onclick="adjustSubGoal(-1)">−1 total</button>
-          <button class="dark-btn" onclick="adjustSubGoal(1)">+1 total</button>
-          <button class="dark-btn" onclick="resetSubCounterSession()">Reset session</button>
-          <button class="dark-btn" onclick="resetSubGoal()" style="border-color:#a72a22;color:#ff8a7a">Reset total</button>
-        </div>
-      </div>
-
-      <div class="panel">
-        <h3>🎯 Objectif de subs</h3>
-        <div style="font-size:10px;color:var(--muted);margin-bottom:12px;line-height:1.6">
-          Barre de progression OBS basée sur le total de subs. Les nouveaux subs et subs gifts augmentent le compteur automatiquement.
-        </div>
-
-        <label class="lbl">Objectif</label>
-        <div style="display:flex;gap:8px;margin-bottom:14px">
-          <input type="number" class="inp" id="subgoal-target-input" min="1" placeholder="50">
-          <button class="dark-btn" onclick="saveSubGoalTarget()">ENREGISTRER</button>
-        </div>
-
-        <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-top:1px solid var(--brd);border-bottom:1px solid var(--brd);margin-bottom:12px">
-          <div>
-            <div style="font-size:10px;color:var(--muted)">PROGRESSION ACTUELLE</div>
-            <div style="font-size:22px;font-weight:800"><span id="subgoal-current-display">0</span> / <span id="subgoal-target-display">50</span></div>
-          </div>
-          <div style="font-size:22px;font-weight:900;color:var(--accent)" id="subgoal-percent-display">0%</div>
-        </div>
-
-        <div style="padding:10px;background:var(--card2);border:1px solid var(--brd);border-radius:8px;font-size:10px;color:var(--muted);line-height:1.7;margin-bottom:10px">
-          <b style="color:var(--text)">🔗 Lien overlay OBS Sub Goal</b><br>
-          <code style="background:var(--card);padding:2px 6px;border-radius:4px;color:var(--accent);font-size:9px;display:block;margin-top:4px;word-break:break-all" id="subgoal-obs-url">/widgets/subgoal.html</code>
-          <span style="margin-top:6px;display:block">Taille recommandée : 560×100. Fond transparent.</span>
-        </div>
-
-        <div style="padding:10px;background:var(--card2);border:1px solid var(--brd);border-radius:8px;font-size:10px;color:var(--muted);line-height:1.7">
-          <b style="color:var(--text)">🔗 Lien overlay OBS Compteur compact</b><br>
-          <code style="background:var(--card);padding:2px 6px;border-radius:4px;color:var(--accent);font-size:9px;display:block;margin-top:4px;word-break:break-all" id="subcounter-obs-url">/widgets/subcounter.html</code>
-          <span style="margin-top:6px;display:block">Taille recommandée : 420×130.</span>
+        <div class="panel" style="min-height:150px;opacity:.55;border-style:dashed;display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center">
+          <div style="font-size:28px;margin-bottom:8px">＋</div>
+          <div style="font-size:14px;font-weight:900;color:var(--text)">Nouveau widget</div>
+          <div style="font-size:10px;color:var(--muted);margin-top:6px;line-height:1.5">Emplacement prêt pour ajouter d’autres widgets plus tard.</div>
         </div>
       </div>
     </div>
 
-    <div class="panel" style="margin-top:14px">
-      <h3>🕘 Derniers événements subs</h3>
-      <div id="subcounter-latest-list"><div class="empty"><div class="ei">⭐</div><p>Aucun sub détecté pour le moment</p></div></div>
+    <div id="widget-subgoal-settings" style="display:none">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:14px">
+        <button class="dark-btn" onclick="backToWidgetsHome()">← Retour aux widgets</button>
+        <div style="font-size:10px;color:var(--muted);font-weight:800;text-transform:uppercase;letter-spacing:.7px">Widget actif : Sub Goal</div>
+      </div>
+
+      <div class="g2">
+        <div class="panel">
+          <h3>⭐ Compteur de subs live</h3>
+          <div style="font-size:10px;color:var(--muted);margin-bottom:12px;line-height:1.6">
+            Compteur connecté aux webhooks Kick : nouveau sub, sub gift et renouvellement. Le total et la session se mettent à jour automatiquement dès qu'un event arrive.
+          </div>
+
+          <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-bottom:14px">
+            <div style="padding:12px;background:var(--card2);border:1px solid var(--brd);border-radius:12px">
+              <div style="font-size:9px;color:var(--muted);font-weight:800;letter-spacing:.5px;text-transform:uppercase">Total subs</div>
+              <div style="font-size:30px;font-weight:900;margin-top:4px" id="subcounter-total-display">0</div>
+            </div>
+            <div style="padding:12px;background:var(--card2);border:1px solid var(--brd);border-radius:12px">
+              <div style="font-size:9px;color:var(--muted);font-weight:800;letter-spacing:.5px;text-transform:uppercase">Session live</div>
+              <div style="font-size:30px;font-weight:900;margin-top:4px;color:var(--accent)" id="subcounter-session-display">0</div>
+            </div>
+            <div style="padding:12px;background:var(--card2);border:1px solid var(--brd);border-radius:12px">
+              <div style="font-size:9px;color:var(--muted);font-weight:800;letter-spacing:.5px;text-transform:uppercase">Subs gift</div>
+              <div style="font-size:22px;font-weight:900;margin-top:4px" id="subcounter-gifts-display">0</div>
+            </div>
+            <div style="padding:12px;background:var(--card2);border:1px solid var(--brd);border-radius:12px">
+              <div style="font-size:9px;color:var(--muted);font-weight:800;letter-spacing:.5px;text-transform:uppercase">Renouvellements</div>
+              <div style="font-size:22px;font-weight:900;margin-top:4px" id="subcounter-renewals-display">0</div>
+            </div>
+          </div>
+
+          <label class="lbl">Corriger le total actuel</label>
+          <div style="display:flex;gap:8px;margin-bottom:12px">
+            <input type="number" class="inp" id="subcounter-total-input" min="0" placeholder="0">
+            <button class="dark-btn" onclick="saveSubCounterTotal()">ENREGISTRER</button>
+          </div>
+
+          <div style="display:flex;gap:8px;flex-wrap:wrap">
+            <button class="dark-btn" onclick="adjustSubGoal(-1)">−1 total</button>
+            <button class="dark-btn" onclick="adjustSubGoal(1)">+1 total</button>
+            <button class="dark-btn" onclick="resetSubCounterSession()">Reset session</button>
+            <button class="dark-btn" onclick="resetSubGoal()" style="border-color:#a72a22;color:#ff8a7a">Reset total</button>
+          </div>
+        </div>
+
+        <div class="panel">
+          <h3>🎯 Objectif de subs</h3>
+          <div style="font-size:10px;color:var(--muted);margin-bottom:12px;line-height:1.6">
+            Barre de progression OBS basée sur le total de subs. Les nouveaux subs et subs gifts augmentent le compteur automatiquement.
+          </div>
+
+          <label class="lbl">Texte affiché dans la barre overlay</label>
+          <div style="display:flex;gap:8px;margin-bottom:12px">
+            <input type="text" class="inp" id="subgoal-label-input" maxlength="40" placeholder="Sub Goal">
+            <button class="dark-btn" onclick="saveSubGoalLabel()">ENREGISTRER</button>
+          </div>
+          <div style="font-size:9px;color:var(--muted);margin-top:-6px;margin-bottom:14px">Exemples : Objectif subs, Road to 50 subs, Support le live.</div>
+
+          <label class="lbl">Objectif</label>
+          <div style="display:flex;gap:8px;margin-bottom:14px">
+            <input type="number" class="inp" id="subgoal-target-input" min="1" placeholder="50">
+            <button class="dark-btn" onclick="saveSubGoalTarget()">ENREGISTRER</button>
+          </div>
+
+          <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-top:1px solid var(--brd);border-bottom:1px solid var(--brd);margin-bottom:12px">
+            <div>
+              <div style="font-size:10px;color:var(--muted)">PROGRESSION ACTUELLE</div>
+              <div style="font-size:22px;font-weight:800"><span id="subgoal-current-display">0</span> / <span id="subgoal-target-display">50</span></div>
+            </div>
+            <div style="font-size:22px;font-weight:900;color:var(--accent)" id="subgoal-percent-display">0%</div>
+          </div>
+
+          <div style="padding:10px;background:var(--card2);border:1px solid var(--brd);border-radius:8px;font-size:10px;color:var(--muted);line-height:1.7;margin-bottom:10px">
+            <b style="color:var(--text)">🔗 Lien overlay OBS Sub Goal</b><br>
+            <code style="background:var(--card);padding:2px 6px;border-radius:4px;color:var(--accent);font-size:9px;display:block;margin-top:4px;word-break:break-all" id="subgoal-obs-url">/widgets/subgoal.html</code>
+            <span style="margin-top:6px;display:block">Taille recommandée : 560×100. Fond transparent.</span>
+          </div>
+
+          <div style="padding:10px;background:var(--card2);border:1px solid var(--brd);border-radius:8px;font-size:10px;color:var(--muted);line-height:1.7">
+            <b style="color:var(--text)">🔗 Lien overlay OBS Compteur compact</b><br>
+            <code style="background:var(--card);padding:2px 6px;border-radius:4px;color:var(--accent);font-size:9px;display:block;margin-top:4px;word-break:break-all" id="subcounter-obs-url">/widgets/subcounter.html</code>
+            <span style="margin-top:6px;display:block">Taille recommandée : 420×130.</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel" style="margin-top:14px">
+        <h3>🕘 Derniers événements subs</h3>
+        <div id="subcounter-latest-list"><div class="empty"><div class="ei">⭐</div><p>Aucun sub détecté pour le moment</p></div></div>
+      </div>
     </div>
   </div>
 
@@ -1287,6 +1324,21 @@ let lbData = [], levels = [];
 const PAGE_TITLES = {dashboard:'Dashboard',classement:'Classement',lobby:'Lobby',jeux:'Jeux',objectifs:'Objectifs',dbd:'Dead by Daylight',moderation:'Modération',commands:'Commandes',historique:'Historique',admin:'Administration',settings:'Paramètres',outils:'Outils Chat'};
 
 // ── Navigation ─────────────────────────────────────────────────────────────────
+function openWidgetSettings(name) {
+  const home = document.getElementById('widgets-home');
+  const subgoal = document.getElementById('widget-subgoal-settings');
+  if (home) home.style.display = 'none';
+  if (subgoal) subgoal.style.display = name === 'subgoal' ? 'block' : 'none';
+  if (name === 'subgoal') loadSubGoal();
+}
+
+function backToWidgetsHome() {
+  const home = document.getElementById('widgets-home');
+  const subgoal = document.getElementById('widget-subgoal-settings');
+  if (home) home.style.display = 'block';
+  if (subgoal) subgoal.style.display = 'none';
+}
+
 async function loadSubGoal() {
   try {
     const r = await fetch(API + '/api/widgets/subcounter');
@@ -1317,6 +1369,7 @@ function renderSubCounter(d) {
   set('subgoal-percent-display', pct + '%');
   setVal('subcounter-total-input', total);
   setVal('subgoal-target-input', target);
+  setVal('subgoal-label-input', d.label || 'Sub Goal');
   renderSubCounterLatest(d.latest || []);
 }
 
@@ -1345,6 +1398,19 @@ async function saveSubCounterTotal() {
   });
   if (!r.ok) return toast('Erreur', false);
   toast(`⭐ Total subs corrigé à ${total}`);
+  loadSubGoal();
+}
+
+
+async function saveSubGoalLabel() {
+  const input = document.getElementById('subgoal-label-input');
+  const label = (input?.value || 'Sub Goal').trim() || 'Sub Goal';
+  const r = await fetch(API + '/api/admin/widgets/subgoal/label', {
+    method: 'POST', headers: { 'Content-Type': 'application/json', 'x-panel-key': getKey() },
+    body: JSON.stringify({ label })
+  });
+  if (!r.ok) return toast('Erreur', false);
+  toast(`Texte overlay mis à jour : ${label}`);
   loadSubGoal();
 }
 
@@ -1406,7 +1472,7 @@ function showPage(name) {
   if(name==='subdon') { loadFollowAnnounce(); loadSubAnnounce(); loadSubDonPreview(); }
   if(name==='logs') loadModerationLogs();
   if(name==='chests') loadChests();
-  if(name==='widgets') loadSubGoal();
+  if(name==='widgets') { backToWidgetsHome(); loadSubGoal(); }
   if(name==='admin') { loadCmds(); loadAdminLevels(); loadAccessRequests(); }
   if(name==='commands') { loadCommandsPage(); loadSystemCommands(); }
   if(name==='dbd') initDBD();

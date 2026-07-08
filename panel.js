@@ -97,6 +97,7 @@ const SUB_COUNTER_DEFAULTS = {
   renewals: 0,
   gifts: 0,
   target: 50,
+  label: 'Sub Goal',
   latest: []
 };
 
@@ -110,6 +111,7 @@ async function getSubCounterState() {
     renewals: parseInt(await db.getSettingStr('subcounter_renewals', '0')) || 0,
     gifts: parseInt(await db.getSettingStr('subcounter_gifts', '0')) || 0,
     target: parseInt(await db.getSettingStr('subgoal_target', '50')) || 50,
+    label: await db.getSettingStr('subgoal_label', 'Sub Goal'),
     latest: Array.isArray(latest) ? latest.slice(0, 12) : []
   };
 }
@@ -117,7 +119,7 @@ async function getSubCounterState() {
 async function emitSubCounterState() {
   const state = await getSubCounterState();
   io.emit('subcounter-update', state);
-  io.emit('subgoal-update', { current: state.total, target: state.target });
+  io.emit('subgoal-update', { current: state.total, target: state.target, label: state.label });
   return state;
 }
 
@@ -149,7 +151,7 @@ async function recordSubEvent(type, payload = {}) {
     await db.setSettingStr('subgoal_current', String(state.total));
     await db.setSettingStr('subcounter_latest', JSON.stringify(state.latest));
     io.emit('subcounter-update', state);
-    io.emit('subgoal-update', { current: state.total, target: state.target });
+    io.emit('subgoal-update', { current: state.total, target: state.target, label: state.label });
     return state;
   } catch(e) { console.error('[SUBCOUNTER] Erreur event:', e.message); }
 }
@@ -527,8 +529,8 @@ async function broadcastChestResult(result) {
 app.get('/api/widgets/subgoal', async (req, res) => {
   try {
     const state = await getSubCounterState();
-    res.json({ current: state.total, target: state.target });
-  } catch(e) { res.json({ current: 0, target: 50 }); }
+    res.json({ current: state.total, target: state.target, label: state.label });
+  } catch(e) { res.json({ current: 0, target: 50, label: 'Sub Goal' }); }
 });
 
 app.get('/api/widgets/subcounter', async (req, res) => {
@@ -551,6 +553,15 @@ app.post('/api/admin/widgets/subcounter/session/reset', requireAuth, async (req,
     await db.setSettingStr('subcounter_renewals', '0');
     await db.setSettingStr('subcounter_gifts', '0');
     await db.setSettingStr('subcounter_latest', '[]');
+    res.json({ success: true, ...(await emitSubCounterState()) });
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+
+app.post('/api/admin/widgets/subgoal/label', requireAuth, async (req, res) => {
+  try {
+    const label = String(req.body.label || 'Sub Goal').trim().slice(0, 40) || 'Sub Goal';
+    await db.setSettingStr('subgoal_label', label);
     res.json({ success: true, ...(await emitSubCounterState()) });
   } catch(e) { res.status(500).json({ error: e.message }); }
 });

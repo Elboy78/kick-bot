@@ -55,7 +55,7 @@
 
 <div id="wrap">
   <div id="label">
-    <span class="title">🎯 Sub Goal</span>
+    <span class="title" id="goal-label">🎯 Sub Goal</span>
     <span class="count"><b id="cur">0</b><span> / <span id="tgt">50</span> subs</span></span>
   </div>
   <div id="track">
@@ -73,10 +73,12 @@ const glow = document.getElementById('glow');
 const curEl = document.getElementById('cur');
 const tgtEl = document.getElementById('tgt');
 const pctText = document.getElementById('pct-text');
+const labelEl = document.getElementById('goal-label');
 
 let lastCurrent = null;
 
-function render(current, target) {
+function render(current, target, label) {
+  if (labelEl) labelEl.textContent = '🎯 ' + (label || 'Sub Goal');
   const pct = target > 0 ? Math.min(100, Math.round((current / target) * 100)) : 0;
   curEl.textContent = current;
   tgtEl.textContent = target;
@@ -95,11 +97,11 @@ async function loadInitial() {
   try {
     const r = await fetch('/api/widgets/subgoal');
     const d = await r.json();
-    render(d.current || 0, d.target || 50);
+    render(d.current || 0, d.target || 50, d.label || 'Sub Goal');
   } catch(e) { console.error('[SUBGOAL] Erreur chargement initial', e); }
 }
 
-socket.on('subgoal-update', (d) => render(d.current || 0, d.target || 50));
+socket.on('subgoal-update', (d) => render(d.current || 0, d.target || 50, d.label || 'Sub Goal'));
 
 loadInitial();
 </script>
