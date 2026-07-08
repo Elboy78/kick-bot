@@ -15,7 +15,7 @@ const server = http.createServer(app);
 const io     = new Server(server, { cors: { origin: '*' } });
 
 app.use(cors());
-app.use(express.json());
+app.use(express.json({ limit: '8mb' }));
 app.use(express.static(path.join(__dirname, 'public')));
 
 function requireAuth(req, res, next) { next(); }
@@ -510,7 +510,7 @@ async function saveLevelImage(name, imageUrl) {
   const key = levelImageKey(name);
   if (!key) return;
   const clean = String(imageUrl || '').trim();
-  if (clean) map[key] = clean.slice(0, 1000);
+  if (clean) map[key] = clean.slice(0, 2_500_000);
   else delete map[key];
   await db.setSettingStr('leaderboard_level_images', JSON.stringify(map));
 }

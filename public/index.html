@@ -586,8 +586,9 @@ hr.div{border:none;border-top:1px solid var(--brd);margin:12px 0}
           <label class="lbl">Emoji</label>
           <input class="inp" id="cfg-level-emoji" placeholder="🔥" maxlength="4">
           <label class="lbl">Image personnalisée du niveau <span style="color:var(--muted2);font-weight:600">(optionnel)</span></label>
-          <input class="inp" id="cfg-level-image" placeholder="https://.../image.png">
-          <p style="margin:6px 0 0;color:var(--muted2);font-size:11px">L’image restera petite dans le classement. Si vide, l’emoji sera utilisé.</p>
+          <input class="inp" id="cfg-level-image" placeholder="https://.../image.png ou image chargée depuis ton PC">
+          <input type="file" accept="image/*" class="inp" id="cfg-level-image-file" style="margin-top:8px;padding:9px" onchange="readLevelImageFile(this, 'cfg-level-image')">
+          <p style="margin:6px 0 0;color:var(--muted2);font-size:11px">Tu peux mettre une URL ou parcourir tes images. L’image restera petite dans le classement. Conseil : image légère, carrée, PNG/JPG/WebP.</p>
           <button class="btnx btn-primary" style="width:100%;justify-content:center;margin-top:12px" onclick="addConfigLevel()">➕ Ajouter le niveau</button>
           <div id="cfg-level-msg" style="margin-top:7px"></div>
         </div>
@@ -5148,7 +5149,8 @@ async function loadConfigLevels() {
             <input class="inp inp-sm" value="${esc(l.emoji || '⭐')}" id="lvl-emoji-${l.id}" maxlength="4" style="width:48px;text-align:center">
             <span style="font-size:9px;color:var(--muted2)">pts min</span>
           </div>
-          <input class="inp inp-sm" value="${esc(l.imageUrl || '')}" id="lvl-image-${l.id}" placeholder="URL image personnalisée du niveau">
+          <input class="inp inp-sm" value="${esc(l.imageUrl || '')}" id="lvl-image-${l.id}" placeholder="URL image ou image chargée depuis ton PC">
+          <input type="file" accept="image/*" class="inp inp-sm" style="margin-top:4px;padding:7px" onchange="readLevelImageFile(this, 'lvl-image-${l.id}')">
         </div>
         <div style="display:flex;flex-direction:column;gap:4px">
           <button class="btnx btn-outline btn-xs" onclick="saveConfigLevel(${l.id})">💾</button>
@@ -5160,6 +5162,31 @@ async function loadConfigLevels() {
     renderLevelsGrid();
     renderAdminLevels();
   } catch(e) {}
+}
+
+
+function readLevelImageFile(input, targetId) {
+  const file = input?.files?.[0];
+  const target = document.getElementById(targetId);
+  if (!file || !target) return;
+  if (!file.type || !file.type.startsWith('image/')) {
+    toast('Fichier image uniquement', false);
+    input.value = '';
+    return;
+  }
+  const maxSize = 2 * 1024 * 1024;
+  if (file.size > maxSize) {
+    toast('Image trop lourde : max 2 Mo', false);
+    input.value = '';
+    return;
+  }
+  const reader = new FileReader();
+  reader.onload = () => {
+    target.value = String(reader.result || '');
+    toast('🖼️ Image chargée depuis ton PC');
+  };
+  reader.onerror = () => toast('Impossible de lire cette image', false);
+  reader.readAsDataURL(file);
 }
 
 async function addConfigLevel() {
