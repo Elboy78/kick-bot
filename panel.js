@@ -9,6 +9,7 @@ const db      = require('./database');
 const kickOAuth = require('./kick-oauth');
 const shared = require('./shared');
 const tenant = require('./tenant');
+const { createTenantManager } = require('./tenant-manager');
 
 const app    = express();
 const PORT   = parseInt(process.env.PANEL_PORT || '3000');
@@ -29,6 +30,11 @@ app.use((req, res, next) => {
 });
 app.use(express.static(path.join(__dirname, 'public')));
 app.use((req, res, next) => tenant.attachTenant(db, req, res, next));
+app.use((req, res, next) => {
+  // V2 Phase 3 : point d'entrée unique pour settings/rooms/URLs par streamer.
+  req.tenantManager = createTenantManager({ db, io, streamer: req.streamer, req });
+  next();
+});
 
 function requireAuth(req, res, next) { next(); }
 
@@ -87,8 +93,21 @@ app.get('/api/v2/streamers/current', waitDB, async (req, res) => {
 });
 app.get('/api/v2/tenant/current', waitDB, async (req, res) => {
   try {
-    const streamer = req.streamer || await db.ensureDefaultStreamer(tenant.getDefaultStreamerSeed());
-    res.json({ data: { streamerId: streamer.id, slug: streamer.slug, displayName: streamer.display_name || streamer.displayName || streamer.slug, room: tenant.roomName(streamer.slug) } });
+    res.json({ data: req.tenantManager.info() });
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+app.get('/api/v2/tenant/debug', waitDB, async (req, res) => {
+  try {
+    const tm = req.tenantManager;
+    res.json({
+      data: {
+        ...tm.info(),
+        overlayLinks: tm.overlayLinks(),
+        sampleScopedKey: tm.scopedKey('songrequest_queue'),
+        sampleSongRequestQueue: await tm.getJson('songrequest_queue', [])
+      }
+    });
   } catch(e) { res.status(500).json({ error: e.message }); }
 });
 
@@ -112,20 +131,8 @@ app.post('/api/v2/admin/streamers', requireAuth, waitDB, async (req, res) => {
 });
 
 app.get('/api/v2/obs-links', waitDB, async (req, res) => {
-  try {
-    const protocol = req.headers['x-forwarded-proto'] || req.protocol || 'https';
-    const host = req.get('host');
-    const base = `${protocol}://${host}`;
-    const slug = req.streamer?.slug || tenant.DEFAULT_STREAMER_SLUG;
-    res.json({ data: {
-      streamer: slug,
-      classement: `${base}/s/${slug}/classement`,
-      alerts: `${base}/s/${slug}/widgets/alerts.html`,
-      chat: `${base}/s/${slug}/widgets/chat.html`,
-      songrequest: `${base}/s/${slug}/widgets/songrequest.html`,
-      subgoal: `${base}/s/${slug}/widgets/subgoal.html`
-    }});
-  } catch(e) { res.status(500).json({ error: e.message }); }
+  try { res.json({ data: req.tenantManager.overlayLinks() }); }
+  catch(e) { res.status(500).json({ error: e.message }); }
 });
 
 
@@ -184,18 +191,15 @@ app.get('/api/v2/account', waitDB, async (req, res) => {
 
 app.get('/api/v2/overlays', waitDB, async (req, res) => {
   try {
-    const protocol = req.headers['x-forwarded-proto'] || req.protocol || 'https';
-    const host = req.get('host');
-    const base = `${protocol}://${host}`;
-    const slug = req.streamer?.slug || tenant.DEFAULT_STREAMER_SLUG;
+    const links = req.tenantManager.overlayLinks();
     const items = [
-      { key:'songrequest', name:'Song Request', url:`${base}/s/${slug}/widgets/songrequest.html`, desc:'Lecteur musique OBS' },
-      { key:'chat', name:'Overlay Chat', url:`${base}/s/${slug}/widgets/chat.html`, desc:'Chat Kick affiché sur OBS' },
-      { key:'subgoal', name:'Sub Goal', url:`${base}/s/${slug}/widgets/subgoal.html`, desc:'Objectif de subs' },
-      { key:'alerts', name:'Alertes', url:`${base}/s/${slug}/widgets/alerts.html`, desc:'Follow, sub, gifts et raids' },
-      { key:'classement', name:'Classement public', url:`${base}/s/${slug}/classement`, desc:'Page viewer du classement' }
+      { key:'songrequest', name:'Song Request', url:links.songrequest, desc:'Lecteur musique OBS' },
+      { key:'chat', name:'Overlay Chat', url:links.chat, desc:'Chat Kick affiché sur OBS' },
+      { key:'subgoal', name:'Sub Goal', url:links.subgoal, desc:'Objectif de subs' },
+      { key:'alerts', name:'Alertes', url:links.alerts, desc:'Follow, sub, gifts et raids' },
+      { key:'classement', name:'Classement public', url:links.classement, desc:'Page viewer du classement' }
     ];
-    res.json({ data: { streamer: slug, items } });
+    res.json({ data: { streamer: links.streamer, items } });
   } catch(e) { res.status(500).json({ error: e.message }); }
 });
 
