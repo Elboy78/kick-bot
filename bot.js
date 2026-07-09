@@ -18,6 +18,7 @@ const CONFIG = {
   pointsAmount: parseInt(process.env.POINTS_PER_INTERVAL || '10'),
   intervalMs:   parseInt(process.env.POINTS_INTERVAL_MS  || '300000'),
   debug:        process.env.DEBUG === 'true',
+  legacyChannelEnabled: process.env.KICK_LEGACY_CHANNEL === 'true',
 };
 
 const PUSHER_URL = 'wss://ws-us2.pusher.com/app/32cbd69e4b950bf97679?protocol=7&client=js&version=7.4.0&flash=false';
@@ -62,7 +63,7 @@ async function loadActiveBotChannels() {
     for (const s of rows || []) {
       const chatroomId = String(s.chatroom_id || '').trim();
       if (!chatroomId) {
-        console.log(`[BOT V2] ${s.slug}: chatroom_id manquant. Ouvre son panel /s/${s.slug}/dashboard une fois pour synchroniser la chaîne.`);
+        console.log(`[BOT V2] ${s.slug}: ignoré — chatroom_id manquant. Reconnecte ce streamer via Kick pour enregistrer son chatroom_id.`);
         continue;
       }
       const ctx = {
@@ -76,7 +77,7 @@ async function loadActiveBotChannels() {
       usable.push(ctx);
       botChannelState.chatrooms.set(chatroomId, ctx);
     }
-    console.log(`[BOT V2] Channels actifs: ${usable.map(x => `${x.slug}#${x.chatroomId}`).join(', ') || 'aucun'}`);
+    console.log(`[BOT V2] Channels actifs via DB: ${usable.map(x => `${x.slug}#${x.chatroomId}`).join(', ') || 'aucun'}`);
     return usable;
   } catch(e) {
     console.warn('[BOT V2] Sync channels impossible:', e.message);
@@ -154,8 +155,10 @@ function connect() {
     reconnectDelay = 5000;
     // V2 : on s'abonne à toutes les chatrooms connues des streamers actifs.
     syncActiveBotChannels();
-    // Compat legacy seulement si un KICK_CHANNEL_ID est explicitement configuré.
-    if (CONFIG.channelId && CONFIG.channelId !== '0') {
+    // V2 propre : aucun fallback automatique vers KICK_CHANNEL.
+    // Le legacy est volontairement désactivé sauf si KICK_LEGACY_CHANNEL=true,
+    // pour éviter que le bot retombe sur fack7up ou une ancienne chaîne.
+    if (CONFIG.legacyChannelEnabled && CONFIG.channelId && CONFIG.channelId !== '0') {
       subscribe(`chatrooms.${CONFIG.channelId}.v2`);
       subscribe(`channel.${CONFIG.channelId}`);
     }
@@ -188,6 +191,8 @@ function subscribe(channel) {
 function cleanup() {
   if (pingInterval)   { clearInterval(pingInterval);   pingInterval   = null; }
   if (pointsInterval) { clearInterval(pointsInterval); pointsInterval = null; }
+  // Important : après une reconnexion WebSocket, il faut réabonner toutes les rooms.
+  botChannelState.subscribed.clear();
   isLive = false;
 }
 
@@ -228,7 +233,7 @@ function handleEvent(msg) {
 
   switch(event) {
     case 'pusher:connection_established': console.log('[BOT] Handshake OK'); break;
-    case 'pusher_internal:subscription_succeeded': console.log('[BOT] Subscription ✓'); break;
+    case 'pusher_internal:subscription_succeeded': console.log(`[BOT] Subscription ✓ ${channel || ''}`.trim()); break;
 
     case 'App\\Events\\ChatMessageEvent':
     case 'ChatMessageEvent': {
