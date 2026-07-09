@@ -107,10 +107,18 @@ app.get('/api/v2/obs-links', waitDB, async (req, res) => {
 // V2 multi-streamer : attache le tenant et force les settings par streamer.
 // Ainsi, le même panel complet affiche les données du compte Kick connecté,
 // pas celles du streamer par défaut.
-function setStreamerCookieMiddleware(req, res, next) {
-  const slug = tenant.normalizeSlug(req.params?.streamer || req.query?.streamer || '');
-  if (slug) {
-    res.cookie('kb_streamer', slug, { path: '/', sameSite: 'Lax', maxAge: 1000 * 60 * 60 * 24 * 365 });
+async function setStreamerCookieMiddleware(req, res, next) {
+  try {
+    const slug = tenant.normalizeSlug(req.params?.streamer || req.query?.streamer || '');
+    if (slug) {
+      const streamer = await tenant.ensureRequestedStreamer(db, slug);
+      req.streamer = streamer;
+      req.streamerSlug = streamer.slug;
+      res.cookie('kb_streamer', streamer.slug, { path: '/', sameSite: 'Lax', maxAge: 1000 * 60 * 60 * 24 * 365 });
+      res.setHeader('X-Streamer-Slug', streamer.slug);
+    }
+  } catch(e) {
+    console.warn('[TENANT] Impossible de poser le streamer route:', e.message);
   }
   next();
 }
@@ -226,7 +234,7 @@ app.get('/api/active',         async (req,res) => { try { res.json({data: await 
 
 // Expose le slug de la chaîne au client pour les appels directs vers Kick
 app.get('/api/channel-info', (req, res) => {
-  res.json({ channel: process.env.KICK_CHANNEL || 'fack7up' });
+  res.json({ channel: req.streamer?.slug || req.streamerSlug || process.env.KICK_CHANNEL || 'fack7up' });
 });
 
 // ── Follow Announce ────────────────────────────────────────────────────────────
@@ -1863,8 +1871,9 @@ app.get('/auth/callback', async (req, res) => {
     }
 
     setStreamerSessionCookie(res, slug);
+    res.cookie('kb_streamer', slug, { path: '/', sameSite: 'Lax', maxAge: 1000 * 60 * 60 * 24 * 365 });
     console.log(`[OAUTH CALLBACK V2] ✅ Streamer connecté: ${slug} (#${streamer.id})`);
-    res.redirect(`/s/${slug}/dashboard`);
+    res.redirect(`/s/${slug}/dashboard?streamer=${encodeURIComponent(slug)}`);
   } catch (e) {
     console.error('[OAUTH CALLBACK V2] ❌ Exception:', e.response?.data || e.message, e.stack);
     res.status(500).send(`<pre style="color:#ff5c7a;background:#111;padding:20px;font-family:monospace;white-space:pre-wrap">Erreur OAuth V2: ${e.message}\n\n${e.stack || ''}</pre>`);
@@ -2197,7 +2206,22 @@ app.post('/api/admin/widgets/chat-overlay/test', requireAuth, async (req, res) =
 });
 
 io.on('connection', (socket) => {
-  console.log('[TTS] Overlay connecté:', socket.id);
+  const requested = socket.handshake?.query?.streamer || socket.handshake?.auth?.streamer || socket.handshake?.headers?.['x-streamer-slug'];
+  const slug = requested ? tenant.normalizeSlug(requested) : '';
+  if (slug) {
+    const room = tenant.roomName(slug);
+    socket.join(room);
+    socket.emit('tenant-joined', { room, slug });
+    console.log(`[SOCKET] Connecté ${socket.id} → ${room}`);
+  } else {
+    console.log('[SOCKET] Connecté sans tenant:', socket.id);
+  }
+  socket.on('tenant-join', (joinSlug) => {
+    const clean = tenant.normalizeSlug(joinSlug);
+    const room = tenant.roomName(clean);
+    socket.join(room);
+    socket.emit('tenant-joined', { room, slug: clean });
+  });
 });
 
 app.get('/login', (req,res) => res.sendFile(path.join(__dirname,'public','login.html')));

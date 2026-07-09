@@ -538,7 +538,7 @@ hr.div{border:none;border-top:1px solid var(--brd);margin:12px 0}
         <h3>Informations</h3>
         <ul class="info">
           <li><span>Statut</span><span class="online">● En ligne</span></li>
-          <li><span>Chaîne</span><span>fack7up</span></li>
+          <li><span>Chaîne</span><span id="settings-channel-name">Connecté</span></li>
           <li><span>Viewers</span><span id="ic-viewers">—</span></li>
           <li><span>Followers</span><span id="ic-followers">—</span></li>
           <li><span>Statut live</span><span id="ic-live-badge" class="ic-offline-badge">Hors ligne</span></li>
@@ -1582,7 +1582,7 @@ Option 3" rows="4"></textarea><div style="display:flex;gap:6px;margin-top:10px">
           <button class="btnx btn-ghost btn-sm" style="width:100%;justify-content:center;margin-top:6px" onclick="window.open('https://dashboard.render.com','_blank')">🔗 Ouvrir Render → Environment</button>
           <div id="token-msg" style="margin-top:7px"></div>
         </div>
-        <div class="panel" style="margin-bottom:14px"><h3>ℹ️ À propos</h3><ul class="info"><li><span>Version</span><span style="color:#8b35ff;font-weight:700">Bot7uP v2.1.0</span></li><li><span>Base de données</span><span>Turso (LibSQL)</span></li><li><span>Hébergement</span><span>Render.com</span></li><li><span>Chaîne</span><span>fack7up</span></li></ul></div>
+        <div class="panel" style="margin-bottom:14px"><h3>ℹ️ À propos</h3><ul class="info"><li><span>Version</span><span style="color:#8b35ff;font-weight:700">Bot7uP v2.1.0</span></li><li><span>Base de données</span><span>Turso (LibSQL)</span></li><li><span>Hébergement</span><span>Render.com</span></li><li><span>Chaîne</span><span id="settings-channel-name">Connecté</span></li></ul></div>
         <div class="danger"><div class="danger-t">⚠ Réinitialisation</div><p style="font-size:10px;color:#a1a1aa;margin-bottom:8px">Remet les préférences aux valeurs par défaut.</p><button class="btnx btn-red" style="width:100%;justify-content:center" onclick="resetSettings()">🔄 Réinitialiser</button></div>
       </div>
     </div>
@@ -1597,7 +1597,55 @@ Option 3" rows="4"></textarea><div style="display:flex;gap:6px;margin-top:10px">
 
 
 const API = '';
+
+// V2 multi-streamer : le panel complet reste le même, mais chaque appel API
+// transporte toujours le streamer présent dans l'URL /s/:streamer/...
+// Cela évite de retomber sur le streamer par défaut fack7up quand un autre
+// compte Kick est connecté.
+const CURRENT_STREAMER_SLUG = (() => {
+  const m = location.pathname.match(/^\/s\/([^\/?#]+)/i);
+  return m ? decodeURIComponent(m[1]).toLowerCase() : '';
+})();
+
+function withStreamerParam(input) {
+  if (!CURRENT_STREAMER_SLUG) return input;
+  if (typeof input !== 'string') return input;
+  if (!input.startsWith('/api/') && !input.startsWith(API + '/api/')) return input;
+  try {
+    const u = new URL(input, location.origin);
+    if (!u.searchParams.get('streamer')) u.searchParams.set('streamer', CURRENT_STREAMER_SLUG);
+    return u.pathname + u.search + u.hash;
+  } catch(e) { return input; }
+}
+
+const __nativeFetch = window.fetch.bind(window);
+window.fetch = (input, init = {}) => {
+  const url = withStreamerParam(input);
+  const nextInit = { ...(init || {}) };
+  if (CURRENT_STREAMER_SLUG && typeof url === 'string' && (url.startsWith('/api/') || url.startsWith(API + '/api/'))) {
+    nextInit.headers = { ...(nextInit.headers || {}), 'x-streamer-slug': CURRENT_STREAMER_SLUG };
+  }
+  return __nativeFetch(url, nextInit);
+};
+
+// Socket.IO : les sockets du panel rejoignent automatiquement la room du streamer.
+if (typeof window.io === 'function') {
+  const __nativeIo = window.io;
+  window.io = function patchedTenantIo(...args) {
+    let url = undefined, opts = {};
+    if (typeof args[0] === 'string') { url = args[0]; opts = args[1] || {}; }
+    else { opts = args[0] || {}; }
+    opts = { ...opts, query: { ...(opts.query || {}), streamer: CURRENT_STREAMER_SLUG || undefined } };
+    const socket = url ? __nativeIo(url, opts) : __nativeIo(opts);
+    if (CURRENT_STREAMER_SLUG && socket && typeof socket.emit === 'function') {
+      socket.on && socket.on('connect', () => socket.emit('tenant-join', CURRENT_STREAMER_SLUG));
+    }
+    return socket;
+  };
+}
+
 const MEDALS = ['🥇','🥈','🥉'];
+try { document.querySelectorAll('#settings-channel-name').forEach(el => el.textContent = CURRENT_STREAMER_SLUG || 'connecté'); } catch(e) {}
 let lbData = [], levels = [];
 const PAGE_TITLES = {dashboard:'Dashboard',classement:'Classement',lobby:'Lobby',jeux:'Jeux',objectifs:'Objectifs',dbd:'Dead by Daylight',moderation:'Modération',commands:'Commandes',historique:'Historique',admin:'Administration',settings:'Paramètres',outils:'Outils Chat',alertes:'Alertes'};
 let songRequestRefreshTimer = null;
