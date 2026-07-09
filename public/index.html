@@ -367,6 +367,7 @@ hr.div{border:none;border-top:1px solid var(--brd);margin:12px 0}
     return rawFetch(input, init);
   };
 })();
+
 </script>
 
 </head>
@@ -436,7 +437,7 @@ hr.div{border:none;border-top:1px solid var(--brd);margin:12px 0}
   <div class="bot-status">
     <p class="bot-status-title">STATUT DU BOT</p>
     <p class="online">● En ligne</p>
-    <p>Chaîne : <b>fack7up</b></p>
+    <p>Chaîne : <b id="sidebar-channel-name">—</b></p>
     <p>Uptime : <b id="sb-uptime">—</b></p>
     <p>Followers : <b id="sb-followers">—</b></p>
     <div class="live-pill off" id="live-pill"><div class="lpd" id="live-dot"></div><span id="live-text">Vérification…</span></div>
@@ -467,11 +468,11 @@ hr.div{border:none;border-top:1px solid var(--brd);margin:12px 0}
   <div class="page active" id="page-dashboard">
     <div class="header">
       <div>
-        <h1>Bonjour, fack7up ! 👋</h1>
+        <h1 id="dashboard-greeting">Bonjour 👋</h1>
         <p>Voici un aperçu complet de ton bot</p>
       </div>
       <div class="header-right">
-        <button class="btn" onclick="window.open('https://kick.com/fack7up','_blank')">💬 Voir le chat</button>
+        <button class="btn" id="open-kick-chat-btn" onclick="openCurrentKickChannel()">💬 Voir le chat</button>
         <button class="btn btn-connected">● Bot connecté</button>
       </div>
     </div>
@@ -1648,6 +1649,38 @@ const MEDALS = ['🥇','🥈','🥉'];
 try { document.querySelectorAll('#settings-channel-name').forEach(el => el.textContent = CURRENT_STREAMER_SLUG || 'connecté'); } catch(e) {}
 let lbData = [], levels = [];
 const PAGE_TITLES = {dashboard:'Dashboard',classement:'Classement',lobby:'Lobby',jeux:'Jeux',objectifs:'Objectifs',dbd:'Dead by Daylight',moderation:'Modération',commands:'Commandes',historique:'Historique',admin:'Administration',settings:'Paramètres',outils:'Outils Chat',alertes:'Alertes'};
+
+async function applyConnectedStreamerIdentity(){
+  try {
+    let slug = CURRENT_STREAMER_SLUG || '';
+    let displayName = slug;
+    const r = await fetch('/api/v2/tenant/current');
+    const j = await r.json().catch(()=>({}));
+    const data = j.data || j || {};
+    slug = (data.slug || data.streamerSlug || slug || '').toString().toLowerCase();
+    displayName = data.displayName || data.display_name || data.kickUsername || data.kick_username || slug || 'streamer';
+    if (slug) {
+      activeKickChannel = slug;
+      window.__STREAMER_SLUG__ = slug;
+    }
+    const pretty = displayName || slug || 'streamer';
+    const sidebar = document.getElementById('sidebar-channel-name');
+    if (sidebar) sidebar.textContent = pretty;
+    const greeting = document.getElementById('dashboard-greeting');
+    if (greeting) greeting.textContent = `Bonjour, ${pretty} ! 👋`;
+    const settingsChannel = document.getElementById('settings-channel-name');
+    if (settingsChannel) settingsChannel.textContent = pretty;
+    const profileName = document.getElementById('prof-name');
+    if (profileName) profileName.textContent = pretty;
+    const avatar = document.getElementById('prof-avatar');
+    if (avatar) avatar.textContent = pretty.slice(0,1).toUpperCase();
+  } catch(e) {}
+}
+function openCurrentKickChannel(){
+  const slug = activeKickChannel || CURRENT_STREAMER_SLUG || 'fack7up';
+  window.open(`https://kick.com/${slug}`, '_blank');
+}
+
 let songRequestRefreshTimer = null;
 
 // ── Navigation ─────────────────────────────────────────────────────────────────
@@ -2540,7 +2573,7 @@ const SYS_CMD_DESCS = {
 async function loadLiveStatus() {
   try {
     // Appel direct depuis le navigateur — Kick ne bloque pas les navigateurs
-    const r = await fetch('https://kick.com/api/v2/channels/fack7up');
+    const r = await fetch(`https://kick.com/api/v2/channels/${activeKickChannel || CURRENT_STREAMER_SLUG || 'fack7up'}`);
     const d = await r.json();
 
     const live      = !!d.livestream;
@@ -3336,7 +3369,7 @@ const VOD_CAT_LABELS = { moment:'🎯 Moment', funny:'😂 Funny', clutch:'🔥 
 let currentVodTab    = 'replays';
 let allVodsData      = [];
 let allClipsData     = [];
-let activeKickChannel = 'fack7up';
+let activeKickChannel = CURRENT_STREAMER_SLUG || 'fack7up';
 
 function openOnKick() {
   const map = { replays:'videos', clips:'clips', myclips:'videos' };
@@ -3409,7 +3442,7 @@ async function loadVods() {
   try {
     const infoR = await fetch('/api/channel-info');
     const info  = await infoR.json();
-    activeKickChannel = info.channel || 'fack7up';
+    activeKickChannel = info.channel || CURRENT_STREAMER_SLUG || 'fack7up';
     allVodsData = [];
     for (let p=1; p<=3; p++) {
       const r = await fetch(`https://kick.com/api/v2/channels/${activeKickChannel}/videos?page=${p}&limit=12&sort=desc`,
@@ -3507,9 +3540,9 @@ async function loadClips() {
   if (!grid) return;
   grid.innerHTML = '<div class="empty" style="grid-column:1/-1"><div class="ei">⏳</div><p>Chargement des clips…</p></div>';
   try {
-    if (!activeKickChannel||activeKickChannel==='fack7up') {
+    if (!activeKickChannel) {
       const infoR = await fetch('/api/channel-info');
-      activeKickChannel = (await infoR.json()).channel||'fack7up';
+      activeKickChannel = (await infoR.json()).channel || CURRENT_STREAMER_SLUG || 'fack7up';
     }
     allClipsData = [];
     for (let p=1; p<=3; p++) {
@@ -5862,7 +5895,7 @@ async function resolveFollowDates() {
     const missing = await get('/api/viewers/missing-follow') || [];
     for (const username of missing.slice(0, 5)) {  // max 5 par cycle pour rester léger
       try {
-        const r = await fetch(`https://kick.com/api/v2/channels/${activeKickChannel||'fack7up'}/users/${encodeURIComponent(username)}`,
+        const r = await fetch(`https://kick.com/api/v2/channels/${activeKickChannel || CURRENT_STREAMER_SLUG || 'fack7up'}/users/${encodeURIComponent(username)}`,
           { headers: { 'Accept': 'application/json', 'Accept-Language': 'en-US' } });
         if (!r.ok) continue;
         const d = await r.json();
@@ -5883,6 +5916,7 @@ setInterval(resolveFollowDates, 60000);
 setTimeout(resolveFollowDates, 5000); // premier passage rapide après chargement
 
 
+try { applyConnectedStreamerIdentity(); } catch(e) {}
 
 </script>
 </body>
