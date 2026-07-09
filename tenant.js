@@ -1,6 +1,9 @@
 // tenant.js — Socle V2 multi-streamer
 // Centralise la résolution du streamer courant sans casser la V1.
 
+const { AsyncLocalStorage } = require('async_hooks');
+const tenantStorage = new AsyncLocalStorage();
+
 const DEFAULT_STREAMER_SLUG = (process.env.DEFAULT_STREAMER_SLUG || process.env.KICK_CHANNEL || 'main')
   .toString()
   .trim()
@@ -51,7 +54,33 @@ async function attachTenant(db, req, res, next) {
     req.streamer = null;
     req.streamerSlug = DEFAULT_STREAMER_SLUG;
   }
-  next();
+  const context = {
+    streamerId: req.streamer?.id || null,
+    streamerSlug: req.streamer?.slug || DEFAULT_STREAMER_SLUG,
+    streamer: req.streamer || null
+  };
+  tenantStorage.run(context, () => next());
+}
+
+function runWithStreamer(streamer, fn) {
+  const context = {
+    streamerId: streamer?.id || streamer || null,
+    streamerSlug: streamer?.slug || DEFAULT_STREAMER_SLUG,
+    streamer: typeof streamer === 'object' ? streamer : null
+  };
+  return tenantStorage.run(context, fn);
+}
+
+function getCurrentTenant() {
+  return tenantStorage.getStore() || null;
+}
+
+function getCurrentStreamerId() {
+  return tenantStorage.getStore()?.streamerId || null;
+}
+
+function getCurrentStreamerSlug() {
+  return tenantStorage.getStore()?.streamerSlug || DEFAULT_STREAMER_SLUG;
 }
 
 function scopedKey(streamer, key) {
@@ -65,5 +94,9 @@ module.exports = {
   getDefaultStreamerSeed,
   readRequestedSlug,
   attachTenant,
+  runWithStreamer,
+  getCurrentTenant,
+  getCurrentStreamerId,
+  getCurrentStreamerSlug,
   scopedKey
 };
