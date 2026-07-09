@@ -1227,6 +1227,8 @@ async function songRequestMacroHandler(req, res) {
 }
 app.get('/api/widgets/songrequest/macro/:action', songRequestMacroHandler);
 app.post('/api/widgets/songrequest/macro/:action', songRequestMacroHandler);
+// Alias public plus simple pour Kick Bot Companion :
+// https://ton-render.onrender.com/api/songrequest/macro/toggle
 app.get('/api/songrequest/macro/:action', songRequestMacroHandler);
 app.post('/api/songrequest/macro/:action', songRequestMacroHandler);
 

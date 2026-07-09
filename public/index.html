@@ -1015,6 +1015,30 @@ Option 3" rows="4"></textarea><div style="display:flex;gap:6px;margin-top:10px">
       #widget-songrequest-settings .sr-switch span:before{content:'';position:absolute;width:18px;height:18px;left:3px;top:2px;border-radius:50%;background:#6b7280;transition:.18s;box-shadow:0 2px 8px rgba(0,0,0,.35)}
       #widget-songrequest-settings .sr-switch input:checked + span{background:rgba(124,58,237,.35);border-color:#8b5cf6}
       #widget-songrequest-settings .sr-switch input:checked + span:before{transform:translateX(21px);background:#a78bfa}
+      #widget-songrequest-settings .sr-player-card{position:relative;overflow:hidden;border:1px solid rgba(148,163,184,.18);background:linear-gradient(135deg,rgba(15,23,42,.96),rgba(24,20,54,.92) 52%,rgba(5,20,24,.94));border-radius:22px;padding:18px;box-shadow:0 22px 70px rgba(0,0,0,.28)}
+      #widget-songrequest-settings .sr-player-card:before{content:'';position:absolute;inset:-40%;background:radial-gradient(circle at 12% 16%,rgba(96,165,250,.22),transparent 30%),radial-gradient(circle at 78% 30%,rgba(45,212,191,.14),transparent 28%),radial-gradient(circle at 55% 100%,rgba(139,92,246,.20),transparent 34%);pointer-events:none}
+      #widget-songrequest-settings .sr-player-main{position:relative;display:flex;align-items:center;gap:16px;min-width:0}
+      #widget-songrequest-settings .sr-cover{width:112px;height:72px;border-radius:14px;background:rgba(15,23,42,.78);border:1px solid rgba(255,255,255,.16);display:flex;align-items:center;justify-content:center;overflow:hidden;flex:0 0 auto;box-shadow:0 14px 35px rgba(0,0,0,.38)}
+      #widget-songrequest-settings .sr-cover img{width:100%;height:100%;object-fit:cover}
+      #widget-songrequest-settings .sr-info{min-width:0;flex:1}
+      #widget-songrequest-settings .sr-title-line{display:flex;align-items:center;gap:8px;margin-bottom:4px}
+      #widget-songrequest-settings .sr-pill{font-size:9px;font-weight:950;text-transform:uppercase;letter-spacing:.9px;color:#dbeafe;background:rgba(96,165,250,.14);border:1px solid rgba(147,197,253,.24);border-radius:999px;padding:4px 9px}
+      #widget-songrequest-settings .sr-state{font-size:10px;font-weight:950;text-transform:uppercase;color:#cbd5e1;display:flex;align-items:center;gap:6px}
+      #widget-songrequest-settings .sr-state:before{content:'';width:8px;height:8px;border-radius:99px;background:#f59e0b;box-shadow:0 0 14px rgba(245,158,11,.75)}
+      #widget-songrequest-settings .sr-state.playing:before{background:#22c55e;box-shadow:0 0 14px rgba(34,197,94,.75)}
+      #widget-songrequest-settings .sr-song-title{font-size:22px;font-weight:950;color:#fff;line-height:1.12;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-shadow:0 2px 16px rgba(0,0,0,.35)}
+      #widget-songrequest-settings .sr-song-meta{font-size:11px;color:#b8c2d6;margin-top:5px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+      #widget-songrequest-settings .sr-progress-row{position:relative;margin-top:15px}
+      #widget-songrequest-settings #sr-seek{width:100%;accent-color:#93c5fd;cursor:default;opacity:.92}
+      #widget-songrequest-settings .sr-times{display:flex;align-items:center;justify-content:space-between;color:#cbd5e1;font-size:11px;font-weight:850;margin-top:3px}
+      #widget-songrequest-settings .sr-controls{position:relative;display:flex;align-items:center;justify-content:center;gap:12px;margin-top:18px;flex-wrap:wrap}
+      #widget-songrequest-settings .sr-round-btn{width:46px;height:46px;border-radius:999px;border:1px solid rgba(255,255,255,.13);background:rgba(255,255,255,.08);color:#fff;font-weight:950;display:inline-flex;align-items:center;justify-content:center;cursor:pointer;transition:.16s;box-shadow:0 12px 25px rgba(0,0,0,.20)}
+      #widget-songrequest-settings .sr-round-btn:hover{transform:translateY(-1px);background:rgba(147,197,253,.14);border-color:rgba(147,197,253,.34)}
+      #widget-songrequest-settings .sr-round-btn.primary{width:58px;height:58px;background:linear-gradient(135deg,#60a5fa,#8b5cf6);border-color:rgba(255,255,255,.2);font-size:18px}
+      #widget-songrequest-settings .sr-volume-box{display:flex;align-items:center;gap:8px;margin-left:12px;color:#cbd5e1;font-size:10px;font-weight:900;text-transform:uppercase}
+      #widget-songrequest-settings #sr-volume{width:150px;accent-color:#93c5fd}
+      #widget-songrequest-settings .sr-empty-hint{position:relative;text-align:center;padding:28px 10px;color:#94a3b8}
+      @media(max-width:720px){#widget-songrequest-settings .sr-player-main{align-items:flex-start}#widget-songrequest-settings .sr-cover{width:88px;height:58px}#widget-songrequest-settings .sr-song-title{font-size:17px}#widget-songrequest-settings .sr-volume-box{width:100%;justify-content:center;margin-left:0}}
     </style>
 
     <div class="g2">
@@ -1048,30 +1072,28 @@ Option 3" rows="4"></textarea><div style="display:flex;gap:6px;margin-top:10px">
         </div>
       </div>
     </div>
-    <div class="panel" style="margin-top:14px">
-      <h3>🎧 Lecteur Song Request</h3>
-      <div style="display:flex;align-items:center;gap:12px;min-width:0">
-        <div id="sr-now-thumb" style="width:86px;height:48px;border-radius:8px;background:var(--card2);border:1px solid var(--brd);display:flex;align-items:center;justify-content:center;overflow:hidden;flex-shrink:0">🎵</div>
-        <div style="min-width:0;flex:1">
-          <div id="sr-now-title" style="font-size:14px;font-weight:950;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Aucune musique en cours</div>
-          <div id="sr-now-meta" style="font-size:10px;color:var(--muted);margin-top:4px">00:00 / 00:00</div>
-          <input id="sr-seek" type="range" min="0" max="0" value="0" step="1" disabled style="width:100%;margin-top:8px;opacity:.75;cursor:not-allowed">
+    <div class="panel" style="margin-top:14px;border:0;background:transparent;padding:0;box-shadow:none">
+      <div class="sr-player-card">
+        <div class="sr-player-main">
+          <div class="sr-cover" id="sr-now-thumb">🎵</div>
+          <div class="sr-info">
+            <div class="sr-title-line">
+              <span class="sr-pill">Song Request</span>
+              <span class="sr-state" id="sr-status">En attente</span>
+            </div>
+            <div class="sr-song-title" id="sr-now-title">Aucune musique en cours</div>
+            <div class="sr-song-meta" id="sr-now-meta">Le chat peut demander une musique avec !sr</div>
+            <div class="sr-progress-row">
+              <input id="sr-seek" type="range" min="0" max="0" value="0" step="1" disabled>
+              <div class="sr-times"><span id="sr-current-time">0:00</span><span id="sr-duration-time">0:00</span></div>
+            </div>
+          </div>
         </div>
-      </div>
-      <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap;align-items:center">
-        <button class="dark-btn" onclick="nextSongRequest()">⏭ Suivant</button>
-        <label class="lbl" style="margin:0 0 0 8px">Volume</label>
-        <input id="sr-volume" type="range" min="0" max="100" value="100" step="1" style="width:140px" onchange="setSongRequestVolume(this.value)">
-        <span id="sr-status" style="font-size:10px;color:var(--muted);font-weight:800">STOP</span>
-      </div>
-      <div style="font-size:10px;color:var(--muted);line-height:1.6;margin-top:8px">Lecture pilotée par l’overlay OBS. Le panel affiche seulement l’état réel pour éviter les conflits play/pause.</div>
-      <div style="margin-top:14px;padding:12px;background:var(--card2);border:1px solid var(--brd);border-radius:10px">
-        <h4 style="margin:0 0 10px;color:var(--text);font-size:12px">⌨️ Macros externes</h4>
-        <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;font-size:9px;color:var(--muted);line-height:1.6">
-          <div><b style="color:var(--text)">URL Play/Pause Companion</b><code id="sr-macro-toggle-url" style="display:block;margin-top:4px;background:var(--card);padding:5px;border-radius:6px;color:#93c5fd;word-break:break-all"></code></div>
-          <div><b style="color:var(--text)">URL Suivant Companion</b><code id="sr-macro-next-url" style="display:block;margin-top:4px;background:var(--card);padding:5px;border-radius:6px;color:#93c5fd;word-break:break-all"></code></div>
+        <div class="sr-controls">
+          <button class="sr-round-btn primary" id="sr-toggle-btn" onclick="toggleSongRequest()" title="Lecture / Pause">▶</button>
+          <button class="sr-round-btn" onclick="nextSongRequest()" title="Suivant">⏭</button>
+          <div class="sr-volume-box"><span>🔊</span><input id="sr-volume" type="range" min="0" max="100" value="100" step="1" onchange="setSongRequestVolume(this.value)" oninput="previewSongRequestVolume(this.value)"><span id="sr-volume-label">100%</span></div>
         </div>
-        <div style="font-size:9px;color:var(--muted);margin-top:8px;line-height:1.6">Les raccourcis clavier du panel ont été retirés. Pour jouer en jeu, utilise Kick Bot Companion avec ces URLs.</div>
       </div>
     </div>
     <div class="panel" style="margin-top:14px">
@@ -4507,7 +4529,6 @@ async function loadSongRequest(silent = false) {
     const vol = document.getElementById('sr-volume');
     if (vol && d.player?.volume !== undefined) vol.value = d.player.volume;
     setObsUrl('songrequest-obs-url', '/widgets/songrequest.html');
-    setupSongRequestMacroUrls();
     srLastQueue = Array.isArray(d.queue) ? d.queue : [];
     srPlayer = Object.assign(srPlayer, d.player || {});
     if (!srLastQueue.length) srPlayer = Object.assign(srPlayer, { status:'stopped', currentTime:0, duration:0, itemId:'' });
@@ -4523,14 +4544,28 @@ function renderSongRequestPlayer(queue = srLastQueue, player = srPlayer) {
   const meta = document.getElementById('sr-now-meta');
   const seek = document.getElementById('sr-seek');
   const status = document.getElementById('sr-status');
+  const toggleBtn = document.getElementById('sr-toggle-btn');
+  const curTimeEl = document.getElementById('sr-current-time');
+  const durTimeEl = document.getElementById('sr-duration-time');
+  const vol = document.getElementById('sr-volume');
+  const volLabel = document.getElementById('sr-volume-label');
   if (!cur) player = Object.assign({}, player, { status:'stopped', currentTime:0, duration:0, itemId:'' });
   const duration = Math.max(Number(player.duration || 0), Number(cur?.duration || 0), 0);
   const current = Math.max(0, Math.min(Number(player.currentTime || 0), duration || Number(player.currentTime || 0)));
-  if (thumb) thumb.innerHTML = cur?.thumbnail ? `<img src="${escapeAttr(cur.thumbnail)}" style="width:100%;height:100%;object-fit:cover" onerror="this.parentNode.textContent='🎵'">` : '🎵';
+  const st = String(player.status || (cur ? 'playing' : 'stopped')).toLowerCase();
+  if (thumb) thumb.innerHTML = cur?.thumbnail ? `<img src="${escapeAttr(cur.thumbnail)}" onerror="this.parentNode.textContent='🎵'">` : '🎵';
   if (title) title.textContent = cur ? (cur.title || cur.song || 'Musique en cours') : 'Aucune musique en cours';
-  if (meta) meta.textContent = cur ? `${fmtSongTime(current)} / ${duration ? fmtSongTime(duration) : '??:??'} · ${cur.username || 'Anonyme'}` : '00:00 / 00:00';
+  if (meta) meta.textContent = cur ? `Demandé par ${cur.username || 'Anonyme'}${cur.author ? ' · ' + cur.author : ''}` : 'Le chat peut demander une musique avec !sr';
   if (seek) { seek.max = duration || 0; seek.value = Math.min(current, duration || current); }
-  if (status) status.textContent = String(player.status || 'stopped').toUpperCase();
+  if (curTimeEl) curTimeEl.textContent = fmtSongTime(current);
+  if (durTimeEl) durTimeEl.textContent = duration ? fmtSongTime(duration) : '0:00';
+  if (status) {
+    status.classList.toggle('playing', st === 'playing');
+    status.textContent = !cur ? 'En attente' : (st === 'paused' ? 'En pause' : st === 'playing' ? 'En lecture' : 'Prêt');
+  }
+  if (toggleBtn) toggleBtn.textContent = st === 'playing' ? '⏸' : '▶';
+  if (vol && player.volume !== undefined && document.activeElement !== vol) vol.value = player.volume;
+  if (volLabel) volLabel.textContent = `${Math.round(Number(vol?.value || player.volume || 100))}%`;
 }
 function startSongRequestProgressTimer(){
   if (srProgressTimer) clearInterval(srProgressTimer);
@@ -4611,6 +4646,11 @@ async function deleteSongRequest(id) {
 }
 async function playSongRequest() { await fetch(API + '/api/admin/widgets/songrequest/play', { method:'POST' }); loadSongRequest(true); }
 async function pauseSongRequest() { await fetch(API + '/api/admin/widgets/songrequest/pause', { method:'POST' }); loadSongRequest(true); }
+async function toggleSongRequest() {
+  const isPlaying = String(srPlayer.status || '').toLowerCase() === 'playing';
+  if (isPlaying) { srPlayer.status = 'paused'; renderSongRequestPlayer(srLastQueue, srPlayer); await pauseSongRequest(); }
+  else { srPlayer.status = srLastQueue.length ? 'playing' : 'stopped'; renderSongRequestPlayer(srLastQueue, srPlayer); await playSongRequest(); }
+}
 function previewSongRequestSeek(v) {
   srPlayer.currentTime = Number(v || 0);
   renderSongRequestPlayer(srLastQueue, srPlayer);
@@ -4619,7 +4659,13 @@ async function seekSongRequest(v) {
   await fetch(API + '/api/admin/widgets/songrequest/seek', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ seconds: Number(v || 0) }) });
   loadSongRequest(true);
 }
+function previewSongRequestVolume(v) {
+  const label = document.getElementById('sr-volume-label');
+  if (label) label.textContent = `${Math.round(Number(v || 0))}%`;
+}
 async function setSongRequestVolume(v) {
+  previewSongRequestVolume(v);
+  srPlayer.volume = Number(v || 100);
   await fetch(API + '/api/admin/widgets/songrequest/volume', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ volume: Number(v || 100) }) });
   loadSongRequest(true);
 }
@@ -4634,69 +4680,6 @@ async function clearSongRequests() {
   loadSongRequest();
 }
 
-
-function setupSongRequestMacroUrls() {
-  const base = window.location.origin + '/api/songrequest/macro/';
-  const toggle = document.getElementById('sr-macro-toggle-url');
-  const next = document.getElementById('sr-macro-next-url');
-  if (toggle) toggle.textContent = base + 'toggle';
-  if (next) next.textContent = base + 'next';
-}
-function getSongRequestHotkeys() {
-  try { return JSON.parse(localStorage.getItem('songrequest_hotkeys') || '{}') || {}; } catch(e) { return {}; }
-}
-function saveSongRequestHotkeyState(state) {
-  localStorage.setItem('songrequest_hotkeys', JSON.stringify(state || {}));
-}
-function formatSongRequestHotkey(h) {
-  if (!h || !h.code) return 'Choisir une touche';
-  const parts = [];
-  if (h.ctrl) parts.push('Ctrl');
-  if (h.alt) parts.push('Alt');
-  if (h.shift) parts.push('Shift');
-  if (h.meta) parts.push('Win');
-  parts.push((h.key || h.code || '').replace(/^Key/, '').replace(/^Digit/, ''));
-  return parts.join(' + ');
-}
-function loadSongRequestHotkeys() {
-  const h = getSongRequestHotkeys();
-  const enabled = document.getElementById('sr-hotkeys-enabled');
-  srSetChecked('sr-hotkeys-enabled', h.enabled !== false);
-  const bToggle = document.getElementById('sr-hotkey-toggle');
-  const bNext = document.getElementById('sr-hotkey-next');
-  if (bToggle) bToggle.textContent = formatSongRequestHotkey(h.toggle);
-  if (bNext) bNext.textContent = formatSongRequestHotkey(h.next);
-}
-function saveSongRequestHotkeys() {
-  const h = getSongRequestHotkeys();
-  h.enabled = document.getElementById('sr-hotkeys-enabled')?.checked !== false;
-  saveSongRequestHotkeyState(h);
-  toast('Raccourcis Song Request enregistrés ✓');
-}
-function recordSongRequestHotkey(action) {
-  const btn = document.getElementById(action === 'next' ? 'sr-hotkey-next' : 'sr-hotkey-toggle');
-  if (btn) btn.textContent = 'Appuie sur une touche…';
-  const handler = (ev) => {
-    ev.preventDefault();
-    ev.stopPropagation();
-    const h = getSongRequestHotkeys();
-    h.enabled = document.getElementById('sr-hotkeys-enabled')?.checked !== false;
-    h[action] = { key: ev.key, code: ev.code, ctrl: ev.ctrlKey, alt: ev.altKey, shift: ev.shiftKey, meta: ev.metaKey };
-    saveSongRequestHotkeyState(h);
-    toast('Touche macro enregistrée ✓');
-  };
-  window.addEventListener('keydown', handler, { once:true, capture:true });
-}
-function matchSongRequestHotkey(ev, h) {
-  if (!h || !h.code) return false;
-  return ev.code === h.code && !!ev.ctrlKey === !!h.ctrl && !!ev.altKey === !!h.alt && !!ev.shiftKey === !!h.shift && !!ev.metaKey === !!h.meta;
-}
-async function triggerSongRequestMacro(action) {
-  await fetch(API + '/api/widgets/songrequest/macro/' + action, { method:'POST' });
-  loadSongRequest(true);
-}
-// Raccourcis clavier internes retirés : une page web ne peut pas capter une touche globale en jeu.
-// Utilise Kick Bot Companion / Stream Deck via les URLs macro affichées dans le widget.
 
 async function copyObsUrl(id) {
   const el = document.getElementById(id);
