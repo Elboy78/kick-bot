@@ -1130,7 +1130,7 @@ async function getSongRequestPlayerState(reqOrTm = null) {
     status: state?.status || 'stopped',
     currentTime: Number(state?.currentTime || 0),
     duration: Number(state?.duration || 0),
-    volume: Math.max(0, Math.min(100, parseInt(state?.volume ?? 100) || 100)),
+    volume: (() => { const v = Number(state?.volume); return Number.isFinite(v) ? Math.max(0, Math.min(100, Math.round(v))) : 100; })(),
     updatedAt: state?.updatedAt || null
   };
 }
@@ -1414,7 +1414,7 @@ app.post('/api/widgets/songrequest/player-state', async (req, res) => {
     }
     if (req.body.currentTime !== undefined) patch.currentTime = Math.max(0, parseFloat(req.body.currentTime) || 0);
     if (req.body.duration !== undefined) patch.duration = Math.max(0, parseFloat(req.body.duration) || 0);
-    if (req.body.volume !== undefined) patch.volume = Math.max(0, Math.min(100, parseInt(req.body.volume) || 100));
+    if (req.body.volume !== undefined) { const v = Number(req.body.volume); patch.volume = Number.isFinite(v) ? Math.max(0, Math.min(100, Math.round(v))) : state.player.volume; }
     const next = await saveSongRequestPlayerState(patch, true, tm);
     res.json({ success:true, player: next });
   } catch(e) { res.status(500).json({ error:e.message }); }
