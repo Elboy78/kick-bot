@@ -1,359 +1,58 @@
 <!DOCTYPE html>
 <html lang="fr">
 <head>
-<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Bot7uP — Connexion</title>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-<style>
-*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
-:root{--bg:#0e1117;--s1:#161b27;--s2:#1c2333;--s3:#232d42;--b1:#ffffff0a;--b2:#ffffff14;--text:#e8edf5;--muted:#8b95b0;--muted2:#4a5370;--green:#22c55e;--green-bg:#22c55e0f;--green-brd:#22c55e25;--red:#ef4444;--r:8px;--r2:12px}
-body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--text);min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px;-webkit-font-smoothing:antialiased}
-
-.wrap{width:100%;max-width:420px}
-
-/* Logo */
-.logo{text-align:center;margin-bottom:28px}
-.logo-box{width:54px;height:54px;border-radius:14px;background:var(--green);display:flex;align-items:center;justify-content:center;font-size:22px;font-weight:800;color:#000;margin:0 auto 12px;box-shadow:0 0 24px #22c55e40;letter-spacing:-1px}
-.logo-name{font-size:22px;font-weight:800;color:var(--text);letter-spacing:-.5px}
-.logo-sub{font-size:12px;color:var(--muted);margin-top:4px}
-
-/* Card */
-.card{background:var(--s1);border:1px solid var(--b2);border-radius:var(--r2);padding:28px}
-
-/* Steps */
-.step{display:none}.step.active{display:block}
-
-/* Kick connect button */
-.btn-kick{width:100%;padding:13px;border-radius:var(--r);border:none;cursor:pointer;font-size:14px;font-weight:700;font-family:inherit;transition:all .15s;display:flex;align-items:center;justify-content:center;gap:10px;margin-top:8px;background:linear-gradient(135deg,#53fc18,#22c55e);color:#000;letter-spacing:-.2px}
-.btn-kick:hover{transform:translateY(-1px);box-shadow:0 8px 24px #22c55e30}
-.btn-kick:active{transform:scale(.98)}
-.btn-kick svg{width:20px;height:20px}
-
-/* Kick logo SVG */
-.kick-logo{font-size:18px;font-weight:900;color:#000;font-style:italic;letter-spacing:-1px}
-
-.divider{display:flex;align-items:center;gap:10px;margin:16px 0;color:var(--muted2);font-size:11px}
-.divider::before,.divider::after{content:'';flex:1;height:1px;background:var(--b2)}
-
-.btn-manual{width:100%;padding:10px;border-radius:var(--r);border:1px solid var(--b2);background:var(--s2);color:var(--muted);font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;transition:all .15s}
-.btn-manual:hover{border-color:var(--b2);color:var(--text);background:var(--s3)}
-
-/* Status steps */
-.s-icon{font-size:40px;text-align:center;margin-bottom:12px}
-.s-title{font-size:17px;font-weight:700;text-align:center;margin-bottom:6px}
-.s-sub{font-size:12px;color:var(--muted);text-align:center;line-height:1.6}
-
-.btn-primary{width:100%;padding:11px;border-radius:var(--r);border:none;cursor:pointer;font-size:13px;font-weight:700;font-family:inherit;transition:all .15s;background:var(--green);color:#000;margin-top:16px}
-.btn-primary:hover{background:#16a34a}
-.btn-back{width:100%;padding:9px;border-radius:var(--r);border:1px solid var(--b2);background:transparent;color:var(--muted);font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;margin-top:8px;transition:all .15s}
-.btn-back:hover{color:var(--text)}
-
-/* Input */
-.inp{width:100%;background:var(--s2);border:1px solid var(--b2);border-radius:var(--r);padding:9px 12px;color:var(--text);font-size:13px;outline:none;transition:border .15s;font-family:inherit;margin-top:6px}
-.inp:focus{border-color:var(--green)}
-.inp::placeholder{color:var(--muted2)}
-.lbl{font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-top:14px;display:block}
-.lbl:first-child{margin-top:0}
-
-/* Msg */
-.msg{font-size:11px;padding:8px 12px;border-radius:var(--r);margin-top:10px;display:none}
-.msg.ok{background:var(--green-bg);color:var(--green);border:1px solid var(--green-brd);display:block}
-.msg.err{background:#ef44440f;color:var(--red);border:1px solid #ef444425;display:block}
-.msg.warn{background:#f59e0b0f;color:#f59e0b;border:1px solid #f59e0b25;display:block}
-
-/* Loading spinner */
-.spinner{width:28px;height:28px;border:3px solid var(--b2);border-top-color:var(--green);border-radius:50%;animation:spin .8s linear infinite;margin:12px auto}
-@keyframes spin{to{transform:rotate(360deg)}}
-
-/* Connected badge */
-.kick-badge{display:flex;align-items:center;gap:10px;background:var(--green-bg);border:1px solid var(--green-brd);border-radius:var(--r);padding:10px 12px;margin-bottom:14px}
-.kick-badge-avatar{width:32px;height:32px;border-radius:50%;background:var(--green);display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:800;color:#000;flex-shrink:0}
-.kick-badge-name{font-size:13px;font-weight:700;color:var(--green)}
-.kick-badge-verified{font-size:9px;color:var(--muted);margin-top:1px}
-
-/* Password toggle */
-.pw-wrap{position:relative}
-.pw-wrap .inp{padding-right:36px}
-.pw-toggle{position:absolute;right:10px;top:50%;transform:translateY(-50%);background:none;border:none;color:var(--muted);cursor:pointer;font-size:14px;padding:2px}
-
-.footer-note{text-align:center;font-size:10px;color:var(--muted2);margin-top:16px;line-height:1.6}
-</style>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Bot7uP — Connexion Kick</title>
+  <style>
+    *{box-sizing:border-box}body{margin:0;min-height:100vh;font-family:Inter,system-ui,-apple-system,Segoe UI,sans-serif;background:radial-gradient(circle at 30% 15%,#20ff6622,transparent 32%),linear-gradient(135deg,#060a10,#0b101b 55%,#05070d);color:#f5f7ff;display:grid;place-items:center;padding:24px}.card{width:min(520px,100%);background:rgba(13,19,32,.86);border:1px solid rgba(255,255,255,.1);box-shadow:0 24px 80px rgba(0,0,0,.45);border-radius:28px;padding:32px;text-align:center;backdrop-filter:blur(16px)}.logo{width:66px;height:66px;margin:0 auto 18px;border-radius:20px;background:linear-gradient(135deg,#33ff6e,#13a83d);display:grid;place-items:center;color:#06100a;font-weight:1000;font-size:24px;box-shadow:0 0 38px #25d34f55}h1{margin:0;font-size:30px;letter-spacing:-.04em}.muted{color:#9aa6bb;line-height:1.55}.steps{margin:24px 0;text-align:left;background:#07140d;border:1px solid #25d34f33;border-radius:18px;padding:16px}.step{display:flex;gap:12px;align-items:flex-start;margin:10px 0}.num{min-width:24px;height:24px;border-radius:999px;background:#25d34f;color:#06100a;font-weight:900;display:grid;place-items:center;font-size:13px}.btn{display:flex;align-items:center;justify-content:center;gap:10px;width:100%;border:0;border-radius:14px;background:#25d34f;color:#06100a;padding:15px 18px;text-decoration:none;font-weight:1000;font-size:15px;cursor:pointer;transition:.16s}.btn:hover{transform:translateY(-1px);filter:brightness(1.06)}.btn.secondary{margin-top:10px;background:#121a2a;color:#dce5f5;border:1px solid rgba(255,255,255,.1)}.status{margin-top:18px;font-size:13px;color:#8f9bb0}.error{display:none;margin-top:16px;text-align:left;color:#ffd1d1;background:#2a0f14;border:1px solid #ff5c7a44;border-radius:14px;padding:12px;font-size:13px}.loading{opacity:.72;pointer-events:none}.kick{width:22px;height:22px;border-radius:5px;background:#53fc18;color:#071200;font-weight:1000;display:grid;place-items:center;font-size:13px}.small{font-size:12px;color:#7f8aa0;margin-top:20px}
+  </style>
 </head>
 <body>
-<div class="wrap">
-  <div class="logo">
-    <div class="logo-box">B7</div>
-    <div class="logo-name">Bot7uP</div>
-    <div class="logo-sub">Panel de gestion · Accès restreint</div>
-  </div>
+  <main class="card" id="card">
+    <div class="logo">B7</div>
+    <h1>Connexion Bot7uP</h1>
+    <p class="muted">Connecte ton compte Kick pour créer ou ouvrir automatiquement ton espace streamer V2.</p>
 
-  <div class="card">
-
-    <!-- ── ÉTAPE 1 : Connexion Kick ── -->
-    <div class="step active" id="step-1">
-      <div style="font-size:13px;font-weight:600;color:var(--text);margin-bottom:4px">Connecte ton compte Kick</div>
-      <div style="font-size:11px;color:var(--muted);margin-bottom:16px">On vérifie ton identité via Kick pour accéder au panel.</div>
-
-      <button class="btn-kick" onclick="connectKick()">
-        <span class="kick-logo">KICK</span>
-        Se connecter avec Kick
-      </button>
-
-      <div class="divider">ou</div>
-
-      <button class="btn-manual" onclick="showManual()">Entrer mon pseudo manuellement</button>
-
-      <div class="msg" id="step1-msg"></div>
+    <div class="steps">
+      <div class="step"><span class="num">1</span><div><b>Connexion officielle Kick</b><br><span class="muted">Tu es redirigé vers Kick OAuth, pas une validation manuelle.</span></div></div>
+      <div class="step"><span class="num">2</span><div><b>Création automatique</b><br><span class="muted">Ton panel est lié au pseudo Kick connecté.</span></div></div>
+      <div class="step"><span class="num">3</span><div><b>Dashboard personnel</b><br><span class="muted">Tu arrives sur <code>/s/tonpseudo/dashboard</code>.</span></div></div>
     </div>
 
-    <!-- ── ÉTAPE 1b : Manuel ── -->
-    <div class="step" id="step-1b">
-      <div style="font-size:13px;font-weight:600;color:var(--text);margin-bottom:4px">Connexion manuelle</div>
-      <div style="font-size:11px;color:var(--muted);margin-bottom:16px">Entre ton pseudo Kick et le mot de passe du panel.</div>
-      <label class="lbl">Pseudo Kick</label>
-      <input class="inp" id="manual-user" placeholder="Ex: elboy78" autocomplete="off" onkeydown="if(event.key==='Enter')document.getElementById('manual-pass').focus()">
-      <label class="lbl">Mot de passe panel</label>
-      <div class="pw-wrap">
-        <input class="inp" id="manual-pass" type="password" placeholder="••••••••" onkeydown="if(event.key==='Enter')submitManual()">
-        <button class="pw-toggle" onclick="togglePw()">👁</button>
-      </div>
-      <button class="btn-primary" onclick="submitManual()">Accéder au panel →</button>
-      <button class="btn-back" onclick="showStep('step-1')">← Retour</button>
-      <div class="msg" id="step1b-msg"></div>
-    </div>
+    <a class="btn" id="loginBtn" href="/auth/login"><span class="kick">K</span> Se connecter avec Kick</a>
+    <a class="btn secondary" id="dashBtn" style="display:none">Ouvrir mon dashboard</a>
+    <div class="error" id="err"></div>
+    <div class="status" id="status">Vérification de la session...</div>
+    <div class="small">Aucun pseudo à taper : l’identité vient directement du compte Kick connecté.</div>
+  </main>
 
-    <!-- ── ÉTAPE 2 : Spinner (unused) ── -->
-    <div class="step" id="step-2">
-      <div class="s-icon">🔄</div>
-      <div class="s-title">Connexion…</div>
-      <div class="spinner"></div>
-    </div>
-
-    <!-- ── ÉTAPE 2b : Guidage connexion Kick ── -->
-    <div class="step" id="step-2b">
-      <div style="background:linear-gradient(135deg,#0c1f10,#0d1a24);border:1px solid #22c55e30;border-radius:10px;padding:14px;margin-bottom:16px">
-        <div style="font-size:12px;font-weight:700;color:#22c55e;margin-bottom:10px">📋 Étapes à suivre</div>
-        <div style="display:flex;flex-direction:column;gap:8px">
-          <div style="display:flex;align-items:flex-start;gap:8px;font-size:11px;color:#8b95b0">
-            <span style="background:#22c55e;color:#000;border-radius:50%;width:18px;height:18px;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:10px;flex-shrink:0">1</span>
-            Dans la popup Kick qui vient de s'ouvrir, <b style="color:#e8edf5">connecte-toi</b> avec ton compte
-          </div>
-          <div style="display:flex;align-items:flex-start;gap:8px;font-size:11px;color:#8b95b0">
-            <span style="background:#22c55e;color:#000;border-radius:50%;width:18px;height:18px;display:flex;align-items:center;justify-content:function:center;font-weight:700;font-size:10px;flex-shrink:0">2</span>
-            Une fois connecté, <b style="color:#e8edf5">clique sur ton avatar</b> en haut à droite pour voir ton pseudo
-          </div>
-          <div style="display:flex;align-items:flex-start;gap:8px;font-size:11px;color:#8b95b0">
-            <span style="background:#22c55e;color:#000;border-radius:50%;width:18px;height:18px;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:10px;flex-shrink:0">3</span>
-            Reviens ici et <b style="color:#e8edf5">entre ton pseudo</b> ci-dessous pour confirmer
-          </div>
-        </div>
-      </div>
-      <label class="lbl">Ton pseudo Kick (confirmé après connexion)</label>
-      <input class="inp" id="kick-confirm-user" placeholder="Ex: elboy78" autocomplete="off" onkeydown="if(event.key==='Enter')confirmKickLogin()">
-      <button class="btn-primary" onclick="confirmKickLogin()">Confirmer mon identité →</button>
-      <button class="btn-back" onclick="if(kickPopup&&!kickPopup.closed)kickPopup.close();showStep('step-1')">← Annuler</button>
-      <div class="msg" id="step2b-msg"></div>
-      <div style="font-size:10px;color:#4a5370;text-align:center;margin-top:10px">La popup Kick est ouverte — connecte-toi dedans puis reviens ici</div>
-    </div>
-
-    <!-- ── ÉTAPE 3 : Compte vérifié, entrer mot de passe ── -->
-    <div class="step" id="step-3">
-      <div class="kick-badge">
-        <div class="kick-badge-avatar" id="kick-avatar">?</div>
-        <div>
-          <div class="kick-badge-name" id="kick-username-display">—</div>
-          <div class="kick-badge-verified">✅ Compte Kick vérifié</div>
-        </div>
-      </div>
-      <label class="lbl">Mot de passe du panel</label>
-      <div class="pw-wrap">
-        <input class="inp" id="panel-pass" type="password" placeholder="••••••••" onkeydown="if(event.key==='Enter')submitAccess()">
-        <button class="pw-toggle" onclick="togglePw2()">👁</button>
-      </div>
-      <button class="btn-primary" onclick="submitAccess()">Accéder au panel →</button>
-      <button class="btn-back" onclick="showStep('step-1')">← Changer de compte</button>
-      <div class="msg" id="step3-msg"></div>
-    </div>
-
-    <!-- ── ÉTAPE 4 : Accès accordé ── -->
-    <div class="step" id="step-4">
-      <div class="s-icon">✅</div>
-      <div class="s-title">Accès accordé !</div>
-      <div class="s-sub">Bienvenue <span id="approved-name" style="color:var(--green);font-weight:700"></span> —<br>tu peux accéder au panel.</div>
-      <button class="btn-primary" onclick="enterPanel()">Accéder au panel →</button>
-    </div>
-
-    <!-- ── ÉTAPE 5 : Refusé ── -->
-    <div class="step" id="step-5">
-      <div class="s-icon">🚫</div>
-      <div class="s-title">Accès refusé</div>
-      <div class="s-sub">Ton accès a été révoqué ou le mot de passe est incorrect.</div>
-      <button class="btn-back" onclick="showStep('step-1')">← Réessayer</button>
-    </div>
-
-  </div>
-
-  <div class="footer-note">
-    Bot7uP · Panel sécurisé<br>
-    Seuls les comptes autorisés peuvent accéder
-  </div>
-</div>
-
-<script>
-let verifiedUsername = '';
-let kickPopup = null;
-
-// Vérifier si déjà connecté
-window.addEventListener('load', () => {
-  const saved = localStorage.getItem('kick_panel_user');
-  const approved = localStorage.getItem('kick_panel_approved');
-  if (saved && approved) {
-    verifiedUsername = saved;
-    // Vérifier côté serveur que c'est toujours valide
-    fetch('/api/auth/check?username=' + encodeURIComponent(saved))
-      .then(r => r.json())
-      .then(d => {
-        if (d.status === 'approved') {
-          document.getElementById('approved-name').textContent = saved;
-          showStep('step-4');
+  <script>
+    const $ = (id) => document.getElementById(id);
+    function showError(msg){ $('err').style.display='block'; $('err').textContent=msg; }
+    async function boot(){
+      try{
+        const r = await fetch('/api/oauth/status', { cache:'no-store' });
+        const j = await r.json();
+        const st = j.streamer || {};
+        if(!j.configured){
+          $('status').textContent = 'OAuth Kick non configuré sur Render.';
+          showError('Ajoute KICK_CLIENT_ID, KICK_CLIENT_SECRET et KICK_REDIRECT_URI dans les variables Render.');
+          return;
         }
-      }).catch(() => {});
-  }
-});
-
-function showStep(id) {
-  document.querySelectorAll('.step').forEach(s => s.classList.remove('active'));
-  document.getElementById(id).classList.add('active');
-}
-
-function showManual() { showStep('step-1b'); }
-
-function showMsg(id, msg, type) {
-  const el = document.getElementById(id);
-  el.textContent = msg; el.className = 'msg ' + type;
-}
-
-// ── Connexion Kick via popup ──────────────────────────────────────────────────
-
-function connectKick() {
-  // Ouvrir kick.com dans un popup
-  const w = 500, h = 600;
-  const left = Math.round((screen.width - w) / 2);
-  const top  = Math.round((screen.height - h) / 2);
-  kickPopup = window.open(
-    'https://kick.com',
-    'kick_login',
-    `width=${w},height=${h},left=${left},top=${top},resizable=yes,scrollbars=yes`
-  );
-
-  if (!kickPopup) {
-    showMsg('step1-msg', 'Popup bloquée — autorise les popups dans ton navigateur puis réessaie', 'err');
-    return;
-  }
-
-  // Passer à l'étape de vérification manuelle guidée
-  showStep('step-2b');
-
-  // Surveiller si la popup est fermée
-  const closed = setInterval(() => {
-    if (kickPopup && kickPopup.closed) {
-      clearInterval(closed);
+        if(j.connected && st.slug){
+          $('status').textContent = 'Connecté en tant que ' + (st.displayName || st.slug) + '.';
+          $('dashBtn').style.display = 'flex';
+          $('dashBtn').href = '/s/' + encodeURIComponent(st.slug) + '/dashboard';
+          // Redirection douce, mais laisse le bouton visible si tu veux cliquer toi-même.
+          setTimeout(() => { if(!location.hash.includes('stay')) location.href = $('dashBtn').href; }, 900);
+        } else {
+          $('status').textContent = 'Prêt à connecter ton compte Kick.';
+        }
+      }catch(e){ $('status').textContent='Impossible de vérifier la session.'; }
     }
-  }, 1000);
-}
-
-function confirmKickLogin() {
-  const username = document.getElementById('kick-confirm-user').value.trim();
-  if (!username || username.length < 2) {
-    showMsg('step2b-msg', 'Entre ton pseudo Kick', 'err');
-    return;
-  }
-  if (kickPopup && !kickPopup.closed) kickPopup.close();
-  verifiedUsername = username;
-  document.getElementById('kick-avatar').textContent = username[0].toUpperCase();
-  document.getElementById('kick-username-display').textContent = username;
-  showStep('step-3');
-}
-
-// ── Soumission avec mot de passe ──────────────────────────────────────────────
-
-async function submitAccess() {
-  const password = document.getElementById('panel-pass').value.trim();
-  if (!password) return showMsg('step3-msg', 'Entre le mot de passe du panel', 'err');
-  if (!verifiedUsername) return showMsg('step3-msg', 'Erreur: identité non vérifiée', 'err');
-
-  const btn = document.querySelector('#step-3 .btn-primary');
-  btn.disabled = true; btn.textContent = 'Vérification…';
-
-  try {
-    const r = await fetch('/api/auth/request?username=' + encodeURIComponent(verifiedUsername) + '&password=' + encodeURIComponent(password));
-    const d = await r.json();
-
-    if (d.error === 'wrong_password') {
-      showMsg('step3-msg', 'Mot de passe incorrect', 'err');
-    } else if (d.status === 'approved') {
-      localStorage.setItem('kick_panel_user', verifiedUsername);
-      localStorage.setItem('kick_panel_approved', '1');
-      document.getElementById('approved-name').textContent = verifiedUsername;
-      showStep('step-4');
-    } else if (d.status === 'revoked') {
-      showStep('step-5');
-    } else {
-      showMsg('step3-msg', 'Erreur inattendue', 'err');
-    }
-  } catch(e) {
-    showMsg('step3-msg', 'Erreur de connexion', 'err');
-  } finally {
-    btn.disabled = false; btn.textContent = 'Accéder au panel →';
-  }
-}
-
-// ── Connexion manuelle ────────────────────────────────────────────────────────
-
-async function submitManual() {
-  const username = document.getElementById('manual-user').value.trim();
-  const password = document.getElementById('manual-pass').value.trim();
-  if (!username) return showMsg('step1b-msg', 'Entre ton pseudo Kick', 'err');
-  if (!password) return showMsg('step1b-msg', 'Entre le mot de passe', 'err');
-
-  const btn = document.querySelector('#step-1b .btn-primary');
-  btn.disabled = true; btn.textContent = 'Vérification…';
-
-  try {
-    const r = await fetch('/api/auth/request?username=' + encodeURIComponent(username) + '&password=' + encodeURIComponent(password));
-    const d = await r.json();
-
-    if (d.error === 'wrong_password') {
-      showMsg('step1b-msg', 'Mot de passe incorrect', 'err');
-    } else if (d.status === 'approved') {
-      localStorage.setItem('kick_panel_user', username);
-      localStorage.setItem('kick_panel_approved', '1');
-      document.getElementById('approved-name').textContent = username;
-      showStep('step-4');
-    } else if (d.status === 'revoked') {
-      showStep('step-5');
-    } else {
-      showMsg('step1b-msg', 'Erreur inattendue', 'err');
-    }
-  } catch(e) {
-    showMsg('step1b-msg', 'Erreur de connexion', 'err');
-  } finally {
-    btn.disabled = false; btn.textContent = 'Accéder au panel →';
-  }
-}
-
-function togglePw() {
-  const inp = document.getElementById('manual-pass');
-  inp.type = inp.type === 'password' ? 'text' : 'password';
-}
-function togglePw2() {
-  const inp = document.getElementById('panel-pass');
-  inp.type = inp.type === 'password' ? 'text' : 'password';
-}
-
-function enterPanel() {
-  window.location.href = '/';
-}
-</script>
+    $('loginBtn').addEventListener('click', () => { $('card').classList.add('loading'); $('status').textContent='Redirection vers Kick...'; });
+    boot();
+  </script>
 </body>
 </html>

@@ -18,7 +18,7 @@ const io     = new Server(server, { cors: { origin: '*' } });
 
 app.use(cors());
 app.use(express.json({ limit: '8mb' }));
-app.use(express.static(path.join(__dirname, 'public')));
+app.use(express.static(path.join(__dirname, 'public'), { index: false }));
 
 function requireAuth(req, res, next) { next(); }
 
@@ -36,11 +36,11 @@ db.ensureInit().then(async () => {
   dbReady = true;
   console.log('[PANEL] DB prête ✓');
   // Servir les fichiers statiques seulement après init
-  app.use(express.static(path.join(__dirname, 'public')));
+  app.use(express.static(path.join(__dirname, 'public'), { index: false }));
 }).catch(err => {
   console.error('[PANEL] Erreur init DB:', err);
   // Démarrer quand même sans DB
-  app.use(express.static(path.join(__dirname, 'public')));
+  app.use(express.static(path.join(__dirname, 'public'), { index: false }));
 });
 
 // Middleware : attendre que la DB soit prête
@@ -48,6 +48,13 @@ function waitDB(req, res, next) {
   if (!dbReady) return res.status(503).json({ error: 'Base de données en cours de chargement, réessaie dans 5 secondes' });
   next();
 }
+
+
+// Page d'entrée V2 : vraie connexion Kick OAuth.
+// Le panel complet reste servi uniquement dans /s/:streamer/dashboard ou /s/:streamer/panel.
+app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'public', 'login.html')));
+app.get('/login', (req, res) => res.sendFile(path.join(__dirname, 'public', 'login.html')));
+app.get('/login.html', (req, res) => res.sendFile(path.join(__dirname, 'public', 'login.html')));
 
 // V2 multi-streamer : attache un tenant à chaque requête API/widget.
 // Les URLs /s/:streamer/... et ?streamer=... isolent les données par streamer.
