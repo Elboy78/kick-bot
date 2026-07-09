@@ -59,6 +59,12 @@ app.get('/s/:streamer/widgets/:file', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'widgets', file));
 });
 app.get('/s/:streamer/classement', (req, res) => res.sendFile(path.join(__dirname, 'public', 'classement.html')));
+app.get('/s/:streamer/dashboard', (req, res) => res.sendFile(path.join(__dirname, 'public', 'dashboard.html')));
+app.get('/s/:streamer/dashboard.html', (req, res) => res.sendFile(path.join(__dirname, 'public', 'dashboard.html')));
+app.get('/s/:streamer/overlays', (req, res) => res.sendFile(path.join(__dirname, 'public', 'overlays.html')));
+app.get('/s/:streamer/overlays.html', (req, res) => res.sendFile(path.join(__dirname, 'public', 'overlays.html')));
+app.get('/s/:streamer/account', (req, res) => res.sendFile(path.join(__dirname, 'public', 'account.html')));
+app.get('/s/:streamer/account.html', (req, res) => res.sendFile(path.join(__dirname, 'public', 'account.html')));
 
 // ── API lecture ───────────────────────────────────────────────────────────────
 
@@ -1710,6 +1716,19 @@ app.get('/classement', (req,res) => res.sendFile(path.join(__dirname,'public','c
 
 
 
+
+function setStreamerCookie(res, slug) {
+  const clean = tenant.normalizeSlug(slug);
+  const secure = process.env.NODE_ENV === 'production' || process.env.RENDER || process.env.RENDER_EXTERNAL_URL;
+  res.setHeader('Set-Cookie', [
+    `kb_streamer=${encodeURIComponent(clean)}; Path=/; Max-Age=${60*60*24*365}; SameSite=Lax${secure ? '; Secure' : ''}`
+  ]);
+}
+function clearStreamerCookie(res) {
+  const secure = process.env.NODE_ENV === 'production' || process.env.RENDER || process.env.RENDER_EXTERNAL_URL;
+  res.setHeader('Set-Cookie', `kb_streamer=; Path=/; Max-Age=0; SameSite=Lax${secure ? '; Secure' : ''}`);
+}
+
 // ════════════════════════════════════════════════════════════════════
 // OAuth Kick officiel (id.kick.com) — refresh automatique du token
 // ════════════════════════════════════════════════════════════════════
@@ -1718,53 +1737,116 @@ app.get('/auth/login', (req, res) => {
   if (!kickOAuth.isConfigured()) {
     return res.status(400).send('KICK_CLIENT_ID, KICK_CLIENT_SECRET ou KICK_REDIRECT_URI manquant dans les variables Render.');
   }
-  const url = kickOAuth.getAuthorizationUrl();
-  console.log('[OAUTH LOGIN] URL générée:', url);
+  const returnTo = String(req.query.returnTo || req.query.redirect || '').slice(0, 300);
+  const url = kickOAuth.getAuthorizationUrl(null, { mode: 'streamer_login', returnTo });
+  console.log('[OAUTH LOGIN V2] Connexion streamer Kick lancée');
   res.redirect(url);
 });
 
 app.get('/auth/callback', async (req, res) => {
-  console.log('[OAUTH CALLBACK] Requête reçue — query:', JSON.stringify(req.query));
+  console.log('[OAUTH CALLBACK V2] Requête reçue — query:', JSON.stringify(req.query));
   try {
     const { code, state, error, error_description } = req.query;
-    if (error) {
-      console.error('[OAUTH CALLBACK] Erreur Kick:', error, error_description);
-      return res.status(400).send(`Erreur Kick: ${error} — ${error_description || ''}`);
-    }
-    if (!code || !state) {
-      console.error('[OAUTH CALLBACK] Code ou state manquant. Query complète:', req.query);
-      return res.status(400).send('Code ou state manquant.');
+    if (error) return res.status(400).send(`Erreur Kick: ${error} — ${error_description || ''}`);
+    if (!code || !state) return res.status(400).send('Code ou state manquant.');
+
+    const token = await kickOAuth.exchangeCodeForToken(code, state);
+    const kickUser = await kickOAuth.fetchCurrentUser(token.accessToken);
+    const username = kickUser.username || kickUser.displayName || kickUser.id;
+    if (!username) throw new Error('Kick n’a pas renvoyé de pseudo exploitable.');
+    const slug = tenant.normalizeSlug(username);
+
+    const streamer = await db.upsertStreamer({
+      slug,
+      kickUserId: kickUser.id || null,
+      kickUsername: username,
+      displayName: kickUser.displayName || username,
+      avatarUrl: kickUser.avatar || '',
+      role: 'streamer',
+      status: 'active'
+    });
+
+    await db.saveOAuthToken(kickOAuth.providerForStreamer(streamer.id), token.accessToken, token.refreshToken, token.expiresAt);
+    // Compatibilité V1 : si c'est le streamer par défaut, on garde aussi le provider global kick.
+    if (slug === tenant.DEFAULT_STREAMER_SLUG) {
+      await db.saveOAuthToken('kick', token.accessToken, token.refreshToken, token.expiresAt);
     }
 
-    console.log('[OAUTH CALLBACK] Code reçu, échange en cours...');
-    await kickOAuth.exchangeCodeForToken(code, state);
-    console.log('[OAUTH CALLBACK] ✅ Token échangé et sauvegardé avec succès');
-
-    res.send(`
-      <html><body style="font-family:sans-serif;background:#050814;color:#fff;display:flex;align-items:center;justify-content:center;height:100vh;margin:0">
-        <div style="text-align:center">
-          <h2 style="color:#28ff66">✅ Compte Kick connecté avec succès</h2>
-          <p>Le token se rafraîchira automatiquement désormais. Tu peux fermer cette page.</p>
-          <script>setTimeout(()=>window.close(), 3000)</script>
-        </div>
-      </body></html>
-    `);
+    setStreamerCookie(res, slug);
+    console.log(`[OAUTH CALLBACK V2] ✅ Streamer connecté: ${slug} (#${streamer.id})`);
+    res.redirect(`/s/${slug}/dashboard`);
   } catch (e) {
-    console.error('[OAUTH CALLBACK] ❌ Exception:', e.message, e.stack);
-    res.status(500).send(`<pre style="color:red;background:#111;padding:20px;font-family:monospace">Erreur: ${e.message}\n\n${e.stack || ''}</pre>`);
+    console.error('[OAUTH CALLBACK V2] ❌ Exception:', e.response?.data || e.message, e.stack);
+    res.status(500).send(`<pre style="color:#ff5c7a;background:#111;padding:20px;font-family:monospace;white-space:pre-wrap">Erreur OAuth V2: ${e.message}\n\n${e.stack || ''}</pre>`);
   }
 });
 
 app.get('/api/oauth/status', async (req, res) => {
   try {
-    const connected = await kickOAuth.isConnected();
-    res.json({ configured: kickOAuth.isConfigured(), connected });
-  } catch (e) { res.json({ configured: false, connected: false }); }
+    const tm = createTenantManager({ db, io, req });
+    const connected = await kickOAuth.isConnected(tm.streamerId);
+    res.json({ configured: kickOAuth.isConfigured(), connected, streamer: tm.info() });
+  } catch (e) { res.json({ configured: kickOAuth.isConfigured(), connected: false }); }
 });
 
 app.post('/api/admin/oauth/disconnect', async (req, res) => {
-  try { await kickOAuth.disconnect(); res.json({ success: true }); }
-  catch (e) { res.status(500).json({ error: e.message }); }
+  try {
+    const tm = createTenantManager({ db, io, req });
+    await kickOAuth.disconnect(tm.streamerId);
+    clearStreamerCookie(res);
+    res.json({ success: true });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.get('/api/v2/dashboard-summary', async (req, res) => {
+  try {
+    const tm = createTenantManager({ db, io, req });
+    const sr = await getSongRequestState();
+    const sub = await getSubCounterState().catch(() => ({ total:0, session:0 }));
+    const stats = await db.getGlobalStats().catch(() => ({}));
+    res.json({
+      data: {
+        streamer: { ...tm.info(), oauthConnected: await kickOAuth.isConnected(tm.streamerId) },
+        overlayLinks: tm.overlayLinks(),
+        songRequest: { queueLength: sr.queue?.length || 0, current: sr.queue?.[0] || null, player: sr.player || {} },
+        subGoal: { total: sub.total || 0, session: sub.session || 0, target: sub.target || 0 },
+        live: { messages: stats?.total_messages || stats?.messages || 0 }
+      }
+    });
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+app.get('/api/v2/account', async (req, res) => {
+  try {
+    const tm = createTenantManager({ db, io, req });
+    const st = req.streamer || {};
+    res.json({ data: {
+      ...tm.info(),
+      id: tm.streamerId,
+      role: st.role || 'streamer',
+      kickUsername: st.kick_username || st.kickUsername || st.slug || tm.slug,
+      avatarUrl: st.avatar_url || st.avatarUrl || '',
+      oauthConnected: await kickOAuth.isConnected(tm.streamerId),
+      overlayLinks: tm.overlayLinks()
+    } });
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+app.get('/api/v2/overlays', async (req, res) => {
+  try {
+    const tm = createTenantManager({ db, io, req });
+    const links = tm.overlayLinks();
+    res.json({ data: {
+      streamer: tm.slug,
+      items: [
+        { key:'songrequest', name:'Song Request', desc:'Musique actuelle + file d’attente', url: links.songrequest },
+        { key:'alerts', name:'Alertes', desc:'Follow, sub, gift, raid', url: links.alerts },
+        { key:'chat', name:'Chat Overlay', desc:'Chat Kick en overlay OBS', url: links.chat },
+        { key:'subgoal', name:'Sub Goal', desc:'Objectif de subs', url: links.subgoal },
+        { key:'classement', name:'Classement viewers', desc:'Page publique du classement', url: links.classement }
+      ]
+    } });
+  } catch(e) { res.status(500).json({ error: e.message }); }
 });
 
 // ════════════════════════════════════════════════════════════════════

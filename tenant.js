@@ -20,6 +20,18 @@ function normalizeSlug(value) {
     .replace(/^-|-$/g, '') || DEFAULT_STREAMER_SLUG;
 }
 
+
+function parseCookies(req) {
+  const header = req?.headers?.cookie || '';
+  return Object.fromEntries(String(header).split(';').map(v => {
+    const i = v.indexOf('=');
+    if (i < 0) return null;
+    const key = v.slice(0, i).trim();
+    const val = decodeURIComponent(v.slice(i + 1).trim());
+    return key ? [key, val] : null;
+  }).filter(Boolean));
+}
+
 function getDefaultStreamerSeed() {
   const slug = normalizeSlug(DEFAULT_STREAMER_SLUG);
   return {
@@ -32,13 +44,15 @@ function getDefaultStreamerSeed() {
 
 function readRequestedSlug(req) {
   const pathSlug = String(req?.path || req?.url || '').match(/^\/s\/([^\/?#]+)/)?.[1];
+  const cookies = { ...parseCookies(req), ...(req?.cookies || {}) };
   return normalizeSlug(
     req?.params?.streamer ||
     req?.params?.slug ||
     pathSlug ||
     req?.query?.streamer ||
     req?.headers?.['x-streamer-slug'] ||
-    req?.cookies?.streamer ||
+    cookies.kb_streamer ||
+    cookies.streamer ||
     DEFAULT_STREAMER_SLUG
   );
 }
@@ -125,6 +139,7 @@ function scopedKey(streamer, key) {
 module.exports = {
   DEFAULT_STREAMER_SLUG,
   normalizeSlug,
+  parseCookies,
   getDefaultStreamerSeed,
   readRequestedSlug,
   ensureRequestedStreamer,
