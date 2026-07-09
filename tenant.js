@@ -43,18 +43,45 @@ function readRequestedSlug(req) {
   );
 }
 
+async function ensureRequestedStreamer(db, slug) {
+  const cleanSlug = normalizeSlug(slug || DEFAULT_STREAMER_SLUG);
+  let streamer = await db.getStreamerBySlug(cleanSlug).catch(() => null);
+
+  // V2 réelle : un slug demandé par /s/:streamer ou ?streamer= doit avoir
+  // son propre tenant. Avant, un slug inconnu retombait sur le streamer par
+  // défaut, donc tous les widgets affichaient la même file Song Request.
+  if (!streamer) {
+    if (cleanSlug === DEFAULT_STREAMER_SLUG) {
+      streamer = await db.ensureDefaultStreamer(getDefaultStreamerSeed());
+    } else if (typeof db.upsertStreamer === 'function') {
+      streamer = await db.upsertStreamer({
+        slug: cleanSlug,
+        kickUsername: cleanSlug,
+        displayName: cleanSlug,
+        role: 'streamer',
+        status: 'active'
+      });
+    }
+  }
+
+  return streamer || await db.ensureDefaultStreamer(getDefaultStreamerSeed());
+}
+
 async function attachTenant(db, req, res, next) {
   try {
     const slug = readRequestedSlug(req);
-    let streamer = await db.getStreamerBySlug(slug);
-    if (!streamer && slug === DEFAULT_STREAMER_SLUG) {
-      streamer = await db.ensureDefaultStreamer(getDefaultStreamerSeed());
-    }
-    req.streamer = streamer || await db.ensureDefaultStreamer(getDefaultStreamerSeed());
-    req.streamerSlug = req.streamer.slug;
+    const streamer = await ensureRequestedStreamer(db, slug);
+    req.streamer = streamer;
+    req.streamerSlug = streamer.slug;
   } catch (e) {
-    req.streamer = null;
-    req.streamerSlug = DEFAULT_STREAMER_SLUG;
+    try {
+      const fallback = await db.ensureDefaultStreamer(getDefaultStreamerSeed());
+      req.streamer = fallback;
+      req.streamerSlug = fallback.slug;
+    } catch (_) {
+      req.streamer = null;
+      req.streamerSlug = DEFAULT_STREAMER_SLUG;
+    }
   }
   const context = {
     streamerId: req.streamer?.id || null,
@@ -100,6 +127,7 @@ module.exports = {
   normalizeSlug,
   getDefaultStreamerSeed,
   readRequestedSlug,
+  ensureRequestedStreamer,
   attachTenant,
   runWithStreamer,
   getCurrentTenant,
