@@ -21,7 +21,7 @@ const CONFIG = {
 };
 
 const PUSHER_URL = 'wss://ws-us2.pusher.com/app/32cbd69e4b950bf97679?protocol=7&client=js&version=7.4.0&flash=false';
-const SYSTEM_COMMANDS = ['!points','!top','!topv','!rang','!niveau','!aide','!duel','!accepter','!refuser','!participer','!giveaway','!lobby','!quote','!addquote','!mort','!death','!score','!queue','!join','!leave','!pos','!vote','!sondage','!so','!uptime','!fc','!sc','!coffre','!victoire','!to','!dice','!des','!rps','!pfc','!clip','!addcmd','!delcmd','!addword','!delword','!allowword','!disallowword'];
+const SYSTEM_COMMANDS = ['!points','!top','!rang','!niveau','!aide','!duel','!accepter','!refuser','!participer','!giveaway','!lobby','!quote','!addquote','!mort','!death','!score','!compteur','!queue','!join','!leave','!pos','!vote','!sondage','!so','!uptime','!fc','!followage','!sc','!coffre','!victoire','!to','!dice','!des','!rps','!pfc','!clip','!addcmd','!delcmd','!addword','!delword','!allowword','!disallowword'];
 
 let ws             = null;
 let reconnectDelay = 5000;
@@ -318,7 +318,6 @@ async function handleChatMessage(payload) {
     switch(cmd) {
       case '!points':    return cmdPoints(username);
       case '!top':       return cmdTop(username);
-      case '!topv':      return cmdTopViewersLink(username);
       case '!rang':      return cmdRang(username);
       case '!niveau':    return cmdNiveau(username);
       case '!aide':      return cmdAide(username);
@@ -370,7 +369,9 @@ async function handleChatMessage(payload) {
   const custom = await db.getCustomCommand(cmd);
   if (custom) {
     db.logCommandUsage(cmd, username).catch(()=>{});
-    const response = custom.response.replace(/@\{user\}/gi, '@' + username);
+    let response = custom.response.replace(/@\{user\}/gi, '@' + username);
+    const shouldMention = custom.mention_user === 1 || custom.mention_user === true || custom.mention_user === '1';
+    if (shouldMention && !/^@\S+/.test(response.trim())) response = '@' + username + ' ' + response;
     return sendChat(response);
   }
 }
@@ -402,14 +403,6 @@ function getPublicBaseUrl() {
     || '';
   const cleaned = String(raw || '').trim().replace(/\/+$/, '');
   return cleaned;
-}
-
-async function cmdTopViewersLink(username) {
-  const baseUrl = getPublicBaseUrl();
-  const path = '/classement';
-  const url = baseUrl ? `${baseUrl}${path}` : path;
-  const prefix = username ? `@${username} ` : '';
-  return sendChat(`${prefix}Classement viewers : ${url}`);
 }
 
 async function cmdRang(username) {

@@ -102,6 +102,7 @@ async function initSchema() {
       id         INTEGER PRIMARY KEY AUTOINCREMENT,
       trigger    TEXT NOT NULL UNIQUE,
       response   TEXT NOT NULL,
+      mention_user INTEGER NOT NULL DEFAULT 0,
       enabled    INTEGER NOT NULL DEFAULT 1,
       created_at TEXT NOT NULL DEFAULT (datetime('now'))
     )`,
@@ -343,6 +344,7 @@ async function initSchema() {
     `ALTER TABLE chest_seasons ADD COLUMN ever_secured INTEGER NOT NULL DEFAULT 0`,
     `ALTER TABLE chest_seasons ADD COLUMN victory_pending INTEGER NOT NULL DEFAULT 0`,
     `ALTER TABLE chest_seasons ADD COLUMN protected_number INTEGER DEFAULT NULL`,
+    `ALTER TABLE custom_commands ADD COLUMN mention_user INTEGER NOT NULL DEFAULT 0`,
   ];
   for (const sql of migrations) {
     try {
@@ -498,6 +500,7 @@ async function clearAllPoints() {
 
 // ─── Commandes ────────────────────────────────────────────────────────────────
 
+
 async function getCustomCommands() {
   return all(`SELECT * FROM custom_commands ORDER BY trigger ASC`);
 }
@@ -506,11 +509,11 @@ async function getCustomCommand(trigger) {
   return get(`SELECT * FROM custom_commands WHERE trigger = ? AND enabled = 1`, [trigger.toLowerCase()]);
 }
 
-async function setCustomCommand(trigger, response) {
+async function setCustomCommand(trigger, response, mentionUser = 0) {
   await run(`
-    INSERT INTO custom_commands (trigger, response) VALUES (?, ?)
-    ON CONFLICT(trigger) DO UPDATE SET response = ?
-  `, [trigger.toLowerCase(), response, response]);
+    INSERT INTO custom_commands (trigger, response, mention_user) VALUES (?, ?, ?)
+    ON CONFLICT(trigger) DO UPDATE SET response = ?, mention_user = ?
+  `, [trigger.toLowerCase(), response, mentionUser ? 1 : 0, response, mentionUser ? 1 : 0]);
 }
 
 async function deleteCustomCommand(trigger) {
