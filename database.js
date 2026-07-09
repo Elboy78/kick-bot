@@ -106,7 +106,8 @@ async function initSchema() {
     )`,
     `CREATE TABLE IF NOT EXISTS viewers (
       id            INTEGER PRIMARY KEY AUTOINCREMENT,
-      username      TEXT    NOT NULL UNIQUE,
+      streamer_id   INTEGER NOT NULL DEFAULT 1,
+      username      TEXT    NOT NULL,
       kick_user_id  TEXT,
       following_since TEXT,
       subscribed_for INTEGER,
@@ -116,14 +117,16 @@ async function initSchema() {
       level         TEXT    NOT NULL DEFAULT 'Bronze',
       last_seen     TEXT,
       first_seen    TEXT    NOT NULL DEFAULT (datetime('now')),
-      created_at    TEXT    NOT NULL DEFAULT (datetime('now'))
+      created_at    TEXT    NOT NULL DEFAULT (datetime('now')),
+      UNIQUE(streamer_id, username)
     )`,
     `CREATE TABLE IF NOT EXISTS points_log (
-      id         INTEGER PRIMARY KEY AUTOINCREMENT,
-      username   TEXT    NOT NULL,
-      points     INTEGER NOT NULL,
-      reason     TEXT    NOT NULL DEFAULT 'watch_time',
-      created_at TEXT    NOT NULL DEFAULT (datetime('now'))
+      id          INTEGER PRIMARY KEY AUTOINCREMENT,
+      streamer_id INTEGER NOT NULL DEFAULT 1,
+      username    TEXT    NOT NULL,
+      points      INTEGER NOT NULL,
+      reason      TEXT    NOT NULL DEFAULT 'watch_time',
+      created_at  TEXT    NOT NULL DEFAULT (datetime('now'))
     )`,
     `CREATE TABLE IF NOT EXISTS stream_sessions (
       id            INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -1450,6 +1453,91 @@ async function deleteOAuthTokenForStreamer(streamerId) {
 
 // ─── Init ─────────────────────────────────────────────────────────────────────
 
+
+async function tableCreateSql(table) {
+  try {
+    const row = await get(`SELECT sql FROM sqlite_master WHERE type = 'table' AND name = ?`, [table]);
+    return String(row?.sql || '');
+  } catch(e) { return ''; }
+}
+
+async function tableColumns(table) {
+  try {
+    const rows = await all(`PRAGMA table_info(${table})`);
+    return rows.map(r => String(r.name || '').toLowerCase()).filter(Boolean);
+  } catch(e) { return []; }
+}
+
+async function migrateViewersToScopedUnique(defaultStreamerId = 1) {
+  const sql = await tableCreateSql('viewers');
+  if (!sql) return;
+  const alreadyScoped = /UNIQUE\s*\(\s*streamer_id\s*,\s*username\s*\)/i.test(sql) && !/username\s+TEXT\s+NOT\s+NULL\s+UNIQUE/i.test(sql);
+  if (alreadyScoped) return;
+
+  console.log('[DB V2] Migration viewers: UNIQUE(username) → UNIQUE(streamer_id, username)');
+  await run(`DROP TABLE IF EXISTS viewers_v2_migration`);
+  await run(`CREATE TABLE viewers_v2_migration (
+    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+    streamer_id     INTEGER NOT NULL DEFAULT 1,
+    username        TEXT    NOT NULL,
+    kick_user_id    TEXT,
+    following_since TEXT,
+    subscribed_for  INTEGER,
+    points          INTEGER NOT NULL DEFAULT 0,
+    total_minutes   INTEGER NOT NULL DEFAULT 0,
+    sessions        INTEGER NOT NULL DEFAULT 0,
+    level           TEXT    NOT NULL DEFAULT 'Bronze',
+    last_seen       TEXT,
+    first_seen      TEXT    NOT NULL DEFAULT (datetime('now')),
+    created_at      TEXT    NOT NULL DEFAULT (datetime('now')),
+    UNIQUE(streamer_id, username)
+  )`);
+
+  // Copie sécurisée : si une ancienne ligne n'a pas encore streamer_id, on la rattache au streamer par défaut.
+  // GROUP BY évite qu'une ancienne migration partielle bloque la recréation sur une paire déjà existante.
+  const cols = await tableColumns('viewers');
+  const hasStreamerId = cols.includes('streamer_id');
+  const sidExpr = hasStreamerId ? 'COALESCE(streamer_id, ?)' : '?';
+  await run(`INSERT OR IGNORE INTO viewers_v2_migration
+    (id, streamer_id, username, kick_user_id, following_since, subscribed_for, points, total_minutes, sessions, level, last_seen, first_seen, created_at)
+    SELECT
+      MIN(id) AS id,
+      ${sidExpr} AS streamer_id,
+      LOWER(username) AS username,
+      MAX(kick_user_id) AS kick_user_id,
+      MAX(following_since) AS following_since,
+      MAX(subscribed_for) AS subscribed_for,
+      MAX(points) AS points,
+      MAX(total_minutes) AS total_minutes,
+      MAX(sessions) AS sessions,
+      COALESCE(MAX(level), 'Bronze') AS level,
+      MAX(last_seen) AS last_seen,
+      COALESCE(MIN(first_seen), datetime('now')) AS first_seen,
+      COALESCE(MIN(created_at), datetime('now')) AS created_at
+    FROM viewers
+    GROUP BY ${sidExpr}, LOWER(username)`, [defaultStreamerId, defaultStreamerId]);
+
+  await run(`DROP TABLE viewers`);
+  await run(`ALTER TABLE viewers_v2_migration RENAME TO viewers`);
+  await run(`CREATE INDEX IF NOT EXISTS idx_viewers_streamer_points ON viewers(streamer_id, points DESC, last_seen DESC)`);
+  await run(`CREATE INDEX IF NOT EXISTS idx_viewers_streamer_last_seen ON viewers(streamer_id, last_seen DESC)`);
+}
+
+async function migratePointsLogToScoped(defaultStreamerId = 1) {
+  try { await run(`ALTER TABLE points_log ADD COLUMN streamer_id INTEGER`); } catch(e) {}
+  try { await run(`UPDATE points_log SET streamer_id = ? WHERE streamer_id IS NULL`, [defaultStreamerId]); } catch(e) {}
+  try { await run(`CREATE INDEX IF NOT EXISTS idx_points_log_streamer_created ON points_log(streamer_id, created_at DESC)`); } catch(e) {}
+}
+
+async function migrateCoreScopedTables(defaultStreamerId = 1) {
+  await migrateViewersToScopedUnique(defaultStreamerId);
+  await migratePointsLogToScoped(defaultStreamerId);
+  try { await run(`CREATE INDEX IF NOT EXISTS idx_custom_commands_streamer_trigger ON custom_commands(streamer_id, trigger)`); } catch(e) {}
+  try { await run(`CREATE INDEX IF NOT EXISTS idx_stream_sessions_streamer_started ON stream_sessions(streamer_id, started_at DESC)`); } catch(e) {}
+  try { await run(`CREATE INDEX IF NOT EXISTS idx_command_usage_streamer_used ON command_usage(streamer_id, used_at DESC)`); } catch(e) {}
+  try { await run(`CREATE INDEX IF NOT EXISTS idx_chat_activity_streamer_day ON chat_activity_daily(streamer_id, day)`); } catch(e) {}
+}
+
 async function migrateLegacyRowsToDefaultStreamer(defaultStreamerId = 1) {
   const tables = ['viewers','points_log','stream_sessions','command_usage','chat_activity_daily','custom_commands'];
   for (const table of tables) {
@@ -1463,6 +1551,7 @@ async function ensureInit() {
     try {
       await initSchema();
       const defaultStreamer = await ensureDefaultStreamer();
+      await migrateCoreScopedTables(defaultStreamer?.id || 1);
       await migrateLegacyRowsToDefaultStreamer(defaultStreamer?.id || 1);
     } catch(e) {
       console.error('[DB] Erreur init schema:', e.message);
