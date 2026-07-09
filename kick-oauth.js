@@ -8,7 +8,9 @@ const tenant = require('./tenant');
 
 const KICK_AUTH_BASE = 'https://id.kick.com';
 const PROVIDER = 'kick';
+const BOT_PROVIDER = 'kick:bot';
 function providerForStreamer(streamerId) { return streamerId ? `kick:${streamerId}` : PROVIDER; }
+function providerForBot() { return BOT_PROVIDER; }
 
 const CLIENT_ID     = process.env.KICK_CLIENT_ID || '';
 const CLIENT_SECRET = process.env.KICK_CLIENT_SECRET || '';
@@ -98,7 +100,8 @@ async function exchangeCodeForToken(code, state) {
 
   const data = response.data || {};
   const expiresAt = Date.now() + ((data.expires_in || 3600) * 1000);
-  await db.saveOAuthToken(PROVIDER, data.access_token, data.refresh_token, expiresAt); // compat bot actuel
+  // V2 : on ne sauvegarde plus automatiquement le token dans le provider global.
+  // Le callback décide si le token est celui du streamer connecté ou celui du compte bot.
 
   db.setBotStatus(`pkce_code_verifier_${state}`, '').catch(()=>{});
   db.setBotStatus(`pkce_meta_${state}`, '').catch(()=>{});
@@ -142,7 +145,6 @@ async function fetchCurrentUser(accessToken) {
 
 async function getValidAccessToken(streamerId = null) {
   let stored = await db.getOAuthToken(providerForStreamer(streamerId));
-  if (!stored && streamerId) stored = await db.getOAuthToken(PROVIDER);
   if (!stored) return null;
   if (Date.now() < stored.expires_at - 60000) return stored.access_token;
   try {
@@ -168,8 +170,38 @@ async function getValidAccessToken(streamerId = null) {
 
 async function isConnected(streamerId = null) {
   let stored = await db.getOAuthToken(providerForStreamer(streamerId));
-  if (!stored && streamerId) stored = await db.getOAuthToken(PROVIDER);
   return !!stored;
+}
+
+async function getBotAccessToken() {
+  let stored = await db.getOAuthToken(BOT_PROVIDER);
+  // Compatibilité : si tu as encore l'ancien token manuel/OAuth global configuré, on le garde en fallback.
+  if (!stored) stored = await db.getOAuthToken(PROVIDER);
+  if (!stored) return null;
+  if (Date.now() < stored.expires_at - 60000) return stored.access_token;
+  try {
+    const response = await axios.post(
+      `${KICK_AUTH_BASE}/oauth/token`,
+      new URLSearchParams({
+        grant_type: 'refresh_token',
+        refresh_token: stored.refresh_token,
+        client_id: CLIENT_ID,
+        client_secret: CLIENT_SECRET,
+      }).toString(),
+      { headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, timeout: 12000 }
+    );
+    const data = response.data || {};
+    const expiresAt = Date.now() + ((data.expires_in || 3600) * 1000);
+    await db.saveOAuthToken(BOT_PROVIDER, data.access_token, data.refresh_token || stored.refresh_token, expiresAt);
+    return data.access_token;
+  } catch (err) {
+    console.error('[OAUTH BOT] Échec du refresh:', err.response?.data || err.message);
+    return null;
+  }
+}
+
+async function isBotConnected() {
+  return !!(await db.getOAuthToken(BOT_PROVIDER));
 }
 
 async function disconnect(streamerId = null) {
@@ -185,4 +217,8 @@ module.exports = {
   isConnected,
   disconnect,
   providerForStreamer,
+  providerForBot,
+  getBotAccessToken,
+  isBotConnected,
+  BOT_PROVIDER,
 };

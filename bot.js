@@ -1268,9 +1268,14 @@ async function moderateUser(username, kickId, action, duration, word) {
 // ─── Token actif (OAuth officiel en priorité, sinon token manuel legacy) ──────
 
 async function getActiveToken() {
-  if (kickOAuth.isConfigured()) {
-    const oauthToken = await kickOAuth.getValidAccessToken();
-    if (oauthToken) return { token: oauthToken, official: true };
+  // V2 multi-streamer : le chat doit toujours être envoyé par le compte BOT,
+  // jamais par le compte streamer connecté au panel.
+  if (process.env.KICK_BOT_ACCESS_TOKEN) {
+    return { token: process.env.KICK_BOT_ACCESS_TOKEN, official: true };
+  }
+  if (kickOAuth.isConfigured() && typeof kickOAuth.getBotAccessToken === 'function') {
+    const botToken = await kickOAuth.getBotAccessToken();
+    if (botToken) return { token: botToken, official: true };
   }
   return { token: CONFIG.token, official: false };
 }

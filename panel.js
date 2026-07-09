@@ -1561,7 +1561,7 @@ app.post('/api/admin/bot-settings',       async (req,res) => { try { const {key,
 // Followers
 app.get('/api/followers', async (req, res) => {
   try {
-    const data = await fetchKickAPI(process.env.KICK_CHANNEL||'');
+    const data = await fetchKickAPI(req.streamer?.slug || req.streamerSlug || process.env.KICK_CHANNEL || '');
     if (!data) return res.json({ count: 0 });
     const count = data?.followers_count || data?.followersCount || 0;
     res.json({ count });
@@ -1597,7 +1597,7 @@ app.get('/api/live', async (req,res) => {
 
   // Sinon essayer l'API serveur
   try {
-    const data = await fetchKickAPI(process.env.KICK_CHANNEL||'');
+    const data = await fetchKickAPI(req.streamer?.slug || req.streamerSlug || process.env.KICK_CHANNEL || '');
     if (!data) return res.json({ live: false, viewers: 0, error: 'api_blocked' });
     const live = data?.livestream;
     res.json({
@@ -1810,6 +1810,21 @@ app.get('/api/tts/quota', async (req, res) => {
   }
 });
 
+
+app.get('/api/v2/core/status', async (req, res) => {
+  try {
+    const tm = createTenantManager({ db, io, req });
+    const live = await fetchKickAPI(tm.slug).catch(() => null);
+    const botName = await db.getBotStatus('bot_account_username').then(r => r?.value || '').catch(() => '');
+    res.json({ data: {
+      streamer: tm.info(),
+      botAccount: { username: botName || process.env.KICK_BOT_USERNAME || 'Bot7uP', connected: await kickOAuth.isBotConnected?.() },
+      channel: tm.slug,
+      live: { isLive: !!(live?.livestream?.is_live), viewers: live?.livestream?.viewer_count || 0, followers: live?.followers_count || live?.followersCount || 0 }
+    } });
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
 app.get('/overlay', (req,res) => res.sendFile(path.join(__dirname,'public','overlay.html')));
 app.get('/classement', (req,res) => res.sendFile(path.join(__dirname,'public','classement.html')));
 
@@ -1831,6 +1846,16 @@ function clearStreamerCookie(res) {
 // OAuth Kick officiel (id.kick.com) — refresh automatique du token
 // ════════════════════════════════════════════════════════════════════
 
+
+app.get('/auth/bot/login', (req, res) => {
+  if (!kickOAuth.isConfigured()) {
+    return res.status(400).send('KICK_CLIENT_ID, KICK_CLIENT_SECRET ou KICK_REDIRECT_URI manquant dans les variables Render.');
+  }
+  const url = kickOAuth.getAuthorizationUrl(null, { mode: 'bot_login', returnTo: '/admin/bot' });
+  console.log('[OAUTH BOT] Connexion du compte bot lancée');
+  res.redirect(url);
+});
+
 app.get('/auth/login', (req, res) => {
   if (!kickOAuth.isConfigured()) {
     return res.status(400).send('KICK_CLIENT_ID, KICK_CLIENT_SECRET ou KICK_REDIRECT_URI manquant dans les variables Render.');
@@ -1849,6 +1874,14 @@ app.get('/auth/callback', async (req, res) => {
     if (!code || !state) return res.status(400).send('Code ou state manquant.');
 
     const token = await kickOAuth.exchangeCodeForToken(code, state);
+    if (token.meta?.mode === 'bot_login') {
+      await db.saveOAuthToken(kickOAuth.providerForBot(), token.accessToken, token.refreshToken, token.expiresAt);
+      const botUser = await kickOAuth.fetchCurrentUser(token.accessToken).catch(() => null);
+      if (botUser?.username) await db.setBotStatus('bot_account_username', botUser.username).catch(()=>{});
+      console.log(`[OAUTH BOT] ✅ Compte bot connecté: ${botUser?.username || 'compte bot'}`);
+      return res.redirect('/?botConnected=1');
+    }
+
     const kickUser = await kickOAuth.fetchCurrentUser(token.accessToken);
     const username = kickUser.username || kickUser.displayName || kickUser.id;
     if (!username) throw new Error('Kick n’a pas renvoyé de pseudo exploitable.');
@@ -1865,11 +1898,6 @@ app.get('/auth/callback', async (req, res) => {
     });
 
     await db.saveOAuthToken(kickOAuth.providerForStreamer(streamer.id), token.accessToken, token.refreshToken, token.expiresAt);
-    // Compatibilité V1 : si c'est le streamer par défaut, on garde aussi le provider global kick.
-    if (slug === tenant.DEFAULT_STREAMER_SLUG) {
-      await db.saveOAuthToken('kick', token.accessToken, token.refreshToken, token.expiresAt);
-    }
-
     setStreamerSessionCookie(res, slug);
     res.cookie('kb_streamer', slug, { path: '/', sameSite: 'Lax', maxAge: 1000 * 60 * 60 * 24 * 365 });
     console.log(`[OAUTH CALLBACK V2] ✅ Streamer connecté: ${slug} (#${streamer.id})`);
