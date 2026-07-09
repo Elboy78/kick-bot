@@ -20,19 +20,6 @@
   .next{position:relative;z-index:2;margin-top:11px;border:1px solid rgba(147,197,253,.15);background:rgba(15,23,42,.46);border-radius:14px;padding:9px 12px;font-size:11px;color:rgba(226,232,240,.7);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.empty .song{color:rgba(226,232,240,.78)}.empty .fill{width:0!important}
   #yt-holder{position:absolute;left:-9999px;top:-9999px;width:1px;height:1px;opacity:0;pointer-events:none}
 </style>
-
-<script>
-window.__STREAMER_SLUG__ = window.__STREAMER_SLUG__ || new URLSearchParams(location.search).get('streamer') || (location.pathname.match(/^\/s\/([^\/]+)/)||[])[1] || '';
-function tenantApiUrl(url){
-  const slug = window.__STREAMER_SLUG__ || '';
-  if(!slug) return url;
-  return url + (url.includes('?') ? '&' : '?') + 'streamer=' + encodeURIComponent(slug);
-}
-function tenantSocketOptions(extra){
-  const slug = window.__STREAMER_SLUG__ || '';
-  return Object.assign({transports:['websocket','polling'], query: slug ? {streamer:slug} : {}}, extra || {});
-}
-</script>
 </head>
 <body>
 <div id="yt-holder"><div id="yt-player"></div></div>
@@ -40,6 +27,9 @@ function tenantSocketOptions(extra){
 <script src="/socket.io/socket.io.js"></script>
 <script src="https://www.youtube.com/iframe_api"></script>
 <script>
+
+const STREAMER_SLUG=(location.pathname.match(/^\/s\/([^\/]+)/)||[])[1]||new URLSearchParams(location.search).get('streamer')||'';
+function apiUrl(path){const sep=path.includes('?')?'&':'?';return STREAMER_SLUG?path+sep+'streamer='+encodeURIComponent(STREAMER_SLUG):path;}
 const el={card:document.getElementById('card'),dot:document.getElementById('dot'),thumb:document.getElementById('thumb'),song:document.getElementById('song'),by:document.getElementById('by'),next:document.getElementById('next'),fill:document.getElementById('fill'),cur:document.getElementById('curTime'),dur:document.getElementById('durTime'),state:document.getElementById('stateTxt')};
 let player=null, ytReady=false, lastSeq=0, currentVideoId='', currentItemId='', desiredStatus='stopped', queue=[], enabled=false, volume=100, freezeTime=null, lastPost=0, suppressNextState=false, displayTime=0, lastTick=Date.now(), loadGuardUntil=0, lastServerItemId='';
 function esc(v){return String(v||'').replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));}
@@ -75,14 +65,14 @@ function playLocal(){ if(!player)return; desiredStatus='playing'; unfreeze(); tr
 function pauseLocal(){ if(!player)return; desiredStatus='paused'; freeze(); try{ if(pstate()!==YT.PlayerState.PAUSED) player.pauseVideo(); }catch(e){} render(); }
 function stopLocal(){ desiredStatus='stopped'; freezeTime=null; currentItemId=''; currentVideoId=''; setStableTime(0); try{ if(player&&player.stopVideo) player.stopVideo(); }catch(e){} render(); }
 function onPlayerStateChange(e){ if(suppressNextState)return; if(e.data===YT.PlayerState.PLAYING && desiredStatus==='paused'){ pauseLocal(); return; } if(e.data===YT.PlayerState.PAUSED && desiredStatus==='playing'){ setTimeout(()=>{ if(desiredStatus==='playing') playLocal(); },180); return; } if(e.data===YT.PlayerState.ENDED){ postState('ended',true); nextPublic(); return; } postState(desiredStatus,false); render(); }
-async function postState(status,force){const now=Date.now(); if(!force&&now-lastPost<900)return; lastPost=now; const cur=queue[0]; if(!cur)return; const t=getStableTime(); const d=pdur()||Number(cur.duration||0)||0; fetch(tenantApiUrl('/api/widgets/songrequest/player-state'),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({itemId:cur.id,status,currentTime:t,duration:d,volume})}).catch(()=>{});}
-async function nextPublic(){try{await fetch(tenantApiUrl('/api/widgets/songrequest/next'),{method:'POST'});}catch(e){}}
+async function postState(status,force){const now=Date.now(); if(!force&&now-lastPost<900)return; lastPost=now; const cur=queue[0]; if(!cur)return; const t=getStableTime(); const d=pdur()||Number(cur.duration||0)||0; fetch(apiUrl('/api/widgets/songrequest/player-state'),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({itemId:cur.id,status,currentTime:t,duration:d,volume})}).catch(()=>{});}
+async function nextPublic(){try{await fetch(apiUrl('/api/widgets/songrequest/next'),{method:'POST'});}catch(e){}}
 function applyServerState(st,initial=false){enabled=!!st.enabled; const oldItem=queue[0]?.id||''; queue=Array.isArray(st.queue)?st.queue:[]; volume=Number(st.player?.volume??volume)||100; const srvStatus=st.player?.status; const newItem=queue[0]?.id||''; if(newItem && newItem!==oldItem){setStableTime(0); loadGuardUntil=Date.now()+1800;} if(initial || !queue[0]) desiredStatus=queue[0]?(srvStatus==='paused'?'paused':srvStatus==='stopped'?'stopped':'playing'):'stopped'; if(!queue[0]) stopLocal(); else {ensurePlayer(); applyPlayback('server');} render();}
-async function load(initial=false){try{const r=await fetch(tenantApiUrl('/api/widgets/songrequest?ts='+Date.now()),{cache:'no-store'}); const st=await r.json(); applyServerState(st,initial);}catch(e){}}
+async function load(initial=false){try{const r=await fetch(apiUrl('/api/widgets/songrequest?ts='+Date.now()),{cache:'no-store'}); const st=await r.json(); applyServerState(st,initial);}catch(e){}}
 function handleControl(c){ if(!c||Number(c.seq||0)<=lastSeq)return; lastSeq=Number(c.seq||0); const a=String(c.action||''); if(a==='pause'){desiredStatus='paused'; pauseLocal(); postState('paused',true);} else if(a==='play'){desiredStatus='playing'; applyPlayback('play'); postState('playing',true);} else if(a==='stop'){stopLocal(); postState('stopped',true);} else if(a==='next'||a==='load-current'){load(false);} else if(a==='seek'){try{const sec=Math.max(0,Number(c.seconds||0)); setStableTime(sec); freezeTime=desiredStatus==='paused'?sec:null; player&&player.seekTo&&player.seekTo(sec,true);}catch(e){} render(); postState(desiredStatus,true);} else if(a==='volume'){volume=Math.max(0,Math.min(100,Number(c.volume??100))); try{player&&player.setVolume&&player.setVolume(volume)}catch(e){} postState(desiredStatus,true);} }
 window.onYouTubeIframeAPIReady=function(){ytReady=true; ensurePlayer();};
 load(true); setInterval(()=>{updateTimeUI(); postState(desiredStatus,false)},700); setInterval(()=>load(false),8000);
-try{const socket=io(tenantSocketOptions()); socket.on('songrequest-control',handleControl); socket.on('songrequest-update',d=>{const old=queue[0]?.id||''; queue=Array.isArray(d.queue)?d.queue:[]; if(!queue[0]) stopLocal(); else if((queue[0].id||'')!==old){ setStableTime(0); loadGuardUntil=Date.now()+1800; if(desiredStatus==='stopped') desiredStatus='playing'; applyPlayback('queue'); } render();}); socket.on('songrequest-player-state',st=>{ if(st&&st.volume!==undefined){volume=Number(st.volume)||volume; try{player&&player.setVolume&&player.setVolume(volume)}catch(e){}} });}catch(e){}
+try{const socket=io({transports:['websocket','polling']}); if(STREAMER_SLUG) socket.emit('tenant-join', STREAMER_SLUG); socket.on('songrequest-control',handleControl); socket.on('songrequest-update',d=>{const old=queue[0]?.id||''; queue=Array.isArray(d.queue)?d.queue:[]; if(!queue[0]) stopLocal(); else if((queue[0].id||'')!==old){ setStableTime(0); loadGuardUntil=Date.now()+1800; if(desiredStatus==='stopped') desiredStatus='playing'; applyPlayback('queue'); } render();}); socket.on('songrequest-player-state',st=>{ if(st&&st.volume!==undefined){volume=Number(st.volume)||volume; try{player&&player.setVolume&&player.setVolume(volume)}catch(e){}} });}catch(e){}
 </script>
 </body>
 </html>

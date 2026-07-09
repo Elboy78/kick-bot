@@ -18,31 +18,13 @@ const io     = new Server(server, { cors: { origin: '*' } });
 
 app.use(cors());
 app.use(express.json({ limit: '8mb' }));
-app.use((req, res, next) => {
-  // Petit parser cookie sans dépendance : permet au panel V2 de retenir le streamer courant.
-  req.cookies = Object.fromEntries(String(req.headers.cookie || '').split(';').map(v => v.trim()).filter(Boolean).map(v => {
-    const i = v.indexOf('=');
-    return i >= 0 ? [decodeURIComponent(v.slice(0, i)), decodeURIComponent(v.slice(i + 1))] : [v, ''];
-  }));
-  const m = String(req.path || '').match(/^\/s\/([^\/]+)/);
-  if (m && m[1]) res.setHeader('Set-Cookie', `streamer=${encodeURIComponent(tenant.normalizeSlug(m[1]))}; Path=/; SameSite=Lax`);
-  next();
-});
 app.use(express.static(path.join(__dirname, 'public')));
-app.use((req, res, next) => tenant.attachTenant(db, req, res, next));
-app.use((req, res, next) => {
-  // V2 Phase 3 : point d'entrée unique pour settings/rooms/URLs par streamer.
-  req.tenantManager = createTenantManager({ db, io, streamer: req.streamer, req });
-  next();
-});
 
 function requireAuth(req, res, next) { next(); }
 
 // Init DB avant de démarrer
 let dbReady = false;
 db.ensureInit().then(async () => {
-  const defaultStreamer = await db.ensureDefaultStreamer(tenant.getDefaultStreamerSeed());
-  console.log(`[V2] Streamer par défaut : ${defaultStreamer.slug} (#${defaultStreamer.id})`);
   const owner = process.env.PANEL_OWNER || '';
   if (owner) {
     try {
@@ -67,169 +49,16 @@ function waitDB(req, res, next) {
   next();
 }
 
-function currentTenantRoom() {
-  return tenant.roomName(tenant.getCurrentStreamerSlug());
-}
-function emitTenant(event, payload) {
-  io.to(currentTenantRoom()).emit(event, payload);
-}
-function emitTenantFromSlug(slug, event, payload) {
-  io.to(tenant.roomName(slug || tenant.getCurrentStreamerSlug())).emit(event, payload);
-}
-function injectStreamerBootstrap(html, slug) {
-  const safe = tenant.normalizeSlug(slug || tenant.DEFAULT_STREAMER_SLUG).replace(/</g, '');
-  const boot = `<script>window.__STREAMER_SLUG__=${JSON.stringify(safe)};window.__API_STREAMER_PARAM__='streamer='+encodeURIComponent(window.__STREAMER_SLUG__);</script>`;
-  return String(html || '').replace(/<head([^>]*)>/i, `<head$1>${boot}`);
-}
+// V2 multi-streamer : attache un tenant à chaque requête API/widget.
+// Les URLs /s/:streamer/... et ?streamer=... isolent les données par streamer.
+app.use((req, res, next) => tenant.attachTenant(db, req, res, next));
 
-
-// ── V2 Multi-streamer : socle sans casser la V1 ──────────────────────────────
-app.get('/api/v2/streamers/current', waitDB, async (req, res) => {
-  try {
-    const streamer = req.streamer || await db.ensureDefaultStreamer(tenant.getDefaultStreamerSeed());
-    const connected = await kickOAuth.isConnected(streamer.id).catch(() => false);
-    res.json({ data: { ...streamer, oauthConnected: connected, isDefault: streamer.slug === tenant.DEFAULT_STREAMER_SLUG } });
-  } catch(e) { res.status(500).json({ error: e.message }); }
+// Widgets OBS isolés par streamer : /s/elboy78/widgets/songrequest.html
+app.get('/s/:streamer/widgets/:file', (req, res) => {
+  const file = String(req.params.file || '').replace(/[^a-z0-9_.-]/gi, '');
+  res.sendFile(path.join(__dirname, 'public', 'widgets', file));
 });
-app.get('/api/v2/tenant/current', waitDB, async (req, res) => {
-  try {
-    res.json({ data: req.tenantManager.info() });
-  } catch(e) { res.status(500).json({ error: e.message }); }
-});
-
-app.get('/api/v2/tenant/debug', waitDB, async (req, res) => {
-  try {
-    const tm = req.tenantManager;
-    res.json({
-      data: {
-        ...tm.info(),
-        overlayLinks: tm.overlayLinks(),
-        sampleScopedKey: tm.scopedKey('songrequest_queue'),
-        sampleSongRequestQueue: await tm.getJson('songrequest_queue', [])
-      }
-    });
-  } catch(e) { res.status(500).json({ error: e.message }); }
-});
-
-app.get('/api/v2/streamers', waitDB, async (req, res) => {
-  try { res.json({ data: await db.listStreamers() }); }
-  catch(e) { res.status(500).json({ error: e.message }); }
-});
-
-app.post('/api/v2/admin/streamers', requireAuth, waitDB, async (req, res) => {
-  try {
-    const streamer = await db.upsertStreamer({
-      slug: req.body.slug,
-      kickUsername: req.body.kickUsername || req.body.kick_username,
-      displayName: req.body.displayName || req.body.display_name,
-      avatarUrl: req.body.avatarUrl || req.body.avatar_url,
-      role: req.body.role || 'streamer',
-      status: req.body.status || 'active'
-    });
-    res.json({ success: true, data: streamer });
-  } catch(e) { res.status(500).json({ error: e.message }); }
-});
-
-app.get('/api/v2/obs-links', waitDB, async (req, res) => {
-  try { res.json({ data: req.tenantManager.overlayLinks() }); }
-  catch(e) { res.status(500).json({ error: e.message }); }
-});
-
-
-
-app.get('/api/v2/dashboard-summary', waitDB, async (req, res) => {
-  try {
-    const streamer = req.streamer || await db.ensureDefaultStreamer(tenant.getDefaultStreamerSeed());
-    const [stats, songState, subState, oauthConnected] = await Promise.all([
-      db.getGlobalStats().catch(() => ({})),
-      getSongRequestState().catch(() => ({ queue: [], player: { status: 'stopped' } })),
-      getSubCounterState().catch(() => ({ total: 0, session: 0, gifts: 0, renewals: 0, target: 50 })),
-      kickOAuth.isConnected(streamer.id).catch(() => false)
-    ]);
-    res.json({ data: {
-      streamer: {
-        id: streamer.id,
-        slug: streamer.slug,
-        displayName: streamer.display_name || streamer.displayName || streamer.slug,
-        avatarUrl: streamer.avatar_url || streamer.avatarUrl || '',
-        role: streamer.role || 'streamer',
-        oauthConnected
-      },
-      live: {
-        viewers: Number(stats?.active_viewers || stats?.viewers || stats?.total_viewers || 0),
-        messages: Number(stats?.total_messages || stats?.messages || 0),
-        points: Number(stats?.total_points || 0)
-      },
-      songRequest: {
-        enabled: !!songState.enabled,
-        queueLength: Array.isArray(songState.queue) ? songState.queue.length : 0,
-        current: Array.isArray(songState.queue) ? (songState.queue[0] || null) : null,
-        player: songState.player || { status: 'stopped' }
-      },
-      subGoal: subState
-    }});
-  } catch(e) { res.status(500).json({ error: e.message }); }
-});
-
-app.get('/api/v2/account', waitDB, async (req, res) => {
-  try {
-    const streamer = req.streamer || await db.ensureDefaultStreamer(tenant.getDefaultStreamerSeed());
-    res.json({ data: {
-      id: streamer.id,
-      slug: streamer.slug,
-      kickUserId: streamer.kick_user_id || '',
-      kickUsername: streamer.kick_username || streamer.slug,
-      displayName: streamer.display_name || streamer.slug,
-      avatarUrl: streamer.avatar_url || '',
-      role: streamer.role || 'streamer',
-      status: streamer.status || 'active',
-      createdAt: streamer.created_at || '',
-      oauth: { configured: kickOAuth.isConfigured(), connected: await kickOAuth.isConnected(streamer.id).catch(()=>false) }
-    }});
-  } catch(e) { res.status(500).json({ error: e.message }); }
-});
-
-app.get('/api/v2/overlays', waitDB, async (req, res) => {
-  try {
-    const links = req.tenantManager.overlayLinks();
-    const items = [
-      { key:'songrequest', name:'Song Request', url:links.songrequest, desc:'Lecteur musique OBS' },
-      { key:'chat', name:'Overlay Chat', url:links.chat, desc:'Chat Kick affiché sur OBS' },
-      { key:'subgoal', name:'Sub Goal', url:links.subgoal, desc:'Objectif de subs' },
-      { key:'alerts', name:'Alertes', url:links.alerts, desc:'Follow, sub, gifts et raids' },
-      { key:'classement', name:'Classement public', url:links.classement, desc:'Page viewer du classement' }
-    ];
-    res.json({ data: { streamer: links.streamer, items } });
-  } catch(e) { res.status(500).json({ error: e.message }); }
-});
-
-app.get('/s/:streamer/dashboard', (req,res) => {
-  const file = path.join(__dirname,'public','dashboard.html');
-  require('fs').readFile(file, 'utf8', (err, html) => err ? res.status(404).send('Not found') : res.type('html').send(injectStreamerBootstrap(html, req.params.streamer)));
-});
-app.get('/s/:streamer/overlays', (req,res) => {
-  const file = path.join(__dirname,'public','overlays.html');
-  require('fs').readFile(file, 'utf8', (err, html) => err ? res.status(404).send('Not found') : res.type('html').send(injectStreamerBootstrap(html, req.params.streamer)));
-});
-app.get('/s/:streamer/account', (req,res) => {
-  const file = path.join(__dirname,'public','account.html');
-  require('fs').readFile(file, 'utf8', (err, html) => err ? res.status(404).send('Not found') : res.type('html').send(injectStreamerBootstrap(html, req.params.streamer)));
-});
-app.get('/dashboard', (req,res) => res.redirect(`/s/${req.streamer?.slug || tenant.DEFAULT_STREAMER_SLUG}/dashboard`));
-app.get('/overlays', (req,res) => res.redirect(`/s/${req.streamer?.slug || tenant.DEFAULT_STREAMER_SLUG}/overlays`));
-app.get('/account', (req,res) => res.redirect(`/s/${req.streamer?.slug || tenant.DEFAULT_STREAMER_SLUG}/account`));
-
-// URLs publiques prêtes pour la V2 : /s/:streamer/...
-// Pour cette première phase, elles servent les mêmes fichiers que la V1 mais portent déjà le slug streamer.
-app.get('/s/:streamer/classement', (req,res) => {
-  const file = path.join(__dirname,'public','classement.html');
-  require('fs').readFile(file, 'utf8', (err, html) => err ? res.status(404).send('Not found') : res.type('html').send(injectStreamerBootstrap(html, req.params.streamer)));
-});
-app.get('/s/:streamer/widgets/:widget', (req,res) => {
-  const safeWidget = path.basename(req.params.widget || '');
-  const file = path.join(__dirname,'public','widgets', safeWidget);
-  require('fs').readFile(file, 'utf8', (err, html) => err ? res.status(404).send('Not found') : res.type('html').send(injectStreamerBootstrap(html, req.params.streamer)));
-});
+app.get('/s/:streamer/classement', (req, res) => res.sendFile(path.join(__dirname, 'public', 'classement.html')));
 
 // ── API lecture ───────────────────────────────────────────────────────────────
 
@@ -350,8 +179,8 @@ async function getSubCounterState() {
 
 async function emitSubCounterState() {
   const state = await getSubCounterState();
-  emitTenant('subcounter-update', state);
-  emitTenant('subgoal-update', { current: state.total, target: state.target, label: state.label, textPosition: state.textPosition, countPosition: state.countPosition, progressDisplay: state.progressDisplay, textAlign: state.textAlign });
+  io.emit('subcounter-update', state);
+  io.emit('subgoal-update', { current: state.total, target: state.target, label: state.label, textPosition: state.textPosition, countPosition: state.countPosition, progressDisplay: state.progressDisplay, textAlign: state.textAlign });
   return state;
 }
 
@@ -387,8 +216,8 @@ async function recordSubEvent(type, payload = {}) {
     await db.setSettingStr('subcounter_gifts', String(state.gifts));
     await db.setSettingStr('subgoal_current', String(state.total));
     await db.setSettingStr('subcounter_latest', JSON.stringify(state.latest));
-    emitTenant('subcounter-update', state);
-    emitTenant('subgoal-update', { current: state.total, target: state.target, label: state.label, textPosition: state.textPosition, countPosition: state.countPosition, progressDisplay: state.progressDisplay, textAlign: state.textAlign });
+    io.emit('subcounter-update', state);
+    io.emit('subgoal-update', { current: state.total, target: state.target, label: state.label, textPosition: state.textPosition, countPosition: state.countPosition, progressDisplay: state.progressDisplay, textAlign: state.textAlign });
     console.log(`[SUBCOUNTER] Update ${type} → total=${state.total} session=${state.session} gifts=${state.gifts} renewals=${state.renewals}`);
     return state;
   } catch(e) { console.error('[SUBCOUNTER] Erreur event:', e.message); }
@@ -844,6 +673,8 @@ async function broadcastChestResult(result) {
   const chatEnabled = await db.getSetting('chests_chat_enabled');
   if (chatEnabled) {
     const shared = require('./shared');
+const tenant = require('./tenant');
+const { createTenantManager } = require('./tenant-manager');
     const moneyStr = result.money > 0 && ['positive','epic','legendary'].includes(result.tier) ? ` (${result.money}€)` : '';
     let msg = `🧰 COFFRE ${result.number} → ${result.tierEmoji} ${result.tierName} : ${result.label}${moneyStr}`;
     try { await shared.sendChat(msg); } catch(e) {}
@@ -855,8 +686,8 @@ async function broadcastChestResult(result) {
       try { await shared.sendChat(`🩸 SAISON TERMINÉE — ${s.bonuses} bonus, ${s.maluses} malus, ${s.jackpots} jackpot(s), ${s.challengesDone}/${s.challengesTotal} défis réussis, ${s.money}€ gagnés !`); } catch(e) {}
     }
   }
-  emitTenant('chest-opened', result);
-  emitTenant('chests-update');
+  io.emit('chest-opened', result);
+  io.emit('chests-update');
 }
 
 app.get('/api/widgets/subgoal', async (req, res) => {
@@ -1071,14 +902,26 @@ async function resolveSongRequest(song) {
   if (found) return { song: found.title || raw, query: raw, ...found };
   return { song: raw, query: raw, url: '', videoId: '', title: raw, author: '', thumbnail: '', duration: 0, durationText: '' };
 }
+// Tenant courant du Song Request. Dans une requête /s/:streamer ou ?streamer=,
+// AsyncLocalStorage donne automatiquement le bon streamer.
+function getSongRequestTenant() {
+  return createTenantManager({ db, io });
+}
+function emitSongRequestTenant(tm, event, payload) {
+  // Emission dans la room du streamer, avec fallback global pour l'ancien panel V1.
+  try { tm.emit(event, payload); } catch(e) {}
+  if (!tm.streamerId) io.emit(event, payload);
+}
+
 // Etat mémoire Song Request pour rendre les macros quasi instantanées.
 // Le clic macro ne doit pas attendre Turso avant de partir vers l'overlay OBS.
 let songRequestControlSeqMemory = Date.now();
 let songRequestDesiredStatusMemory = null;
 
 async function getSongRequestPlayerState() {
+  const tm = getSongRequestTenant();
   let state = {};
-  try { state = JSON.parse(await db.getSettingStr('songrequest_player_state', '{}')); } catch(e) { state = {}; }
+  try { state = JSON.parse(await tm.getSetting('songrequest_player_state', '{}')); } catch(e) { state = {}; }
   return {
     itemId: state.itemId || '',
     status: state.status || 'stopped',
@@ -1091,14 +934,15 @@ async function getSongRequestPlayerState() {
 async function saveSongRequestPlayerState(patch = {}, emit = true) {
   const prev = await getSongRequestPlayerState();
   const next = { ...prev, ...patch, updatedAt: new Date().toISOString() };
-  await db.setSettingStr('songrequest_player_state', JSON.stringify(next));
-  if (emit) emitTenant('songrequest-player-state', next);
+  await getSongRequestTenant().setSetting('songrequest_player_state', JSON.stringify(next));
+  if (emit) emitSongRequestTenant(getSongRequestTenant(), 'songrequest-player-state', next);
   return next;
 }
 
 async function getSongRequestControl() {
+  const tm = getSongRequestTenant();
   let control = {};
-  try { control = JSON.parse(await db.getSettingStr('songrequest_control', '{}')); } catch(e) { control = {}; }
+  try { control = JSON.parse(await tm.getSetting('songrequest_control', '{}')); } catch(e) { control = {}; }
   return {
     seq: Number(control.seq || songRequestControlSeqMemory || 0),
     action: control.action || '',
@@ -1114,22 +958,23 @@ function emitSongRequestControlNow(action, payload = {}) {
     ...payload,
     at: new Date().toISOString()
   };
-  emitTenant('songrequest-control', control);
+  emitSongRequestTenant(getSongRequestTenant(), 'songrequest-control', control);
   return control;
 }
 async function issueSongRequestControl(action, payload = {}) {
   // IMPORTANT : émission OBS immédiate, sauvegarde après.
   // Avant, la macro attendait l'écriture DB avant d'arriver dans OBS, ce qui ajoutait une latence visible.
   const control = emitSongRequestControlNow(action, payload);
-  db.setSettingStr('songrequest_control', JSON.stringify(control)).catch(e => {
+  getSongRequestTenant().setSetting('songrequest_control', JSON.stringify(control)).catch(e => {
     console.warn('[SONGREQUEST] Sauvegarde contrôle macro impossible:', e.message);
   });
   return control;
 }
 
 async function getSongRequestState() {
+  const tm = getSongRequestTenant();
   let queue = [];
-  try { queue = JSON.parse(await db.getSettingStr('songrequest_queue', '[]')); } catch(e) { queue = []; }
+  try { queue = JSON.parse(await tm.getSetting('songrequest_queue', '[]')); } catch(e) { queue = []; }
   queue = Array.isArray(queue) ? queue : [];
   const player = await getSongRequestPlayerState();
   const currentItem = queue[0] || null;
@@ -1152,11 +997,11 @@ async function getSongRequestState() {
     player.status = songRequestDesiredStatusMemory;
   }
   return {
-    enabled: await db.getSetting('songrequest_enabled'),
-    command: await db.getSettingStr('songrequest_command', '!sr'),
-    confirmMessage: await db.getSettingStr('songrequest_confirm', '🎵 @{username}, ta musique a été ajoutée à la file !'),
-    chatConfirmEnabled: (await db.getSettingStr('songrequest_chat_confirm_enabled', '0')) === '1',
-    maxQueue: parseInt(await db.getSettingStr('songrequest_max_queue', '30')) || 30,
+    enabled: await tm.getBool('songrequest_enabled', true),
+    command: await tm.getSetting('songrequest_command', '!sr'),
+    confirmMessage: await tm.getSetting('songrequest_confirm', '🎵 @{username}, ta musique a été ajoutée à la file !'),
+    chatConfirmEnabled: (await tm.getSetting('songrequest_chat_confirm_enabled', '0')) === '1',
+    maxQueue: parseInt(await tm.getSetting('songrequest_max_queue', '30')) || 30,
     queue,
     player,
     control: await getSongRequestControl()
@@ -1164,12 +1009,13 @@ async function getSongRequestState() {
 }
 
 async function saveSongRequestQueue(queue) {
+  const tm = getSongRequestTenant();
   const clean = Array.isArray(queue) ? queue.slice(0, 100) : [];
-  await db.setSettingStr('songrequest_queue', JSON.stringify(clean));
+  await tm.setSetting('songrequest_queue', JSON.stringify(clean));
   if (!clean.length) {
     await saveSongRequestPlayerState({ itemId:'', status:'stopped', currentTime:0, duration:0 }, false);
   }
-  emitTenant('songrequest-update', { queue: clean });
+  emitSongRequestTenant(tm, 'songrequest-update', { queue: clean });
   return clean;
 }
 
@@ -1219,15 +1065,16 @@ app.get('/api/widgets/songrequest', async (req, res) => {
 
 app.post('/api/admin/widgets/songrequest/settings', requireAuth, async (req, res) => {
   try {
-    if (typeof req.body.enabled === 'boolean') await db.setSetting('songrequest_enabled', req.body.enabled);
+    const tm = getSongRequestTenant();
+    if (typeof req.body.enabled === 'boolean') await tm.setBool('songrequest_enabled', req.body.enabled);
     if (typeof req.body.command === 'string') {
       let command = req.body.command.trim().slice(0,20) || '!sr';
       if (!command.startsWith('!')) command = '!' + command;
-      await db.setSettingStr('songrequest_command', command.toLowerCase());
+      await tm.setSetting('songrequest_command', command.toLowerCase());
     }
-    if (typeof req.body.confirmMessage === 'string') await db.setSettingStr('songrequest_confirm', req.body.confirmMessage.trim().slice(0,180));
-    if (typeof req.body.chatConfirmEnabled === 'boolean') await db.setSettingStr('songrequest_chat_confirm_enabled', req.body.chatConfirmEnabled ? '1' : '0');
-    if (req.body.maxQueue !== undefined) await db.setSettingStr('songrequest_max_queue', String(Math.min(100, Math.max(1, parseInt(req.body.maxQueue) || 30))));
+    if (typeof req.body.confirmMessage === 'string') await tm.setSetting('songrequest_confirm', req.body.confirmMessage.trim().slice(0,180));
+    if (typeof req.body.chatConfirmEnabled === 'boolean') await tm.setSetting('songrequest_chat_confirm_enabled', req.body.chatConfirmEnabled ? '1' : '0');
+    if (req.body.maxQueue !== undefined) await tm.setSetting('songrequest_max_queue', String(Math.min(100, Math.max(1, parseInt(req.body.maxQueue) || 30))));
     res.json({ success:true, ...(await getSongRequestState()) });
   } catch(e) { res.status(500).json({ error:e.message }); }
 });
@@ -1312,17 +1159,9 @@ app.post('/api/admin/widgets/songrequest/seek', requireAuth, async (req, res) =>
 });
 app.post('/api/admin/widgets/songrequest/volume', requireAuth, async (req, res) => {
   try {
-    // Volume ultra réactif : on envoie l'ordre OBS avant l'écriture Turso.
-    // Et on garde bien 0 comme valeur valide (ancien code : 0 redevenait 100).
-    const raw = Number(req.body.volume ?? 100);
-    const volume = Math.max(0, Math.min(100, Number.isFinite(raw) ? Math.round(raw) : 100));
-    const state = await getSongRequestPlayerState();
-    const next = { ...state, volume, updatedAt: new Date().toISOString() };
-    emitTenant('songrequest-player-state', next);
+    const volume = Math.max(0, Math.min(100, parseInt(req.body.volume ?? 100) || 100));
+    const next = await saveSongRequestPlayerState({ volume });
     await issueSongRequestControl('volume', { volume });
-    db.setSettingStr('songrequest_player_state', JSON.stringify(next)).catch(e => {
-      console.warn('[SONGREQUEST] Sauvegarde volume impossible:', e.message);
-    });
     res.json({ success:true, player: next });
   } catch(e) { res.status(500).json({ error:e.message }); }
 });
@@ -1419,19 +1258,30 @@ async function songRequestMacroHandler(req, res) {
 }
 app.get('/api/widgets/songrequest/macro/:action', songRequestMacroHandler);
 app.post('/api/widgets/songrequest/macro/:action', songRequestMacroHandler);
-// Alias public plus simple pour Kick Bot Companion :
-// https://ton-render.onrender.com/api/songrequest/macro/toggle
 app.get('/api/songrequest/macro/:action', songRequestMacroHandler);
 app.post('/api/songrequest/macro/:action', songRequestMacroHandler);
 
+
+app.get('/api/v2/tenant/debug', async (req, res) => {
+  try {
+    const tm = createTenantManager({ db, io, req });
+    res.json({ data: { ...tm.info(), overlayLinks: tm.overlayLinks(), sampleScopedKey: tm.scopedKey('songrequest_queue'), sampleSongRequestQueue: await tm.getJson('songrequest_queue', []) } });
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+app.get('/api/v2/tenant/current', async (req, res) => {
+  try { const tm = createTenantManager({ db, io, req }); res.json({ data: tm.info() }); }
+  catch(e) { res.status(500).json({ error: e.message }); }
+});
 app.get('/api/chests', async (req, res) => {
   try { res.json(await chests.getPublicState()); } catch(e) { res.json({ season: null, chests: [] }); }
 });
 app.post('/api/admin/chests/new-season', requireAuth, async (req, res) => {
   try {
     const r = await chests.newSeason();
-    emitTenant('chests-update');
+    io.emit('chests-update');
     const shared = require('./shared');
+const tenant = require('./tenant');
+const { createTenantManager } = require('./tenant-manager');
     try { await shared.sendChat(`🩸 UNE NOUVELLE SAISON DES 30 COFFRES DE L'ENTITÉ COMMENCE ! Le contenu a été mélangé par le Brouillard…`); } catch(e) {}
     res.json({ success: true, ...r });
   } catch(e) { res.status(500).json({ error: e.message }); }
@@ -1450,8 +1300,10 @@ app.post('/api/admin/chests/secure', requireAuth, async (req, res) => {
   try {
     const result = await chests.secureChest(parseInt(req.body.number));
     if (result.error) return res.status(400).json(result);
-    emitTenant('chests-update');
+    io.emit('chests-update');
     const shared = require('./shared');
+const tenant = require('./tenant');
+const { createTenantManager } = require('./tenant-manager');
     if (await db.getSetting('chests_chat_enabled')) {
       if (result.moved) { try { await shared.sendChat(`🔒 La sécurité passe du coffre ${result.from ?? '?'} au coffre ${result.to} — DERNIER changement possible utilisé, plus aucune modification jusqu'à la prochaine saison !`); } catch(e) {} }
       else { try { await shared.sendChat(`🔒 Le coffre ${result.to} est maintenant SÉCURISÉ.`); } catch(e) {} }
@@ -1462,7 +1314,7 @@ app.post('/api/admin/chests/secure', requireAuth, async (req, res) => {
 app.post('/api/admin/chests/unsecure', requireAuth, async (req, res) => {
   try {
     const result = await chests.unsecureChest();
-    emitTenant('chests-update');
+    io.emit('chests-update');
     res.json(result);
   } catch(e) { res.status(500).json({ error: e.message }); }
 });
@@ -1470,8 +1322,10 @@ app.post('/api/admin/chests/victory', requireAuth, async (req, res) => {
   try {
     const result = await chests.markVictory();
     if (result.error) return res.status(400).json(result);
-    emitTenant('chests-update');
+    io.emit('chests-update');
     const shared = require('./shared');
+const tenant = require('./tenant');
+const { createTenantManager } = require('./tenant-manager');
     if (await db.getSetting('chests_chat_enabled')) {
       try { await shared.sendChat(`🏆 VICTOIRE ! Le coffre sécurisé n°${result.protectedNumber} verra son contenu DOUBLÉ à l'ouverture !`); } catch(e) {}
     }
@@ -1481,7 +1335,7 @@ app.post('/api/admin/chests/victory', requireAuth, async (req, res) => {
 app.post('/api/admin/chests/victory/clear', requireAuth, async (req, res) => {
   try {
     const result = await chests.clearVictory();
-    emitTenant('chests-update');
+    io.emit('chests-update');
     res.json(result);
   } catch(e) { res.status(500).json({ error: e.message }); }
 });
@@ -1518,7 +1372,7 @@ app.post('/api/admin/chests/update-content', requireAuth, async (req, res) => {
     if (!chest) return res.status(404).json({ error: 'Coffre introuvable' });
     const fogByTier = { legendary:80, epic:50, positive:25, challenge:0, cursed:-30, fake:-60 };
     await db.updateChestContent(chest.id, tier, label, Number.isFinite(money) ? money : 0, fogByTier[tier] || 0);
-    emitTenant('chests-update');
+    io.emit('chests-update');
     res.json({ success: true });
   } catch(e) { res.status(500).json({ error: e.message }); }
 });
@@ -1531,7 +1385,7 @@ app.post('/api/admin/chests/challenge-done', requireAuth, async (req, res) => {
     const chest = await db.getChest(season.id, parseInt(number));
     if (!chest) return res.status(400).json({ error: 'Coffre introuvable' });
     await db.setChestChallengeDone(chest.id, !!done);
-    emitTenant('chests-update');
+    io.emit('chests-update');
     res.json({ success: true });
   } catch(e) { res.status(500).json({ error: e.message }); }
 });
@@ -1548,7 +1402,7 @@ require('./shared').registerOpenChest(async (number) => {
 require('./shared').registerMarkVictory(async () => {
   const result = await chests.markVictory();
   if (result.error) return result;
-  emitTenant('chests-update');
+  io.emit('chests-update');
   if (await db.getSetting('chests_chat_enabled')) {
     try { await require('./shared').sendChat(`🏆 VICTOIRE ! Le coffre sécurisé n°${result.protectedNumber} verra son contenu DOUBLÉ à l'ouverture !`); } catch(e) {}
   }
@@ -1722,7 +1576,7 @@ app.post('/webhook/donation', async (req, res) => {
     }
     if (await db.isTTSBlacklisted(message)) {
       await db.addTTSHistory(username, message, amount, 'blocked');
-      emitTenant('tts-update');
+      io.emit('tts-update');
       return res.json({ ignored: true, reason: 'blacklisted' });
     }
 
@@ -1730,8 +1584,8 @@ app.post('/webhook/donation', async (req, res) => {
     await db.addTTSHistory(username, message, amount, 'played');
 
     const audioBase64 = await generateTTSAudio(message);
-    emitTenant('play-tts', { username, message, amount, audio: audioBase64, volume: cfg.volume });
-    emitTenant('tts-update');
+    io.emit('play-tts', { username, message, amount, audio: audioBase64, volume: cfg.volume });
+    io.emit('tts-update');
 
     res.json({ success: true });
   } catch(e) {
@@ -1750,8 +1604,8 @@ app.post('/api/tts/test', async (req, res) => {
 
     await db.addTTSHistory('Test Panel', message, 0, 'test');
     const audioBase64 = await generateTTSAudio(message);
-    emitTenant('play-tts', { username: 'Test Panel', message, amount: 0, audio: audioBase64, volume: cfg.volume });
-    emitTenant('tts-update');
+    io.emit('play-tts', { username: 'Test Panel', message, amount: 0, audio: audioBase64, volume: cfg.volume });
+    io.emit('tts-update');
     res.json({ success: true, audioGenerated: !!audioBase64 });
   } catch(e) { res.status(500).json({ error: e.message }); }
 });
@@ -1860,13 +1714,11 @@ app.get('/classement', (req,res) => res.sendFile(path.join(__dirname,'public','c
 // OAuth Kick officiel (id.kick.com) — refresh automatique du token
 // ════════════════════════════════════════════════════════════════════
 
-app.get('/auth/login', async (req, res) => {
+app.get('/auth/login', (req, res) => {
   if (!kickOAuth.isConfigured()) {
     return res.status(400).send('KICK_CLIENT_ID, KICK_CLIENT_SECRET ou KICK_REDIRECT_URI manquant dans les variables Render.');
   }
-  const streamerSlug = tenant.readRequestedSlug(req);
-  const streamer = await db.getStreamerBySlug(streamerSlug).catch(()=>null) || await db.ensureDefaultStreamer(tenant.getDefaultStreamerSeed());
-  const url = kickOAuth.getAuthorizationUrl(undefined, { streamerId: streamer.id });
+  const url = kickOAuth.getAuthorizationUrl();
   console.log('[OAUTH LOGIN] URL générée:', url);
   res.redirect(url);
 });
@@ -1885,18 +1737,15 @@ app.get('/auth/callback', async (req, res) => {
     }
 
     console.log('[OAUTH CALLBACK] Code reçu, échange en cours...');
-    const exchanged = await kickOAuth.exchangeCodeForToken(code, state);
-    const streamer = exchanged?.streamerId ? await db.getStreamerById(exchanged.streamerId).catch(()=>null) : null;
-    const slug = streamer?.slug || req.streamer?.slug || tenant.DEFAULT_STREAMER_SLUG;
-    console.log('[OAUTH CALLBACK] ✅ Token échangé et sauvegardé avec succès pour', slug);
-    res.setHeader('Set-Cookie', `streamer=${encodeURIComponent(slug)}; Path=/; SameSite=Lax`);
+    await kickOAuth.exchangeCodeForToken(code, state);
+    console.log('[OAUTH CALLBACK] ✅ Token échangé et sauvegardé avec succès');
 
     res.send(`
       <html><body style="font-family:sans-serif;background:#050814;color:#fff;display:flex;align-items:center;justify-content:center;height:100vh;margin:0">
         <div style="text-align:center">
           <h2 style="color:#28ff66">✅ Compte Kick connecté avec succès</h2>
-          <p>Redirection vers ton dashboard...</p>
-          <script>setTimeout(()=>{ window.location.href='/s/${slug}/dashboard'; }, 900)</script>
+          <p>Le token se rafraîchira automatiquement désormais. Tu peux fermer cette page.</p>
+          <script>setTimeout(()=>window.close(), 3000)</script>
         </div>
       </body></html>
     `);
@@ -1908,13 +1757,13 @@ app.get('/auth/callback', async (req, res) => {
 
 app.get('/api/oauth/status', async (req, res) => {
   try {
-    const connected = await kickOAuth.isConnected(req.streamer?.id);
-    res.json({ configured: kickOAuth.isConfigured(), connected, streamer: req.streamer?.slug || null });
+    const connected = await kickOAuth.isConnected();
+    res.json({ configured: kickOAuth.isConfigured(), connected });
   } catch (e) { res.json({ configured: false, connected: false }); }
 });
 
 app.post('/api/admin/oauth/disconnect', async (req, res) => {
-  try { await kickOAuth.disconnect(req.streamer?.id); res.json({ success: true }); }
+  try { await kickOAuth.disconnect(); res.json({ success: true }); }
   catch (e) { res.status(500).json({ error: e.message }); }
 });
 
@@ -2041,7 +1890,7 @@ async function pushObsAlert(type, vars={}, force=false) {
     cfg,
     createdAt: new Date().toISOString()
   };
-  emitTenant('alert-overlay-event', payload);
+  io.emit('alert-overlay-event', payload);
   console.log('[ALERT OBS]', type, payload.message);
   return { success:true, alert: payload };
 }
@@ -2064,7 +1913,7 @@ app.post('/api/admin/widgets/alerts/:type', requireAuth, async (req, res) => {
     const type = sanitizeAlertType(req.params.type);
     const cfg = normalizeAlertCfg(type, req.body || {});
     await db.setSettingStr('alert_config_' + type, JSON.stringify(cfg));
-    emitTenant('alert-overlay-settings', { configs: await getAllAlertConfigs() });
+    io.emit('alert-overlay-settings', { configs: await getAllAlertConfigs() });
     res.json({ success:true, type, cfg });
   } catch(e) { res.status(500).json({ error: e.message }); }
 });
@@ -2133,7 +1982,7 @@ async function emitChatOverlayMessage(msg = {}) {
       color: msg.color || '',
       at: msg.at || new Date().toISOString()
     };
-    emitTenant('chat-overlay-message', payload);
+    io.emit('chat-overlay-message', payload);
     return true;
   } catch(e) {
     console.warn('[CHAT OVERLAY] Message ignoré:', e.message);
@@ -2163,7 +2012,7 @@ app.post('/api/admin/widgets/chat-overlay/settings', requireAuth, async (req, re
     if (typeof b.animation === 'string') await db.setSettingStr('chat_overlay_animation', b.animation.slice(0, 30));
     if (typeof b.design === 'string') await db.setSettingStr('chat_overlay_design', b.design.slice(0, 30));
     const cfg = await getChatOverlaySettings();
-    emitTenant('chat-overlay-settings', cfg);
+    io.emit('chat-overlay-settings', cfg);
     res.json({ success: true, settings: cfg });
   } catch(e) { res.status(500).json({ error: e.message }); }
 });
@@ -2176,12 +2025,14 @@ app.post('/api/admin/widgets/chat-overlay/test', requireAuth, async (req, res) =
 });
 
 io.on('connection', (socket) => {
-  const qStreamer = socket.handshake?.query?.streamer || socket.handshake?.auth?.streamer;
-  const referer = socket.handshake?.headers?.referer || '';
-  const refStreamer = String(referer).match(/\/s\/([^\/]+)/)?.[1];
-  const slug = tenant.normalizeSlug(qStreamer || refStreamer || tenant.DEFAULT_STREAMER_SLUG);
-  socket.join(tenant.roomName(slug));
-  console.log(`[SOCKET] Connecté ${socket.id} → ${slug}`);
+  console.log('[TTS] Overlay connecté:', socket.id);
+  socket.on('tenant-join', (slug) => {
+    try {
+      const room = tenant.roomName(slug);
+      socket.join(room);
+      socket.emit('tenant-joined', { room });
+    } catch(e) {}
+  });
 });
 
 app.get('/login', (req,res) => res.sendFile(path.join(__dirname,'public','login.html')));
