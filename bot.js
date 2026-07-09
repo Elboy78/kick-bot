@@ -1268,16 +1268,19 @@ async function moderateUser(username, kickId, action, duration, word) {
 // ─── Token actif (OAuth officiel en priorité, sinon token manuel legacy) ──────
 
 async function getActiveToken() {
-  // V2 multi-streamer : le chat doit toujours être envoyé par le compte BOT,
-  // jamais par le compte streamer connecté au panel.
+  // V2 multi-streamer : le chat doit TOUJOURS être envoyé par le compte BOT.
+  // Interdiction d'utiliser kickOAuth.getValidAccessToken() ici : ce token appartient
+  // au streamer connecté au panel et ferait parler le bot avec son compte.
   if (process.env.KICK_BOT_ACCESS_TOKEN) {
-    return { token: process.env.KICK_BOT_ACCESS_TOKEN, official: true };
+    return { token: process.env.KICK_BOT_ACCESS_TOKEN, official: true, source: 'env_bot' };
   }
   if (kickOAuth.isConfigured() && typeof kickOAuth.getBotAccessToken === 'function') {
     const botToken = await kickOAuth.getBotAccessToken();
-    if (botToken) return { token: botToken, official: true };
+    if (botToken) return { token: botToken, official: true, source: 'oauth_bot' };
   }
-  return { token: CONFIG.token, official: false };
+  if (CONFIG.token) return { token: CONFIG.token, official: false, source: 'legacy_bot' };
+  console.warn('[AUTH BOT] Aucun token BOT disponible. Connecte BOT7UP via /auth/bot/login. Le token streamer ne sera pas utilisé.');
+  return { token: '', official: false, source: 'none' };
 }
 
 // ─── Envoi messages ───────────────────────────────────────────────────────────

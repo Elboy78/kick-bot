@@ -174,9 +174,10 @@ async function isConnected(streamerId = null) {
 }
 
 async function getBotAccessToken() {
+  // IMPORTANT V2 : le token bot est strictement séparé du token streamer.
+  // On ne retombe JAMAIS sur le provider global "kick", car il peut contenir
+  // le token du streamer connecté au panel. Sinon le bot parle avec le mauvais compte.
   let stored = await db.getOAuthToken(BOT_PROVIDER);
-  // Compatibilité : si tu as encore l'ancien token manuel/OAuth global configuré, on le garde en fallback.
-  if (!stored) stored = await db.getOAuthToken(PROVIDER);
   if (!stored) return null;
   if (Date.now() < stored.expires_at - 60000) return stored.access_token;
   try {
