@@ -45,6 +45,7 @@ let followerCheckInterval = null;
 const botChannels = new Map(); // slug -> { streamer, slug, chatroomId, channelId, broadcasterUserId }
 const chatroomToSlug = new Map();
 const channelToSlug = new Map();
+const subscribedPusherChannels = new Set();
 let botChannelsSyncing = false;
 let botChannelsInterval = null;
 
@@ -93,7 +94,7 @@ async function init() {
   setInterval(checkLiveStatus, 120000);
   // Resynchroniser montant/intervalle de points toutes les 2 minutes (changements panel)
   setInterval(syncPointsConfig, 120000);
-  botChannelsInterval = setInterval(syncBotChannels, 60000);
+  botChannelsInterval = setInterval(syncBotChannels, 15000);
   console.log('[BOT] Base de données prête ✓');
 
   const oauthConfigured = kickOAuth.isConfigured();
@@ -126,6 +127,7 @@ function connect() {
 
   ws.on('open', () => {
     console.log('[BOT] Connecté ✓');
+    subscribedPusherChannels.clear();
     reconnectDelay = 5000;
     subscribeKnownBotChannels();
     // Sécurité legacy : si aucun streamer n'est encore en base, on écoute la chaîne env.
@@ -155,6 +157,9 @@ function connect() {
 }
 
 function subscribe(channel) {
+  if (!channel || !ws || ws.readyState !== WebSocket.OPEN) return;
+  if (subscribedPusherChannels.has(channel)) return;
+  subscribedPusherChannels.add(channel);
   ws.send(JSON.stringify({ event: 'pusher:subscribe', data: { auth: '', channel } }));
   console.log(`[BOT] Abonné: ${channel}`);
 }
@@ -221,17 +226,60 @@ async function fetchKickChannelForSlug(slug) {
   return null;
 }
 
+
+async function collectBotStreamersToListen() {
+  const bySlug = new Map();
+  const add = (obj = {}) => {
+    const slug = normalizeSlug(obj.slug || obj.kick_username || obj.kickUsername || obj.display_name || obj.displayName || obj.username || obj.name);
+    if (!slug) return;
+    bySlug.set(slug, {
+      id: obj.id || obj.streamer_id || obj.streamerId || null,
+      slug,
+      kick_username: obj.kick_username || obj.kickUsername || obj.username || slug,
+      display_name: obj.display_name || obj.displayName || obj.username || slug,
+      status: obj.status || 'active'
+    });
+  };
+
+  // 1) Nouveaux comptes streamers V2 créés via OAuth Kick.
+  try {
+    if (typeof db.listStreamers === 'function') {
+      const rows = await db.listStreamers();
+      for (const r of Array.isArray(rows) ? rows : []) add(r);
+    }
+  } catch(e) {
+    console.warn('[BOT V2] listStreamers impossible:', e.message);
+  }
+
+  // 2) Ancien système d'accès panel : si un pseudo était approuvé avant la V2,
+  // on l'écoute aussi. Ça évite le cas où Elboy78 est approuvé mais pas encore
+  // présent correctement dans la table streamers.
+  try {
+    if (typeof db.getAllAccessRequests === 'function') {
+      const rows = await db.getAllAccessRequests();
+      for (const r of Array.isArray(rows) ? rows : []) {
+        if (String(r.status || '').toLowerCase() === 'approved') add({ username: r.username, status: 'active' });
+      }
+    }
+  } catch(e) {}
+
+  // 3) Channels forcées depuis Render si besoin : BOT_CHANNELS=elboy78,fack7up
+  const envList = [process.env.BOT_CHANNELS, process.env.KICK_BOT_CHANNELS, process.env.KICK_CHANNELS]
+    .filter(Boolean).join(',');
+  for (const item of envList.split(/[\n,; ]+/).map(v => v.trim()).filter(Boolean)) add({ slug: item });
+
+  // 4) Fallback legacy : jamais perdre la chaîne historique.
+  if (CONFIG.channel && CONFIG.channel !== 'votre_chaine') add({ slug: CONFIG.channel });
+
+  return [...bySlug.values()];
+}
+
 async function syncBotChannels() {
   if (botChannelsSyncing) return;
   botChannelsSyncing = true;
   try {
-    let streamers = [];
-    if (typeof db.listStreamers === 'function') {
-      streamers = await db.listStreamers();
-    }
-    if (!Array.isArray(streamers) || !streamers.length) {
-      streamers = [{ id: null, slug: CONFIG.channel, kick_username: CONFIG.channel, display_name: CONFIG.channel }];
-    }
+    const streamers = await collectBotStreamersToListen();
+    console.log(`[BOT V2] Sync channels: ${streamers.map(s => s.slug).join(', ') || 'aucune'}`);
 
     for (const streamer of streamers) {
       const slug = normalizeSlug(streamer.slug || streamer.kick_username || streamer.display_name);
