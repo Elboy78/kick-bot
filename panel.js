@@ -1128,9 +1128,17 @@ app.post('/api/admin/widgets/songrequest/seek', requireAuth, async (req, res) =>
 });
 app.post('/api/admin/widgets/songrequest/volume', requireAuth, async (req, res) => {
   try {
-    const volume = Math.max(0, Math.min(100, parseInt(req.body.volume ?? 100) || 100));
-    const next = await saveSongRequestPlayerState({ volume });
+    // Volume ultra réactif : on envoie l'ordre OBS avant l'écriture Turso.
+    // Et on garde bien 0 comme valeur valide (ancien code : 0 redevenait 100).
+    const raw = Number(req.body.volume ?? 100);
+    const volume = Math.max(0, Math.min(100, Number.isFinite(raw) ? Math.round(raw) : 100));
+    const state = await getSongRequestPlayerState();
+    const next = { ...state, volume, updatedAt: new Date().toISOString() };
+    io.emit('songrequest-player-state', next);
     await issueSongRequestControl('volume', { volume });
+    db.setSettingStr('songrequest_player_state', JSON.stringify(next)).catch(e => {
+      console.warn('[SONGREQUEST] Sauvegarde volume impossible:', e.message);
+    });
     res.json({ success:true, player: next });
   } catch(e) { res.status(500).json({ error:e.message }); }
 });
