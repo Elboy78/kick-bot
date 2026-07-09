@@ -1055,36 +1055,23 @@ Option 3" rows="4"></textarea><div style="display:flex;gap:6px;margin-top:10px">
         <div style="min-width:0;flex:1">
           <div id="sr-now-title" style="font-size:14px;font-weight:950;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Aucune musique en cours</div>
           <div id="sr-now-meta" style="font-size:10px;color:var(--muted);margin-top:4px">00:00 / 00:00</div>
-          <input id="sr-seek" type="range" min="0" max="0" value="0" step="1" style="width:100%;margin-top:8px" oninput="previewSongRequestSeek(this.value)" onchange="seekSongRequest(this.value)">
+          <input id="sr-seek" type="range" min="0" max="0" value="0" step="1" disabled style="width:100%;margin-top:8px;opacity:.75;cursor:not-allowed">
         </div>
       </div>
       <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap;align-items:center">
-        <button class="dark-btn" onclick="playSongRequest()">▶ Reprendre</button>
-        <button class="dark-btn" onclick="pauseSongRequest()">⏸ Pause</button>
         <button class="dark-btn" onclick="nextSongRequest()">⏭ Suivant</button>
         <label class="lbl" style="margin:0 0 0 8px">Volume</label>
         <input id="sr-volume" type="range" min="0" max="100" value="100" step="1" style="width:140px" onchange="setSongRequestVolume(this.value)">
         <span id="sr-status" style="font-size:10px;color:var(--muted);font-weight:800">STOP</span>
       </div>
-      <div style="font-size:10px;color:var(--muted);line-height:1.6;margin-top:8px">Le temps affiché vient de l’overlay OBS. La source navigateur doit être ouverte dans OBS pour que le lecteur soit actif.</div>
+      <div style="font-size:10px;color:var(--muted);line-height:1.6;margin-top:8px">Lecture pilotée par l’overlay OBS. Le panel affiche seulement l’état réel pour éviter les conflits play/pause.</div>
       <div style="margin-top:14px;padding:12px;background:var(--card2);border:1px solid var(--brd);border-radius:10px">
-        <h4 style="margin:0 0 10px;color:var(--text);font-size:12px">⌨️ Macros / raccourcis Song Request</h4>
-        <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-bottom:10px">
-          <div>
-            <label class="lbl">Touche Play / Pause</label>
-            <button type="button" class="dark-btn" id="sr-hotkey-toggle" onclick="recordSongRequestHotkey('toggle')" style="width:100%;justify-content:center">Choisir une touche</button>
-          </div>
-          <div>
-            <label class="lbl">Touche Suivant</label>
-            <button type="button" class="dark-btn" id="sr-hotkey-next" onclick="recordSongRequestHotkey('next')" style="width:100%;justify-content:center">Choisir une touche</button>
-          </div>
-        </div>
-        <label class="row" style="margin:0 0 10px"><input type="checkbox" id="sr-hotkeys-enabled" onchange="saveSongRequestHotkeys()"> Activer les raccourcis clavier quand cette page est ouverte</label>
+        <h4 style="margin:0 0 10px;color:var(--text);font-size:12px">⌨️ Macros externes</h4>
         <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;font-size:9px;color:var(--muted);line-height:1.6">
-          <div><b style="color:var(--text)">URL macro Play/Pause</b><code id="sr-macro-toggle-url" style="display:block;margin-top:4px;background:var(--card);padding:5px;border-radius:6px;color:#93c5fd;word-break:break-all"></code></div>
-          <div><b style="color:var(--text)">URL macro Suivant</b><code id="sr-macro-next-url" style="display:block;margin-top:4px;background:var(--card);padding:5px;border-radius:6px;color:#93c5fd;word-break:break-all"></code></div>
+          <div><b style="color:var(--text)">URL Play/Pause Companion</b><code id="sr-macro-toggle-url" style="display:block;margin-top:4px;background:var(--card);padding:5px;border-radius:6px;color:#93c5fd;word-break:break-all"></code></div>
+          <div><b style="color:var(--text)">URL Suivant Companion</b><code id="sr-macro-next-url" style="display:block;margin-top:4px;background:var(--card);padding:5px;border-radius:6px;color:#93c5fd;word-break:break-all"></code></div>
         </div>
-        <div style="font-size:9px;color:var(--muted);margin-top:8px;line-height:1.6">Pour une vraie macro sans ouvrir le panel, configure ton Stream Deck / clavier macro pour ouvrir l’URL ci-dessus.</div>
+        <div style="font-size:9px;color:var(--muted);margin-top:8px;line-height:1.6">Les raccourcis clavier du panel ont été retirés. Pour jouer en jeu, utilise Kick Bot Companion avec ces URLs.</div>
       </div>
     </div>
     <div class="panel" style="margin-top:14px">
@@ -4521,7 +4508,6 @@ async function loadSongRequest(silent = false) {
     if (vol && d.player?.volume !== undefined) vol.value = d.player.volume;
     setObsUrl('songrequest-obs-url', '/widgets/songrequest.html');
     setupSongRequestMacroUrls();
-    loadSongRequestHotkeys();
     srLastQueue = Array.isArray(d.queue) ? d.queue : [];
     srPlayer = Object.assign(srPlayer, d.player || {});
     if (!srLastQueue.length) srPlayer = Object.assign(srPlayer, { status:'stopped', currentTime:0, duration:0, itemId:'' });
@@ -4650,7 +4636,7 @@ async function clearSongRequests() {
 
 
 function setupSongRequestMacroUrls() {
-  const base = window.location.origin + '/api/widgets/songrequest/macro/';
+  const base = window.location.origin + '/api/songrequest/macro/';
   const toggle = document.getElementById('sr-macro-toggle-url');
   const next = document.getElementById('sr-macro-next-url');
   if (toggle) toggle.textContent = base + 'toggle';
@@ -4697,7 +4683,6 @@ function recordSongRequestHotkey(action) {
     h.enabled = document.getElementById('sr-hotkeys-enabled')?.checked !== false;
     h[action] = { key: ev.key, code: ev.code, ctrl: ev.ctrlKey, alt: ev.altKey, shift: ev.shiftKey, meta: ev.metaKey };
     saveSongRequestHotkeyState(h);
-    loadSongRequestHotkeys();
     toast('Touche macro enregistrée ✓');
   };
   window.addEventListener('keydown', handler, { once:true, capture:true });
@@ -4710,14 +4695,8 @@ async function triggerSongRequestMacro(action) {
   await fetch(API + '/api/widgets/songrequest/macro/' + action, { method:'POST' });
   loadSongRequest(true);
 }
-window.addEventListener('keydown', (ev) => {
-  const tag = String(ev.target?.tagName || '').toLowerCase();
-  if (['input','textarea','select'].includes(tag)) return;
-  const h = getSongRequestHotkeys();
-  if (h.enabled === false) return;
-  if (matchSongRequestHotkey(ev, h.toggle)) { ev.preventDefault(); triggerSongRequestMacro('toggle'); }
-  if (matchSongRequestHotkey(ev, h.next)) { ev.preventDefault(); triggerSongRequestMacro('next'); }
-});
+// Raccourcis clavier internes retirés : une page web ne peut pas capter une touche globale en jeu.
+// Utilise Kick Bot Companion / Stream Deck via les URLs macro affichées dans le widget.
 
 async function copyObsUrl(id) {
   const el = document.getElementById(id);
