@@ -964,6 +964,9 @@ async function getSongRequestState() {
   } else if (!player.itemId) {
     player.itemId = currentItem.id;
   }
+  if (currentItem && ['playing','paused','stopped'].includes(songRequestDesiredStatusMemory || '')) {
+    player.status = songRequestDesiredStatusMemory;
+  }
   return {
     enabled: await db.getSetting('songrequest_enabled'),
     command: await db.getSettingStr('songrequest_command', '!sr'),
@@ -1067,6 +1070,7 @@ app.post('/api/widgets/songrequest/next', async (req, res) => {
     const state = await getSongRequestState();
     state.queue.shift();
     await saveSongRequestQueue(state.queue);
+    songRequestDesiredStatusMemory = state.queue[0] ? 'playing' : 'stopped';
     await saveSongRequestPlayerState({ itemId: state.queue[0]?.id || '', status: state.queue[0] ? 'playing' : 'stopped', currentTime: 0, duration: state.queue[0]?.duration || 0 });
     await issueSongRequestControl('next');
     res.json({ success:true, ...(await getSongRequestState()) });
@@ -1078,6 +1082,7 @@ app.post('/api/admin/widgets/songrequest/next', requireAuth, async (req, res) =>
     const state = await getSongRequestState();
     state.queue.shift();
     await saveSongRequestQueue(state.queue);
+    songRequestDesiredStatusMemory = state.queue[0] ? 'playing' : 'stopped';
     await saveSongRequestPlayerState({ itemId: state.queue[0]?.id || '', status: state.queue[0] ? 'playing' : 'stopped', currentTime: 0, duration: state.queue[0]?.duration || 0 });
     await issueSongRequestControl('next');
     res.json({ success:true, ...(await getSongRequestState()) });
@@ -1087,6 +1092,7 @@ app.post('/api/admin/widgets/songrequest/next', requireAuth, async (req, res) =>
 app.post('/api/admin/widgets/songrequest/clear', requireAuth, async (req, res) => {
   try {
     await saveSongRequestQueue([]);
+    songRequestDesiredStatusMemory = 'stopped';
     await saveSongRequestPlayerState({ itemId:'', status:'stopped', currentTime:0, duration:0 });
     await issueSongRequestControl('stop');
     res.json({ success:true, ...(await getSongRequestState()) });
@@ -1098,6 +1104,7 @@ app.post('/api/admin/widgets/songrequest/play', requireAuth, async (req, res) =>
   try {
     const state = await getSongRequestState();
     const cur = state.queue[0];
+    songRequestDesiredStatusMemory = cur ? 'playing' : 'stopped';
     const next = await saveSongRequestPlayerState({ itemId: cur?.id || '', status: cur ? 'playing' : 'stopped' });
     await issueSongRequestControl('play');
     res.json({ success:true, player: next });
@@ -1105,6 +1112,7 @@ app.post('/api/admin/widgets/songrequest/play', requireAuth, async (req, res) =>
 });
 app.post('/api/admin/widgets/songrequest/pause', requireAuth, async (req, res) => {
   try {
+    songRequestDesiredStatusMemory = 'paused';
     const next = await saveSongRequestPlayerState({ status:'paused' });
     await issueSongRequestControl('pause');
     res.json({ success:true, player: next });
@@ -1141,12 +1149,13 @@ app.post('/api/widgets/songrequest/player-state', async (req, res) => {
       return res.json({ success:true, ignored:true, player: state.player });
     }
     const patch = { itemId: currentItem.id };
-    if (typeof req.body.status === 'string' && ['playing','paused','stopped','buffering'].includes(req.body.status)) {
-      patch.status = req.body.status;
-      // On garde un état mémoire pour que /macro/toggle réponde instantanément.
-      if (patch.status === 'playing' || patch.status === 'paused' || patch.status === 'stopped') {
-        songRequestDesiredStatusMemory = patch.status;
-      }
+    // IMPORTANT QUALITÉ : l'overlay OBS ne décide plus de l'état lecture/pause.
+    // Il remonte seulement le temps et la durée. Sinon YouTube peut envoyer PLAYING/PAUSED
+    // pendant un buffering, un refresh OBS ou une mise à jour de file, et le panel se met
+    // à jouer/pauser tout seul. Seules les commandes panel/macros modifient le statut.
+    if (typeof req.body.status === 'string' && req.body.status === 'ended') {
+      patch.status = 'stopped';
+      songRequestDesiredStatusMemory = 'stopped';
     }
     if (req.body.currentTime !== undefined) patch.currentTime = Math.max(0, parseFloat(req.body.currentTime) || 0);
     if (req.body.duration !== undefined) patch.duration = Math.max(0, parseFloat(req.body.duration) || 0);
