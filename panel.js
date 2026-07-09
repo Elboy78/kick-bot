@@ -59,12 +59,14 @@ app.get('/s/:streamer/widgets/:file', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'widgets', file));
 });
 app.get('/s/:streamer/classement', (req, res) => res.sendFile(path.join(__dirname, 'public', 'classement.html')));
-app.get('/s/:streamer/dashboard', (req, res) => res.sendFile(path.join(__dirname, 'public', 'dashboard.html')));
-app.get('/s/:streamer/dashboard.html', (req, res) => res.sendFile(path.join(__dirname, 'public', 'dashboard.html')));
+app.get('/s/:streamer/dashboard', (req, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));
+app.get('/s/:streamer/dashboard.html', (req, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));
 app.get('/s/:streamer/overlays', (req, res) => res.sendFile(path.join(__dirname, 'public', 'overlays.html')));
 app.get('/s/:streamer/overlays.html', (req, res) => res.sendFile(path.join(__dirname, 'public', 'overlays.html')));
 app.get('/s/:streamer/account', (req, res) => res.sendFile(path.join(__dirname, 'public', 'account.html')));
 app.get('/s/:streamer/account.html', (req, res) => res.sendFile(path.join(__dirname, 'public', 'account.html')));
+app.get('/s/:streamer/panel', (req, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));
+app.get('/s/:streamer/panel.html', (req, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));
 
 // ── API lecture ───────────────────────────────────────────────────────────────
 
