@@ -442,8 +442,46 @@ async function ensureLevelsSeeded() {
 
 async function getLevels() {
   await ensureLevelsSeeded();
-  const rows = await all(`SELECT * FROM level_config ORDER BY min_points ASC`);
-  return rows.map(r => ({ id: r.id, name: r.name, min: r.min_points, emoji: r.emoji }));
+  const rows = await all(`SELECT * FROM level_config ORDER BY min_points ASC, sort_order ASC`);
+  return rows.map(r => ({ id: r.id, name: r.name, min: parseInt(r.min_points) || 0, emoji: r.emoji }));
+}
+
+function normalizePointsValue(points) {
+  const n = parseInt(points || 0, 10);
+  return Number.isFinite(n) ? n : 0;
+}
+
+async function getRankingEngine() {
+  const levels = await getLevels();
+  const sortedAsc = [...levels].sort((a, b) => (a.min - b.min) || String(a.name).localeCompare(String(b.name)));
+  function calculate(points) {
+    const value = normalizePointsValue(points);
+    let current = sortedAsc[0] || { name: 'Bronze', min: 0, emoji: '🥉' };
+    let next = null;
+    for (const level of sortedAsc) {
+      if (value >= normalizePointsValue(level.min)) current = level;
+      else { next = level; break; }
+    }
+    const currentMin = normalizePointsValue(current.min);
+    const nextMin = next ? normalizePointsValue(next.min) : currentMin;
+    const span = Math.max(1, nextMin - currentMin);
+    const progress = next ? Math.max(0, Math.min(100, Math.round(((value - currentMin) / span) * 100))) : 100;
+    return { ...current, nextLevel: next, progress };
+  }
+  function apply(viewer) {
+    if (!viewer) return viewer;
+    const calculated = calculate(viewer.points);
+    return {
+      ...viewer,
+      level: calculated.name,
+      level_emoji: calculated.emoji,
+      level_min: calculated.min,
+      next_level: calculated.nextLevel?.name || null,
+      next_level_min: calculated.nextLevel?.min ?? null,
+      level_progress: calculated.progress
+    };
+  }
+  return { levels: sortedAsc, calculate, apply };
 }
 
 async function addLevel(name, min, emoji) {
@@ -461,16 +499,13 @@ async function deleteLevel(id) {
 }
 
 async function getLevel(points) {
-  const levels = await getLevels();
-  let level = levels[0] || DEFAULT_LEVELS[0];
-  for (const l of levels) { if (points >= l.min) level = l; }
-  return level;
+  const engine = await getRankingEngine();
+  return engine.calculate(points);
 }
 
 async function getNextLevel(points) {
-  const levels = await getLevels();
-  for (const l of levels) { if (points < l.min) return l; }
-  return null;
+  const engine = await getRankingEngine();
+  return engine.calculate(points).nextLevel || null;
 }
 
 // ─── Viewers ──────────────────────────────────────────────────────────────────
@@ -511,7 +546,9 @@ async function addPoints(username, points, reason = 'watch_time', minutesWatched
 }
 
 async function getViewer(username) {
-  return get(`SELECT * FROM viewers WHERE username = ? AND COALESCE(streamer_id, 1) = ?`, [String(username || '').toLowerCase(), scopedStreamerId()]);
+  const viewer = await get(`SELECT * FROM viewers WHERE username = ? AND COALESCE(streamer_id, 1) = ?`, [String(username || '').toLowerCase(), scopedStreamerId()]);
+  const engine = await getRankingEngine();
+  return engine.apply(viewer);
 }
 
 async function getLeaderboard(limit = 10) {
@@ -522,7 +559,8 @@ async function getLeaderboard(limit = 10) {
     ORDER BY points DESC, last_seen DESC
     LIMIT ?
   `, [scopedStreamerId(), limit]);
-  return rows.map((v, i) => ({ ...v, rank: i + 1 }));
+  const engine = await getRankingEngine();
+  return rows.map((v, i) => ({ ...engine.apply(v), rank: i + 1 }));
 }
 
 async function getViewerRank(username) {
@@ -821,11 +859,12 @@ async function getFidelityLeaderboard(limit = 50) {
   const rows = await all(`
     SELECT username, total_minutes, sessions, points, level, first_seen, last_seen
     FROM viewers
-    WHERE total_minutes > 0
+    WHERE COALESCE(streamer_id, 1) = ? AND total_minutes > 0
     ORDER BY total_minutes DESC, sessions DESC
     LIMIT ?
-  `, [limit]);
-  return rows.map((v, i) => ({ ...v, rank: i + 1 }));
+  `, [scopedStreamerId(), limit]);
+  const engine = await getRankingEngine();
+  return rows.map((v, i) => ({ ...engine.apply(v), rank: i + 1 }));
 }
 
 // Heatmap : activité par heure et jour de la semaine (7 derniers jours)
@@ -1565,7 +1604,7 @@ module.exports = {
   getDB,
   upsertViewer, addPoints, getViewer, getLeaderboard, getViewerRank,
   getGlobalStats, getRecentLogs, getActiveViewers, clearAllPoints,
-  getLevel, getNextLevel, getLevels, addLevel, updateLevel, deleteLevel,
+  getLevel, getNextLevel, getLevels, getRankingEngine, addLevel, updateLevel, deleteLevel,
   getCustomCommands, getCustomCommand, setCustomCommand, deleteCustomCommand, toggleCustomCommand,
   getObjectives, createObjective, deleteObjective, achieveObjective,
   startSession, endSession, getStreamHistory, recordViewerSample, getSessionsWithAvgViewers,
