@@ -107,7 +107,7 @@ app.get('/api/v2/obs-links', waitDB, async (req, res) => {
 // V2 multi-streamer : attache le tenant et force les settings par streamer.
 // Ainsi, le même panel complet affiche les données du compte Kick connecté,
 // pas celles du streamer par défaut.
-function setStreamerCookie(req, res, next) {
+function setStreamerCookieMiddleware(req, res, next) {
   const slug = tenant.normalizeSlug(req.params?.streamer || req.query?.streamer || '');
   if (slug) {
     res.cookie('kb_streamer', slug, { path: '/', sameSite: 'Lax', maxAge: 1000 * 60 * 60 * 24 * 365 });
@@ -148,19 +148,19 @@ app.use((req, res, next) => tenant.attachTenant(db, req, res, next));
 app.use((req, res, next) => { req.tenantManager = createTenantManager({ db, io, req, streamer: req.streamer }); next(); });
 
 // Routes tenant qui posent le cookie streamer avant de servir le panel/overlays.
-app.get('/s/:streamer/widgets/:file', setStreamerCookie, (req, res) => {
+app.get('/s/:streamer/widgets/:file', setStreamerCookieMiddleware, (req, res) => {
   const file = String(req.params.file || '').replace(/[^a-z0-9_.-]/gi, '');
   res.sendFile(path.join(__dirname, 'public', 'widgets', file));
 });
-app.get('/s/:streamer/classement', setStreamerCookie, (req, res) => res.sendFile(path.join(__dirname, 'public', 'classement.html')));
-app.get('/s/:streamer/dashboard', setStreamerCookie, (req, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));
-app.get('/s/:streamer/dashboard.html', setStreamerCookie, (req, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));
-app.get('/s/:streamer/panel', setStreamerCookie, (req, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));
-app.get('/s/:streamer/panel.html', setStreamerCookie, (req, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));
-app.get('/s/:streamer/overlays', setStreamerCookie, (req, res) => res.sendFile(path.join(__dirname, 'public', 'overlays.html')));
-app.get('/s/:streamer/overlays.html', setStreamerCookie, (req, res) => res.sendFile(path.join(__dirname, 'public', 'overlays.html')));
-app.get('/s/:streamer/account', setStreamerCookie, (req, res) => res.sendFile(path.join(__dirname, 'public', 'account.html')));
-app.get('/s/:streamer/account.html', setStreamerCookie, (req, res) => res.sendFile(path.join(__dirname, 'public', 'account.html')));
+app.get('/s/:streamer/classement', setStreamerCookieMiddleware, (req, res) => res.sendFile(path.join(__dirname, 'public', 'classement.html')));
+app.get('/s/:streamer/dashboard', setStreamerCookieMiddleware, (req, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));
+app.get('/s/:streamer/dashboard.html', setStreamerCookieMiddleware, (req, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));
+app.get('/s/:streamer/panel', setStreamerCookieMiddleware, (req, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));
+app.get('/s/:streamer/panel.html', setStreamerCookieMiddleware, (req, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));
+app.get('/s/:streamer/overlays', setStreamerCookieMiddleware, (req, res) => res.sendFile(path.join(__dirname, 'public', 'overlays.html')));
+app.get('/s/:streamer/overlays.html', setStreamerCookieMiddleware, (req, res) => res.sendFile(path.join(__dirname, 'public', 'overlays.html')));
+app.get('/s/:streamer/account', setStreamerCookieMiddleware, (req, res) => res.sendFile(path.join(__dirname, 'public', 'account.html')));
+app.get('/s/:streamer/account.html', setStreamerCookieMiddleware, (req, res) => res.sendFile(path.join(__dirname, 'public', 'account.html')));
 
 
 app.get('/api/v2/tenant/debug', async (req, res) => {
@@ -1807,7 +1807,7 @@ app.get('/classement', (req,res) => res.sendFile(path.join(__dirname,'public','c
 
 
 
-function setStreamerCookie(res, slug) {
+function setStreamerSessionCookie(res, slug) {
   const clean = tenant.normalizeSlug(slug);
   const secure = process.env.NODE_ENV === 'production' || process.env.RENDER || process.env.RENDER_EXTERNAL_URL;
   res.setHeader('Set-Cookie', [
@@ -1862,7 +1862,7 @@ app.get('/auth/callback', async (req, res) => {
       await db.saveOAuthToken('kick', token.accessToken, token.refreshToken, token.expiresAt);
     }
 
-    setStreamerCookie(res, slug);
+    setStreamerSessionCookie(res, slug);
     console.log(`[OAUTH CALLBACK V2] ✅ Streamer connecté: ${slug} (#${streamer.id})`);
     res.redirect(`/s/${slug}/dashboard`);
   } catch (e) {
