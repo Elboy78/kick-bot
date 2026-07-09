@@ -19,12 +19,15 @@ const io     = new Server(server, { cors: { origin: '*' } });
 app.use(cors());
 app.use(express.json({ limit: '8mb' }));
 app.use(express.static(path.join(__dirname, 'public'), { index: false }));
+app.use((req, res, next) => tenant.attachTenant(db, req, res, next));
 
 function requireAuth(req, res, next) { next(); }
 
 // Init DB avant de démarrer
 let dbReady = false;
 db.ensureInit().then(async () => {
+  const defaultStreamer = await db.ensureDefaultStreamer(tenant.getDefaultStreamerSeed());
+  console.log(`[V2] Streamer par défaut : ${defaultStreamer.slug} (#${defaultStreamer.id})`);
   const owner = process.env.PANEL_OWNER || '';
   if (owner) {
     try {
@@ -49,31 +52,127 @@ function waitDB(req, res, next) {
   next();
 }
 
-
-// Page d'entrée V2 : vraie connexion Kick OAuth.
-// Le panel complet reste servi uniquement dans /s/:streamer/dashboard ou /s/:streamer/panel.
+// V2 : page d'entrée = login Kick. Le panel complet vit dans /s/:streamer/dashboard.
 app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'public', 'login.html')));
 app.get('/login', (req, res) => res.sendFile(path.join(__dirname, 'public', 'login.html')));
 app.get('/login.html', (req, res) => res.sendFile(path.join(__dirname, 'public', 'login.html')));
 
-// V2 multi-streamer : attache un tenant à chaque requête API/widget.
-// Les URLs /s/:streamer/... et ?streamer=... isolent les données par streamer.
-app.use((req, res, next) => tenant.attachTenant(db, req, res, next));
 
-// Widgets OBS isolés par streamer : /s/elboy78/widgets/songrequest.html
-app.get('/s/:streamer/widgets/:file', (req, res) => {
+// ── V2 Multi-streamer : socle sans casser la V1 ──────────────────────────────
+app.get('/api/v2/streamers/current', waitDB, async (req, res) => {
+  try {
+    const streamer = req.streamer || await db.ensureDefaultStreamer(tenant.getDefaultStreamerSeed());
+    const connected = await kickOAuth.isConnected(streamer.id).catch(() => false);
+    res.json({ data: { ...streamer, oauthConnected: connected, isDefault: streamer.slug === tenant.DEFAULT_STREAMER_SLUG } });
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+app.get('/api/v2/streamers', waitDB, async (req, res) => {
+  try { res.json({ data: await db.listStreamers() }); }
+  catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+app.post('/api/v2/admin/streamers', requireAuth, waitDB, async (req, res) => {
+  try {
+    const streamer = await db.upsertStreamer({
+      slug: req.body.slug,
+      kickUsername: req.body.kickUsername || req.body.kick_username,
+      displayName: req.body.displayName || req.body.display_name,
+      avatarUrl: req.body.avatarUrl || req.body.avatar_url,
+      role: req.body.role || 'streamer',
+      status: req.body.status || 'active'
+    });
+    res.json({ success: true, data: streamer });
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+app.get('/api/v2/obs-links', waitDB, async (req, res) => {
+  try {
+    const protocol = req.headers['x-forwarded-proto'] || req.protocol || 'https';
+    const host = req.get('host');
+    const base = `${protocol}://${host}`;
+    const slug = req.streamer?.slug || tenant.DEFAULT_STREAMER_SLUG;
+    res.json({ data: {
+      streamer: slug,
+      classement: `${base}/s/${slug}/classement`,
+      alerts: `${base}/s/${slug}/widgets/alerts.html`,
+      chat: `${base}/s/${slug}/widgets/chat.html`,
+      songrequest: `${base}/s/${slug}/widgets/songrequest.html`,
+      subgoal: `${base}/s/${slug}/widgets/subgoal.html`
+    }});
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+
+// V2 multi-streamer : attache le tenant et force les settings par streamer.
+// Ainsi, le même panel complet affiche les données du compte Kick connecté,
+// pas celles du streamer par défaut.
+function setStreamerCookie(req, res, next) {
+  const slug = tenant.normalizeSlug(req.params?.streamer || req.query?.streamer || '');
+  if (slug) {
+    res.cookie('kb_streamer', slug, { path: '/', sameSite: 'Lax', maxAge: 1000 * 60 * 60 * 24 * 365 });
+  }
+  next();
+}
+
+function installTenantScopedSettings() {
+  if (db.__tenantScopedSettingsInstalled) return;
+  db.__tenantScopedSettingsInstalled = true;
+  const raw = {
+    getSettingStr: db.getSettingStr.bind(db),
+    setSettingStr: db.setSettingStr.bind(db),
+    getSetting: db.getSetting.bind(db),
+    setSetting: db.setSetting.bind(db)
+  };
+  const globalKeys = new Set([
+    // Auth / accès panel restent globaux.
+    'panel_password', 'panel_owner'
+  ]);
+  function scopedKey(key) {
+    const k = String(key || '');
+    if (!k || k.startsWith('streamer:') || globalKeys.has(k)) return k;
+    const slug = tenant.getCurrentStreamerSlug();
+    // Hors requête tenant, on garde le comportement V1 pour bot.js et les jobs internes.
+    if (!slug) return k;
+    return tenant.scopedKey(slug, k);
+  }
+  db.getSettingStr = async (key, defaultVal = '') => raw.getSettingStr(scopedKey(key), defaultVal);
+  db.setSettingStr = async (key, value) => raw.setSettingStr(scopedKey(key), value);
+  db.getSetting = async (key) => raw.getSetting(scopedKey(key));
+  db.setSetting = async (key, enabled) => raw.setSetting(scopedKey(key), enabled);
+  db.__rawSettings = raw;
+}
+installTenantScopedSettings();
+
+app.use((req, res, next) => tenant.attachTenant(db, req, res, next));
+app.use((req, res, next) => { req.tenantManager = createTenantManager({ db, io, req, streamer: req.streamer }); next(); });
+
+// Routes tenant qui posent le cookie streamer avant de servir le panel/overlays.
+app.get('/s/:streamer/widgets/:file', setStreamerCookie, (req, res) => {
   const file = String(req.params.file || '').replace(/[^a-z0-9_.-]/gi, '');
   res.sendFile(path.join(__dirname, 'public', 'widgets', file));
 });
-app.get('/s/:streamer/classement', (req, res) => res.sendFile(path.join(__dirname, 'public', 'classement.html')));
-app.get('/s/:streamer/dashboard', (req, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));
-app.get('/s/:streamer/dashboard.html', (req, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));
-app.get('/s/:streamer/overlays', (req, res) => res.sendFile(path.join(__dirname, 'public', 'overlays.html')));
-app.get('/s/:streamer/overlays.html', (req, res) => res.sendFile(path.join(__dirname, 'public', 'overlays.html')));
-app.get('/s/:streamer/account', (req, res) => res.sendFile(path.join(__dirname, 'public', 'account.html')));
-app.get('/s/:streamer/account.html', (req, res) => res.sendFile(path.join(__dirname, 'public', 'account.html')));
-app.get('/s/:streamer/panel', (req, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));
-app.get('/s/:streamer/panel.html', (req, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));
+app.get('/s/:streamer/classement', setStreamerCookie, (req, res) => res.sendFile(path.join(__dirname, 'public', 'classement.html')));
+app.get('/s/:streamer/dashboard', setStreamerCookie, (req, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));
+app.get('/s/:streamer/dashboard.html', setStreamerCookie, (req, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));
+app.get('/s/:streamer/panel', setStreamerCookie, (req, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));
+app.get('/s/:streamer/panel.html', setStreamerCookie, (req, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));
+app.get('/s/:streamer/overlays', setStreamerCookie, (req, res) => res.sendFile(path.join(__dirname, 'public', 'overlays.html')));
+app.get('/s/:streamer/overlays.html', setStreamerCookie, (req, res) => res.sendFile(path.join(__dirname, 'public', 'overlays.html')));
+app.get('/s/:streamer/account', setStreamerCookie, (req, res) => res.sendFile(path.join(__dirname, 'public', 'account.html')));
+app.get('/s/:streamer/account.html', setStreamerCookie, (req, res) => res.sendFile(path.join(__dirname, 'public', 'account.html')));
+
+
+app.get('/api/v2/tenant/debug', async (req, res) => {
+  try {
+    const tm = createTenantManager({ db, io, req });
+    res.json({ data: { ...tm.info(), overlayLinks: tm.overlayLinks(), sampleScopedKey: tm.scopedKey('songrequest_queue'), sampleSongRequestQueue: await tm.getJson('songrequest_queue', []) } });
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+app.get('/api/v2/tenant/current', async (req, res) => {
+  try { const tm = createTenantManager({ db, io, req }); res.json({ data: tm.info() }); }
+  catch(e) { res.status(500).json({ error: e.message }); }
+});
 
 // ── API lecture ───────────────────────────────────────────────────────────────
 
@@ -917,26 +1016,14 @@ async function resolveSongRequest(song) {
   if (found) return { song: found.title || raw, query: raw, ...found };
   return { song: raw, query: raw, url: '', videoId: '', title: raw, author: '', thumbnail: '', duration: 0, durationText: '' };
 }
-// Tenant courant du Song Request. Dans une requête /s/:streamer ou ?streamer=,
-// AsyncLocalStorage donne automatiquement le bon streamer.
-function getSongRequestTenant() {
-  return createTenantManager({ db, io });
-}
-function emitSongRequestTenant(tm, event, payload) {
-  // Emission dans la room du streamer, avec fallback global pour l'ancien panel V1.
-  try { tm.emit(event, payload); } catch(e) {}
-  if (!tm.streamerId) io.emit(event, payload);
-}
-
 // Etat mémoire Song Request pour rendre les macros quasi instantanées.
 // Le clic macro ne doit pas attendre Turso avant de partir vers l'overlay OBS.
 let songRequestControlSeqMemory = Date.now();
 let songRequestDesiredStatusMemory = null;
 
 async function getSongRequestPlayerState() {
-  const tm = getSongRequestTenant();
   let state = {};
-  try { state = JSON.parse(await tm.getSetting('songrequest_player_state', '{}')); } catch(e) { state = {}; }
+  try { state = JSON.parse(await db.getSettingStr('songrequest_player_state', '{}')); } catch(e) { state = {}; }
   return {
     itemId: state.itemId || '',
     status: state.status || 'stopped',
@@ -949,15 +1036,14 @@ async function getSongRequestPlayerState() {
 async function saveSongRequestPlayerState(patch = {}, emit = true) {
   const prev = await getSongRequestPlayerState();
   const next = { ...prev, ...patch, updatedAt: new Date().toISOString() };
-  await getSongRequestTenant().setSetting('songrequest_player_state', JSON.stringify(next));
-  if (emit) emitSongRequestTenant(getSongRequestTenant(), 'songrequest-player-state', next);
+  await db.setSettingStr('songrequest_player_state', JSON.stringify(next));
+  if (emit) io.emit('songrequest-player-state', next);
   return next;
 }
 
 async function getSongRequestControl() {
-  const tm = getSongRequestTenant();
   let control = {};
-  try { control = JSON.parse(await tm.getSetting('songrequest_control', '{}')); } catch(e) { control = {}; }
+  try { control = JSON.parse(await db.getSettingStr('songrequest_control', '{}')); } catch(e) { control = {}; }
   return {
     seq: Number(control.seq || songRequestControlSeqMemory || 0),
     action: control.action || '',
@@ -973,23 +1059,22 @@ function emitSongRequestControlNow(action, payload = {}) {
     ...payload,
     at: new Date().toISOString()
   };
-  emitSongRequestTenant(getSongRequestTenant(), 'songrequest-control', control);
+  io.emit('songrequest-control', control);
   return control;
 }
 async function issueSongRequestControl(action, payload = {}) {
   // IMPORTANT : émission OBS immédiate, sauvegarde après.
   // Avant, la macro attendait l'écriture DB avant d'arriver dans OBS, ce qui ajoutait une latence visible.
   const control = emitSongRequestControlNow(action, payload);
-  getSongRequestTenant().setSetting('songrequest_control', JSON.stringify(control)).catch(e => {
+  db.setSettingStr('songrequest_control', JSON.stringify(control)).catch(e => {
     console.warn('[SONGREQUEST] Sauvegarde contrôle macro impossible:', e.message);
   });
   return control;
 }
 
 async function getSongRequestState() {
-  const tm = getSongRequestTenant();
   let queue = [];
-  try { queue = JSON.parse(await tm.getSetting('songrequest_queue', '[]')); } catch(e) { queue = []; }
+  try { queue = JSON.parse(await db.getSettingStr('songrequest_queue', '[]')); } catch(e) { queue = []; }
   queue = Array.isArray(queue) ? queue : [];
   const player = await getSongRequestPlayerState();
   const currentItem = queue[0] || null;
@@ -1012,11 +1097,11 @@ async function getSongRequestState() {
     player.status = songRequestDesiredStatusMemory;
   }
   return {
-    enabled: await tm.getBool('songrequest_enabled', true),
-    command: await tm.getSetting('songrequest_command', '!sr'),
-    confirmMessage: await tm.getSetting('songrequest_confirm', '🎵 @{username}, ta musique a été ajoutée à la file !'),
-    chatConfirmEnabled: (await tm.getSetting('songrequest_chat_confirm_enabled', '0')) === '1',
-    maxQueue: parseInt(await tm.getSetting('songrequest_max_queue', '30')) || 30,
+    enabled: await db.getSetting('songrequest_enabled'),
+    command: await db.getSettingStr('songrequest_command', '!sr'),
+    confirmMessage: await db.getSettingStr('songrequest_confirm', '🎵 @{username}, ta musique a été ajoutée à la file !'),
+    chatConfirmEnabled: (await db.getSettingStr('songrequest_chat_confirm_enabled', '0')) === '1',
+    maxQueue: parseInt(await db.getSettingStr('songrequest_max_queue', '30')) || 30,
     queue,
     player,
     control: await getSongRequestControl()
@@ -1024,13 +1109,12 @@ async function getSongRequestState() {
 }
 
 async function saveSongRequestQueue(queue) {
-  const tm = getSongRequestTenant();
   const clean = Array.isArray(queue) ? queue.slice(0, 100) : [];
-  await tm.setSetting('songrequest_queue', JSON.stringify(clean));
+  await db.setSettingStr('songrequest_queue', JSON.stringify(clean));
   if (!clean.length) {
     await saveSongRequestPlayerState({ itemId:'', status:'stopped', currentTime:0, duration:0 }, false);
   }
-  emitSongRequestTenant(tm, 'songrequest-update', { queue: clean });
+  io.emit('songrequest-update', { queue: clean });
   return clean;
 }
 
@@ -1080,16 +1164,15 @@ app.get('/api/widgets/songrequest', async (req, res) => {
 
 app.post('/api/admin/widgets/songrequest/settings', requireAuth, async (req, res) => {
   try {
-    const tm = getSongRequestTenant();
-    if (typeof req.body.enabled === 'boolean') await tm.setBool('songrequest_enabled', req.body.enabled);
+    if (typeof req.body.enabled === 'boolean') await db.setSetting('songrequest_enabled', req.body.enabled);
     if (typeof req.body.command === 'string') {
       let command = req.body.command.trim().slice(0,20) || '!sr';
       if (!command.startsWith('!')) command = '!' + command;
-      await tm.setSetting('songrequest_command', command.toLowerCase());
+      await db.setSettingStr('songrequest_command', command.toLowerCase());
     }
-    if (typeof req.body.confirmMessage === 'string') await tm.setSetting('songrequest_confirm', req.body.confirmMessage.trim().slice(0,180));
-    if (typeof req.body.chatConfirmEnabled === 'boolean') await tm.setSetting('songrequest_chat_confirm_enabled', req.body.chatConfirmEnabled ? '1' : '0');
-    if (req.body.maxQueue !== undefined) await tm.setSetting('songrequest_max_queue', String(Math.min(100, Math.max(1, parseInt(req.body.maxQueue) || 30))));
+    if (typeof req.body.confirmMessage === 'string') await db.setSettingStr('songrequest_confirm', req.body.confirmMessage.trim().slice(0,180));
+    if (typeof req.body.chatConfirmEnabled === 'boolean') await db.setSettingStr('songrequest_chat_confirm_enabled', req.body.chatConfirmEnabled ? '1' : '0');
+    if (req.body.maxQueue !== undefined) await db.setSettingStr('songrequest_max_queue', String(Math.min(100, Math.max(1, parseInt(req.body.maxQueue) || 30))));
     res.json({ success:true, ...(await getSongRequestState()) });
   } catch(e) { res.status(500).json({ error:e.message }); }
 });
@@ -1174,9 +1257,17 @@ app.post('/api/admin/widgets/songrequest/seek', requireAuth, async (req, res) =>
 });
 app.post('/api/admin/widgets/songrequest/volume', requireAuth, async (req, res) => {
   try {
-    const volume = Math.max(0, Math.min(100, parseInt(req.body.volume ?? 100) || 100));
-    const next = await saveSongRequestPlayerState({ volume });
+    // Volume ultra réactif : on envoie l'ordre OBS avant l'écriture Turso.
+    // Et on garde bien 0 comme valeur valide (ancien code : 0 redevenait 100).
+    const raw = Number(req.body.volume ?? 100);
+    const volume = Math.max(0, Math.min(100, Number.isFinite(raw) ? Math.round(raw) : 100));
+    const state = await getSongRequestPlayerState();
+    const next = { ...state, volume, updatedAt: new Date().toISOString() };
+    io.emit('songrequest-player-state', next);
     await issueSongRequestControl('volume', { volume });
+    db.setSettingStr('songrequest_player_state', JSON.stringify(next)).catch(e => {
+      console.warn('[SONGREQUEST] Sauvegarde volume impossible:', e.message);
+    });
     res.json({ success:true, player: next });
   } catch(e) { res.status(500).json({ error:e.message }); }
 });
@@ -1273,20 +1364,11 @@ async function songRequestMacroHandler(req, res) {
 }
 app.get('/api/widgets/songrequest/macro/:action', songRequestMacroHandler);
 app.post('/api/widgets/songrequest/macro/:action', songRequestMacroHandler);
+// Alias public plus simple pour Kick Bot Companion :
+// https://ton-render.onrender.com/api/songrequest/macro/toggle
 app.get('/api/songrequest/macro/:action', songRequestMacroHandler);
 app.post('/api/songrequest/macro/:action', songRequestMacroHandler);
 
-
-app.get('/api/v2/tenant/debug', async (req, res) => {
-  try {
-    const tm = createTenantManager({ db, io, req });
-    res.json({ data: { ...tm.info(), overlayLinks: tm.overlayLinks(), sampleScopedKey: tm.scopedKey('songrequest_queue'), sampleSongRequestQueue: await tm.getJson('songrequest_queue', []) } });
-  } catch(e) { res.status(500).json({ error: e.message }); }
-});
-app.get('/api/v2/tenant/current', async (req, res) => {
-  try { const tm = createTenantManager({ db, io, req }); res.json({ data: tm.info() }); }
-  catch(e) { res.status(500).json({ error: e.message }); }
-});
 app.get('/api/chests', async (req, res) => {
   try { res.json(await chests.getPublicState()); } catch(e) { res.json({ season: null, chests: [] }); }
 });
@@ -1725,7 +1807,6 @@ app.get('/classement', (req,res) => res.sendFile(path.join(__dirname,'public','c
 
 
 
-
 function setStreamerCookie(res, slug) {
   const clean = tenant.normalizeSlug(slug);
   const secure = process.env.NODE_ENV === 'production' || process.env.RENDER || process.env.RENDER_EXTERNAL_URL;
@@ -2117,13 +2198,6 @@ app.post('/api/admin/widgets/chat-overlay/test', requireAuth, async (req, res) =
 
 io.on('connection', (socket) => {
   console.log('[TTS] Overlay connecté:', socket.id);
-  socket.on('tenant-join', (slug) => {
-    try {
-      const room = tenant.roomName(slug);
-      socket.join(room);
-      socket.emit('tenant-joined', { room });
-    } catch(e) {}
-  });
 });
 
 app.get('/login', (req,res) => res.sendFile(path.join(__dirname,'public','login.html')));

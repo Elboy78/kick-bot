@@ -346,6 +346,29 @@ hr.div{border:none;border-top:1px solid var(--brd);margin:12px 0}
 .cmd-modal-actions{display:flex;gap:10px;justify-content:flex-end;margin-top:16px;flex-wrap:wrap}
 
 </style>
+
+<script>
+(function(){
+  const match = location.pathname.match(/^\/s\/([^\/]+)/);
+  const slug = match ? decodeURIComponent(match[1]).toLowerCase() : '';
+  if(!slug) return;
+  window.__STREAMER_SLUG__ = slug;
+  document.cookie = 'kb_streamer=' + encodeURIComponent(slug) + ';path=/;max-age=' + (60*60*24*365) + ';SameSite=Lax';
+  const rawFetch = window.fetch.bind(window);
+  window.fetch = function(input, init){
+    try{
+      let url = (typeof input === 'string') ? input : input.url;
+      if(url && url.startsWith('/api/') && !url.includes('streamer=')){
+        url += (url.includes('?') ? '&' : '?') + 'streamer=' + encodeURIComponent(slug);
+        if(typeof input === 'string') input = url;
+        else input = new Request(url, input);
+      }
+    }catch(e){}
+    return rawFetch(input, init);
+  };
+})();
+</script>
+
 </head>
 <body>
 

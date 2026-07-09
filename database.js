@@ -63,16 +63,6 @@ async function get(sql, params = []) {
   return rows[0] || null;
 }
 
-function currentStreamerId() {
-  try {
-    return require('./tenant').getCurrentStreamerId?.() || null;
-  } catch(e) { return null; }
-}
-
-function hasTenantScope() {
-  return !!currentStreamerId();
-}
-
 // ─── Init Schema ──────────────────────────────────────────────────────────────
 
 async function initSchema() {
@@ -103,24 +93,6 @@ async function initSchema() {
       value       TEXT NOT NULL DEFAULT '',
       updated_at  TEXT NOT NULL DEFAULT (datetime('now')),
       PRIMARY KEY(streamer_id, key)
-    )`,
-    `CREATE TABLE IF NOT EXISTS streamer_custom_commands (
-      id           INTEGER PRIMARY KEY AUTOINCREMENT,
-      streamer_id  INTEGER NOT NULL,
-      trigger      TEXT NOT NULL,
-      response     TEXT NOT NULL,
-      mention_user INTEGER NOT NULL DEFAULT 0,
-      enabled      INTEGER NOT NULL DEFAULT 1,
-      created_at   TEXT NOT NULL DEFAULT (datetime('now')),
-      updated_at   TEXT NOT NULL DEFAULT (datetime('now')),
-      UNIQUE(streamer_id, trigger)
-    )`,
-    `CREATE TABLE IF NOT EXISTS streamer_system_commands_state (
-      streamer_id INTEGER NOT NULL,
-      trigger     TEXT NOT NULL,
-      enabled     INTEGER NOT NULL DEFAULT 1,
-      updated_at  TEXT NOT NULL DEFAULT (datetime('now')),
-      PRIMARY KEY(streamer_id, trigger)
     )`,
     `CREATE TABLE IF NOT EXISTS viewers (
       id            INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -557,46 +529,26 @@ async function clearAllPoints() {
 
 
 async function getCustomCommands() {
-  const sid = currentStreamerId();
-  if (sid) return all(`SELECT * FROM streamer_custom_commands WHERE streamer_id = ? ORDER BY trigger ASC`, [sid]);
   return all(`SELECT * FROM custom_commands ORDER BY trigger ASC`);
 }
 
 async function getCustomCommand(trigger) {
-  const sid = currentStreamerId();
-  const t = trigger.toLowerCase();
-  if (sid) return get(`SELECT * FROM streamer_custom_commands WHERE streamer_id = ? AND trigger = ? AND enabled = 1`, [sid, t]);
-  return get(`SELECT * FROM custom_commands WHERE trigger = ? AND enabled = 1`, [t]);
+  return get(`SELECT * FROM custom_commands WHERE trigger = ? AND enabled = 1`, [trigger.toLowerCase()]);
 }
 
 async function setCustomCommand(trigger, response, mentionUser = 0) {
-  const sid = currentStreamerId();
-  const t = trigger.toLowerCase();
-  if (sid) {
-    await run(`
-      INSERT INTO streamer_custom_commands (streamer_id, trigger, response, mention_user, updated_at) VALUES (?, ?, ?, ?, datetime('now'))
-      ON CONFLICT(streamer_id, trigger) DO UPDATE SET response = ?, mention_user = ?, updated_at = datetime('now')
-    `, [sid, t, response, mentionUser ? 1 : 0, response, mentionUser ? 1 : 0]);
-    return;
-  }
   await run(`
     INSERT INTO custom_commands (trigger, response, mention_user) VALUES (?, ?, ?)
     ON CONFLICT(trigger) DO UPDATE SET response = ?, mention_user = ?
-  `, [t, response, mentionUser ? 1 : 0, response, mentionUser ? 1 : 0]);
+  `, [trigger.toLowerCase(), response, mentionUser ? 1 : 0, response, mentionUser ? 1 : 0]);
 }
 
 async function deleteCustomCommand(trigger) {
-  const sid = currentStreamerId();
-  const t = trigger.toLowerCase();
-  if (sid) return run(`DELETE FROM streamer_custom_commands WHERE streamer_id = ? AND trigger = ?`, [sid, t]);
-  await run(`DELETE FROM custom_commands WHERE trigger = ?`, [t]);
+  await run(`DELETE FROM custom_commands WHERE trigger = ?`, [trigger.toLowerCase()]);
 }
 
 async function toggleCustomCommand(trigger, enabled) {
-  const sid = currentStreamerId();
-  const t = trigger.toLowerCase();
-  if (sid) return run(`UPDATE streamer_custom_commands SET enabled = ?, updated_at = datetime('now') WHERE streamer_id = ? AND trigger = ?`, [enabled ? 1 : 0, sid, t]);
-  await run(`UPDATE custom_commands SET enabled = ? WHERE trigger = ?`, [enabled ? 1 : 0, t]);
+  await run(`UPDATE custom_commands SET enabled = ? WHERE trigger = ?`, [enabled ? 1 : 0, trigger.toLowerCase()]);
 }
 
 // ─── Objectifs ────────────────────────────────────────────────────────────────
@@ -1112,48 +1064,31 @@ const DEFAULT_SETTINGS = {
 };
 
 async function getAllSettings() {
-  const sid = currentStreamerId();
-  const rows = sid
-    ? await all(`SELECT key, value FROM streamer_settings WHERE streamer_id = ?`, [sid])
-    : await all(`SELECT * FROM bot_settings`);
+  const rows = await all(`SELECT * FROM bot_settings`);
   const result = {};
+  // Valeurs par défaut
   for (const key of Object.keys(DEFAULT_SETTINGS)) result[key] = true;
+  // Valeurs en base
   rows.forEach(r => { result[r.key] = r.value === '1'; });
   return result;
 }
 
 async function getSetting(key) {
-  const sid = currentStreamerId();
-  const r = sid
-    ? await get(`SELECT value FROM streamer_settings WHERE streamer_id = ? AND key = ?`, [sid, key])
-    : await get(`SELECT value FROM bot_settings WHERE key = ?`, [key]);
-  return r ? r.value === '1' : true;
+  const r = await get(`SELECT value FROM bot_settings WHERE key = ?`, [key]);
+  return r ? r.value === '1' : true; // true par défaut
 }
 
 async function setSetting(key, enabled) {
-  const sid = currentStreamerId();
-  if (sid) {
-    await setStreamerSetting(sid, key, enabled ? '1' : '0');
-    return;
-  }
   await run(`INSERT INTO bot_settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = ?, updated_at = datetime('now')`,
     [key, enabled ? '1' : '0', enabled ? '1' : '0']);
 }
 
 async function getSettingStr(key, defaultVal = '') {
-  const sid = currentStreamerId();
-  const r = sid
-    ? await get(`SELECT value FROM streamer_settings WHERE streamer_id = ? AND key = ?`, [sid, key])
-    : await get(`SELECT value FROM bot_settings WHERE key = ?`, [key]);
+  const r = await get(`SELECT value FROM bot_settings WHERE key = ?`, [key]);
   return r ? r.value : defaultVal;
 }
 
 async function setSettingStr(key, value) {
-  const sid = currentStreamerId();
-  if (sid) {
-    await setStreamerSetting(sid, key, value);
-    return;
-  }
   await run(`INSERT INTO bot_settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = ?, updated_at = datetime('now')`,
     [key, value, value]);
 }
@@ -1161,20 +1096,15 @@ async function setSettingStr(key, value) {
 // ─── System Commands ──────────────────────────────────────────────────────────
 
 async function initSystemCommandsState(commands) {
-  const sid = currentStreamerId();
   for (const cmd of commands) {
     try {
-      if (sid) await run(`INSERT OR IGNORE INTO streamer_system_commands_state (streamer_id, trigger, enabled) VALUES (?, ?, 1)`, [sid, cmd]);
-      else await run(`INSERT OR IGNORE INTO system_commands_state (trigger, enabled) VALUES (?, 1)`, [cmd]);
+      await run(`INSERT OR IGNORE INTO system_commands_state (trigger, enabled) VALUES (?, 1)`, [cmd]);
     } catch(e) {}
   }
 }
 
 async function isSystemCmdEnabled(trigger) {
-  const sid = currentStreamerId();
-  const r = sid
-    ? await get(`SELECT enabled FROM streamer_system_commands_state WHERE streamer_id = ? AND trigger = ?`, [sid, trigger])
-    : await get(`SELECT enabled FROM system_commands_state WHERE trigger = ?`, [trigger]);
+  const r = await get(`SELECT enabled FROM system_commands_state WHERE trigger = ?`, [trigger]);
   return r ? r.enabled === 1 : true;
 }
 
@@ -1352,18 +1282,10 @@ async function getAllowedWordByText(word) {
 }
 
 async function getAllSystemCommandsState() {
-  const sid = currentStreamerId();
-  if (sid) return all(`SELECT trigger, enabled, updated_at FROM streamer_system_commands_state WHERE streamer_id = ? ORDER BY trigger ASC`, [sid]);
   return all(`SELECT * FROM system_commands_state ORDER BY trigger ASC`);
 }
 
 async function toggleSystemCommand(trigger, enabled) {
-  const sid = currentStreamerId();
-  if (sid) {
-    await run(`INSERT INTO streamer_system_commands_state (streamer_id, trigger, enabled, updated_at) VALUES (?, ?, ?, datetime('now'))
-      ON CONFLICT(streamer_id, trigger) DO UPDATE SET enabled = ?, updated_at = datetime('now')`, [sid, trigger, enabled ? 1 : 0, enabled ? 1 : 0]);
-    return;
-  }
   await run(`INSERT OR REPLACE INTO system_commands_state (trigger, enabled) VALUES (?, ?)`, [trigger, enabled ? 1 : 0]);
 }
 
@@ -1455,41 +1377,12 @@ async function deleteOAuthTokenForStreamer(streamerId) {
 
 // ─── Init ─────────────────────────────────────────────────────────────────────
 
-
-async function migrateLegacyTenantData(defaultStreamerId) {
-  if (!defaultStreamerId) return;
-  try {
-    const flag = await getStreamerSetting(defaultStreamerId, '_legacy_v1_migrated_phase1', '0');
-    if (flag === '1') return;
-    const commands = await all(`SELECT trigger, response, mention_user, enabled, created_at FROM custom_commands`);
-    for (const c of commands) {
-      await run(`INSERT OR IGNORE INTO streamer_custom_commands (streamer_id, trigger, response, mention_user, enabled, created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?, COALESCE(?, datetime('now')), datetime('now'))`,
-        [defaultStreamerId, c.trigger, c.response, c.mention_user || 0, c.enabled ?? 1, c.created_at || null]);
-    }
-    const system = await all(`SELECT trigger, enabled FROM system_commands_state`);
-    for (const c of system) {
-      await run(`INSERT OR IGNORE INTO streamer_system_commands_state (streamer_id, trigger, enabled)
-        VALUES (?, ?, ?)`, [defaultStreamerId, c.trigger, c.enabled ?? 1]);
-    }
-    const settings = await all(`SELECT key, value FROM bot_settings`);
-    for (const s of settings) {
-      await setStreamerSetting(defaultStreamerId, s.key, s.value);
-    }
-    await setStreamerSetting(defaultStreamerId, '_legacy_v1_migrated_phase1', '1');
-    console.log('[V2] Migration données V1 → streamer par défaut ✓');
-  } catch(e) {
-    console.warn('[V2] Migration données V1 ignorée:', e.message);
-  }
-}
-
 let initialized = false;
 async function ensureInit() {
   if (!initialized) {
     try {
       await initSchema();
-      const defaultStreamer = await ensureDefaultStreamer();
-      await migrateLegacyTenantData(defaultStreamer.id);
+      await ensureDefaultStreamer();
     } catch(e) {
       console.error('[DB] Erreur init schema:', e.message);
     }
