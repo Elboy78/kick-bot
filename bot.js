@@ -8,8 +8,8 @@ const axios    = require('axios');
 const db       = require('./database');
 const kickOAuth = require('./kick-oauth');
 const shared   = require('./shared');
-const { AsyncLocalStorage } = require('async_hooks');
 const tenant   = require('./tenant');
+const { AsyncLocalStorage } = require('async_hooks');
 
 const CONFIG = {
   channel:      process.env.KICK_CHANNEL       || 'votre_chaine',
@@ -106,14 +106,22 @@ async function syncActiveBotChannels() {
 function withChatContext(ctx, fn) {
   const previous = botChannelState.currentContext;
   const nextCtx = ctx || previous || null;
-  const tenantStreamer = nextCtx ? { id: nextCtx.streamerId || nextCtx.id, slug: nextCtx.slug || nextCtx.streamerSlug } : null;
-  // AsyncLocalStorage garde le bon streamer pendant toute la commande, même après await.
-  // tenant.runWithStreamer isole aussi toutes les requêtes database.js (points/rang/top/commandes).
-  return tenant.runWithStreamer(tenantStreamer, () => chatContextStore.run(nextCtx, async () => {
+
+  // V2 Core : on synchronise DEUX contextes pendant toute la commande :
+  // 1) le contexte chat pour envoyer la réponse dans le bon salon ;
+  // 2) le contexte tenant pour que database.js lise/écrive les points du bon streamer.
+  const execute = async () => {
     botChannelState.currentContext = nextCtx;
     try { return await fn(); }
     finally { botChannelState.currentContext = previous; }
-  }));
+  };
+
+  return chatContextStore.run(nextCtx, async () => {
+    if (nextCtx?.streamerId && tenant?.runWithStreamer) {
+      return tenant.runWithStreamer({ id: nextCtx.streamerId, slug: nextCtx.slug }, execute);
+    }
+    return execute();
+  });
 }
 function currentChatContext() {
   return chatContextStore.getStore() || botChannelState.currentContext || null;
