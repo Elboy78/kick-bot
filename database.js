@@ -6,6 +6,16 @@
 let createClient = null;
 let client = null;
 
+function getTenantStreamerId() {
+  try {
+    const tenant = require('./tenant');
+    const id = tenant.getCurrentStreamerId && tenant.getCurrentStreamerId();
+    return id ? Number(id) : null;
+  } catch(e) { return null; }
+}
+function scopedStreamerId() { return getTenantStreamerId() || 1; }
+
+
 function getDB() {
   if (!client) {
     if (process.env.TURSO_URL && process.env.TURSO_TOKEN) {
@@ -372,6 +382,13 @@ async function initSchema() {
     `ALTER TABLE chest_seasons ADD COLUMN victory_pending INTEGER NOT NULL DEFAULT 0`,
     `ALTER TABLE chest_seasons ADD COLUMN protected_number INTEGER DEFAULT NULL`,
     `ALTER TABLE custom_commands ADD COLUMN mention_user INTEGER NOT NULL DEFAULT 0`,
+    `ALTER TABLE viewers ADD COLUMN streamer_id INTEGER`,
+    `ALTER TABLE points_log ADD COLUMN streamer_id INTEGER`,
+    `ALTER TABLE stream_sessions ADD COLUMN streamer_id INTEGER`,
+    `ALTER TABLE command_usage ADD COLUMN streamer_id INTEGER`,
+    `ALTER TABLE chat_activity_daily ADD COLUMN streamer_id INTEGER`,
+    `ALTER TABLE custom_commands ADD COLUMN streamer_id INTEGER`,
+    `ALTER TABLE custom_commands ADD COLUMN display_trigger TEXT`,
   ];
   for (const sql of migrations) {
     try {
@@ -451,50 +468,55 @@ async function getNextLevel(points) {
 // ─── Viewers ──────────────────────────────────────────────────────────────────
 
 async function upsertViewer(username, kickUserId = null) {
-  await run(`
-    INSERT INTO viewers (username, kick_user_id, last_seen)
-    VALUES (?, ?, datetime('now'))
-    ON CONFLICT(username) DO UPDATE SET
-      last_seen    = datetime('now'),
-      kick_user_id = COALESCE(?, kick_user_id)
-  `, [username.toLowerCase(), kickUserId, kickUserId]);
+  const sid = scopedStreamerId();
+  const lower = username.toLowerCase();
+  const existing = await get(`SELECT id FROM viewers WHERE username = ? AND COALESCE(streamer_id, 1) = ?`, [lower, sid]);
+  if (existing) {
+    await run(`UPDATE viewers SET last_seen = datetime('now'), kick_user_id = COALESCE(?, kick_user_id), streamer_id = ? WHERE id = ?`, [kickUserId, sid, existing.id]);
+  } else {
+    await run(`INSERT INTO viewers (username, kick_user_id, last_seen, streamer_id) VALUES (?, ?, datetime('now'), ?)`, [lower, kickUserId, sid]);
+  }
 }
 
 async function addPoints(username, points, reason = 'watch_time', minutesWatched = 0) {
+  const sid = scopedStreamerId();
+  const lower = username.toLowerCase();
+  await upsertViewer(lower);
   await run(`
     UPDATE viewers
     SET points        = MAX(0, points + ?),
         total_minutes = total_minutes + ?,
         last_seen     = datetime('now')
-    WHERE username = ?
-  `, [points, minutesWatched, username.toLowerCase()]);
+    WHERE username = ? AND COALESCE(streamer_id, 1) = ?
+  `, [points, minutesWatched, lower, sid]);
 
-  const viewer = await get(`SELECT points FROM viewers WHERE username = ?`, [username.toLowerCase()]);
+  const viewer = await get(`SELECT points FROM viewers WHERE username = ? AND COALESCE(streamer_id, 1) = ?`, [lower, sid]);
   if (viewer) {
     const level = await getLevel(viewer.points);
-    await run(`UPDATE viewers SET level = ? WHERE username = ?`, [level.name, username.toLowerCase()]);
+    await run(`UPDATE viewers SET level = ? WHERE username = ? AND COALESCE(streamer_id, 1) = ?`, [level.name, lower, sid]);
   }
 
-  await run(`INSERT INTO points_log (username, points, reason) VALUES (?, ?, ?)`,
-    [username.toLowerCase(), points, reason]);
+  await run(`INSERT INTO points_log (username, points, reason, streamer_id) VALUES (?, ?, ?, ?)`,
+    [lower, points, reason, sid]);
 }
 
 async function getViewer(username) {
-  return get(`SELECT * FROM viewers WHERE username = ?`, [username.toLowerCase()]);
+  return get(`SELECT * FROM viewers WHERE username = ? AND COALESCE(streamer_id, 1) = ?`, [username.toLowerCase(), scopedStreamerId()]);
 }
 
 async function getLeaderboard(limit = 10) {
   const rows = await all(`
     SELECT username, points, total_minutes, sessions, last_seen, level
     FROM viewers
+    WHERE COALESCE(streamer_id, 1) = ?
     ORDER BY points DESC, last_seen DESC
     LIMIT ?
-  `, [limit]);
+  `, [scopedStreamerId(), limit]);
   return rows.map((v, i) => ({ ...v, rank: i + 1 }));
 }
 
 async function getViewerRank(username) {
-  const all_viewers = await all(`SELECT username FROM viewers ORDER BY points DESC, last_seen DESC`);
+  const all_viewers = await all(`SELECT username FROM viewers WHERE COALESCE(streamer_id, 1) = ? ORDER BY points DESC, last_seen DESC`, [scopedStreamerId()]);
   const idx = all_viewers.findIndex(v => v.username === username.toLowerCase());
   return idx >= 0 ? idx + 1 : null;
 }
@@ -507,48 +529,61 @@ async function getGlobalStats() {
       SUM(total_minutes) as total_minutes_watched,
       AVG(points) as avg_points,
       MAX(points) as max_points,
-      (SELECT username FROM viewers ORDER BY points DESC LIMIT 1) as top_viewer
-    FROM viewers
-  `);
+      (SELECT username FROM viewers WHERE COALESCE(streamer_id, 1) = scoped.sid ORDER BY points DESC LIMIT 1) as top_viewer
+    FROM viewers, (SELECT ? AS sid) scoped
+    WHERE COALESCE(streamer_id, 1) = scoped.sid
+  `, [scopedStreamerId()]);
 }
 
 async function getRecentLogs(limit = 50) {
-  return all(`SELECT username, points, reason, created_at FROM points_log ORDER BY created_at DESC LIMIT ?`, [limit]);
+  return all(`SELECT username, points, reason, created_at FROM points_log WHERE COALESCE(streamer_id, 1) = ? ORDER BY created_at DESC LIMIT ?`, [scopedStreamerId(), limit]);
 }
 
 async function getActiveViewers(minutes = 120) {
-  return all(`SELECT username FROM viewers WHERE last_seen >= datetime('now', ?) ORDER BY last_seen DESC`, [`-${minutes} minutes`]);
+  return all(`SELECT username FROM viewers WHERE COALESCE(streamer_id, 1) = ? AND last_seen >= datetime('now', ?) ORDER BY last_seen DESC`, [scopedStreamerId(), `-${minutes} minutes`]);
 }
 
 async function clearAllPoints() {
-  await run(`UPDATE viewers SET points = 0, total_minutes = 0, level = 'Bronze'`);
-  await run(`DELETE FROM points_log`);
+  await run(`UPDATE viewers SET points = 0, total_minutes = 0, level = 'Bronze' WHERE COALESCE(streamer_id, 1) = ?`, [scopedStreamerId()]);
+  await run(`DELETE FROM points_log WHERE COALESCE(streamer_id, 1) = ?`, [scopedStreamerId()]);
 }
 
 // ─── Commandes ────────────────────────────────────────────────────────────────
 
 
 async function getCustomCommands() {
-  return all(`SELECT * FROM custom_commands ORDER BY trigger ASC`);
+  const sid = scopedStreamerId();
+  const rows = await all(`SELECT * FROM custom_commands WHERE COALESCE(streamer_id, 1) = ? ORDER BY trigger ASC`, [sid]);
+  return rows.map(r => ({ ...r, trigger: r.display_trigger || String(r.trigger || '').replace(new RegExp(`^${sid}:`), '') }));
 }
 
 async function getCustomCommand(trigger) {
-  return get(`SELECT * FROM custom_commands WHERE trigger = ? AND enabled = 1`, [trigger.toLowerCase()]);
+  const sid = scopedStreamerId();
+  const lower = String(trigger || '').toLowerCase();
+  const key = `${sid}:${lower}`;
+  const row = await get(`SELECT * FROM custom_commands WHERE (trigger = ? OR (trigger = ? AND COALESCE(streamer_id, 1) = ?)) AND enabled = 1`, [key, lower, sid]);
+  return row ? { ...row, trigger: row.display_trigger || lower } : null;
 }
 
 async function setCustomCommand(trigger, response, mentionUser = 0) {
-  await run(`
-    INSERT INTO custom_commands (trigger, response, mention_user) VALUES (?, ?, ?)
-    ON CONFLICT(trigger) DO UPDATE SET response = ?, mention_user = ?
-  `, [trigger.toLowerCase(), response, mentionUser ? 1 : 0, response, mentionUser ? 1 : 0]);
+  const sid = scopedStreamerId();
+  const lower = String(trigger || '').toLowerCase();
+  const key = `${sid}:${lower}`;
+  const existing = await get(`SELECT id FROM custom_commands WHERE trigger = ? OR (trigger = ? AND COALESCE(streamer_id, 1) = ?)`, [key, lower, sid]);
+  if (existing) await run(`UPDATE custom_commands SET response = ?, mention_user = ?, display_trigger = ?, streamer_id = ? WHERE id = ?`, [response, mentionUser ? 1 : 0, lower, sid, existing.id]);
+  else await run(`INSERT INTO custom_commands (trigger, display_trigger, response, mention_user, streamer_id) VALUES (?, ?, ?, ?, ?)`, [key, lower, response, mentionUser ? 1 : 0, sid]);
 }
 
 async function deleteCustomCommand(trigger) {
-  await run(`DELETE FROM custom_commands WHERE trigger = ?`, [trigger.toLowerCase()]);
+  const sid = scopedStreamerId();
+  const lower = String(trigger || '').toLowerCase();
+  await run(`DELETE FROM custom_commands WHERE (trigger = ? OR trigger = ?) AND COALESCE(streamer_id, 1) = ?`, [`${sid}:${lower}`, lower, sid]);
 }
 
 async function toggleCustomCommand(trigger, enabled) {
-  await run(`UPDATE custom_commands SET enabled = ? WHERE trigger = ?`, [enabled ? 1 : 0, trigger.toLowerCase()]);
+  const sid = scopedStreamerId();
+  const lower = String(trigger || '').toLowerCase();
+  await run(`UPDATE custom_commands SET enabled = ? WHERE (trigger = ? OR trigger = ?) AND COALESCE(streamer_id, 1) = ?`, [enabled ? 1 : 0, `${sid}:${lower}`, lower, sid]);
 }
 
 // ─── Objectifs ────────────────────────────────────────────────────────────────
@@ -575,10 +610,10 @@ async function achieveObjective(id) {
 async function startSession() {
   const db = getDB();
   if (db.execute) {
-    const r = await db.execute({ sql: `INSERT INTO stream_sessions (started_at) VALUES (datetime('now'))`, args: [] });
+    const r = await db.execute({ sql: `INSERT INTO stream_sessions (started_at, streamer_id) VALUES (datetime('now'), ?)`, args: [scopedStreamerId()] });
     return Number(r?.lastInsertRowid ?? r?.lastInsertRowID ?? r?.lastInsertId);
   } else {
-    return db.prepare(`INSERT INTO stream_sessions (started_at) VALUES (datetime('now'))`).run().lastInsertRowid;
+    return db.prepare(`INSERT INTO stream_sessions (started_at, streamer_id) VALUES (datetime('now'), ?)`).run(scopedStreamerId()).lastInsertRowid;
   }
 }
 
@@ -593,7 +628,7 @@ async function endSession(id, peakViewers, durationMin) {
 }
 
 async function getStreamHistory(limit = 10) {
-  return all(`SELECT * FROM stream_sessions WHERE ended_at IS NOT NULL ORDER BY started_at DESC LIMIT ?`, [limit]);
+  return all(`SELECT * FROM stream_sessions WHERE COALESCE(streamer_id, 1) = ? AND ended_at IS NOT NULL ORDER BY started_at DESC LIMIT ?`, [scopedStreamerId(), limit]);
 }
 
 // ─── Analytics : usage des commandes & activité du chat ────────────────────────
@@ -703,22 +738,23 @@ async function clearModerationLogs() {
 }
 
 async function logCommandUsage(trigger, username) {
-  await run(`INSERT INTO command_usage (trigger, username) VALUES (?, ?)`, [trigger.toLowerCase(), (username||'').toLowerCase()]);
+  await run(`INSERT INTO command_usage (trigger, username, streamer_id) VALUES (?, ?, ?)`, [trigger.toLowerCase(), (username||'').toLowerCase(), scopedStreamerId()]);
 }
 
 async function getCommandUsageStats(days = 7) {
   const rows = await all(
     `SELECT trigger, COUNT(*) as count FROM command_usage
-     WHERE created_at >= datetime('now', ?)
+     WHERE COALESCE(streamer_id, 1) = ? AND created_at >= datetime('now', ?)
      GROUP BY trigger ORDER BY count DESC LIMIT 10`,
-    [`-${days} days`]
+    [scopedStreamerId(), `-${days} days`]
   );
   const total = rows.reduce((sum, r) => sum + r.count, 0);
   return rows.map(r => ({ trigger: r.trigger, count: r.count, pct: total > 0 ? Math.round((r.count / total) * 100) : 0 }));
 }
 
 async function logChatActivity(username) {
-  const today = todayParis();
+  const sid = scopedStreamerId();
+  const today = `${sid}:${todayParis()}`;
   const lower = username.toLowerCase();
 
   try {
@@ -750,12 +786,13 @@ async function logChatActivity(username) {
 }
 
 async function getChatActivityWeek() {
-  const rows = await all(`SELECT * FROM chat_activity_daily WHERE date >= date('now', '-6 days') ORDER BY date ASC`);
+  const sid = scopedStreamerId();
+  const rows = await all(`SELECT * FROM chat_activity_daily WHERE date LIKE ? ORDER BY date ASC`, [`${sid}:%`]);
   const map = {};
   rows.forEach(r => {
     let chatters = [];
     try { chatters = JSON.parse(r.unique_chatters); } catch(e) {}
-    map[r.date] = { messageCount: r.message_count, uniqueChatters: chatters.length };
+    map[String(r.date).split(':').pop()] = { messageCount: r.message_count, uniqueChatters: chatters.length };
   });
   // Compléter les 7 derniers jours (en heure de Paris) même sans données (0 par défaut)
   const todayStr = todayParis(); // YYYY-MM-DD en heure de Paris
@@ -770,7 +807,7 @@ async function getChatActivityWeek() {
 }
 
 async function getSessionsWithAvgViewers(limit = 14) {
-  return all(`SELECT id, started_at, avg_viewers, peak_viewers, duration_min FROM stream_sessions WHERE ended_at IS NOT NULL ORDER BY started_at DESC LIMIT ?`, [limit]);
+  return all(`SELECT id, started_at, avg_viewers, peak_viewers, duration_min FROM stream_sessions WHERE COALESCE(streamer_id, 1) = ? AND ended_at IS NOT NULL ORDER BY started_at DESC LIMIT ?`, [scopedStreamerId(), limit]);
 }
 
 // Classement fidélité (temps regardé cumulé, pas points)
@@ -778,20 +815,21 @@ async function getFidelityLeaderboard(limit = 50) {
   const rows = await all(`
     SELECT username, total_minutes, sessions, points, level, first_seen, last_seen
     FROM viewers
-    WHERE total_minutes > 0
+    WHERE COALESCE(streamer_id, 1) = ? AND total_minutes > 0
     ORDER BY total_minutes DESC, sessions DESC
     LIMIT ?
-  `, [limit]);
+  `, [scopedStreamerId(), limit]);
   return rows.map((v, i) => ({ ...v, rank: i + 1 }));
 }
 
 // Heatmap : activité par heure et jour de la semaine (7 derniers jours)
 async function getChatHeatmap() {
   // Reconstruit depuis chat_activity_daily — on agrège par jour de semaine
-  const rows = await all(`SELECT date, message_count FROM chat_activity_daily WHERE date >= date('now', '-28 days') ORDER BY date ASC`);
+  const sid = scopedStreamerId();
+  const rows = await all(`SELECT date, message_count FROM chat_activity_daily WHERE date LIKE ? ORDER BY date ASC`, [`${sid}:%`]);
   const heatmap = {};
   rows.forEach(r => {
-    const d = new Date(r.date + 'T12:00:00Z'); // midi UTC évite les décalages de jour
+    const d = new Date(String(r.date).split(':').pop() + 'T12:00:00Z'); // midi UTC évite les décalages de jour
     const dow = d.getUTCDay(); // 0=dim, 1=lun...
     if (!heatmap[dow]) heatmap[dow] = { total: 0, count: 0 };
     heatmap[dow].total += r.message_count;
@@ -802,16 +840,16 @@ async function getChatHeatmap() {
 
 // Followage : date du premier message (proxy pour depuis quand il est là)
 async function getViewerFirstSeen(username) {
-  const row = await get(`SELECT first_seen, total_minutes, sessions, following_since, subscribed_for FROM viewers WHERE username = ?`, [username.toLowerCase()]);
+  const row = await get(`SELECT first_seen, total_minutes, sessions, following_since, subscribed_for FROM viewers WHERE username = ? AND COALESCE(streamer_id, 1) = ?`, [username.toLowerCase(), scopedStreamerId()]);
   return row || null;
 }
 
 async function setViewerFollowingSince(username, followingSince, subscribedFor) {
   if (subscribedFor !== undefined) {
-    await run(`UPDATE viewers SET following_since = ?, subscribed_for = ? WHERE username = ?`,
-      [followingSince, subscribedFor, username.toLowerCase()]);
+    await run(`UPDATE viewers SET following_since = ?, subscribed_for = ? WHERE username = ? AND COALESCE(streamer_id, 1) = ?`,
+      [followingSince, subscribedFor, username.toLowerCase(), scopedStreamerId()]);
   } else {
-    await run(`UPDATE viewers SET following_since = ? WHERE username = ?`, [followingSince, username.toLowerCase()]);
+    await run(`UPDATE viewers SET following_since = ? WHERE username = ? AND COALESCE(streamer_id, 1) = ?`, [followingSince, username.toLowerCase(), scopedStreamerId()]);
   }
 }
 
@@ -1377,12 +1415,20 @@ async function deleteOAuthTokenForStreamer(streamerId) {
 
 // ─── Init ─────────────────────────────────────────────────────────────────────
 
+async function migrateLegacyRowsToDefaultStreamer(defaultStreamerId = 1) {
+  const tables = ['viewers','points_log','stream_sessions','command_usage','custom_commands'];
+  for (const table of tables) {
+    try { await run(`UPDATE ${table} SET streamer_id = ? WHERE streamer_id IS NULL`, [defaultStreamerId]); } catch(e) {}
+  }
+}
+
 let initialized = false;
 async function ensureInit() {
   if (!initialized) {
     try {
       await initSchema();
-      await ensureDefaultStreamer();
+      const defaultStreamer = await ensureDefaultStreamer();
+      await migrateLegacyRowsToDefaultStreamer(defaultStreamer?.id || 1);
     } catch(e) {
       console.error('[DB] Erreur init schema:', e.message);
     }
