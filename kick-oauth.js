@@ -103,7 +103,7 @@ async function exchangeCodeForToken(code, state) {
   await db.saveOAuthToken(providerForStreamer(streamerId), data.access_token, data.refresh_token, expiresAt);
   if (!streamerId) await db.saveOAuthToken(PROVIDER, data.access_token, data.refresh_token, expiresAt);
   console.log(`[OAUTH] Token Kick sauvegardé en DB ✓${streamerId ? ' streamer_id=' + streamerId : ''}`);
-  return data.access_token;
+  return { accessToken: data.access_token, streamerId: streamerId || null };
 }
 
 // Retourne un access_token valide, en le rafraîchissant automatiquement si besoin

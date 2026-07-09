@@ -128,6 +128,93 @@ app.get('/api/v2/obs-links', waitDB, async (req, res) => {
   } catch(e) { res.status(500).json({ error: e.message }); }
 });
 
+
+
+app.get('/api/v2/dashboard-summary', waitDB, async (req, res) => {
+  try {
+    const streamer = req.streamer || await db.ensureDefaultStreamer(tenant.getDefaultStreamerSeed());
+    const [stats, songState, subState, oauthConnected] = await Promise.all([
+      db.getGlobalStats().catch(() => ({})),
+      getSongRequestState().catch(() => ({ queue: [], player: { status: 'stopped' } })),
+      getSubCounterState().catch(() => ({ total: 0, session: 0, gifts: 0, renewals: 0, target: 50 })),
+      kickOAuth.isConnected(streamer.id).catch(() => false)
+    ]);
+    res.json({ data: {
+      streamer: {
+        id: streamer.id,
+        slug: streamer.slug,
+        displayName: streamer.display_name || streamer.displayName || streamer.slug,
+        avatarUrl: streamer.avatar_url || streamer.avatarUrl || '',
+        role: streamer.role || 'streamer',
+        oauthConnected
+      },
+      live: {
+        viewers: Number(stats?.active_viewers || stats?.viewers || stats?.total_viewers || 0),
+        messages: Number(stats?.total_messages || stats?.messages || 0),
+        points: Number(stats?.total_points || 0)
+      },
+      songRequest: {
+        enabled: !!songState.enabled,
+        queueLength: Array.isArray(songState.queue) ? songState.queue.length : 0,
+        current: Array.isArray(songState.queue) ? (songState.queue[0] || null) : null,
+        player: songState.player || { status: 'stopped' }
+      },
+      subGoal: subState
+    }});
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+app.get('/api/v2/account', waitDB, async (req, res) => {
+  try {
+    const streamer = req.streamer || await db.ensureDefaultStreamer(tenant.getDefaultStreamerSeed());
+    res.json({ data: {
+      id: streamer.id,
+      slug: streamer.slug,
+      kickUserId: streamer.kick_user_id || '',
+      kickUsername: streamer.kick_username || streamer.slug,
+      displayName: streamer.display_name || streamer.slug,
+      avatarUrl: streamer.avatar_url || '',
+      role: streamer.role || 'streamer',
+      status: streamer.status || 'active',
+      createdAt: streamer.created_at || '',
+      oauth: { configured: kickOAuth.isConfigured(), connected: await kickOAuth.isConnected(streamer.id).catch(()=>false) }
+    }});
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+app.get('/api/v2/overlays', waitDB, async (req, res) => {
+  try {
+    const protocol = req.headers['x-forwarded-proto'] || req.protocol || 'https';
+    const host = req.get('host');
+    const base = `${protocol}://${host}`;
+    const slug = req.streamer?.slug || tenant.DEFAULT_STREAMER_SLUG;
+    const items = [
+      { key:'songrequest', name:'Song Request', url:`${base}/s/${slug}/widgets/songrequest.html`, desc:'Lecteur musique OBS' },
+      { key:'chat', name:'Overlay Chat', url:`${base}/s/${slug}/widgets/chat.html`, desc:'Chat Kick affiché sur OBS' },
+      { key:'subgoal', name:'Sub Goal', url:`${base}/s/${slug}/widgets/subgoal.html`, desc:'Objectif de subs' },
+      { key:'alerts', name:'Alertes', url:`${base}/s/${slug}/widgets/alerts.html`, desc:'Follow, sub, gifts et raids' },
+      { key:'classement', name:'Classement public', url:`${base}/s/${slug}/classement`, desc:'Page viewer du classement' }
+    ];
+    res.json({ data: { streamer: slug, items } });
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+app.get('/s/:streamer/dashboard', (req,res) => {
+  const file = path.join(__dirname,'public','dashboard.html');
+  require('fs').readFile(file, 'utf8', (err, html) => err ? res.status(404).send('Not found') : res.type('html').send(injectStreamerBootstrap(html, req.params.streamer)));
+});
+app.get('/s/:streamer/overlays', (req,res) => {
+  const file = path.join(__dirname,'public','overlays.html');
+  require('fs').readFile(file, 'utf8', (err, html) => err ? res.status(404).send('Not found') : res.type('html').send(injectStreamerBootstrap(html, req.params.streamer)));
+});
+app.get('/s/:streamer/account', (req,res) => {
+  const file = path.join(__dirname,'public','account.html');
+  require('fs').readFile(file, 'utf8', (err, html) => err ? res.status(404).send('Not found') : res.type('html').send(injectStreamerBootstrap(html, req.params.streamer)));
+});
+app.get('/dashboard', (req,res) => res.redirect(`/s/${req.streamer?.slug || tenant.DEFAULT_STREAMER_SLUG}/dashboard`));
+app.get('/overlays', (req,res) => res.redirect(`/s/${req.streamer?.slug || tenant.DEFAULT_STREAMER_SLUG}/overlays`));
+app.get('/account', (req,res) => res.redirect(`/s/${req.streamer?.slug || tenant.DEFAULT_STREAMER_SLUG}/account`));
+
 // URLs publiques prêtes pour la V2 : /s/:streamer/...
 // Pour cette première phase, elles servent les mêmes fichiers que la V1 mais portent déjà le slug streamer.
 app.get('/s/:streamer/classement', (req,res) => {
@@ -1794,15 +1881,18 @@ app.get('/auth/callback', async (req, res) => {
     }
 
     console.log('[OAUTH CALLBACK] Code reçu, échange en cours...');
-    await kickOAuth.exchangeCodeForToken(code, state);
-    console.log('[OAUTH CALLBACK] ✅ Token échangé et sauvegardé avec succès');
+    const exchanged = await kickOAuth.exchangeCodeForToken(code, state);
+    const streamer = exchanged?.streamerId ? await db.getStreamerById(exchanged.streamerId).catch(()=>null) : null;
+    const slug = streamer?.slug || req.streamer?.slug || tenant.DEFAULT_STREAMER_SLUG;
+    console.log('[OAUTH CALLBACK] ✅ Token échangé et sauvegardé avec succès pour', slug);
+    res.setHeader('Set-Cookie', `streamer=${encodeURIComponent(slug)}; Path=/; SameSite=Lax`);
 
     res.send(`
       <html><body style="font-family:sans-serif;background:#050814;color:#fff;display:flex;align-items:center;justify-content:center;height:100vh;margin:0">
         <div style="text-align:center">
           <h2 style="color:#28ff66">✅ Compte Kick connecté avec succès</h2>
-          <p>Le token se rafraîchira automatiquement désormais. Tu peux fermer cette page.</p>
-          <script>setTimeout(()=>window.close(), 3000)</script>
+          <p>Redirection vers ton dashboard...</p>
+          <script>setTimeout(()=>{ window.location.href='/s/${slug}/dashboard'; }, 900)</script>
         </div>
       </body></html>
     `);
