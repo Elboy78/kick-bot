@@ -8,6 +8,7 @@ const axios   = require('axios');
 const db      = require('./database');
 const kickOAuth = require('./kick-oauth');
 const shared = require('./shared');
+const tenant = require('./tenant');
 
 const app    = express();
 const PORT   = parseInt(process.env.PANEL_PORT || '3000');
@@ -17,12 +18,15 @@ const io     = new Server(server, { cors: { origin: '*' } });
 app.use(cors());
 app.use(express.json({ limit: '8mb' }));
 app.use(express.static(path.join(__dirname, 'public')));
+app.use((req, res, next) => tenant.attachTenant(db, req, res, next));
 
 function requireAuth(req, res, next) { next(); }
 
 // Init DB avant de démarrer
 let dbReady = false;
 db.ensureInit().then(async () => {
+  const defaultStreamer = await db.ensureDefaultStreamer(tenant.getDefaultStreamerSeed());
+  console.log(`[V2] Streamer par défaut : ${defaultStreamer.slug} (#${defaultStreamer.id})`);
   const owner = process.env.PANEL_OWNER || '';
   if (owner) {
     try {
@@ -46,6 +50,57 @@ function waitDB(req, res, next) {
   if (!dbReady) return res.status(503).json({ error: 'Base de données en cours de chargement, réessaie dans 5 secondes' });
   next();
 }
+
+
+// ── V2 Multi-streamer : socle sans casser la V1 ──────────────────────────────
+app.get('/api/v2/streamers/current', waitDB, async (req, res) => {
+  try {
+    const streamer = req.streamer || await db.ensureDefaultStreamer(tenant.getDefaultStreamerSeed());
+    const connected = await kickOAuth.isConnected(streamer.id).catch(() => false);
+    res.json({ data: { ...streamer, oauthConnected: connected, isDefault: streamer.slug === tenant.DEFAULT_STREAMER_SLUG } });
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+app.get('/api/v2/streamers', waitDB, async (req, res) => {
+  try { res.json({ data: await db.listStreamers() }); }
+  catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+app.post('/api/v2/admin/streamers', requireAuth, waitDB, async (req, res) => {
+  try {
+    const streamer = await db.upsertStreamer({
+      slug: req.body.slug,
+      kickUsername: req.body.kickUsername || req.body.kick_username,
+      displayName: req.body.displayName || req.body.display_name,
+      avatarUrl: req.body.avatarUrl || req.body.avatar_url,
+      role: req.body.role || 'streamer',
+      status: req.body.status || 'active'
+    });
+    res.json({ success: true, data: streamer });
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+app.get('/api/v2/obs-links', waitDB, async (req, res) => {
+  try {
+    const protocol = req.headers['x-forwarded-proto'] || req.protocol || 'https';
+    const host = req.get('host');
+    const base = `${protocol}://${host}`;
+    const slug = req.streamer?.slug || tenant.DEFAULT_STREAMER_SLUG;
+    res.json({ data: {
+      streamer: slug,
+      classement: `${base}/s/${slug}/classement`,
+      alerts: `${base}/s/${slug}/widgets/alerts.html`,
+      chat: `${base}/s/${slug}/widgets/chat.html`,
+      songrequest: `${base}/s/${slug}/widgets/songrequest.html`,
+      subgoal: `${base}/s/${slug}/widgets/subgoal.html`
+    }});
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+// URLs publiques prêtes pour la V2 : /s/:streamer/...
+// Pour cette première phase, elles servent les mêmes fichiers que la V1 mais portent déjà le slug streamer.
+app.get('/s/:streamer/classement', (req,res) => res.sendFile(path.join(__dirname,'public','classement.html')));
+app.get('/s/:streamer/widgets/:widget', (req,res) => res.sendFile(path.join(__dirname,'public','widgets', req.params.widget)));
 
 // ── API lecture ───────────────────────────────────────────────────────────────
 
@@ -660,6 +715,7 @@ async function broadcastChestResult(result) {
   const chatEnabled = await db.getSetting('chests_chat_enabled');
   if (chatEnabled) {
     const shared = require('./shared');
+const tenant = require('./tenant');
     const moneyStr = result.money > 0 && ['positive','epic','legendary'].includes(result.tier) ? ` (${result.money}€)` : '';
     let msg = `🧰 COFFRE ${result.number} → ${result.tierEmoji} ${result.tierName} : ${result.label}${moneyStr}`;
     try { await shared.sendChat(msg); } catch(e) {}
@@ -1248,6 +1304,7 @@ app.post('/api/admin/chests/new-season', requireAuth, async (req, res) => {
     const r = await chests.newSeason();
     io.emit('chests-update');
     const shared = require('./shared');
+const tenant = require('./tenant');
     try { await shared.sendChat(`🩸 UNE NOUVELLE SAISON DES 30 COFFRES DE L'ENTITÉ COMMENCE ! Le contenu a été mélangé par le Brouillard…`); } catch(e) {}
     res.json({ success: true, ...r });
   } catch(e) { res.status(500).json({ error: e.message }); }
@@ -1268,6 +1325,7 @@ app.post('/api/admin/chests/secure', requireAuth, async (req, res) => {
     if (result.error) return res.status(400).json(result);
     io.emit('chests-update');
     const shared = require('./shared');
+const tenant = require('./tenant');
     if (await db.getSetting('chests_chat_enabled')) {
       if (result.moved) { try { await shared.sendChat(`🔒 La sécurité passe du coffre ${result.from ?? '?'} au coffre ${result.to} — DERNIER changement possible utilisé, plus aucune modification jusqu'à la prochaine saison !`); } catch(e) {} }
       else { try { await shared.sendChat(`🔒 Le coffre ${result.to} est maintenant SÉCURISÉ.`); } catch(e) {} }
@@ -1288,6 +1346,7 @@ app.post('/api/admin/chests/victory', requireAuth, async (req, res) => {
     if (result.error) return res.status(400).json(result);
     io.emit('chests-update');
     const shared = require('./shared');
+const tenant = require('./tenant');
     if (await db.getSetting('chests_chat_enabled')) {
       try { await shared.sendChat(`🏆 VICTOIRE ! Le coffre sécurisé n°${result.protectedNumber} verra son contenu DOUBLÉ à l'ouverture !`); } catch(e) {}
     }
@@ -1676,11 +1735,13 @@ app.get('/classement', (req,res) => res.sendFile(path.join(__dirname,'public','c
 // OAuth Kick officiel (id.kick.com) — refresh automatique du token
 // ════════════════════════════════════════════════════════════════════
 
-app.get('/auth/login', (req, res) => {
+app.get('/auth/login', async (req, res) => {
   if (!kickOAuth.isConfigured()) {
     return res.status(400).send('KICK_CLIENT_ID, KICK_CLIENT_SECRET ou KICK_REDIRECT_URI manquant dans les variables Render.');
   }
-  const url = kickOAuth.getAuthorizationUrl();
+  const streamerSlug = tenant.readRequestedSlug(req);
+  const streamer = await db.getStreamerBySlug(streamerSlug).catch(()=>null) || await db.ensureDefaultStreamer(tenant.getDefaultStreamerSeed());
+  const url = kickOAuth.getAuthorizationUrl(undefined, { streamerId: streamer.id });
   console.log('[OAUTH LOGIN] URL générée:', url);
   res.redirect(url);
 });
@@ -1719,13 +1780,13 @@ app.get('/auth/callback', async (req, res) => {
 
 app.get('/api/oauth/status', async (req, res) => {
   try {
-    const connected = await kickOAuth.isConnected();
-    res.json({ configured: kickOAuth.isConfigured(), connected });
+    const connected = await kickOAuth.isConnected(req.streamer?.id);
+    res.json({ configured: kickOAuth.isConfigured(), connected, streamer: req.streamer?.slug || null });
   } catch (e) { res.json({ configured: false, connected: false }); }
 });
 
 app.post('/api/admin/oauth/disconnect', async (req, res) => {
-  try { await kickOAuth.disconnect(); res.json({ success: true }); }
+  try { await kickOAuth.disconnect(req.streamer?.id); res.json({ success: true }); }
   catch (e) { res.status(500).json({ error: e.message }); }
 });
 

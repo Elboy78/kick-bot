@@ -6,6 +6,7 @@ const db = require('./database');
 
 const KICK_AUTH_BASE = 'https://id.kick.com';
 const PROVIDER = 'kick';
+function providerForStreamer(streamerId) { return streamerId ? `kick:${streamerId}` : PROVIDER; }
 
 const CLIENT_ID     = process.env.KICK_CLIENT_ID || '';
 const CLIENT_SECRET = process.env.KICK_CLIENT_SECRET || '';
@@ -30,13 +31,15 @@ function isConfigured() {
   return !!(CLIENT_ID && CLIENT_SECRET && REDIRECT_URI);
 }
 
-function getAuthorizationUrl(scopes) {
+function getAuthorizationUrl(scopes, options = {}) {
+  const streamerId = options.streamerId || options.streamer_id || null;
   const { codeVerifier, codeChallenge, state } = generatePKCE();
   pendingPKCE = { codeVerifier, state, createdAt: Date.now() };
   // Persister en DB pour survivre aux redémarrages
   db.setBotStatus('pkce_code_verifier', codeVerifier).catch(()=>{});
   db.setBotStatus('pkce_state', state).catch(()=>{});
   db.setBotStatus('pkce_created_at', String(Date.now())).catch(()=>{});
+  db.setBotStatus(`pkce_streamer_id_${state}`, streamerId ? String(streamerId) : '').catch(()=>{});
 
   const params = new URLSearchParams({
     response_type: 'code',
@@ -74,10 +77,12 @@ async function exchangeCodeForToken(code, state) {
   }
 
   const codeVerifier = pkce.codeVerifier;
+  const streamerId = await db.getBotStatus(`pkce_streamer_id_${state}`).then(r => r?.value || '').catch(() => '');
   pendingPKCE = null;
   // Nettoyer la DB
   db.setBotStatus('pkce_code_verifier', '').catch(()=>{});
   db.setBotStatus('pkce_state', '').catch(()=>{});
+  db.setBotStatus(`pkce_streamer_id_${state}`, '').catch(()=>{});
 
   const axios = require('axios');
   const response = await axios.post(
@@ -95,14 +100,16 @@ async function exchangeCodeForToken(code, state) {
 
   const data = response.data;
   const expiresAt = Date.now() + (data.expires_in * 1000);
-  await db.saveOAuthToken(PROVIDER, data.access_token, data.refresh_token, expiresAt);
-  console.log('[OAUTH] Token Kick sauvegardé en DB ✓');
+  await db.saveOAuthToken(providerForStreamer(streamerId), data.access_token, data.refresh_token, expiresAt);
+  if (!streamerId) await db.saveOAuthToken(PROVIDER, data.access_token, data.refresh_token, expiresAt);
+  console.log(`[OAUTH] Token Kick sauvegardé en DB ✓${streamerId ? ' streamer_id=' + streamerId : ''}`);
   return data.access_token;
 }
 
 // Retourne un access_token valide, en le rafraîchissant automatiquement si besoin
-async function getValidAccessToken() {
-  const stored = await db.getOAuthToken(PROVIDER);
+async function getValidAccessToken(streamerId = null) {
+  let stored = await db.getOAuthToken(providerForStreamer(streamerId));
+  if (!stored && streamerId) stored = await db.getOAuthToken(PROVIDER);
   if (!stored) return null;
 
   // Marge de sécurité de 60s avant l'expiration réelle
@@ -127,7 +134,7 @@ async function getValidAccessToken() {
     const data = response.data;
     const expiresAt = Date.now() + (data.expires_in * 1000);
     const newRefreshToken = data.refresh_token || stored.refresh_token;
-    await db.saveOAuthToken(PROVIDER, data.access_token, newRefreshToken, expiresAt);
+    await db.saveOAuthToken(providerForStreamer(streamerId), data.access_token, newRefreshToken, expiresAt);
     console.log('[OAUTH] Token Kick rafraîchi automatiquement ✓');
     return data.access_token;
   } catch (err) {
@@ -136,13 +143,14 @@ async function getValidAccessToken() {
   }
 }
 
-async function isConnected() {
-  const stored = await db.getOAuthToken(PROVIDER);
+async function isConnected(streamerId = null) {
+  let stored = await db.getOAuthToken(providerForStreamer(streamerId));
+  if (!stored && streamerId) stored = await db.getOAuthToken(PROVIDER);
   return !!stored;
 }
 
-async function disconnect() {
-  await db.deleteOAuthToken(PROVIDER);
+async function disconnect(streamerId = null) {
+  await db.deleteOAuthToken(providerForStreamer(streamerId));
 }
 
 module.exports = {
@@ -152,4 +160,5 @@ module.exports = {
   getValidAccessToken,
   isConnected,
   disconnect,
+  providerForStreamer,
 };

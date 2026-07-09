@@ -67,6 +67,33 @@ async function get(sql, params = []) {
 
 async function initSchema() {
   const tables = [
+    `CREATE TABLE IF NOT EXISTS streamers (
+      id            INTEGER PRIMARY KEY AUTOINCREMENT,
+      slug          TEXT NOT NULL UNIQUE,
+      kick_user_id  TEXT,
+      kick_username TEXT,
+      display_name  TEXT,
+      avatar_url    TEXT,
+      role          TEXT NOT NULL DEFAULT 'streamer',
+      status        TEXT NOT NULL DEFAULT 'active',
+      created_at    TEXT NOT NULL DEFAULT (datetime('now')),
+      updated_at    TEXT NOT NULL DEFAULT (datetime('now'))
+    )`,
+    `CREATE TABLE IF NOT EXISTS streamer_members (
+      id          INTEGER PRIMARY KEY AUTOINCREMENT,
+      streamer_id INTEGER NOT NULL,
+      username    TEXT NOT NULL,
+      role        TEXT NOT NULL DEFAULT 'admin',
+      created_at  TEXT NOT NULL DEFAULT (datetime('now')),
+      UNIQUE(streamer_id, username)
+    )`,
+    `CREATE TABLE IF NOT EXISTS streamer_settings (
+      streamer_id INTEGER NOT NULL,
+      key         TEXT NOT NULL,
+      value       TEXT NOT NULL DEFAULT '',
+      updated_at  TEXT NOT NULL DEFAULT (datetime('now')),
+      PRIMARY KEY(streamer_id, key)
+    )`,
     `CREATE TABLE IF NOT EXISTS viewers (
       id            INTEGER PRIMARY KEY AUTOINCREMENT,
       username      TEXT    NOT NULL UNIQUE,
@@ -1262,6 +1289,92 @@ async function toggleSystemCommand(trigger, enabled) {
   await run(`INSERT OR REPLACE INTO system_commands_state (trigger, enabled) VALUES (?, ?)`, [trigger, enabled ? 1 : 0]);
 }
 
+
+// ─── V2 Multi-streamer ───────────────────────────────────────────────────────
+
+function normalizeStreamerSlug(value) {
+  return String(value || '')
+    .trim()
+    .toLowerCase()
+    .replace(/^@+/, '')
+    .replace(/[^a-z0-9_-]/g, '-')
+    .replace(/-+/g, '-')
+    .replace(/^-|-$/g, '') || 'main';
+}
+
+async function ensureDefaultStreamer(seed = {}) {
+  const slug = normalizeStreamerSlug(seed.slug || process.env.DEFAULT_STREAMER_SLUG || process.env.KICK_CHANNEL || 'main');
+  const existing = await get(`SELECT * FROM streamers WHERE slug = ?`, [slug]);
+  if (existing) return existing;
+  await run(
+    `INSERT INTO streamers (slug, kick_username, display_name, role, status) VALUES (?, ?, ?, ?, 'active')`,
+    [slug, seed.kickUsername || process.env.KICK_CHANNEL || slug, seed.displayName || process.env.PANEL_OWNER || slug, seed.role || 'owner']
+  );
+  return get(`SELECT * FROM streamers WHERE slug = ?`, [slug]);
+}
+
+async function getStreamerBySlug(slug) {
+  return get(`SELECT * FROM streamers WHERE slug = ?`, [normalizeStreamerSlug(slug)]);
+}
+
+async function getStreamerById(id) {
+  return get(`SELECT * FROM streamers WHERE id = ?`, [id]);
+}
+
+async function listStreamers() {
+  return all(`SELECT id, slug, kick_user_id, kick_username, display_name, avatar_url, role, status, created_at, updated_at FROM streamers ORDER BY created_at ASC`);
+}
+
+async function upsertStreamer(data = {}) {
+  const slug = normalizeStreamerSlug(data.slug || data.kick_username || data.kickUsername || data.display_name || data.displayName);
+  const kickUsername = data.kick_username || data.kickUsername || slug;
+  const displayName = data.display_name || data.displayName || kickUsername;
+  await run(
+    `INSERT INTO streamers (slug, kick_user_id, kick_username, display_name, avatar_url, role, status, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, datetime('now'))
+     ON CONFLICT(slug) DO UPDATE SET
+       kick_user_id = COALESCE(?, kick_user_id),
+       kick_username = COALESCE(?, kick_username),
+       display_name = COALESCE(?, display_name),
+       avatar_url = COALESCE(?, avatar_url),
+       role = COALESCE(?, role),
+       status = COALESCE(?, status),
+       updated_at = datetime('now')`,
+    [slug, data.kick_user_id || data.kickUserId || null, kickUsername, displayName, data.avatar_url || data.avatarUrl || null, data.role || 'streamer', data.status || 'active',
+     data.kick_user_id || data.kickUserId || null, kickUsername, displayName, data.avatar_url || data.avatarUrl || null, data.role || null, data.status || null]
+  );
+  return getStreamerBySlug(slug);
+}
+
+async function getStreamerSetting(streamerId, key, defaultVal = '') {
+  const r = await get(`SELECT value FROM streamer_settings WHERE streamer_id = ? AND key = ?`, [streamerId, key]);
+  return r ? r.value : defaultVal;
+}
+
+async function setStreamerSetting(streamerId, key, value) {
+  await run(
+    `INSERT INTO streamer_settings (streamer_id, key, value, updated_at) VALUES (?, ?, ?, datetime('now'))
+     ON CONFLICT(streamer_id, key) DO UPDATE SET value = ?, updated_at = datetime('now')`,
+    [streamerId, key, String(value ?? ''), String(value ?? '')]
+  );
+}
+
+function oauthProviderForStreamer(streamerId) {
+  return streamerId ? `kick:${streamerId}` : 'kick';
+}
+
+async function saveOAuthTokenForStreamer(streamerId, accessToken, refreshToken, expiresAt) {
+  return saveOAuthToken(oauthProviderForStreamer(streamerId), accessToken, refreshToken, expiresAt);
+}
+
+async function getOAuthTokenForStreamer(streamerId) {
+  return getOAuthToken(oauthProviderForStreamer(streamerId));
+}
+
+async function deleteOAuthTokenForStreamer(streamerId) {
+  return deleteOAuthToken(oauthProviderForStreamer(streamerId));
+}
+
 // ─── Init ─────────────────────────────────────────────────────────────────────
 
 let initialized = false;
@@ -1269,6 +1382,7 @@ async function ensureInit() {
   if (!initialized) {
     try {
       await initSchema();
+      await ensureDefaultStreamer();
     } catch(e) {
       console.error('[DB] Erreur init schema:', e.message);
     }
@@ -1314,4 +1428,6 @@ module.exports = {
   getPointsConfig, setPointsConfigValue, setPointsConfigBulk,
   setBotStatus, getBotStatus, getAllBotStatus,
   saveOAuthToken, getOAuthToken, deleteOAuthToken,
+  ensureDefaultStreamer, getStreamerBySlug, getStreamerById, listStreamers, upsertStreamer,
+  getStreamerSetting, setStreamerSetting, saveOAuthTokenForStreamer, getOAuthTokenForStreamer, deleteOAuthTokenForStreamer,
 };
