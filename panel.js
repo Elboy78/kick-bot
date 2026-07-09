@@ -1228,6 +1228,12 @@ async function songRequestMacroHandler(req, res) {
 app.get('/api/widgets/songrequest/macro/:action', songRequestMacroHandler);
 app.post('/api/widgets/songrequest/macro/:action', songRequestMacroHandler);
 
+// Alias public pour le Kick Bot Companion / Stream Deck / AutoHotkey.
+// Ancienne route utilisée par le panel : /api/widgets/songrequest/macro/:action
+// Route simple voulue pour les macros globales : /api/songrequest/macro/:action
+app.get('/api/songrequest/macro/:action', songRequestMacroHandler);
+app.post('/api/songrequest/macro/:action', songRequestMacroHandler);
+
 app.get('/api/chests', async (req, res) => {
   try { res.json(await chests.getPublicState()); } catch(e) { res.json({ season: null, chests: [] }); }
 });
