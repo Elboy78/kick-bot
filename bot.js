@@ -8,7 +8,6 @@ const axios    = require('axios');
 const db       = require('./database');
 const kickOAuth = require('./kick-oauth');
 const shared   = require('./shared');
-const tenant   = require('./tenant');
 
 const CONFIG = {
   channel:      process.env.KICK_CHANNEL       || 'votre_chaine',
@@ -38,47 +37,71 @@ let streamStartTime = null;
 let lastFollowerCount = 0;
 let followerCheckInterval = null;
 
-// ─── V2 Core multi-streamer : le bot écoute plusieurs chaînes ────────────────
-// Un seul compte BOT7UP parle dans les chats, mais il peut être branché sur
-// plusieurs streamers. Chaque message est traité dans le tenant du streamer
-// correspondant pour que points/commandes/songrequest soient séparés.
-const botChannels = new Map(); // slug -> { streamer, slug, chatroomId, channelId, broadcasterUserId }
-const chatroomToSlug = new Map();
-const channelToSlug = new Map();
-const subscribedPusherChannels = new Set();
-let botChannelsSyncing = false;
-let botChannelsInterval = null;
+
+// V2 Core : BotManager multi-chaînes.
+// Le compte BOT7UP est unique, mais chaque streamer a sa chaîne/chatroom.
+const botChannelState = {
+  chatrooms: new Map(),      // chatroom_id -> streamer
+  subscribed: new Set(),     // pusher channel name
+  currentContext: null,
+};
 
 function normalizeSlug(value) {
-  return String(value || '').trim().toLowerCase().replace(/^@+/, '').replace(/[^a-z0-9_-]/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '') || '';
+  return String(value || '').trim().toLowerCase().replace(/^@+/, '').replace(/[^a-z0-9_-]/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '');
 }
-
-function extractChatroomIdFromPayload(payload = {}) {
-  return String(
-    payload?.chatroom_id || payload?.chatroomId || payload?.chatroom?.id || payload?.chatroom?.chatroom_id ||
-    payload?.message?.chatroom_id || payload?.data?.chatroom_id || ''
-  ).trim();
+function pusherChatroomChannel(chatroomId) { return `chatrooms.${chatroomId}.v2`; }
+function contextFromPusherChannel(channelName, payload = {}) {
+  const id = String(channelName || '').match(/chatrooms\.(\d+)\.v2/)?.[1]
+    || String(payload?.chatroom_id || payload?.chatroom?.id || payload?.chatroom?.chatroom_id || '');
+  return id ? (botChannelState.chatrooms.get(String(id)) || null) : null;
 }
-
-function extractChannelIdFromPayload(payload = {}) {
-  return String(
-    payload?.channel_id || payload?.channelId || payload?.channel?.id || payload?.data?.channel_id || ''
-  ).trim();
-}
-
-function getStreamerForPayload(payload = {}) {
-  const chatroomId = extractChatroomIdFromPayload(payload);
-  const channelId = extractChannelIdFromPayload(payload);
-  const slug = (chatroomId && chatroomToSlug.get(chatroomId)) || (channelId && channelToSlug.get(channelId)) || CONFIG.channel.toLowerCase();
-  return botChannels.get(slug)?.streamer || { id: null, slug, kick_username: slug, display_name: slug };
-}
-
-async function runForStreamer(streamer, fn) {
-  if (tenant && typeof tenant.runWithStreamer === 'function') {
-    return tenant.runWithStreamer(streamer, fn);
+async function loadActiveBotChannels() {
+  try {
+    const rows = await db.getActiveStreamersForBot();
+    const usable = [];
+    for (const s of rows || []) {
+      const chatroomId = String(s.chatroom_id || '').trim();
+      if (!chatroomId) {
+        console.log(`[BOT V2] ${s.slug}: chatroom_id manquant. Ouvre son panel /s/${s.slug}/dashboard une fois pour synchroniser la chaîne.`);
+        continue;
+      }
+      const ctx = {
+        streamerId: s.id,
+        slug: normalizeSlug(s.slug),
+        displayName: s.display_name || s.kick_username || s.slug,
+        channelId: s.channel_id || '',
+        chatroomId,
+        broadcasterUserId: String(s.broadcaster_user_id || s.kick_user_id || '').trim(),
+      };
+      usable.push(ctx);
+      botChannelState.chatrooms.set(chatroomId, ctx);
+    }
+    console.log(`[BOT V2] Channels actifs: ${usable.map(x => `${x.slug}#${x.chatroomId}`).join(', ') || 'aucun'}`);
+    return usable;
+  } catch(e) {
+    console.warn('[BOT V2] Sync channels impossible:', e.message);
+    return [];
   }
-  return fn();
 }
+async function syncActiveBotChannels() {
+  const channels = await loadActiveBotChannels();
+  if (!ws || ws.readyState !== WebSocket.OPEN) return channels;
+  for (const ctx of channels) {
+    const channel = pusherChatroomChannel(ctx.chatroomId);
+    if (!botChannelState.subscribed.has(channel)) {
+      subscribe(channel);
+      botChannelState.subscribed.add(channel);
+    }
+  }
+  return channels;
+}
+function withChatContext(ctx, fn) {
+  const previous = botChannelState.currentContext;
+  botChannelState.currentContext = ctx || previous || null;
+  try { return fn(); }
+  finally { botChannelState.currentContext = previous; }
+}
+function currentChatContext() { return botChannelState.currentContext; }
 
 // ─── Init ─────────────────────────────────────────────────────────────────────
 
@@ -89,12 +112,13 @@ async function init() {
   shared.registerSendChat(sendChat);
   await startAnnouncements();
   await syncPointsConfig();
-  await syncBotChannels();
+  // V2 : synchronise régulièrement les chaînes ajoutées au bot.
+  await syncActiveBotChannels();
+  setInterval(syncActiveBotChannels, 30000);
   // Vérifier live + followers toutes les 2 minutes
   setInterval(checkLiveStatus, 120000);
   // Resynchroniser montant/intervalle de points toutes les 2 minutes (changements panel)
   setInterval(syncPointsConfig, 120000);
-  botChannelsInterval = setInterval(syncBotChannels, 15000);
   console.log('[BOT] Base de données prête ✓');
 
   const oauthConfigured = kickOAuth.isConfigured();
@@ -127,11 +151,11 @@ function connect() {
 
   ws.on('open', () => {
     console.log('[BOT] Connecté ✓');
-    subscribedPusherChannels.clear();
     reconnectDelay = 5000;
-    subscribeKnownBotChannels();
-    // Sécurité legacy : si aucun streamer n'est encore en base, on écoute la chaîne env.
-    if (!botChannels.size && CONFIG.channelId && CONFIG.channelId !== '0') {
+    // V2 : on s'abonne à toutes les chatrooms connues des streamers actifs.
+    syncActiveBotChannels();
+    // Compat legacy seulement si un KICK_CHANNEL_ID est explicitement configuré.
+    if (CONFIG.channelId && CONFIG.channelId !== '0') {
       subscribe(`chatrooms.${CONFIG.channelId}.v2`);
       subscribe(`channel.${CONFIG.channelId}`);
     }
@@ -143,7 +167,7 @@ function connect() {
   });
 
   ws.on('message', (raw) => {
-    try { handleEvent(JSON.parse(raw.toString())); } catch(e) {}
+    try { handleEvent(JSON.parse(raw.toString())); } catch(e) { console.warn('[BOT] Event invalide:', e.message); }
   });
 
   ws.on('close', (code) => {
@@ -157,182 +181,8 @@ function connect() {
 }
 
 function subscribe(channel) {
-  if (!channel || !ws || ws.readyState !== WebSocket.OPEN) return;
-  if (subscribedPusherChannels.has(channel)) return;
-  subscribedPusherChannels.add(channel);
   ws.send(JSON.stringify({ event: 'pusher:subscribe', data: { auth: '', channel } }));
   console.log(`[BOT] Abonné: ${channel}`);
-}
-
-function subscribeIfOpen(channel) {
-  if (!channel) return;
-  if (ws && ws.readyState === WebSocket.OPEN) subscribe(channel);
-}
-
-function subscribeKnownBotChannels() {
-  for (const info of botChannels.values()) {
-    if (info.chatroomId) subscribeIfOpen(`chatrooms.${info.chatroomId}.v2`);
-    if (info.channelId) subscribeIfOpen(`channel.${info.channelId}`);
-  }
-}
-
-async function fetchKickChannelForSlug(slug) {
-  const clean = normalizeSlug(slug);
-  if (!clean) return null;
-  const tokenInfo = await getActiveToken().catch(() => ({}));
-  const token = tokenInfo?.token || '';
-
-  let officialInfo = null;
-
-  // API officielle en premier : utile pour broadcaster_user_id, mais elle ne fournit
-  // pas toujours le chatroom_id nécessaire au websocket Pusher.
-  try {
-    const { data } = await axios.get('https://api.kick.com/public/v1/channels', {
-      params: { slug: clean },
-      timeout: 9000,
-      headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}), Accept: 'application/json' }
-    });
-    const ch = Array.isArray(data?.data) ? data.data[0] : null;
-    if (ch) {
-      officialInfo = {
-        slug: clean,
-        channelId: String(ch.id || ch.channel_id || ch.chatroom?.channel_id || '').trim(),
-        chatroomId: String(ch.chatroom?.id || ch.chatroom_id || ch.chatroomId || '').trim(),
-        broadcasterUserId: String(ch.broadcaster_user_id || ch.user_id || '').trim(),
-        followers: ch.followers_count || 0,
-        isLive: !!(ch.stream && ch.stream.is_live),
-        viewerCount: ch.stream?.viewer_count || 0,
-      };
-      // On ne retourne que si on a vraiment le chatroom_id. Sinon on continue
-      // sur les endpoints web Kick, car sans chatroom_id le bot ne peut pas lire le chat.
-      if (officialInfo.chatroomId) return officialInfo;
-    }
-  } catch(e) {
-    console.warn(`[BOT V2] API officielle channel ${clean} impossible:`, e.response?.status || e.message);
-  }
-
-  // Fallback interne public Kick : c'est celui qui expose normalement chatroom.id.
-  const webHeaders = {
-    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/126 Safari/537.36',
-    'Accept': 'application/json, text/plain, */*',
-    'Accept-Language': 'fr-FR,fr;q=0.9,en;q=0.8',
-    'Referer': `https://kick.com/${encodeURIComponent(clean)}`,
-    'Origin': 'https://kick.com'
-  };
-  const endpoints = [
-    `https://kick.com/api/v2/channels/${encodeURIComponent(clean)}`,
-    `https://kick.com/api/v1/channels/${encodeURIComponent(clean)}`
-  ];
-
-  for (const url of endpoints) {
-    try {
-      const { data } = await axios.get(url, { timeout: 12000, headers: webHeaders });
-      const chatroomId = String(
-        data?.chatroom?.id || data?.chatroom_id || data?.chatroomId ||
-        data?.livestream?.chatroom_id || data?.stream?.chatroom_id || ''
-      ).trim();
-      const info = {
-        slug: clean,
-        channelId: String(data?.id || data?.channel_id || data?.chatroom?.channel_id || officialInfo?.channelId || '').trim(),
-        chatroomId,
-        broadcasterUserId: String(data?.broadcaster_user_id || data?.user_id || data?.user?.id || officialInfo?.broadcasterUserId || '').trim(),
-        followers: data?.followers_count || data?.followers || officialInfo?.followers || 0,
-        isLive: !!(data?.livestream || data?.is_live || officialInfo?.isLive),
-        viewerCount: data?.livestream?.viewer_count || data?.stream?.viewer_count || officialInfo?.viewerCount || 0,
-      };
-      if (info.chatroomId) return info;
-      console.warn(`[BOT V2] ${clean}: endpoint ${url} OK mais chatroom_id absent.`);
-    } catch(e) {
-      console.warn(`[BOT V2] API web channel ${clean} impossible (${url}):`, e.response?.status || e.message);
-    }
-  }
-
-  if (officialInfo) {
-    console.warn(`[BOT V2] ${clean}: Kick a renvoyé la chaîne, mais aucun chatroom_id. Le bot ne peut pas lire ce chat sans cet id.`);
-  }
-  return officialInfo;
-}
-
-
-async function collectBotStreamersToListen() {
-  const bySlug = new Map();
-  const add = (obj = {}) => {
-    const slug = normalizeSlug(obj.slug || obj.kick_username || obj.kickUsername || obj.display_name || obj.displayName || obj.username || obj.name);
-    if (!slug) return;
-    bySlug.set(slug, {
-      id: obj.id || obj.streamer_id || obj.streamerId || null,
-      slug,
-      kick_username: obj.kick_username || obj.kickUsername || obj.username || slug,
-      display_name: obj.display_name || obj.displayName || obj.username || slug,
-      status: obj.status || 'active'
-    });
-  };
-
-  // 1) Nouveaux comptes streamers V2 créés via OAuth Kick.
-  try {
-    if (typeof db.listStreamers === 'function') {
-      const rows = await db.listStreamers();
-      for (const r of Array.isArray(rows) ? rows : []) add(r);
-    }
-  } catch(e) {
-    console.warn('[BOT V2] listStreamers impossible:', e.message);
-  }
-
-  // 2) Ancien système d'accès panel : si un pseudo était approuvé avant la V2,
-  // on l'écoute aussi. Ça évite le cas où Elboy78 est approuvé mais pas encore
-  // présent correctement dans la table streamers.
-  try {
-    if (typeof db.getAllAccessRequests === 'function') {
-      const rows = await db.getAllAccessRequests();
-      for (const r of Array.isArray(rows) ? rows : []) {
-        if (String(r.status || '').toLowerCase() === 'approved') add({ username: r.username, status: 'active' });
-      }
-    }
-  } catch(e) {}
-
-  // 3) Channels forcées depuis Render si besoin : BOT_CHANNELS=elboy78,fack7up
-  const envList = [process.env.BOT_CHANNELS, process.env.KICK_BOT_CHANNELS, process.env.KICK_CHANNELS]
-    .filter(Boolean).join(',');
-  for (const item of envList.split(/[\n,; ]+/).map(v => v.trim()).filter(Boolean)) add({ slug: item });
-
-  // 4) Fallback legacy : jamais perdre la chaîne historique.
-  if (CONFIG.channel && CONFIG.channel !== 'votre_chaine') add({ slug: CONFIG.channel });
-
-  return [...bySlug.values()];
-}
-
-async function syncBotChannels() {
-  if (botChannelsSyncing) return;
-  botChannelsSyncing = true;
-  try {
-    const streamers = await collectBotStreamersToListen();
-    console.log(`[BOT V2] Sync channels: ${streamers.map(s => s.slug).join(', ') || 'aucune'}`);
-
-    for (const streamer of streamers) {
-      const slug = normalizeSlug(streamer.slug || streamer.kick_username || streamer.display_name);
-      if (!slug) continue;
-      const info = await fetchKickChannelForSlug(slug);
-      if (!info || !info.chatroomId) {
-        console.warn(`[BOT V2] Impossible d'écouter ${slug}: chatroom_id introuvable.`);
-        continue;
-      }
-      const previous = botChannels.get(slug);
-      const merged = { ...info, streamer: { ...streamer, slug }, slug };
-      botChannels.set(slug, merged);
-      chatroomToSlug.set(String(info.chatroomId), slug);
-      if (info.channelId) channelToSlug.set(String(info.channelId), slug);
-
-      if (!previous || previous.chatroomId !== info.chatroomId || previous.channelId !== info.channelId) {
-        console.log(`[BOT V2] Streamer actif: ${slug} | chatroom=${info.chatroomId} | channel=${info.channelId || '?'} | broadcaster=${info.broadcasterUserId || '?'}`);
-        subscribeIfOpen(`chatrooms.${info.chatroomId}.v2`);
-        if (info.channelId) subscribeIfOpen(`channel.${info.channelId}`);
-      }
-    }
-  } catch(e) {
-    console.warn('[BOT V2] Sync streamers impossible:', e.message);
-  } finally {
-    botChannelsSyncing = false;
-  }
 }
 
 function cleanup() {
@@ -363,8 +213,7 @@ function looksLikeSubFollowRaidEvent(event, payload) {
 async function forwardKickEventToPanel(event, payload) {
   try {
     if (shared && typeof shared.processKickEvent === 'function') {
-      const streamer = getStreamerForPayload(payload);
-      const result = await runForStreamer(streamer, () => shared.processKickEvent(event, payload));
+      const result = await shared.processKickEvent(event, payload);
       if (result && !result.ignored && !result.duplicate) {
         console.log(`[KICK EVENT] transmis au panel: ${event}`);
       }
@@ -375,7 +224,7 @@ async function forwardKickEventToPanel(event, payload) {
 }
 
 function handleEvent(msg) {
-  const { event, data } = msg;
+  const { event, data, channel } = msg;
 
   switch(event) {
     case 'pusher:connection_established': console.log('[BOT] Handshake OK'); break;
@@ -384,8 +233,7 @@ function handleEvent(msg) {
     case 'App\\Events\\ChatMessageEvent':
     case 'ChatMessageEvent': {
       let p; try { p = typeof data === 'string' ? JSON.parse(data) : data; } catch { break; }
-      const streamer = getStreamerForPayload(p);
-      runForStreamer(streamer, () => handleChatMessage(p, streamer)).catch(e => console.error('[CHAT] Erreur tenant:', e.message));
+      handleChatMessage(p, contextFromPusherChannel(channel, p));
       break;
     }
 
@@ -535,7 +383,7 @@ async function handleRewardRedeemed(payload) {
 
 // ─── Messages chat ────────────────────────────────────────────────────────────
 
-async function handleChatMessage(payload, currentStreamer = null) {
+async function handleChatMessage(payload, ctx = null) {
   // Filet de sécurité : Kick annonce parfois un rachat de récompense comme un message de chat
   // "spécial" plutôt qu'un événement dédié — on le détecte ici avant le traitement normal.
   if (payload?.type === 'reward_redeemed' || payload?.metadata?.reward || payload?.reward) {
@@ -544,6 +392,15 @@ async function handleChatMessage(payload, currentStreamer = null) {
     return;
   }
 
+  const username = payload?.sender?.username || payload?.user?.username || payload?.username;
+  const content  = payload?.content || payload?.message || '';
+  const kickId   = payload?.sender?.id?.toString() || null;
+  if (!username || !content) return;
+  if (ctx) return withChatContext(ctx, () => handleChatMessageScoped(payload, ctx));
+  return handleChatMessageScoped(payload, ctx);
+}
+
+async function handleChatMessageScoped(payload, ctx = null) {
   const username = payload?.sender?.username || payload?.user?.username || payload?.username;
   const content  = payload?.content || payload?.message || '';
   const kickId   = payload?.sender?.id?.toString() || null;
@@ -558,7 +415,7 @@ async function handleChatMessage(payload, currentStreamer = null) {
   recentMessages.set(username.toLowerCase(), { content, kickId });
   if (recentMessages.size > 500) recentMessages.delete(recentMessages.keys().next().value);
   db.logChatActivity(username).catch(e => console.error('[CHAT ACTIVITY] Erreur ignorée:', e.message));
-  console.log(`[CHAT:${currentStreamer?.slug || tenant.getCurrentStreamerSlug?.() || CONFIG.channel}] ${username}: ${content}`);
+  console.log(`${ctx ? `[CHAT:${ctx.slug}]` : '[CHAT]'} ${username}: ${content}`);
   // Overlay Chat OBS : envoie chaque message reçu au panel/socket.io.
   try {
     shared.emitChatOverlayMessage({
@@ -1494,65 +1351,52 @@ async function moderateUser(username, kickId, action, duration, word) {
 // ─── Token actif (OAuth officiel en priorité, sinon token manuel legacy) ──────
 
 async function getActiveToken() {
-  // V2 multi-streamer : le chat doit TOUJOURS être envoyé par le compte BOT.
-  // Interdiction d'utiliser kickOAuth.getValidAccessToken() ici : ce token appartient
-  // au streamer connecté au panel et ferait parler le bot avec son compte.
-  if (process.env.KICK_BOT_ACCESS_TOKEN) {
-    return { token: process.env.KICK_BOT_ACCESS_TOKEN, official: true, source: 'env_bot' };
+  if (kickOAuth.isConfigured()) {
+    // IMPORTANT V2 : le chat est toujours envoyé avec le compte BOT unique (BOT7UP),
+    // jamais avec le token OAuth du streamer connecté au panel.
+    const botToken = await kickOAuth.getValidBotAccessToken().catch(() => null);
+    if (botToken) return { token: botToken, official: true };
   }
-  if (kickOAuth.isConfigured() && typeof kickOAuth.getBotAccessToken === 'function') {
-    const botToken = await kickOAuth.getBotAccessToken();
-    if (botToken) return { token: botToken, official: true, source: 'oauth_bot' };
-  }
-  if (CONFIG.token) return { token: CONFIG.token, official: false, source: 'legacy_bot' };
-  console.warn('[AUTH BOT] Aucun token BOT disponible. Connecte BOT7UP via /auth/bot/login. Le token streamer ne sera pas utilisé.');
-  return { token: '', official: false, source: 'none' };
+  return { token: CONFIG.token, official: false };
 }
 
 // ─── Envoi messages ───────────────────────────────────────────────────────────
 
-async function sendChat(message, targetStreamer = null) {
+async function sendChat(message) {
   const text = normalizeKickChatMessage(message);
   const { token, official } = await getActiveToken();
   if (!token) { console.log(`[BOT → CHAT] ${text}`); return false; }
-  return sendChatVia(text, token, official, false, targetStreamer);
+  return sendChatVia(text, token, official, false);
 }
 
-function getCurrentBotStreamer(targetStreamer = null) {
-  if (targetStreamer) return typeof targetStreamer === 'string' ? { slug: normalizeSlug(targetStreamer) } : targetStreamer;
-  const ctx = tenant && typeof tenant.getCurrentTenant === 'function' ? tenant.getCurrentTenant() : null;
-  if (ctx?.streamer) return ctx.streamer;
-  if (ctx?.streamerSlug) return { id: ctx.streamerId || null, slug: ctx.streamerSlug };
-  const slug = normalizeSlug(CONFIG.channel);
-  return botChannels.get(slug)?.streamer || { id: null, slug, kick_username: slug, display_name: slug };
-}
-
-async function getBroadcasterUserIdForChat(token, targetStreamer = null) {
-  const streamer = getCurrentBotStreamer(targetStreamer);
-  const slug = normalizeSlug(streamer?.slug || streamer?.kick_username || CONFIG.channel);
-
-  const cached = botChannels.get(slug)?.broadcasterUserId;
-  if (cached) return parseInt(cached);
-
-  // Compat legacy uniquement pour la chaîne par défaut. Ne jamais utiliser cet ID pour un autre streamer.
+async function getBroadcasterUserIdForChat(token) {
+  const ctx = currentChatContext();
+  const ctxId = parseInt(ctx?.broadcasterUserId || '');
+  if (ctxId) return ctxId;
   const envId = parseInt(CONFIG.broadcasterUserId);
-  if (envId && slug === normalizeSlug(CONFIG.channel)) return envId;
+  if (envId) return envId;
 
   try {
-    if (streamer?.id && typeof db.getStreamerSetting === 'function') {
-      const stored = await db.getStreamerSetting(streamer.id, 'broadcaster_user_id', '');
-      const storedId = parseInt(stored);
-      if (storedId) return storedId;
-    }
+    const stored = await db.getSettingStr('broadcaster_user_id', '');
+    const storedId = parseInt(stored);
+    if (storedId) return storedId;
   } catch (_) {}
 
-  const info = await fetchKickChannelForSlug(slug);
-  if (info?.broadcasterUserId) {
-    if (streamer?.id && typeof db.setStreamerSetting === 'function') {
-      db.setStreamerSetting(streamer.id, 'broadcaster_user_id', String(info.broadcasterUserId)).catch(()=>{});
+  try {
+    const res = await axios.get('https://api.kick.com/public/v1/channels', {
+      params: { slug: CONFIG.channel },
+      timeout: 8000,
+      headers: { 'Authorization': `Bearer ${token}`, 'Accept': 'application/json' },
+    });
+    const channel = res.data?.data?.[0] || null;
+    const id = parseInt(channel?.broadcaster_user_id || channel?.user_id || channel?.id);
+    if (id) {
+      await db.setSettingStr('broadcaster_user_id', String(id)).catch(()=>{});
+      console.log(`[BOT] broadcaster_user_id détecté pour le chat: ${id}`);
+      return id;
     }
-    botChannels.set(slug, { ...(botChannels.get(slug) || {}), ...info, streamer, slug });
-    return parseInt(info.broadcasterUserId);
+  } catch (e) {
+    console.warn('[BOT] Impossible de récupérer broadcaster_user_id pour le chat:', e.response?.status || e.message);
   }
 
   return 0;
@@ -1572,7 +1416,7 @@ function stripUnsupportedForKick(message) {
     .trim();
 }
 
-async function sendChatVia(message, token, official, isRetry, targetStreamer = null) {
+async function sendChatVia(message, token, official, isRetry) {
   const text = normalizeKickChatMessage(message);
   try {
     let response;
@@ -1580,7 +1424,7 @@ async function sendChatVia(message, token, official, isRetry, targetStreamer = n
       // API officielle Kick.
       // IMPORTANT: broadcaster_user_id = ID UTILISATEUR du streamer, pas l'ID chatroom/channel.
       // Sans ça, Kick renvoie souvent un 500 silencieux et aucune commande ne part.
-      const broadcasterId = await getBroadcasterUserIdForChat(token, targetStreamer);
+      const broadcasterId = await getBroadcasterUserIdForChat(token);
       const payloads = [];
 
       if (broadcasterId) {
@@ -1617,7 +1461,7 @@ async function sendChatVia(message, token, official, isRetry, targetStreamer = n
     } else {
       // Ancien endpoint interne (token manuel, fallback legacy)
       response = await axios.post(
-        `https://kick.com/api/v2/messages/send/${(botChannels.get(normalizeSlug(getCurrentBotStreamer(targetStreamer)?.slug))?.chatroomId) || CONFIG.channelId}`,
+        `https://kick.com/api/v2/messages/send/${currentChatContext()?.chatroomId || CONFIG.channelId}`,
         { content: text, type: 'message' },
         { headers: {
           'Authorization': `Bearer ${token}`,
@@ -1641,13 +1485,13 @@ async function sendChatVia(message, token, official, isRetry, targetStreamer = n
     const safeText = stripUnsupportedForKick(text);
     if (!isRetry && safeText && safeText !== text) {
       console.log('[BOT] Retry avec message simplifié...');
-      return sendChatVia(safeText, token, official, true, targetStreamer);
+      return sendChatVia(safeText, token, official, true);
     }
 
     // Fallback 2 : si l'API officielle bug en 500, tenter le token manuel s'il existe.
     if (status === 500 && official && !isRetry && CONFIG.token) {
       console.log('[BOT] 500 sur API officielle → tentative via token manuel (fallback)...');
-      return sendChatVia(safeText || text, CONFIG.token, false, true, targetStreamer);
+      return sendChatVia(safeText || text, CONFIG.token, false, true);
     }
 
     if (status === 401) {

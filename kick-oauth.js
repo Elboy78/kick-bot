@@ -8,9 +8,9 @@ const tenant = require('./tenant');
 
 const KICK_AUTH_BASE = 'https://id.kick.com';
 const PROVIDER = 'kick';
-const BOT_PROVIDER = 'kick:bot';
-function providerForStreamer(streamerId) { return streamerId ? `kick:${streamerId}` : PROVIDER; }
+const BOT_PROVIDER = 'kick_bot';
 function providerForBot() { return BOT_PROVIDER; }
+function providerForStreamer(streamerId) { return streamerId ? `kick:${streamerId}` : PROVIDER; }
 
 const CLIENT_ID     = process.env.KICK_CLIENT_ID || '';
 const CLIENT_SECRET = process.env.KICK_CLIENT_SECRET || '';
@@ -100,8 +100,9 @@ async function exchangeCodeForToken(code, state) {
 
   const data = response.data || {};
   const expiresAt = Date.now() + ((data.expires_in || 3600) * 1000);
-  // V2 : on ne sauvegarde plus automatiquement le token dans le provider global.
-  // Le callback décide si le token est celui du streamer connecté ou celui du compte bot.
+  if ((pkce.meta || {}).mode === 'bot_login') {
+    await db.saveOAuthToken(BOT_PROVIDER, data.access_token, data.refresh_token, expiresAt);
+  }
 
   db.setBotStatus(`pkce_code_verifier_${state}`, '').catch(()=>{});
   db.setBotStatus(`pkce_meta_${state}`, '').catch(()=>{});
@@ -143,40 +144,41 @@ async function fetchCurrentUser(accessToken) {
   throw new Error(`Impossible de récupérer le compte Kick connecté${lastError?.response?.status ? ' ('+lastError.response.status+')' : ''}`);
 }
 
-async function getValidAccessToken(streamerId = null) {
-  let stored = await db.getOAuthToken(providerForStreamer(streamerId));
-  if (!stored) return null;
-  if (Date.now() < stored.expires_at - 60000) return stored.access_token;
-  try {
-    const response = await axios.post(
-      `${KICK_AUTH_BASE}/oauth/token`,
-      new URLSearchParams({
-        grant_type: 'refresh_token',
-        refresh_token: stored.refresh_token,
-        client_id: CLIENT_ID,
-        client_secret: CLIENT_SECRET,
-      }).toString(),
-      { headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, timeout: 12000 }
-    );
-    const data = response.data || {};
-    const expiresAt = Date.now() + ((data.expires_in || 3600) * 1000);
-    await db.saveOAuthToken(providerForStreamer(streamerId), data.access_token, data.refresh_token || stored.refresh_token, expiresAt);
-    return data.access_token;
-  } catch (err) {
-    console.error('[OAUTH] Échec du refresh:', err.response?.data || err.message);
-    return null;
+
+async function fetchChannelInfoForUser(accessToken, user = {}) {
+  const slug = String(user.username || user.displayName || '').trim().toLowerCase();
+  const headers = { Authorization: `Bearer ${accessToken}`, Accept: 'application/json', 'User-Agent': 'KickBot/2.0' };
+  const out = {};
+
+  // API officielle : fournit souvent broadcaster_user_id / id, mais pas toujours chatroom_id.
+  if (slug) {
+    try {
+      const { data } = await axios.get('https://api.kick.com/public/v1/channels', {
+        params: { slug }, headers, timeout: 10000
+      });
+      const ch = Array.isArray(data?.data) ? data.data[0] : (data?.data || data);
+      if (ch) {
+        out.channelId = ch.id || ch.channel_id || ch.slug_id || out.channelId;
+        out.broadcasterUserId = ch.broadcaster_user_id || ch.user_id || user.id || out.broadcasterUserId;
+        out.chatroomId = ch.chatroom_id || ch.chatroom?.id || ch.chatroom?.chatroom_id || out.chatroomId;
+      }
+    } catch(e) {}
   }
+
+  // Certains endpoints user/channel peuvent contenir chatroom_id selon le scope/format.
+  try {
+    const { data } = await axios.get('https://api.kick.com/public/v1/users', { headers, timeout: 10000 });
+    const root = Array.isArray(data?.data) ? data.data[0] : (data?.data || data?.user || data);
+    const ch = root?.channel || root?.channels?.[0] || root?.livestream?.channel || {};
+    out.channelId = out.channelId || ch.id || ch.channel_id;
+    out.broadcasterUserId = out.broadcasterUserId || ch.broadcaster_user_id || root?.id || user.id;
+    out.chatroomId = out.chatroomId || ch.chatroom_id || ch.chatroom?.id || root?.chatroom_id || root?.chatroom?.id;
+  } catch(e) {}
+
+  return out;
 }
 
-async function isConnected(streamerId = null) {
-  let stored = await db.getOAuthToken(providerForStreamer(streamerId));
-  return !!stored;
-}
-
-async function getBotAccessToken() {
-  // IMPORTANT V2 : le token bot est strictement séparé du token streamer.
-  // On ne retombe JAMAIS sur le provider global "kick", car il peut contenir
-  // le token du streamer connecté au panel. Sinon le bot parle avec le mauvais compte.
+async function getValidBotAccessToken() {
   let stored = await db.getOAuthToken(BOT_PROVIDER);
   if (!stored) return null;
   if (Date.now() < stored.expires_at - 60000) return stored.access_token;
@@ -205,6 +207,38 @@ async function isBotConnected() {
   return !!(await db.getOAuthToken(BOT_PROVIDER));
 }
 
+async function getValidAccessToken(streamerId = null) {
+  let stored = await db.getOAuthToken(providerForStreamer(streamerId));
+  if (!stored && streamerId) stored = await db.getOAuthToken(PROVIDER);
+  if (!stored) return null;
+  if (Date.now() < stored.expires_at - 60000) return stored.access_token;
+  try {
+    const response = await axios.post(
+      `${KICK_AUTH_BASE}/oauth/token`,
+      new URLSearchParams({
+        grant_type: 'refresh_token',
+        refresh_token: stored.refresh_token,
+        client_id: CLIENT_ID,
+        client_secret: CLIENT_SECRET,
+      }).toString(),
+      { headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, timeout: 12000 }
+    );
+    const data = response.data || {};
+    const expiresAt = Date.now() + ((data.expires_in || 3600) * 1000);
+    await db.saveOAuthToken(providerForStreamer(streamerId), data.access_token, data.refresh_token || stored.refresh_token, expiresAt);
+    return data.access_token;
+  } catch (err) {
+    console.error('[OAUTH] Échec du refresh:', err.response?.data || err.message);
+    return null;
+  }
+}
+
+async function isConnected(streamerId = null) {
+  let stored = await db.getOAuthToken(providerForStreamer(streamerId));
+  if (!stored && streamerId) stored = await db.getOAuthToken(PROVIDER);
+  return !!stored;
+}
+
 async function disconnect(streamerId = null) {
   await db.deleteOAuthToken(providerForStreamer(streamerId));
 }
@@ -219,7 +253,7 @@ module.exports = {
   disconnect,
   providerForStreamer,
   providerForBot,
-  getBotAccessToken,
+  fetchChannelInfoForUser,
+  getValidBotAccessToken,
   isBotConnected,
-  BOT_PROVIDER,
 };

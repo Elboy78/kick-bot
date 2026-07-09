@@ -182,6 +182,36 @@ app.get('/api/v2/tenant/current', async (req, res) => {
   catch(e) { res.status(500).json({ error: e.message }); }
 });
 
+// Reçoit les métadonnées de chaîne résolues par le navigateur du streamer.
+// Render peut recevoir 403 sur kick.com/api/v2/channels/:slug, alors que le navigateur du streamer y a accès.
+// Une fois chatroom_id enregistré, BotManager peut écouter la chaîne sans refaire de scraping.
+app.post('/api/v2/streamer/chatroom', waitDB, async (req, res) => {
+  try {
+    const tm = createTenantManager({ db, io, req });
+    const streamer = await db.getStreamerById(tm.streamerId);
+    if (!streamer) return res.status(404).json({ error: 'streamer introuvable' });
+    const slug = tenant.normalizeSlug(req.body?.slug || streamer.slug);
+    if (slug !== streamer.slug) return res.status(403).json({ error: 'slug mismatch' });
+    const updated = await db.updateStreamerKickMeta(streamer.id, {
+      channelId: req.body?.channelId || req.body?.channel_id || null,
+      chatroomId: req.body?.chatroomId || req.body?.chatroom_id || null,
+      broadcasterUserId: req.body?.broadcasterUserId || req.body?.broadcaster_user_id || null,
+      kickUserId: req.body?.kickUserId || req.body?.kick_user_id || null,
+      botEnabled: 1
+    });
+    io.emit('bot-channels-refresh');
+    res.json({ success: true, data: updated });
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+app.get('/api/v2/core/status', waitDB, async (req, res) => {
+  try {
+    const botConnected = await kickOAuth.isBotConnected().catch(()=>false);
+    const streamers = await db.listStreamers();
+    res.json({ data: { botConnected, streamers: streamers.map(s => ({ id:s.id, slug:s.slug, chatroom_id:s.chatroom_id || null, broadcaster_user_id:s.broadcaster_user_id || null, bot_enabled:s.bot_enabled })) } });
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
 // ── API lecture ───────────────────────────────────────────────────────────────
 
 async function getLeaderboardIgnoredUsers() {
@@ -1561,7 +1591,7 @@ app.post('/api/admin/bot-settings',       async (req,res) => { try { const {key,
 // Followers
 app.get('/api/followers', async (req, res) => {
   try {
-    const data = await fetchKickAPI(req.streamer?.slug || req.streamerSlug || process.env.KICK_CHANNEL || '');
+    const data = await fetchKickAPI(process.env.KICK_CHANNEL||'');
     if (!data) return res.json({ count: 0 });
     const count = data?.followers_count || data?.followersCount || 0;
     res.json({ count });
@@ -1597,7 +1627,7 @@ app.get('/api/live', async (req,res) => {
 
   // Sinon essayer l'API serveur
   try {
-    const data = await fetchKickAPI(req.streamer?.slug || req.streamerSlug || process.env.KICK_CHANNEL || '');
+    const data = await fetchKickAPI(process.env.KICK_CHANNEL||'');
     if (!data) return res.json({ live: false, viewers: 0, error: 'api_blocked' });
     const live = data?.livestream;
     res.json({
@@ -1810,21 +1840,6 @@ app.get('/api/tts/quota', async (req, res) => {
   }
 });
 
-
-app.get('/api/v2/core/status', async (req, res) => {
-  try {
-    const tm = createTenantManager({ db, io, req });
-    const live = await fetchKickAPI(tm.slug).catch(() => null);
-    const botName = await db.getBotStatus('bot_account_username').then(r => r?.value || '').catch(() => '');
-    res.json({ data: {
-      streamer: tm.info(),
-      botAccount: { username: botName || process.env.KICK_BOT_USERNAME || 'Bot7uP', connected: await kickOAuth.isBotConnected?.() },
-      channel: tm.slug,
-      live: { isLive: !!(live?.livestream?.is_live), viewers: live?.livestream?.viewer_count || 0, followers: live?.followers_count || live?.followersCount || 0 }
-    } });
-  } catch(e) { res.status(500).json({ error: e.message }); }
-});
-
 app.get('/overlay', (req,res) => res.sendFile(path.join(__dirname,'public','overlay.html')));
 app.get('/classement', (req,res) => res.sendFile(path.join(__dirname,'public','classement.html')));
 
@@ -1842,19 +1857,21 @@ function clearStreamerCookie(res) {
   res.setHeader('Set-Cookie', `kb_streamer=; Path=/; Max-Age=0; SameSite=Lax${secure ? '; Secure' : ''}`);
 }
 
-// ════════════════════════════════════════════════════════════════════
-// OAuth Kick officiel (id.kick.com) — refresh automatique du token
-// ════════════════════════════════════════════════════════════════════
 
-
+// Connexion du compte BOT unique (ex: BOT7UP). Ce compte est utilisé uniquement
+// pour écrire dans les chats, jamais pour identifier le panel streamer.
 app.get('/auth/bot/login', (req, res) => {
   if (!kickOAuth.isConfigured()) {
     return res.status(400).send('KICK_CLIENT_ID, KICK_CLIENT_SECRET ou KICK_REDIRECT_URI manquant dans les variables Render.');
   }
-  const url = kickOAuth.getAuthorizationUrl(null, { mode: 'bot_login', returnTo: '/admin/bot' });
+  const url = kickOAuth.getAuthorizationUrl(null, { mode: 'bot_login', returnTo: '/api/v2/core/status' });
   console.log('[OAUTH BOT] Connexion du compte bot lancée');
   res.redirect(url);
 });
+
+// ════════════════════════════════════════════════════════════════════
+// OAuth Kick officiel (id.kick.com) — refresh automatique du token
+// ════════════════════════════════════════════════════════════════════
 
 app.get('/auth/login', (req, res) => {
   if (!kickOAuth.isConfigured()) {
@@ -1874,30 +1891,39 @@ app.get('/auth/callback', async (req, res) => {
     if (!code || !state) return res.status(400).send('Code ou state manquant.');
 
     const token = await kickOAuth.exchangeCodeForToken(code, state);
-    if (token.meta?.mode === 'bot_login') {
-      await db.saveOAuthToken(kickOAuth.providerForBot(), token.accessToken, token.refreshToken, token.expiresAt);
-      const botUser = await kickOAuth.fetchCurrentUser(token.accessToken).catch(() => null);
-      if (botUser?.username) await db.setBotStatus('bot_account_username', botUser.username).catch(()=>{});
-      console.log(`[OAUTH BOT] ✅ Compte bot connecté: ${botUser?.username || 'compte bot'}`);
-      return res.redirect('/?botConnected=1');
-    }
-
+    const mode = token.meta?.mode || 'streamer_login';
     const kickUser = await kickOAuth.fetchCurrentUser(token.accessToken);
     const username = kickUser.username || kickUser.displayName || kickUser.id;
+    if (mode === 'bot_login') {
+      await db.setBotStatus('bot_oauth_username', username || 'bot');
+      await db.setBotStatus('bot_oauth_connected_at', Date.now().toString());
+      console.log(`[OAUTH BOT] ✅ Compte bot connecté: ${username}`);
+      return res.redirect('/api/v2/core/status');
+    }
     if (!username) throw new Error('Kick n’a pas renvoyé de pseudo exploitable.');
     const slug = tenant.normalizeSlug(username);
 
+    const channelInfo = await kickOAuth.fetchChannelInfoForUser(token.accessToken, kickUser).catch(() => ({}));
     const streamer = await db.upsertStreamer({
       slug,
       kickUserId: kickUser.id || null,
       kickUsername: username,
       displayName: kickUser.displayName || username,
       avatarUrl: kickUser.avatar || '',
+      channelId: channelInfo.channelId || null,
+      chatroomId: channelInfo.chatroomId || null,
+      broadcasterUserId: channelInfo.broadcasterUserId || kickUser.id || null,
       role: 'streamer',
-      status: 'active'
+      status: 'active',
+      botEnabled: 1
     });
 
     await db.saveOAuthToken(kickOAuth.providerForStreamer(streamer.id), token.accessToken, token.refreshToken, token.expiresAt);
+    // Compatibilité V1 : si c'est le streamer par défaut, on garde aussi le provider global kick.
+    if (slug === tenant.DEFAULT_STREAMER_SLUG) {
+      await db.saveOAuthToken('kick', token.accessToken, token.refreshToken, token.expiresAt);
+    }
+
     setStreamerSessionCookie(res, slug);
     res.cookie('kb_streamer', slug, { path: '/', sameSite: 'Lax', maxAge: 1000 * 60 * 60 * 24 * 365 });
     console.log(`[OAUTH CALLBACK V2] ✅ Streamer connecté: ${slug} (#${streamer.id})`);
