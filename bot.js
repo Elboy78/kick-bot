@@ -8,6 +8,7 @@ const axios    = require('axios');
 const db       = require('./database');
 const kickOAuth = require('./kick-oauth');
 const shared   = require('./shared');
+const { AsyncLocalStorage } = require('async_hooks');
 
 const CONFIG = {
   channel:      process.env.KICK_CHANNEL       || 'votre_chaine',
@@ -44,8 +45,13 @@ let followerCheckInterval = null;
 const botChannelState = {
   chatrooms: new Map(),      // chatroom_id -> streamer
   subscribed: new Set(),     // pusher channel name
-  currentContext: null,
+  currentContext: null, // legacy fallback seulement
 };
+
+// V2 : contexte async par message/chat.
+// Avant, le contexte était une variable globale remise à null trop tôt,
+// donc le bot recevait bien [CHAT:elboy78] mais répondait parfois dans fack7up.
+const chatContextStore = new AsyncLocalStorage();
 
 function normalizeSlug(value) {
   return String(value || '').trim().toLowerCase().replace(/^@+/, '').replace(/[^a-z0-9_-]/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '');
@@ -98,11 +104,17 @@ async function syncActiveBotChannels() {
 }
 function withChatContext(ctx, fn) {
   const previous = botChannelState.currentContext;
-  botChannelState.currentContext = ctx || previous || null;
-  try { return fn(); }
-  finally { botChannelState.currentContext = previous; }
+  const nextCtx = ctx || previous || null;
+  // AsyncLocalStorage garde le bon streamer pendant toute la commande, même après await.
+  return chatContextStore.run(nextCtx, async () => {
+    botChannelState.currentContext = nextCtx;
+    try { return await fn(); }
+    finally { botChannelState.currentContext = previous; }
+  });
 }
-function currentChatContext() { return botChannelState.currentContext; }
+function currentChatContext() {
+  return chatContextStore.getStore() || botChannelState.currentContext || null;
+}
 
 // ─── Init ─────────────────────────────────────────────────────────────────────
 
@@ -401,7 +413,7 @@ async function handleChatMessage(payload, ctx = null) {
   const content  = payload?.content || payload?.message || '';
   const kickId   = payload?.sender?.id?.toString() || null;
   if (!username || !content) return;
-  if (ctx) return withChatContext(ctx, () => handleChatMessageScoped(payload, ctx));
+  if (ctx) return await withChatContext(ctx, () => handleChatMessageScoped(payload, ctx));
   return handleChatMessageScoped(payload, ctx);
 }
 
@@ -1369,6 +1381,8 @@ async function getActiveToken() {
 
 async function sendChat(message) {
   const text = normalizeKickChatMessage(message);
+  const ctx = currentChatContext();
+  if (ctx?.slug) console.log(`[BOT V2] Réponse ciblée → ${ctx.slug}#${ctx.chatroomId || '?'} : ${text.slice(0, 80)}`);
   const { token, official } = await getActiveToken();
   if (!token) { console.log(`[BOT → CHAT] ${text}`); return false; }
   return sendChatVia(text, token, official, false);
