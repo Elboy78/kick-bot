@@ -182,7 +182,10 @@ async function fetchKickChannelForSlug(slug) {
   const tokenInfo = await getActiveToken().catch(() => ({}));
   const token = tokenInfo?.token || '';
 
-  // API officielle en premier : elle donne broadcaster_user_id et parfois id/chatroom.
+  let officialInfo = null;
+
+  // API officielle en premier : utile pour broadcaster_user_id, mais elle ne fournit
+  // pas toujours le chatroom_id nécessaire au websocket Pusher.
   try {
     const { data } = await axios.get('https://api.kick.com/public/v1/channels', {
       params: { slug: clean },
@@ -191,7 +194,7 @@ async function fetchKickChannelForSlug(slug) {
     });
     const ch = Array.isArray(data?.data) ? data.data[0] : null;
     if (ch) {
-      return {
+      officialInfo = {
         slug: clean,
         channelId: String(ch.id || ch.channel_id || ch.chatroom?.channel_id || '').trim(),
         chatroomId: String(ch.chatroom?.id || ch.chatroom_id || ch.chatroomId || '').trim(),
@@ -200,30 +203,54 @@ async function fetchKickChannelForSlug(slug) {
         isLive: !!(ch.stream && ch.stream.is_live),
         viewerCount: ch.stream?.viewer_count || 0,
       };
+      // On ne retourne que si on a vraiment le chatroom_id. Sinon on continue
+      // sur les endpoints web Kick, car sans chatroom_id le bot ne peut pas lire le chat.
+      if (officialInfo.chatroomId) return officialInfo;
     }
   } catch(e) {
     console.warn(`[BOT V2] API officielle channel ${clean} impossible:`, e.response?.status || e.message);
   }
 
-  // Fallback interne public Kick : souvent plus utile pour le chatroom_id Pusher.
-  try {
-    const { data } = await axios.get(`https://kick.com/api/v2/channels/${encodeURIComponent(clean)}`, {
-      timeout: 9000,
-      headers: { 'User-Agent': 'Mozilla/5.0', Accept: 'application/json' }
-    });
-    return {
-      slug: clean,
-      channelId: String(data?.id || data?.channel_id || data?.chatroom?.channel_id || '').trim(),
-      chatroomId: String(data?.chatroom?.id || data?.chatroom_id || data?.chatroomId || '').trim(),
-      broadcasterUserId: String(data?.broadcaster_user_id || data?.user_id || data?.user?.id || '').trim(),
-      followers: data?.followers_count || data?.followers || 0,
-      isLive: !!(data?.livestream || data?.is_live),
-      viewerCount: data?.livestream?.viewer_count || 0,
-    };
-  } catch(e) {
-    console.warn(`[BOT V2] API interne channel ${clean} impossible:`, e.response?.status || e.message);
+  // Fallback interne public Kick : c'est celui qui expose normalement chatroom.id.
+  const webHeaders = {
+    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/126 Safari/537.36',
+    'Accept': 'application/json, text/plain, */*',
+    'Accept-Language': 'fr-FR,fr;q=0.9,en;q=0.8',
+    'Referer': `https://kick.com/${encodeURIComponent(clean)}`,
+    'Origin': 'https://kick.com'
+  };
+  const endpoints = [
+    `https://kick.com/api/v2/channels/${encodeURIComponent(clean)}`,
+    `https://kick.com/api/v1/channels/${encodeURIComponent(clean)}`
+  ];
+
+  for (const url of endpoints) {
+    try {
+      const { data } = await axios.get(url, { timeout: 12000, headers: webHeaders });
+      const chatroomId = String(
+        data?.chatroom?.id || data?.chatroom_id || data?.chatroomId ||
+        data?.livestream?.chatroom_id || data?.stream?.chatroom_id || ''
+      ).trim();
+      const info = {
+        slug: clean,
+        channelId: String(data?.id || data?.channel_id || data?.chatroom?.channel_id || officialInfo?.channelId || '').trim(),
+        chatroomId,
+        broadcasterUserId: String(data?.broadcaster_user_id || data?.user_id || data?.user?.id || officialInfo?.broadcasterUserId || '').trim(),
+        followers: data?.followers_count || data?.followers || officialInfo?.followers || 0,
+        isLive: !!(data?.livestream || data?.is_live || officialInfo?.isLive),
+        viewerCount: data?.livestream?.viewer_count || data?.stream?.viewer_count || officialInfo?.viewerCount || 0,
+      };
+      if (info.chatroomId) return info;
+      console.warn(`[BOT V2] ${clean}: endpoint ${url} OK mais chatroom_id absent.`);
+    } catch(e) {
+      console.warn(`[BOT V2] API web channel ${clean} impossible (${url}):`, e.response?.status || e.message);
+    }
   }
-  return null;
+
+  if (officialInfo) {
+    console.warn(`[BOT V2] ${clean}: Kick a renvoyé la chaîne, mais aucun chatroom_id. Le bot ne peut pas lire ce chat sans cet id.`);
+  }
+  return officialInfo;
 }
 
 
