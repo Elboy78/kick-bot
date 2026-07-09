@@ -140,7 +140,9 @@ async function initSchema() {
     )`,
     `CREATE TABLE IF NOT EXISTS custom_commands (
       id         INTEGER PRIMARY KEY AUTOINCREMENT,
+      streamer_id INTEGER NOT NULL DEFAULT 1,
       trigger    TEXT NOT NULL UNIQUE,
+      display_trigger TEXT,
       response   TEXT NOT NULL,
       mention_user INTEGER NOT NULL DEFAULT 0,
       enabled    INTEGER NOT NULL DEFAULT 1,
@@ -299,6 +301,7 @@ async function initSchema() {
     )`,
     `CREATE TABLE IF NOT EXISTS command_usage (
       id         INTEGER PRIMARY KEY AUTOINCREMENT,
+      streamer_id INTEGER NOT NULL DEFAULT 1,
       trigger    TEXT NOT NULL,
       username   TEXT,
       created_at TEXT NOT NULL DEFAULT (datetime('now'))
@@ -357,6 +360,8 @@ async function initSchema() {
     )`,
     `CREATE TABLE IF NOT EXISTS system_commands_state (
       trigger  TEXT PRIMARY KEY,
+      display_trigger TEXT,
+      streamer_id INTEGER NOT NULL DEFAULT 1,
       enabled  INTEGER NOT NULL DEFAULT 1
     )`,
   ];
@@ -392,6 +397,8 @@ async function initSchema() {
     `ALTER TABLE chat_activity_daily ADD COLUMN streamer_id INTEGER`,
     `ALTER TABLE custom_commands ADD COLUMN streamer_id INTEGER`,
     `ALTER TABLE custom_commands ADD COLUMN display_trigger TEXT`,
+    `ALTER TABLE system_commands_state ADD COLUMN streamer_id INTEGER`,
+    `ALTER TABLE system_commands_state ADD COLUMN display_trigger TEXT`,
     `ALTER TABLE streamers ADD COLUMN channel_id TEXT`,
     `ALTER TABLE streamers ADD COLUMN chatroom_id TEXT`,
     `ALTER TABLE streamers ADD COLUMN broadcaster_user_id TEXT`,
@@ -784,15 +791,20 @@ async function clearModerationLogs() {
 }
 
 async function logCommandUsage(trigger, username) {
-  await run(`INSERT INTO command_usage (trigger, username) VALUES (?, ?)`, [trigger.toLowerCase(), (username||'').toLowerCase()]);
+  const sid = scopedStreamerId();
+  await run(
+    `INSERT INTO command_usage (trigger, username, streamer_id) VALUES (?, ?, ?)`,
+    [String(trigger || '').toLowerCase(), (username || '').toLowerCase(), sid]
+  );
 }
 
 async function getCommandUsageStats(days = 7) {
+  const sid = scopedStreamerId();
   const rows = await all(
     `SELECT trigger, COUNT(*) as count FROM command_usage
-     WHERE created_at >= datetime('now', ?)
+     WHERE COALESCE(streamer_id, 1) = ? AND created_at >= datetime('now', ?)
      GROUP BY trigger ORDER BY count DESC LIMIT 10`,
-    [`-${days} days`]
+    [sid, `-${days} days`]
   );
   const total = rows.reduce((sum, r) => sum + r.count, 0);
   return rows.map(r => ({ trigger: r.trigger, count: r.count, pct: total > 0 ? Math.round((r.count / total) * 100) : 0 }));
@@ -1178,15 +1190,35 @@ async function setSettingStr(key, value) {
 // ─── System Commands ──────────────────────────────────────────────────────────
 
 async function initSystemCommandsState(commands) {
+  const sid = scopedStreamerId();
   for (const cmd of commands) {
+    const display = String(cmd || '').toLowerCase();
+    const storage = `${sid}:${display}`;
     try {
-      await run(`INSERT OR IGNORE INTO system_commands_state (trigger, enabled) VALUES (?, 1)`, [cmd]);
-    } catch(e) {}
+      await run(
+        `INSERT OR IGNORE INTO system_commands_state (trigger, display_trigger, streamer_id, enabled) VALUES (?, ?, ?, 1)`,
+        [storage, display, sid]
+      );
+    } catch(e) {
+      // Ancienne base sans colonnes V2 : fallback non bloquant.
+      try { await run(`INSERT OR IGNORE INTO system_commands_state (trigger, enabled) VALUES (?, 1)`, [storage]); } catch(_) {}
+    }
   }
 }
 
 async function isSystemCmdEnabled(trigger) {
-  const r = await get(`SELECT enabled FROM system_commands_state WHERE trigger = ?`, [trigger]);
+  const sid = scopedStreamerId();
+  const raw = String(trigger || '').toLowerCase();
+  const storage = `${sid}:${raw}`;
+  let r = null;
+  try {
+    r = await get(
+      `SELECT enabled FROM system_commands_state WHERE COALESCE(streamer_id, 1) = ? AND (trigger = ? OR display_trigger = ?)`,
+      [sid, storage, raw]
+    );
+  } catch(e) {
+    r = await get(`SELECT enabled FROM system_commands_state WHERE trigger = ?`, [storage]).catch(() => null);
+  }
   return r ? r.enabled === 1 : true;
 }
 
@@ -1364,11 +1396,34 @@ async function getAllowedWordByText(word) {
 }
 
 async function getAllSystemCommandsState() {
-  return all(`SELECT * FROM system_commands_state ORDER BY trigger ASC`);
+  const sid = scopedStreamerId();
+  try {
+    const rows = await all(
+      `SELECT *, COALESCE(display_trigger, trigger) as trigger FROM system_commands_state
+       WHERE COALESCE(streamer_id, 1) = ?
+       ORDER BY COALESCE(display_trigger, trigger) ASC`,
+      [sid]
+    );
+    return rows.map(r => ({ ...r, trigger: String(r.display_trigger || r.trigger || '').replace(new RegExp(`^${sid}:`), '') }));
+  } catch(e) {
+    const rows = await all(`SELECT * FROM system_commands_state ORDER BY trigger ASC`);
+    return rows.map(r => ({ ...r, trigger: String(r.trigger || '').replace(new RegExp(`^${sid}:`), '') }));
+  }
 }
 
 async function toggleSystemCommand(trigger, enabled) {
-  await run(`INSERT OR REPLACE INTO system_commands_state (trigger, enabled) VALUES (?, ?)`, [trigger, enabled ? 1 : 0]);
+  const sid = scopedStreamerId();
+  const raw = String(trigger || '').toLowerCase();
+  const storage = `${sid}:${raw}`;
+  try {
+    await run(
+      `INSERT INTO system_commands_state (trigger, display_trigger, streamer_id, enabled) VALUES (?, ?, ?, ?)
+       ON CONFLICT(trigger) DO UPDATE SET enabled = ?, display_trigger = ?, streamer_id = ?`,
+      [storage, raw, sid, enabled ? 1 : 0, enabled ? 1 : 0, raw, sid]
+    );
+  } catch(e) {
+    await run(`INSERT OR REPLACE INTO system_commands_state (trigger, enabled) VALUES (?, ?)`, [storage, enabled ? 1 : 0]);
+  }
 }
 
 
@@ -1573,12 +1628,13 @@ async function migrateCoreScopedTables(defaultStreamerId = 1) {
   await migratePointsLogToScoped(defaultStreamerId);
   try { await run(`CREATE INDEX IF NOT EXISTS idx_custom_commands_streamer_trigger ON custom_commands(streamer_id, trigger)`); } catch(e) {}
   try { await run(`CREATE INDEX IF NOT EXISTS idx_stream_sessions_streamer_started ON stream_sessions(streamer_id, started_at DESC)`); } catch(e) {}
-  try { await run(`CREATE INDEX IF NOT EXISTS idx_command_usage_streamer_used ON command_usage(streamer_id, used_at DESC)`); } catch(e) {}
+  try { await run(`CREATE INDEX IF NOT EXISTS idx_command_usage_streamer_created ON command_usage(streamer_id, created_at DESC)`); } catch(e) {}
+  try { await run(`CREATE INDEX IF NOT EXISTS idx_system_commands_streamer_trigger ON system_commands_state(streamer_id, trigger)`); } catch(e) {}
   try { await run(`CREATE INDEX IF NOT EXISTS idx_chat_activity_streamer_day ON chat_activity_daily(streamer_id, day)`); } catch(e) {}
 }
 
 async function migrateLegacyRowsToDefaultStreamer(defaultStreamerId = 1) {
-  const tables = ['viewers','points_log','stream_sessions','command_usage','chat_activity_daily','custom_commands'];
+  const tables = ['viewers','points_log','stream_sessions','command_usage','chat_activity_daily','custom_commands','system_commands_state'];
   for (const table of tables) {
     try { await run(`UPDATE ${table} SET streamer_id = ? WHERE streamer_id IS NULL`, [defaultStreamerId]); } catch(e) {}
   }
