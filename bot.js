@@ -9,6 +9,7 @@ const db       = require('./database');
 const kickOAuth = require('./kick-oauth');
 const shared   = require('./shared');
 const { AsyncLocalStorage } = require('async_hooks');
+const tenant   = require('./tenant');
 
 const CONFIG = {
   channel:      process.env.KICK_CHANNEL       || 'votre_chaine',
@@ -105,12 +106,14 @@ async function syncActiveBotChannels() {
 function withChatContext(ctx, fn) {
   const previous = botChannelState.currentContext;
   const nextCtx = ctx || previous || null;
+  const tenantStreamer = nextCtx ? { id: nextCtx.streamerId || nextCtx.id, slug: nextCtx.slug || nextCtx.streamerSlug } : null;
   // AsyncLocalStorage garde le bon streamer pendant toute la commande, même après await.
-  return chatContextStore.run(nextCtx, async () => {
+  // tenant.runWithStreamer isole aussi toutes les requêtes database.js (points/rang/top/commandes).
+  return tenant.runWithStreamer(tenantStreamer, () => chatContextStore.run(nextCtx, async () => {
     botChannelState.currentContext = nextCtx;
     try { return await fn(); }
     finally { botChannelState.currentContext = previous; }
-  });
+  }));
 }
 function currentChatContext() {
   return chatContextStore.getStore() || botChannelState.currentContext || null;

@@ -43,7 +43,13 @@ function getDefaultStreamerSeed() {
 }
 
 function readRequestedSlug(req) {
-  const pathSlug = String(req?.path || req?.url || '').match(/^\/s\/([^\/?#]+)/)?.[1];
+  const directPath = `${req?.originalUrl || ''} ${req?.path || ''} ${req?.url || ''}`;
+  const pathSlug = String(directPath).match(/\/s\/([^\/?#\s]+)/)?.[1];
+  let refererSlug = '';
+  try {
+    const ref = String(req?.headers?.referer || req?.headers?.referrer || '');
+    refererSlug = ref.match(/\/s\/([^\/?#]+)/)?.[1] || '';
+  } catch(e) {}
   const cookies = { ...parseCookies(req), ...(req?.cookies || {}) };
   return normalizeSlug(
     req?.params?.streamer ||
@@ -51,6 +57,7 @@ function readRequestedSlug(req) {
     pathSlug ||
     req?.query?.streamer ||
     req?.headers?.['x-streamer-slug'] ||
+    refererSlug ||
     cookies.kb_streamer ||
     cookies.streamer ||
     DEFAULT_STREAMER_SLUG
