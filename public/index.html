@@ -334,6 +334,17 @@ hr.div{border:none;border-top:1px solid var(--brd);margin:12px 0}
 @media(max-width:1500px){.chests-layout{grid-template-columns:230px minmax(620px,1fr) 370px!important}.dbd-board{grid-template-columns:repeat(5,minmax(126px,1fr))!important}.chestcell.dbd-case{height:132px!important}.dbd-case .mini-chest{width:126px!important;height:108px!important}.anim-preview-box{height:200px}}
 @media(max-width:1180px){.chests-layout{grid-template-columns:1fr!important}.dbd-board{grid-template-columns:repeat(5,1fr)!important}.showcase{max-width:520px;margin:auto}}
 
+
+/* Modal édition commande */
+.cmd-modal-backdrop{position:fixed;inset:0;z-index:9998;display:none;align-items:center;justify-content:center;padding:24px;background:rgba(2,6,23,.58);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px)}
+.cmd-modal-backdrop.active{display:flex}
+.cmd-modal{width:min(760px,96vw);max-height:92vh;overflow:auto;background:linear-gradient(180deg,var(--surface),var(--surface2));border:1px solid var(--border);border-radius:18px;box-shadow:0 30px 90px rgba(0,0,0,.65);padding:20px}
+.cmd-modal-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:14px}
+.cmd-modal-head h2{margin:0;font-size:22px}
+.cmd-modal-head p{margin:4px 0 0;color:var(--muted);font-size:12px}
+.cmd-modal-close{border:1px solid var(--border);background:rgba(255,255,255,.04);color:var(--text);border-radius:10px;padding:8px 11px;cursor:pointer;font-weight:900}
+.cmd-modal-actions{display:flex;gap:10px;justify-content:flex-end;margin-top:16px;flex-wrap:wrap}
+
 </style>
 </head>
 <body>
@@ -642,6 +653,29 @@ hr.div{border:none;border-top:1px solid var(--brd);margin:12px 0}
     </div>
   </div>
 
+
+  <div id="cmd-modal-backdrop" class="cmd-modal-backdrop" onclick="if(event.target===this) closeCmdModal()">
+    <div class="cmd-modal">
+      <div class="cmd-modal-head">
+        <div>
+          <h2 id="cmd-form-title">➕ Nouvelle commande</h2>
+          <p>Paramètres de la commande. Valide pour enregistrer, ou annule pour revenir sans changement.</p>
+        </div>
+        <button class="cmd-modal-close" onclick="closeCmdModal()">✕</button>
+      </div>
+      <label class="lbl">Trigger (avec le !)</label>
+      <input class="inp" id="cmd-page-trigger" placeholder="Ex: !discord" maxlength="30">
+      <label class="lbl">Réponse dans le chat</label>
+      <textarea class="inp" id="cmd-page-response" placeholder="Ex: discord.gg/xxx" rows="5"></textarea>
+      <div style="font-size:10px;color:var(--muted);margin-top:5px">Variables possibles : <b>@{user}</b> pour placer le pseudo où tu veux. Active l’option ci-dessous pour identifier automatiquement la personne au début du message.</div>
+      <label class="co-toggle-line" style="margin-top:14px"><span class="co-switch"><input type="checkbox" id="cmd-page-mention"><span></span></span><b>Identifier automatiquement le viewer qui tape la commande</b></label>
+      <div class="cmd-modal-actions">
+        <button id="cmd-cancel-btn" class="btnx btn-ghost" onclick="closeCmdModal()">Annuler</button>
+        <button id="cmd-save-btn" class="btnx btn-primary" onclick="saveCmdPage()">➕ Ajouter</button>
+      </div>
+    </div>
+  </div>
+
   <!-- ══ DBD ══ -->
   <div class="page" id="page-dbd">
     <div class="header"><div><h1>Dead by Daylight</h1><p>Générateur de builds aléatoires</p></div></div>
@@ -685,7 +719,7 @@ hr.div{border:none;border-top:1px solid var(--brd);margin:12px 0}
     </div>
     <div class="g2">
       <div><div class="panel" style="margin-bottom:14px"><h3>💬 Commandes personnalisées (<span id="cmd-count">0</span>)</h3><div id="cmd-page-list"><div class="empty"><div class="ei">💬</div><p>Aucune commande</p></div></div></div><div class="panel"><h3>📌 Commandes système <span style="display:flex;align-items:center;gap:6px"><span style="font-size:9px;color:#a1a1aa">Tout</span><label class="toggle"><input type="checkbox" id="all-cmds-toggle" checked onchange="toggleAllCommands(this.checked)"><span class="tsl"></span></label></span></h3><div id="sys-cmd-list"><div class="empty"><p>Chargement…</p></div></div></div></div>
-      <div><div class="panel" style="position:sticky;top:20px"><h3 id="cmd-form-title">➕ Nouvelle commande</h3><label class="lbl">Trigger (avec le !)</label><input class="inp" id="cmd-page-trigger" placeholder="Ex: !discord" maxlength="30"><label class="lbl">Réponse dans le chat</label><textarea class="inp" id="cmd-page-response" placeholder="Ex: discord.gg/xxx" rows="4"></textarea><div style="font-size:9px;color:#4a4d68;margin-top:3px">@{user} dans le texte pour placer le pseudo où tu veux</div><label class="co-toggle-line" style="margin-top:10px"><span class="co-switch"><input type="checkbox" id="cmd-page-mention"><span></span></span><b>Identifier automatiquement le viewer</b></label><button id="cmd-save-btn" class="btnx btn-primary" style="width:100%;justify-content:center;margin-top:12px;padding:8px" onclick="saveCmdPage()">➕ Ajouter</button><button id="cmd-cancel-btn" class="btnx btn-ghost" style="display:none;width:100%;justify-content:center;margin-top:8px" onclick="resetCmdForm()">Annuler la modification</button><div id="cmd-page-msg" style="margin-top:7px"></div></div></div>
+      <div><div class="panel" style="position:sticky;top:20px"><h3>➕ Nouvelle commande</h3><p style="color:var(--muted);font-size:12px;margin-bottom:12px">Crée ou modifie une commande dans une fenêtre au premier plan. Le fond reste flouté jusqu’à validation ou annulation.</p><button class="btnx btn-primary" style="width:100%;justify-content:center;padding:10px" onclick="openCmdModal()">➕ Ajouter une commande</button><div id="cmd-page-msg" style="margin-top:7px"></div></div></div>
     </div>
   </div>
 
@@ -2558,7 +2592,32 @@ async function toggleCustomCmd(trigger, enabled) {
 }
 
 
+function escAttr(s){return String(s||'').replace(/[&<>"'`]/g, m=>({'&':'&amp;','<':'&lt;','>':'&gt;','\"':'&quot;',"'":'&#39;','`':'&#96;'}[m]||m));}
+
 let editingCmdTrigger = null;
+
+function openCmdModal(cmd=null) {
+  editingCmdTrigger = cmd?.trigger || null;
+  const modal = document.getElementById('cmd-modal-backdrop');
+  const title = document.getElementById('cmd-form-title');
+  const trigger = document.getElementById('cmd-page-trigger');
+  const response = document.getElementById('cmd-page-response');
+  const mention = document.getElementById('cmd-page-mention');
+  const btn = document.getElementById('cmd-save-btn');
+  if (title) title.textContent = editingCmdTrigger ? '✏️ Modifier la commande' : '➕ Nouvelle commande';
+  if (trigger) { trigger.value = cmd?.trigger || ''; trigger.disabled = !!editingCmdTrigger; }
+  if (response) response.value = cmd?.response || '';
+  if (mention) mention.checked = !!cmd?.mentionUser;
+  if (btn) btn.textContent = editingCmdTrigger ? '💾 Enregistrer la modification' : '➕ Ajouter la commande';
+  if (modal) modal.classList.add('active');
+  setTimeout(()=> (response?.value ? response : trigger)?.focus(), 50);
+}
+
+function closeCmdModal() {
+  const modal = document.getElementById('cmd-modal-backdrop');
+  if (modal) modal.classList.remove('active');
+  resetCmdForm();
+}
 
 function resetCmdForm() {
   editingCmdTrigger = null;
@@ -2567,13 +2626,11 @@ function resetCmdForm() {
   const response = document.getElementById('cmd-page-response');
   const mention = document.getElementById('cmd-page-mention');
   const btn = document.getElementById('cmd-save-btn');
-  const cancel = document.getElementById('cmd-cancel-btn');
   if (title) title.textContent = '➕ Nouvelle commande';
   if (trigger) { trigger.value = ''; trigger.disabled = false; }
   if (response) response.value = '';
   if (mention) mention.checked = false;
   if (btn) btn.textContent = '➕ Ajouter';
-  if (cancel) cancel.style.display = 'none';
 }
 
 async function loadCommandsPage() {
@@ -2603,12 +2660,12 @@ async function loadCommandsPage() {
           <div style="font-size:12px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${safeResponse}</div>
         </div>
         <div style="display:flex;gap:6px;flex-shrink:0">
-          <button class="btnx btn-ghost btn-sm" onclick="editCmd('${safeTrigger}', ${JSON.stringify(c.response)}, ${mention ? 'true' : 'false'})">Modifier</button>
+          <button class="btnx btn-ghost btn-sm" data-trigger="${safeTrigger}" data-response="${escAttr(c.response || '')}" data-mention="${mention ? '1' : '0'}" onclick="editCmdFromButton(this)">Modifier</button>
           <button class="btnx btn-red btn-sm" onclick="deleteCmdPage('${safeTrigger}')">Supprimer</button>
         </div>
       </div>`;
     }).join('');
-  } catch(e) {}
+  } catch(e) { console.error('loadCommandsPage error', e); }
 }
 
 async function saveCmdPage() {
@@ -2624,36 +2681,32 @@ async function saveCmdPage() {
   const r = await post('/api/admin/commands', { trigger, response, mentionUser });
   if (!r.ok) return showInline('cmd-page-msg', r.error || 'Erreur (clé admin requise ?)', false);
   toast('Commande ' + trigger + (editingCmdTrigger ? ' modifiée ✓' : ' ajoutée ✓'));
-  resetCmdForm();
+  const wasEditing = !!editingCmdTrigger;
+  closeCmdModal();
+  showInline('cmd-page-msg', wasEditing ? 'Commande modifiée ✓' : 'Commande ajoutée ✓', true);
   loadCommandsPage();
   loadCmds();
 }
 
 async function addCmdPage(){ return saveCmdPage(); }
 
+function editCmdFromButton(btn) {
+  openCmdModal({
+    trigger: btn.dataset.trigger || '',
+    response: btn.dataset.response || '',
+    mentionUser: btn.dataset.mention === '1'
+  });
+}
+
 function editCmd(trigger, response, mentionUser=false) {
-  editingCmdTrigger = trigger;
-  const title = document.getElementById('cmd-form-title');
-  const triggerEl = document.getElementById('cmd-page-trigger');
-  const responseEl = document.getElementById('cmd-page-response');
-  const mentionEl = document.getElementById('cmd-page-mention');
-  const btn = document.getElementById('cmd-save-btn');
-  const cancel = document.getElementById('cmd-cancel-btn');
-  if (title) title.textContent = '✏️ Modifier la commande';
-  if (triggerEl) { triggerEl.value = trigger; triggerEl.disabled = true; }
-  if (responseEl) responseEl.value = response;
-  if (mentionEl) mentionEl.checked = !!mentionUser;
-  if (btn) btn.textContent = '💾 Sauvegarder';
-  if (cancel) cancel.style.display = 'flex';
-  responseEl?.focus();
-  showInline('cmd-page-msg', 'Modifie puis clique sur Sauvegarder', true);
+  openCmdModal({ trigger, response, mentionUser });
 }
 
 async function deleteCmdPage(trigger) {
   if (!confirm('Supprimer la commande ' + trigger + ' ?')) return;
   await del('/api/admin/commands/' + encodeURIComponent(trigger));
   toast('Commande ' + trigger + ' supprimée');
-  if (editingCmdTrigger === trigger) resetCmdForm();
+  if (editingCmdTrigger === trigger) closeCmdModal();
   loadCommandsPage();
   loadCmds();
 }
