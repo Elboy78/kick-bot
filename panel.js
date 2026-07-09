@@ -169,6 +169,31 @@ function installTenantScopedSettings() {
 installTenantScopedSettings();
 
 app.use((req, res, next) => tenant.attachTenant(db, req, res, next));
+
+// V2 overlays privés : quand un widget OBS est ouvert via /o/<token>/<widget>.html,
+// le navigateur n'a pas forcément un cookie fiable dans OBS. Les APIs du widget
+// peuvent donc envoyer ?overlayToken=<token>. On résout alors le vrai streamer ici,
+// AVANT de créer le TenantManager de la requête.
+app.use(async (req, res, next) => {
+  try {
+    const overlayToken = String(req.query?.overlayToken || req.headers?.['x-overlay-token'] || '').trim();
+    if (overlayToken && typeof db.getOverlayTokenByValue === 'function') {
+      const tokenRow = await db.getOverlayTokenByValue(overlayToken);
+      if (tokenRow?.streamer_id && typeof db.getStreamerById === 'function') {
+        const streamer = await db.getStreamerById(tokenRow.streamer_id);
+        if (streamer) {
+          req.streamer = streamer;
+          req.streamerSlug = streamer.slug;
+          res.setHeader('X-Streamer-Slug', streamer.slug);
+        }
+      }
+    }
+  } catch(e) {
+    console.warn('[OVERLAY TOKEN] Résolution API impossible:', e.message);
+  }
+  next();
+});
+
 app.use((req, res, next) => { req.tenantManager = createTenantManager({ db, io, req, streamer: req.streamer }); next(); });
 
 // Routes tenant qui posent le cookie streamer avant de servir le panel/overlays.
@@ -1386,11 +1411,11 @@ app.post('/api/admin/widgets/songrequest/volume', requireAuth, async (req, res) 
     const volume = Math.max(0, Math.min(100, Number.isFinite(raw) ? Math.round(raw) : 100));
     const state = await getSongRequestPlayerState(tm);
     const next = { ...state, streamer: songRequestSlug(tm), volume, updatedAt: new Date().toISOString() };
+
+    // Sauvegarde AVANT d'émettre, sinon un refresh/poll pouvait relire l'ancien 100%.
+    await tm.setJson('songrequest_player_state', next);
     tm.emit('songrequest-player-state', next);
     await issueSongRequestControl('volume', { volume }, tm);
-    tm.setJson('songrequest_player_state', next).catch(e => {
-      console.warn(`[SONGREQUEST:${songRequestSlug(tm)}] Sauvegarde volume impossible:`, e.message);
-    });
     res.json({ success:true, player: next });
   } catch(e) { res.status(500).json({ error:e.message }); }
 });
@@ -1408,9 +1433,15 @@ app.post('/api/widgets/songrequest/player-state', async (req, res) => {
       return res.json({ success:true, ignored:true, player: state.player });
     }
     const patch = { itemId: currentItem.id };
-    if (typeof req.body.status === 'string' && req.body.status === 'ended') {
-      patch.status = 'stopped';
-      setSongRequestDesiredStatus(tm, 'stopped');
+    if (typeof req.body.status === 'string') {
+      const status = String(req.body.status).toLowerCase();
+      if (status === 'ended') {
+        patch.status = 'stopped';
+        setSongRequestDesiredStatus(tm, 'stopped');
+      } else if (['playing','paused','stopped'].includes(status)) {
+        patch.status = status;
+        setSongRequestDesiredStatus(tm, status);
+      }
     }
     if (req.body.currentTime !== undefined) patch.currentTime = Math.max(0, parseFloat(req.body.currentTime) || 0);
     if (req.body.duration !== undefined) patch.duration = Math.max(0, parseFloat(req.body.duration) || 0);
