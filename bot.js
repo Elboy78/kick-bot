@@ -122,6 +122,33 @@ function cleanup() {
 // Cache des 500 derniers messages pour retrouver le texte associé à un ban/timeout
 const recentMessages = new Map(); // username → { content, msgId }
 
+// Forward des events Kick non-chat vers panel.js (Sub Goal / Alertes).
+// Important : certains subs arrivent via le websocket Pusher et pas via le webhook officiel
+// si l'abonnement EventSub Kick n'est pas configuré ou a expiré.
+function parseKickEventData(data) {
+  try { return typeof data === 'string' ? JSON.parse(data) : (data || {}); } catch { return {}; }
+}
+
+function looksLikeSubFollowRaidEvent(event, payload) {
+  const eventName = String(event || '').toLowerCase();
+  const preview = (() => { try { return JSON.stringify(payload || {}).toLowerCase(); } catch { return ''; } })();
+  return /follow|subscription|subscribe|subscribed|subgift|giftedsub|gifted_subscription|resub|renew|raid/.test(eventName)
+      || /"subscription"|"subscriber"|"gifter"|"giftees"|"gift_count"|"follower"|"raid"/.test(preview);
+}
+
+async function forwardKickEventToPanel(event, payload) {
+  try {
+    if (shared && typeof shared.processKickEvent === 'function') {
+      const result = await shared.processKickEvent(event, payload);
+      if (result && !result.ignored && !result.duplicate) {
+        console.log(`[KICK EVENT] transmis au panel: ${event}`);
+      }
+    }
+  } catch (e) {
+    console.warn(`[KICK EVENT] transmission panel impossible (${event}):`, e.message);
+  }
+}
+
 function handleEvent(msg) {
   const { event, data } = msg;
 
@@ -180,6 +207,29 @@ function handleEvent(msg) {
       break;
     }
 
+    // Subs / follows / raids : on ne les laisse plus seulement en webhook.
+    // Dès qu'un event Pusher Kick ressemble à un sub/follow/raid, on le transmet au moteur panel.
+    case 'App\\Events\\SubscriptionEvent':
+    case 'SubscriptionEvent':
+    case 'App\\Events\\SubscriptionCreatedEvent':
+    case 'SubscriptionCreatedEvent':
+    case 'App\\Events\\ChannelSubscriptionEvent':
+    case 'ChannelSubscriptionEvent':
+    case 'App\\Events\\SubscriptionRenewedEvent':
+    case 'SubscriptionRenewedEvent':
+    case 'App\\Events\\GiftedSubscriptionsEvent':
+    case 'GiftedSubscriptionsEvent':
+    case 'App\\Events\\SubscriptionGiftedEvent':
+    case 'SubscriptionGiftedEvent':
+    case 'App\\Events\\ChannelFollowedEvent':
+    case 'ChannelFollowedEvent':
+    case 'App\\Events\\RaidEvent':
+    case 'RaidEvent': {
+      const p = parseKickEventData(data);
+      forwardKickEventToPanel(event, p);
+      break;
+    }
+
     // Récompense de points de chaîne rachetée — nom d'événement non confirmé sur ce bot,
     // on tente plusieurs variantes plausibles en plus du logger générique ci-dessous.
     case 'App\\Events\\RewardRedeemedEvent':
@@ -192,11 +242,13 @@ function handleEvent(msg) {
     }
 
     default: {
-      // Logger générique : capture tout événement Kick pas encore géré, pour pouvoir
-      // découvrir le vrai nom/format des événements (ex: rachat de récompense) via les logs Render.
+      // Logger générique + auto-détection : capture tout événement Kick pas encore géré.
+      // Si l'event ressemble à un sub/follow/raid, on le transmet aussi au panel.
       if (event && !event.startsWith('pusher:') && !event.startsWith('pusher_internal:')) {
-        let preview = data;
-        try { preview = typeof data === 'string' ? JSON.parse(data) : data; } catch {}
+        let preview = parseKickEventData(data);
+        if (looksLikeSubFollowRaidEvent(event, preview)) {
+          forwardKickEventToPanel(event, preview);
+        }
         console.log(`[EVENT INCONNU] "${event}" —`, JSON.stringify(preview).slice(0, 1500));
       }
       break;

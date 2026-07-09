@@ -189,7 +189,12 @@ async function recordSubEvent(type, payload = {}) {
       state.session += amount;
     }
     if (type === 'gift') state.gifts += amount;
-    if (type === 'renewal') state.renewals += 1;
+    if (type === 'renewal') {
+      // Un renouvellement ne change pas forcément le nombre de subs actifs,
+      // mais il doit bien compter dans les subs de la session live.
+      state.session += amount;
+      state.renewals += amount;
+    }
 
     state.latest = [event, ...state.latest].slice(0, 12);
     await db.setSettingStr('subcounter_total', String(state.total));
@@ -218,12 +223,17 @@ function pick(...values) {
   return values.find(v => typeof v === 'string' && v.trim())?.trim() || '';
 }
 function normalizeKickEventType(type = '') {
-  const t = String(type || '').toLowerCase();
+  const raw = String(type || '');
+  const t = raw.toLowerCase();
   if (t.includes('follow')) return 'channel.followed';
-  if (t.includes('subscription.gift') || t.includes('subgift') || (t.includes('gift') && t.includes('sub'))) return 'channel.subscription.gifts';
-  if (t.includes('subscription.renew') || t.includes('subrenew') || (t.includes('renew') && t.includes('sub'))) return 'channel.subscription.renewal';
-  if (t.includes('subscription.new') || t.includes('subscribed') || t.includes('subscription') || t.includes('sub')) return 'channel.subscription.new';
-  return String(type || '');
+
+  // API officielle Kick EventSub + anciens noms possibles des events Pusher.
+  // Sources officielles/community listent notamment : channel.subscription.new,
+  // channel.subscription.renewal, channel.subscription.gifts.
+  if (t.includes('subscription.gift') || t.includes('giftedsubscription') || t.includes('gifted_subscription') || t.includes('subgift') || (t.includes('gift') && t.includes('sub'))) return 'channel.subscription.gifts';
+  if (t.includes('subscription.renew') || t.includes('subrenew') || t.includes('resub') || t.includes('re-sub') || (t.includes('renew') && t.includes('sub'))) return 'channel.subscription.renewal';
+  if (t.includes('subscription.new') || t.includes('subscriptioncreated') || t.includes('subscription_created') || t.includes('subscribed') || t.includes('subscription') || t.includes('subscribe') || t.includes('sub')) return 'channel.subscription.new';
+  return raw;
 }
 function parsePayloadSafe(payload = {}) {
   if (typeof payload === 'string') {
