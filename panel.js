@@ -91,15 +91,31 @@ app.get('/api/v2/obs-links', waitDB, async (req, res) => {
     const protocol = req.headers['x-forwarded-proto'] || req.protocol || 'https';
     const host = req.get('host');
     const base = `${protocol}://${host}`;
-    const slug = req.streamer?.slug || tenant.DEFAULT_STREAMER_SLUG;
+    const streamer = req.streamer || await db.ensureDefaultStreamer(tenant.getDefaultStreamerSeed());
+    const tokens = await db.getOverlayTokensForStreamer(streamer.id);
+    const linkFor = (widget) => `${base}/o/${tokens[widget].token}/${widget}.html`;
     res.json({ data: {
-      streamer: slug,
-      classement: `${base}/s/${slug}/classement`,
-      alerts: `${base}/s/${slug}/widgets/alerts.html`,
-      chat: `${base}/s/${slug}/widgets/chat.html`,
-      songrequest: `${base}/s/${slug}/widgets/songrequest.html`,
-      subgoal: `${base}/s/${slug}/widgets/subgoal.html`
+      streamer: streamer.slug,
+      mode: 'token',
+      classement: `${base}/s/${streamer.slug}/classement`,
+      alerts: linkFor('alerts'),
+      chat: linkFor('chat'),
+      songrequest: linkFor('songrequest'),
+      subgoal: linkFor('subgoal'),
+      tokens: Object.fromEntries(Object.entries(tokens).map(([k,v]) => [k, { id:v.id, widget:k, token:String(v.token).slice(0,6)+'…'+String(v.token).slice(-6), lastUsedAt:v.last_used_at || null }]))
     }});
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+app.post('/api/v2/admin/overlay-tokens/:widget/regenerate', requireAuth, waitDB, async (req, res) => {
+  try {
+    const protocol = req.headers['x-forwarded-proto'] || req.protocol || 'https';
+    const host = req.get('host');
+    const base = `${protocol}://${host}`;
+    const streamer = req.streamer || await db.ensureDefaultStreamer(tenant.getDefaultStreamerSeed());
+    const widget = String(req.params.widget || '').replace(/\.html$/,'').toLowerCase();
+    const row = await db.regenerateOverlayToken(streamer.id, widget);
+    res.json({ success:true, data:{ widget, url:`${base}/o/${row.token}/${widget}.html`, token:String(row.token).slice(0,6)+'…'+String(row.token).slice(-6) } });
   } catch(e) { res.status(500).json({ error: e.message }); }
 });
 
@@ -159,6 +175,26 @@ app.use((req, res, next) => { req.tenantManager = createTenantManager({ db, io, 
 app.get('/s/:streamer/widgets/:file', setStreamerCookieMiddleware, (req, res) => {
   const file = String(req.params.file || '').replace(/[^a-z0-9_.-]/gi, '');
   res.sendFile(path.join(__dirname, 'public', 'widgets', file));
+});
+
+app.get('/o/:token/:file', waitDB, async (req, res) => {
+  try {
+    const file = String(req.params.file || '').replace(/[^a-z0-9_.-]/gi, '');
+    const widget = file.replace(/\.html$/,'').toLowerCase();
+    const tokenRow = await db.getOverlayTokenByValue(req.params.token);
+    if (!tokenRow || tokenRow.widget !== widget) return res.status(404).send('Overlay introuvable');
+    const streamer = await db.getStreamerById(tokenRow.streamer_id);
+    if (!streamer) return res.status(404).send('Streamer introuvable');
+    req.streamer = streamer;
+    req.streamerSlug = streamer.slug;
+    res.cookie('kb_streamer', streamer.slug, { path: '/', sameSite: 'Lax', maxAge: 1000 * 60 * 60 * 24 * 365 });
+    res.setHeader('X-Streamer-Slug', streamer.slug);
+    res.setHeader('X-Overlay-Widget', widget);
+    res.sendFile(path.join(__dirname, 'public', 'widgets', file));
+  } catch(e) {
+    console.error('[OVERLAY TOKEN] Erreur:', e.message);
+    res.status(500).send('Erreur overlay');
+  }
 });
 app.get('/s/:streamer/classement', setStreamerCookieMiddleware, (req, res) => res.sendFile(path.join(__dirname, 'public', 'classement.html')));
 app.get('/s/:streamer/dashboard', setStreamerCookieMiddleware, (req, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));

@@ -104,6 +104,17 @@ async function initSchema() {
       updated_at  TEXT NOT NULL DEFAULT (datetime('now')),
       PRIMARY KEY(streamer_id, key)
     )`,
+    `CREATE TABLE IF NOT EXISTS overlay_tokens (
+      id          INTEGER PRIMARY KEY AUTOINCREMENT,
+      streamer_id INTEGER NOT NULL,
+      widget      TEXT NOT NULL,
+      token       TEXT NOT NULL UNIQUE,
+      enabled     INTEGER NOT NULL DEFAULT 1,
+      created_at  TEXT NOT NULL DEFAULT (datetime('now')),
+      updated_at  TEXT NOT NULL DEFAULT (datetime('now')),
+      last_used_at TEXT,
+      UNIQUE(streamer_id, widget)
+    )`,
     `CREATE TABLE IF NOT EXISTS viewers (
       id            INTEGER PRIMARY KEY AUTOINCREMENT,
       streamer_id   INTEGER NOT NULL DEFAULT 1,
@@ -1529,6 +1540,58 @@ async function setStreamerSetting(streamerId, key, value) {
   );
 }
 
+function normalizeOverlayWidget(widget) {
+  const w = String(widget || '').toLowerCase().replace(/\.html$/,'').replace(/[^a-z0-9_-]/g, '');
+  const allowed = new Set(['songrequest','chat','subgoal','alerts']);
+  return allowed.has(w) ? w : '';
+}
+function createOverlayTokenValue() {
+  return require('crypto').randomBytes(32).toString('hex');
+}
+async function getOrCreateOverlayToken(streamerId, widget) {
+  const sid = Number(streamerId || scopedStreamerId() || 1);
+  const w = normalizeOverlayWidget(widget);
+  if (!w) throw new Error('widget overlay invalide');
+  let row = await get(`SELECT * FROM overlay_tokens WHERE streamer_id = ? AND widget = ?`, [sid, w]);
+  if (row) return row;
+  for (let i = 0; i < 5; i++) {
+    const token = createOverlayTokenValue();
+    try {
+      await run(`INSERT INTO overlay_tokens (streamer_id, widget, token, enabled, updated_at) VALUES (?, ?, ?, 1, datetime('now'))`, [sid, w, token]);
+      return await get(`SELECT * FROM overlay_tokens WHERE streamer_id = ? AND widget = ?`, [sid, w]);
+    } catch(e) {
+      if (!String(e.message || '').includes('UNIQUE')) throw e;
+    }
+  }
+  throw new Error('impossible de générer un token overlay unique');
+}
+async function regenerateOverlayToken(streamerId, widget) {
+  const sid = Number(streamerId || scopedStreamerId() || 1);
+  const w = normalizeOverlayWidget(widget);
+  if (!w) throw new Error('widget overlay invalide');
+  const token = createOverlayTokenValue();
+  await run(
+    `INSERT INTO overlay_tokens (streamer_id, widget, token, enabled, updated_at) VALUES (?, ?, ?, 1, datetime('now'))
+     ON CONFLICT(streamer_id, widget) DO UPDATE SET token = ?, enabled = 1, updated_at = datetime('now')`,
+    [sid, w, token, token]
+  );
+  return getOrCreateOverlayToken(sid, w);
+}
+async function getOverlayTokenByValue(token) {
+  const t = String(token || '').trim();
+  if (!t) return null;
+  const row = await get(`SELECT ot.*, s.slug, s.display_name FROM overlay_tokens ot JOIN streamers s ON s.id = ot.streamer_id WHERE ot.token = ? AND ot.enabled = 1`, [t]);
+  if (row) run(`UPDATE overlay_tokens SET last_used_at = datetime('now') WHERE id = ?`, [row.id]).catch(()=>{});
+  return row || null;
+}
+async function getOverlayTokensForStreamer(streamerId) {
+  const sid = Number(streamerId || scopedStreamerId() || 1);
+  const widgets = ['songrequest','chat','subgoal','alerts'];
+  const out = {};
+  for (const w of widgets) out[w] = await getOrCreateOverlayToken(sid, w);
+  return out;
+}
+
 function oauthProviderForStreamer(streamerId) {
   return streamerId ? `kick:${streamerId}` : 'kick';
 }
@@ -1694,5 +1757,5 @@ module.exports = {
   setBotStatus, getBotStatus, getAllBotStatus,
   saveOAuthToken, getOAuthToken, deleteOAuthToken,
   ensureDefaultStreamer, getStreamerBySlug, getStreamerById, listStreamers, upsertStreamer, updateStreamerKickMeta, getActiveStreamersForBot,
-  getStreamerSetting, setStreamerSetting, saveOAuthTokenForStreamer, getOAuthTokenForStreamer, deleteOAuthTokenForStreamer,
+  getStreamerSetting, setStreamerSetting, getOrCreateOverlayToken, regenerateOverlayToken, getOverlayTokenByValue, getOverlayTokensForStreamer, saveOAuthTokenForStreamer, getOAuthTokenForStreamer, deleteOAuthTokenForStreamer,
 };
