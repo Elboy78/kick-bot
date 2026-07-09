@@ -17,6 +17,19 @@
   .pop{animation:pop .55s ease}
   @keyframes pop{0%{transform:scale(1)}35%{transform:scale(1.08)}100%{transform:scale(1)}}
 </style>
+
+<script>
+window.__STREAMER_SLUG__ = window.__STREAMER_SLUG__ || new URLSearchParams(location.search).get('streamer') || (location.pathname.match(/^\/s\/([^\/]+)/)||[])[1] || '';
+function tenantApiUrl(url){
+  const slug = window.__STREAMER_SLUG__ || '';
+  if(!slug) return url;
+  return url + (url.includes('?') ? '&' : '?') + 'streamer=' + encodeURIComponent(slug);
+}
+function tenantSocketOptions(extra){
+  const slug = window.__STREAMER_SLUG__ || '';
+  return Object.assign({transports:['websocket','polling'], query: slug ? {streamer:slug} : {}}, extra || {});
+}
+</script>
 </head>
 <body>
 <div id="box">
@@ -31,10 +44,10 @@
 </div>
 <script src="/socket.io/socket.io.js"></script>
 <script>
-const socket=io();const box=document.getElementById('box');let lastTotal=null;
+const socket=io(tenantSocketOptions());const box=document.getElementById('box');let lastTotal=null;
 function esc(s){return String(s||'').replace(/[&<>'"]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[m]));}
 function render(d){const total=Number(d.total||0), session=Number(d.session||0), gifts=Number(d.gifts||0), renewals=Number(d.renewals||0);document.getElementById('total').textContent=total;document.getElementById('session').textContent=session;document.getElementById('gifts').textContent=gifts;document.getElementById('renewals').textContent=renewals;const ev=(d.latest||[])[0];if(ev){document.getElementById('last').innerHTML=ev.type==='gift'?`🎁 ${esc(ev.username||ev.gifter||'Anonyme')} +${ev.count||1}`:ev.type==='renewal'?`🔄 ${esc(ev.username||'Quelqu\'un')} renouvelle`: `⭐ Nouveau sub : ${esc(ev.username||'Quelqu\'un')}`;}if(lastTotal!==null&&total>lastTotal){box.classList.remove('pop');void box.offsetWidth;box.classList.add('pop')}lastTotal=total;}
-fetch('/api/widgets/subcounter').then(r=>r.json()).then(render).catch(()=>{});
+fetch(tenantApiUrl('/api/widgets/subcounter')).then(r=>r.json()).then(render).catch(()=>{});
 socket.on('subcounter-update',render);
 </script>
 </body>

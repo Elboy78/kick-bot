@@ -13,11 +13,24 @@
   .alert.layout-image_left{display:flex;align-items:center;gap:22px;text-align:left}.alert.layout-text_only .media{display:none}.media{display:block;max-width:180px;max-height:130px;object-fit:contain;margin:0 auto 16px;border-radius:16px;filter:drop-shadow(0 14px 28px rgba(0,0,0,.4))}.layout-image_left .media{margin:0;max-width:150px;max-height:120px}.title{font-size:34px;line-height:1.05;font-weight:950;text-shadow:0 4px 18px rgba(0,0,0,.7);letter-spacing:-.8px}.message{font-size:24px;line-height:1.22;font-weight:900;margin-top:10px;text-shadow:0 4px 18px rgba(0,0,0,.75)}.type{font-size:12px;text-transform:uppercase;letter-spacing:1.8px;color:#86efac;font-weight:950;margin-bottom:8px}
   @keyframes fadeIn{to{opacity:1;transform:translateY(0) scale(1)}}@keyframes fadeOut{from{opacity:1;transform:translateY(0) scale(1)}to{opacity:0;transform:translateY(12px) scale(.97)}}@keyframes popIn{0%{opacity:0;transform:scale(.7)}70%{opacity:1;transform:scale(1.05)}100%{opacity:1;transform:scale(1)}}@keyframes slideIn{from{opacity:0;transform:translateX(-90px)}to{opacity:1;transform:translateX(0)}}@keyframes slideOut{from{opacity:1;transform:translateX(0)}to{opacity:0;transform:translateX(90px)}}@keyframes zoomIn{from{opacity:0;transform:scale(1.25);filter:blur(6px)}to{opacity:1;transform:scale(1);filter:blur(0)}}@keyframes zoomOut{from{opacity:1;transform:scale(1)}to{opacity:0;transform:scale(.88)}}
 </style>
+
+<script>
+window.__STREAMER_SLUG__ = window.__STREAMER_SLUG__ || new URLSearchParams(location.search).get('streamer') || (location.pathname.match(/^\/s\/([^\/]+)/)||[])[1] || '';
+function tenantApiUrl(url){
+  const slug = window.__STREAMER_SLUG__ || '';
+  if(!slug) return url;
+  return url + (url.includes('?') ? '&' : '?') + 'streamer=' + encodeURIComponent(slug);
+}
+function tenantSocketOptions(extra){
+  const slug = window.__STREAMER_SLUG__ || '';
+  return Object.assign({transports:['websocket','polling'], query: slug ? {streamer:slug} : {}}, extra || {});
+}
+</script>
 </head>
 <body>
 <div id="stage"></div>
 <script>
-const socket = io();
+const socket = io(tenantSocketOptions());
 const stage = document.getElementById('stage');
 let queue = [];
 let playing = false;

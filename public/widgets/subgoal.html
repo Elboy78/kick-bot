@@ -61,6 +61,19 @@
   #insideLabel { text-transform:uppercase; letter-spacing:.5px; overflow:hidden; text-overflow:ellipsis; min-width:0; }
   #insideCount { font-size:15px; }
 </style>
+
+<script>
+window.__STREAMER_SLUG__ = window.__STREAMER_SLUG__ || new URLSearchParams(location.search).get('streamer') || (location.pathname.match(/^\/s\/([^\/]+)/)||[])[1] || '';
+function tenantApiUrl(url){
+  const slug = window.__STREAMER_SLUG__ || '';
+  if(!slug) return url;
+  return url + (url.includes('?') ? '&' : '?') + 'streamer=' + encodeURIComponent(slug);
+}
+function tenantSocketOptions(extra){
+  const slug = window.__STREAMER_SLUG__ || '';
+  return Object.assign({transports:['websocket','polling'], query: slug ? {streamer:slug} : {}}, extra || {});
+}
+</script>
 </head>
 <body>
 
@@ -81,7 +94,7 @@
 
 <script src="/socket.io/socket.io.js"></script>
 <script>
-const socket = io();
+const socket = io(tenantSocketOptions());
 const fill = document.getElementById('fill');
 const glow = document.getElementById('glow');
 const topLabel = document.getElementById('topLabel');
@@ -148,7 +161,7 @@ function render(current, target, options = {}) {
 
 async function loadInitial() {
   try {
-    const r = await fetch('/api/widgets/subgoal?ts=' + Date.now(), { cache: 'no-store' });
+    const r = await fetch(tenantApiUrl('/api/widgets/subgoal?ts=' + Date.now()), { cache: 'no-store' });
     const d = await r.json();
     render(d.current || 0, d.target || 50, d);
   } catch(e) { console.error('[SUBGOAL] Erreur chargement initial', e); }
@@ -159,7 +172,7 @@ loadInitial();
 setInterval(loadInitial, 2000);
 </script>
 <script>
-const socket = io();
+const socket = io(tenantSocketOptions());
 const fill = document.getElementById('fill');
 const glow = document.getElementById('glow');
 const topLabel = document.getElementById('topLabel');
@@ -220,7 +233,7 @@ function render(current, target, options = {}) {
 
 async function loadInitial() {
   try {
-    const r = await fetch('/api/widgets/subgoal');
+    const r = await fetch(tenantApiUrl('/api/widgets/subgoal'));
     const d = await r.json();
     render(d.current || 0, d.target || 50, d);
   } catch(e) { console.error('[SUBGOAL] Erreur chargement initial', e); }

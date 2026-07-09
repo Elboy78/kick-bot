@@ -31,9 +31,11 @@ function getDefaultStreamerSeed() {
 }
 
 function readRequestedSlug(req) {
+  const pathSlug = String(req?.path || req?.url || '').match(/^\/s\/([^\/?#]+)/)?.[1];
   return normalizeSlug(
     req?.params?.streamer ||
     req?.params?.slug ||
+    pathSlug ||
     req?.query?.streamer ||
     req?.headers?.['x-streamer-slug'] ||
     req?.cookies?.streamer ||
@@ -83,6 +85,11 @@ function getCurrentStreamerSlug() {
   return tenantStorage.getStore()?.streamerSlug || DEFAULT_STREAMER_SLUG;
 }
 
+
+function roomName(streamer) {
+  return `streamer:${normalizeSlug(typeof streamer === 'string' ? streamer : (streamer?.slug || streamer?.streamerSlug || DEFAULT_STREAMER_SLUG))}`;
+}
+
 function scopedKey(streamer, key) {
   const slug = typeof streamer === 'string' ? streamer : (streamer?.slug || DEFAULT_STREAMER_SLUG);
   return `streamer:${normalizeSlug(slug)}:${key}`;
@@ -98,5 +105,6 @@ module.exports = {
   getCurrentTenant,
   getCurrentStreamerId,
   getCurrentStreamerSlug,
-  scopedKey
+  scopedKey,
+  roomName
 };

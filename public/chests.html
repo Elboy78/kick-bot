@@ -59,6 +59,19 @@
   }
   @keyframes flash { 0%,100% { opacity:0; } 50% { opacity:1; } }
 </style>
+
+<script>
+window.__STREAMER_SLUG__ = window.__STREAMER_SLUG__ || new URLSearchParams(location.search).get('streamer') || (location.pathname.match(/^\/s\/([^\/]+)/)||[])[1] || '';
+function tenantApiUrl(url){
+  const slug = window.__STREAMER_SLUG__ || '';
+  if(!slug) return url;
+  return url + (url.includes('?') ? '&' : '?') + 'streamer=' + encodeURIComponent(slug);
+}
+function tenantSocketOptions(extra){
+  const slug = window.__STREAMER_SLUG__ || '';
+  return Object.assign({transports:['websocket','polling'], query: slug ? {streamer:slug} : {}}, extra || {});
+}
+</script>
 </head>
 <body>
 
@@ -88,13 +101,13 @@
 
 <script src="/socket.io/socket.io.js"></script>
 <script>
-const socket = io();
+const socket = io(tenantSocketOptions());
 const TIER_COLORS = { legendary:'#8b35ff', epic:'#ffd700', positive:'#3b9dff', challenge:'#ff8500', cursed:'#ff3b5f', fake:'#777' };
 const TIER_NAMES  = { legendary:'🟣 LÉGENDAIRE', epic:'🟡 ÉPIQUE', positive:'🔵 BONUS', challenge:'🟠 DÉFI', cursed:'🔴 MAUDIT', fake:'⚫ PIÈGE' };
 
 async function loadBoard() {
   try {
-    const r = await fetch('/api/chests');
+    const r = await fetch(tenantApiUrl('/api/chests'));
     const d = await r.json();
     const grid = document.getElementById('grid');
     if (!d.season) { grid.innerHTML = '<div style="grid-column:1/-1;text-align:center;color:#889;font-size:11px;padding:16px">En attente d\u2019une saison…</div>'; return; }

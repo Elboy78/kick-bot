@@ -17,6 +17,16 @@ const io     = new Server(server, { cors: { origin: '*' } });
 
 app.use(cors());
 app.use(express.json({ limit: '8mb' }));
+app.use((req, res, next) => {
+  // Petit parser cookie sans dépendance : permet au panel V2 de retenir le streamer courant.
+  req.cookies = Object.fromEntries(String(req.headers.cookie || '').split(';').map(v => v.trim()).filter(Boolean).map(v => {
+    const i = v.indexOf('=');
+    return i >= 0 ? [decodeURIComponent(v.slice(0, i)), decodeURIComponent(v.slice(i + 1))] : [v, ''];
+  }));
+  const m = String(req.path || '').match(/^\/s\/([^\/]+)/);
+  if (m && m[1]) res.setHeader('Set-Cookie', `streamer=${encodeURIComponent(tenant.normalizeSlug(m[1]))}; Path=/; SameSite=Lax`);
+  next();
+});
 app.use(express.static(path.join(__dirname, 'public')));
 app.use((req, res, next) => tenant.attachTenant(db, req, res, next));
 
@@ -51,6 +61,21 @@ function waitDB(req, res, next) {
   next();
 }
 
+function currentTenantRoom() {
+  return tenant.roomName(tenant.getCurrentStreamerSlug());
+}
+function emitTenant(event, payload) {
+  io.to(currentTenantRoom()).emit(event, payload);
+}
+function emitTenantFromSlug(slug, event, payload) {
+  io.to(tenant.roomName(slug || tenant.getCurrentStreamerSlug())).emit(event, payload);
+}
+function injectStreamerBootstrap(html, slug) {
+  const safe = tenant.normalizeSlug(slug || tenant.DEFAULT_STREAMER_SLUG).replace(/</g, '');
+  const boot = `<script>window.__STREAMER_SLUG__=${JSON.stringify(safe)};window.__API_STREAMER_PARAM__='streamer='+encodeURIComponent(window.__STREAMER_SLUG__);</script>`;
+  return String(html || '').replace(/<head([^>]*)>/i, `<head$1>${boot}`);
+}
+
 
 // ── V2 Multi-streamer : socle sans casser la V1 ──────────────────────────────
 app.get('/api/v2/streamers/current', waitDB, async (req, res) => {
@@ -58,6 +83,12 @@ app.get('/api/v2/streamers/current', waitDB, async (req, res) => {
     const streamer = req.streamer || await db.ensureDefaultStreamer(tenant.getDefaultStreamerSeed());
     const connected = await kickOAuth.isConnected(streamer.id).catch(() => false);
     res.json({ data: { ...streamer, oauthConnected: connected, isDefault: streamer.slug === tenant.DEFAULT_STREAMER_SLUG } });
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+app.get('/api/v2/tenant/current', waitDB, async (req, res) => {
+  try {
+    const streamer = req.streamer || await db.ensureDefaultStreamer(tenant.getDefaultStreamerSeed());
+    res.json({ data: { streamerId: streamer.id, slug: streamer.slug, displayName: streamer.display_name || streamer.displayName || streamer.slug, room: tenant.roomName(streamer.slug) } });
   } catch(e) { res.status(500).json({ error: e.message }); }
 });
 
@@ -99,8 +130,15 @@ app.get('/api/v2/obs-links', waitDB, async (req, res) => {
 
 // URLs publiques prêtes pour la V2 : /s/:streamer/...
 // Pour cette première phase, elles servent les mêmes fichiers que la V1 mais portent déjà le slug streamer.
-app.get('/s/:streamer/classement', (req,res) => res.sendFile(path.join(__dirname,'public','classement.html')));
-app.get('/s/:streamer/widgets/:widget', (req,res) => res.sendFile(path.join(__dirname,'public','widgets', req.params.widget)));
+app.get('/s/:streamer/classement', (req,res) => {
+  const file = path.join(__dirname,'public','classement.html');
+  require('fs').readFile(file, 'utf8', (err, html) => err ? res.status(404).send('Not found') : res.type('html').send(injectStreamerBootstrap(html, req.params.streamer)));
+});
+app.get('/s/:streamer/widgets/:widget', (req,res) => {
+  const safeWidget = path.basename(req.params.widget || '');
+  const file = path.join(__dirname,'public','widgets', safeWidget);
+  require('fs').readFile(file, 'utf8', (err, html) => err ? res.status(404).send('Not found') : res.type('html').send(injectStreamerBootstrap(html, req.params.streamer)));
+});
 
 // ── API lecture ───────────────────────────────────────────────────────────────
 
@@ -221,8 +259,8 @@ async function getSubCounterState() {
 
 async function emitSubCounterState() {
   const state = await getSubCounterState();
-  io.emit('subcounter-update', state);
-  io.emit('subgoal-update', { current: state.total, target: state.target, label: state.label, textPosition: state.textPosition, countPosition: state.countPosition, progressDisplay: state.progressDisplay, textAlign: state.textAlign });
+  emitTenant('subcounter-update', state);
+  emitTenant('subgoal-update', { current: state.total, target: state.target, label: state.label, textPosition: state.textPosition, countPosition: state.countPosition, progressDisplay: state.progressDisplay, textAlign: state.textAlign });
   return state;
 }
 
@@ -258,8 +296,8 @@ async function recordSubEvent(type, payload = {}) {
     await db.setSettingStr('subcounter_gifts', String(state.gifts));
     await db.setSettingStr('subgoal_current', String(state.total));
     await db.setSettingStr('subcounter_latest', JSON.stringify(state.latest));
-    io.emit('subcounter-update', state);
-    io.emit('subgoal-update', { current: state.total, target: state.target, label: state.label, textPosition: state.textPosition, countPosition: state.countPosition, progressDisplay: state.progressDisplay, textAlign: state.textAlign });
+    emitTenant('subcounter-update', state);
+    emitTenant('subgoal-update', { current: state.total, target: state.target, label: state.label, textPosition: state.textPosition, countPosition: state.countPosition, progressDisplay: state.progressDisplay, textAlign: state.textAlign });
     console.log(`[SUBCOUNTER] Update ${type} → total=${state.total} session=${state.session} gifts=${state.gifts} renewals=${state.renewals}`);
     return state;
   } catch(e) { console.error('[SUBCOUNTER] Erreur event:', e.message); }
@@ -715,7 +753,6 @@ async function broadcastChestResult(result) {
   const chatEnabled = await db.getSetting('chests_chat_enabled');
   if (chatEnabled) {
     const shared = require('./shared');
-const tenant = require('./tenant');
     const moneyStr = result.money > 0 && ['positive','epic','legendary'].includes(result.tier) ? ` (${result.money}€)` : '';
     let msg = `🧰 COFFRE ${result.number} → ${result.tierEmoji} ${result.tierName} : ${result.label}${moneyStr}`;
     try { await shared.sendChat(msg); } catch(e) {}
@@ -727,8 +764,8 @@ const tenant = require('./tenant');
       try { await shared.sendChat(`🩸 SAISON TERMINÉE — ${s.bonuses} bonus, ${s.maluses} malus, ${s.jackpots} jackpot(s), ${s.challengesDone}/${s.challengesTotal} défis réussis, ${s.money}€ gagnés !`); } catch(e) {}
     }
   }
-  io.emit('chest-opened', result);
-  io.emit('chests-update');
+  emitTenant('chest-opened', result);
+  emitTenant('chests-update');
 }
 
 app.get('/api/widgets/subgoal', async (req, res) => {
@@ -964,7 +1001,7 @@ async function saveSongRequestPlayerState(patch = {}, emit = true) {
   const prev = await getSongRequestPlayerState();
   const next = { ...prev, ...patch, updatedAt: new Date().toISOString() };
   await db.setSettingStr('songrequest_player_state', JSON.stringify(next));
-  if (emit) io.emit('songrequest-player-state', next);
+  if (emit) emitTenant('songrequest-player-state', next);
   return next;
 }
 
@@ -986,7 +1023,7 @@ function emitSongRequestControlNow(action, payload = {}) {
     ...payload,
     at: new Date().toISOString()
   };
-  io.emit('songrequest-control', control);
+  emitTenant('songrequest-control', control);
   return control;
 }
 async function issueSongRequestControl(action, payload = {}) {
@@ -1041,7 +1078,7 @@ async function saveSongRequestQueue(queue) {
   if (!clean.length) {
     await saveSongRequestPlayerState({ itemId:'', status:'stopped', currentTime:0, duration:0 }, false);
   }
-  io.emit('songrequest-update', { queue: clean });
+  emitTenant('songrequest-update', { queue: clean });
   return clean;
 }
 
@@ -1190,7 +1227,7 @@ app.post('/api/admin/widgets/songrequest/volume', requireAuth, async (req, res) 
     const volume = Math.max(0, Math.min(100, Number.isFinite(raw) ? Math.round(raw) : 100));
     const state = await getSongRequestPlayerState();
     const next = { ...state, volume, updatedAt: new Date().toISOString() };
-    io.emit('songrequest-player-state', next);
+    emitTenant('songrequest-player-state', next);
     await issueSongRequestControl('volume', { volume });
     db.setSettingStr('songrequest_player_state', JSON.stringify(next)).catch(e => {
       console.warn('[SONGREQUEST] Sauvegarde volume impossible:', e.message);
@@ -1302,9 +1339,8 @@ app.get('/api/chests', async (req, res) => {
 app.post('/api/admin/chests/new-season', requireAuth, async (req, res) => {
   try {
     const r = await chests.newSeason();
-    io.emit('chests-update');
+    emitTenant('chests-update');
     const shared = require('./shared');
-const tenant = require('./tenant');
     try { await shared.sendChat(`🩸 UNE NOUVELLE SAISON DES 30 COFFRES DE L'ENTITÉ COMMENCE ! Le contenu a été mélangé par le Brouillard…`); } catch(e) {}
     res.json({ success: true, ...r });
   } catch(e) { res.status(500).json({ error: e.message }); }
@@ -1323,9 +1359,8 @@ app.post('/api/admin/chests/secure', requireAuth, async (req, res) => {
   try {
     const result = await chests.secureChest(parseInt(req.body.number));
     if (result.error) return res.status(400).json(result);
-    io.emit('chests-update');
+    emitTenant('chests-update');
     const shared = require('./shared');
-const tenant = require('./tenant');
     if (await db.getSetting('chests_chat_enabled')) {
       if (result.moved) { try { await shared.sendChat(`🔒 La sécurité passe du coffre ${result.from ?? '?'} au coffre ${result.to} — DERNIER changement possible utilisé, plus aucune modification jusqu'à la prochaine saison !`); } catch(e) {} }
       else { try { await shared.sendChat(`🔒 Le coffre ${result.to} est maintenant SÉCURISÉ.`); } catch(e) {} }
@@ -1336,7 +1371,7 @@ const tenant = require('./tenant');
 app.post('/api/admin/chests/unsecure', requireAuth, async (req, res) => {
   try {
     const result = await chests.unsecureChest();
-    io.emit('chests-update');
+    emitTenant('chests-update');
     res.json(result);
   } catch(e) { res.status(500).json({ error: e.message }); }
 });
@@ -1344,9 +1379,8 @@ app.post('/api/admin/chests/victory', requireAuth, async (req, res) => {
   try {
     const result = await chests.markVictory();
     if (result.error) return res.status(400).json(result);
-    io.emit('chests-update');
+    emitTenant('chests-update');
     const shared = require('./shared');
-const tenant = require('./tenant');
     if (await db.getSetting('chests_chat_enabled')) {
       try { await shared.sendChat(`🏆 VICTOIRE ! Le coffre sécurisé n°${result.protectedNumber} verra son contenu DOUBLÉ à l'ouverture !`); } catch(e) {}
     }
@@ -1356,7 +1390,7 @@ const tenant = require('./tenant');
 app.post('/api/admin/chests/victory/clear', requireAuth, async (req, res) => {
   try {
     const result = await chests.clearVictory();
-    io.emit('chests-update');
+    emitTenant('chests-update');
     res.json(result);
   } catch(e) { res.status(500).json({ error: e.message }); }
 });
@@ -1393,7 +1427,7 @@ app.post('/api/admin/chests/update-content', requireAuth, async (req, res) => {
     if (!chest) return res.status(404).json({ error: 'Coffre introuvable' });
     const fogByTier = { legendary:80, epic:50, positive:25, challenge:0, cursed:-30, fake:-60 };
     await db.updateChestContent(chest.id, tier, label, Number.isFinite(money) ? money : 0, fogByTier[tier] || 0);
-    io.emit('chests-update');
+    emitTenant('chests-update');
     res.json({ success: true });
   } catch(e) { res.status(500).json({ error: e.message }); }
 });
@@ -1406,7 +1440,7 @@ app.post('/api/admin/chests/challenge-done', requireAuth, async (req, res) => {
     const chest = await db.getChest(season.id, parseInt(number));
     if (!chest) return res.status(400).json({ error: 'Coffre introuvable' });
     await db.setChestChallengeDone(chest.id, !!done);
-    io.emit('chests-update');
+    emitTenant('chests-update');
     res.json({ success: true });
   } catch(e) { res.status(500).json({ error: e.message }); }
 });
@@ -1423,7 +1457,7 @@ require('./shared').registerOpenChest(async (number) => {
 require('./shared').registerMarkVictory(async () => {
   const result = await chests.markVictory();
   if (result.error) return result;
-  io.emit('chests-update');
+  emitTenant('chests-update');
   if (await db.getSetting('chests_chat_enabled')) {
     try { await require('./shared').sendChat(`🏆 VICTOIRE ! Le coffre sécurisé n°${result.protectedNumber} verra son contenu DOUBLÉ à l'ouverture !`); } catch(e) {}
   }
@@ -1597,7 +1631,7 @@ app.post('/webhook/donation', async (req, res) => {
     }
     if (await db.isTTSBlacklisted(message)) {
       await db.addTTSHistory(username, message, amount, 'blocked');
-      io.emit('tts-update');
+      emitTenant('tts-update');
       return res.json({ ignored: true, reason: 'blacklisted' });
     }
 
@@ -1605,8 +1639,8 @@ app.post('/webhook/donation', async (req, res) => {
     await db.addTTSHistory(username, message, amount, 'played');
 
     const audioBase64 = await generateTTSAudio(message);
-    io.emit('play-tts', { username, message, amount, audio: audioBase64, volume: cfg.volume });
-    io.emit('tts-update');
+    emitTenant('play-tts', { username, message, amount, audio: audioBase64, volume: cfg.volume });
+    emitTenant('tts-update');
 
     res.json({ success: true });
   } catch(e) {
@@ -1625,8 +1659,8 @@ app.post('/api/tts/test', async (req, res) => {
 
     await db.addTTSHistory('Test Panel', message, 0, 'test');
     const audioBase64 = await generateTTSAudio(message);
-    io.emit('play-tts', { username: 'Test Panel', message, amount: 0, audio: audioBase64, volume: cfg.volume });
-    io.emit('tts-update');
+    emitTenant('play-tts', { username: 'Test Panel', message, amount: 0, audio: audioBase64, volume: cfg.volume });
+    emitTenant('tts-update');
     res.json({ success: true, audioGenerated: !!audioBase64 });
   } catch(e) { res.status(500).json({ error: e.message }); }
 });
@@ -1913,7 +1947,7 @@ async function pushObsAlert(type, vars={}, force=false) {
     cfg,
     createdAt: new Date().toISOString()
   };
-  io.emit('alert-overlay-event', payload);
+  emitTenant('alert-overlay-event', payload);
   console.log('[ALERT OBS]', type, payload.message);
   return { success:true, alert: payload };
 }
@@ -1936,7 +1970,7 @@ app.post('/api/admin/widgets/alerts/:type', requireAuth, async (req, res) => {
     const type = sanitizeAlertType(req.params.type);
     const cfg = normalizeAlertCfg(type, req.body || {});
     await db.setSettingStr('alert_config_' + type, JSON.stringify(cfg));
-    io.emit('alert-overlay-settings', { configs: await getAllAlertConfigs() });
+    emitTenant('alert-overlay-settings', { configs: await getAllAlertConfigs() });
     res.json({ success:true, type, cfg });
   } catch(e) { res.status(500).json({ error: e.message }); }
 });
@@ -2005,7 +2039,7 @@ async function emitChatOverlayMessage(msg = {}) {
       color: msg.color || '',
       at: msg.at || new Date().toISOString()
     };
-    io.emit('chat-overlay-message', payload);
+    emitTenant('chat-overlay-message', payload);
     return true;
   } catch(e) {
     console.warn('[CHAT OVERLAY] Message ignoré:', e.message);
@@ -2035,7 +2069,7 @@ app.post('/api/admin/widgets/chat-overlay/settings', requireAuth, async (req, re
     if (typeof b.animation === 'string') await db.setSettingStr('chat_overlay_animation', b.animation.slice(0, 30));
     if (typeof b.design === 'string') await db.setSettingStr('chat_overlay_design', b.design.slice(0, 30));
     const cfg = await getChatOverlaySettings();
-    io.emit('chat-overlay-settings', cfg);
+    emitTenant('chat-overlay-settings', cfg);
     res.json({ success: true, settings: cfg });
   } catch(e) { res.status(500).json({ error: e.message }); }
 });
@@ -2048,7 +2082,12 @@ app.post('/api/admin/widgets/chat-overlay/test', requireAuth, async (req, res) =
 });
 
 io.on('connection', (socket) => {
-  console.log('[TTS] Overlay connecté:', socket.id);
+  const qStreamer = socket.handshake?.query?.streamer || socket.handshake?.auth?.streamer;
+  const referer = socket.handshake?.headers?.referer || '';
+  const refStreamer = String(referer).match(/\/s\/([^\/]+)/)?.[1];
+  const slug = tenant.normalizeSlug(qStreamer || refStreamer || tenant.DEFAULT_STREAMER_SLUG);
+  socket.join(tenant.roomName(slug));
+  console.log(`[SOCKET] Connecté ${socket.id} → ${slug}`);
 });
 
 app.get('/login', (req,res) => res.sendFile(path.join(__dirname,'public','login.html')));
