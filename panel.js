@@ -887,6 +887,11 @@ async function resolveSongRequest(song) {
   if (found) return { song: found.title || raw, query: raw, ...found };
   return { song: raw, query: raw, url: '', videoId: '', title: raw, author: '', thumbnail: '', duration: 0, durationText: '' };
 }
+// Etat mémoire Song Request pour rendre les macros quasi instantanées.
+// Le clic macro ne doit pas attendre Turso avant de partir vers l'overlay OBS.
+let songRequestControlSeqMemory = Date.now();
+let songRequestDesiredStatusMemory = null;
+
 async function getSongRequestPlayerState() {
   let state = {};
   try { state = JSON.parse(await db.getSettingStr('songrequest_player_state', '{}')); } catch(e) { state = {}; }
@@ -911,23 +916,30 @@ async function getSongRequestControl() {
   let control = {};
   try { control = JSON.parse(await db.getSettingStr('songrequest_control', '{}')); } catch(e) { control = {}; }
   return {
-    seq: Number(control.seq || 0),
+    seq: Number(control.seq || songRequestControlSeqMemory || 0),
     action: control.action || '',
     seconds: Number(control.seconds || 0),
     volume: Number(control.volume ?? 100),
     at: control.at || null
   };
 }
-async function issueSongRequestControl(action, payload = {}) {
-  const prev = await getSongRequestControl();
+function emitSongRequestControlNow(action, payload = {}) {
   const control = {
-    seq: prev.seq + 1,
+    seq: ++songRequestControlSeqMemory,
     action,
     ...payload,
     at: new Date().toISOString()
   };
-  await db.setSettingStr('songrequest_control', JSON.stringify(control));
   io.emit('songrequest-control', control);
+  return control;
+}
+async function issueSongRequestControl(action, payload = {}) {
+  // IMPORTANT : émission OBS immédiate, sauvegarde après.
+  // Avant, la macro attendait l'écriture DB avant d'arriver dans OBS, ce qui ajoutait une latence visible.
+  const control = emitSongRequestControlNow(action, payload);
+  db.setSettingStr('songrequest_control', JSON.stringify(control)).catch(e => {
+    console.warn('[SONGREQUEST] Sauvegarde contrôle macro impossible:', e.message);
+  });
   return control;
 }
 
@@ -1129,7 +1141,13 @@ app.post('/api/widgets/songrequest/player-state', async (req, res) => {
       return res.json({ success:true, ignored:true, player: state.player });
     }
     const patch = { itemId: currentItem.id };
-    if (typeof req.body.status === 'string' && ['playing','paused','stopped','buffering'].includes(req.body.status)) patch.status = req.body.status;
+    if (typeof req.body.status === 'string' && ['playing','paused','stopped','buffering'].includes(req.body.status)) {
+      patch.status = req.body.status;
+      // On garde un état mémoire pour que /macro/toggle réponde instantanément.
+      if (patch.status === 'playing' || patch.status === 'paused' || patch.status === 'stopped') {
+        songRequestDesiredStatusMemory = patch.status;
+      }
+    }
     if (req.body.currentTime !== undefined) patch.currentTime = Math.max(0, parseFloat(req.body.currentTime) || 0);
     if (req.body.duration !== undefined) patch.duration = Math.max(0, parseFloat(req.body.duration) || 0);
     if (req.body.volume !== undefined) patch.volume = Math.max(0, Math.min(100, parseInt(req.body.volume) || 100));
@@ -1143,30 +1161,47 @@ app.post('/api/widgets/songrequest/player-state', async (req, res) => {
 async function runSongRequestMacro(action) {
   const state = await getSongRequestState();
   const cur = state.queue[0] || null;
-  if (action === 'toggle') action = state.player?.status === 'playing' ? 'pause' : 'play';
+
+  if (action === 'toggle') {
+    const currentStatus = songRequestDesiredStatusMemory || state.player?.status || 'stopped';
+    action = currentStatus === 'playing' ? 'pause' : 'play';
+  }
+
   if (action === 'play') {
-    const next = await saveSongRequestPlayerState({ itemId: cur?.id || '', status: cur ? 'playing' : 'stopped' });
+    songRequestDesiredStatusMemory = cur ? 'playing' : 'stopped';
+    // Commande OBS en premier pour réaction immédiate.
     await issueSongRequestControl('play');
-    return { action:'play', player: next };
+    const patch = { itemId: cur?.id || '', status: cur ? 'playing' : 'stopped' };
+    saveSongRequestPlayerState(patch).catch(e => console.warn('[SONGREQUEST] Sauvegarde play macro impossible:', e.message));
+    return { action:'play', player: { ...(state.player || {}), ...patch } };
   }
+
   if (action === 'pause') {
-    const next = await saveSongRequestPlayerState({ status:'paused' });
+    songRequestDesiredStatusMemory = 'paused';
+    // Commande OBS en premier pour réaction immédiate.
     await issueSongRequestControl('pause');
-    return { action:'pause', player: next };
+    const patch = { status:'paused' };
+    saveSongRequestPlayerState(patch).catch(e => console.warn('[SONGREQUEST] Sauvegarde pause macro impossible:', e.message));
+    return { action:'pause', player: { ...(state.player || {}), ...patch } };
   }
+
   if (action === 'next') {
     state.queue.shift();
     await saveSongRequestQueue(state.queue);
     const nextItem = state.queue[0] || null;
-    const next = await saveSongRequestPlayerState({ itemId: nextItem?.id || '', status: nextItem ? 'playing' : 'stopped', currentTime: 0, duration: nextItem?.duration || 0 });
+    songRequestDesiredStatusMemory = nextItem ? 'playing' : 'stopped';
     await issueSongRequestControl('next');
+    const next = await saveSongRequestPlayerState({ itemId: nextItem?.id || '', status: nextItem ? 'playing' : 'stopped', currentTime: 0, duration: nextItem?.duration || 0 });
     return { action:'next', player: next };
   }
+
   if (action === 'stop') {
-    const next = await saveSongRequestPlayerState({ status:'stopped', currentTime:0 });
+    songRequestDesiredStatusMemory = 'stopped';
     await issueSongRequestControl('stop');
+    const next = await saveSongRequestPlayerState({ status:'stopped', currentTime:0 });
     return { action:'stop', player: next };
   }
+
   throw new Error('Action macro invalide');
 }
 
@@ -1174,6 +1209,9 @@ async function songRequestMacroHandler(req, res) {
   try {
     const action = String(req.params.action || req.body?.action || 'toggle').toLowerCase();
     if (!['toggle','play','pause','next','stop'].includes(action)) return res.status(400).json({ error:'Action invalide' });
+    res.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+    res.set('Pragma', 'no-cache');
+    res.set('Expires', '0');
     const result = await runSongRequestMacro(action);
     res.json({ success:true, ...result, ...(await getSongRequestState()) });
   } catch(e) { res.status(500).json({ error:e.message }); }
