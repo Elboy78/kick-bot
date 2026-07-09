@@ -473,6 +473,30 @@ async function handleChatMessageScoped(payload, ctx = null) {
   const parts = content.trim().split(' ');
   const cmd   = parts[0].toLowerCase();
 
+  // Song Request V2 — scoping par streamer via le contexte chat courant.
+  // Chaque chaîne a sa propre file d'attente et ses propres réglages.
+  try {
+    const srEnabled = await db.getSetting('songrequest_enabled');
+    const srCommand = String(await db.getSettingStr('songrequest_command', '!sr') || '!sr').toLowerCase();
+    const srAliases = new Set([srCommand, '!sr', '!songrequest']);
+    if (srEnabled && srAliases.has(cmd)) {
+      const requested = parts.slice(1).join(' ').trim();
+      if (!requested) return sendChat(`@${username} Utilisation : ${srCommand} <lien YouTube ou titre>`);
+      const result = await shared.addSongRequest(username, requested, currentChatContext());
+      if (result?.error) return sendChat(`@${username} ${result.error}`);
+      const chatConfirmEnabled = String(await db.getSettingStr('songrequest_chat_confirm_enabled', '0')) === '1';
+      if (chatConfirmEnabled) {
+        const template = await db.getSettingStr('songrequest_confirm', '🎵 @{username}, ta musique a été ajoutée à la file !');
+        const msg = String(template || '').replace(/\{username\}/gi, username).replace(/@\s*@/g, '@');
+        if (msg.trim()) return sendChat(msg.trim());
+      }
+      return;
+    }
+  } catch(e) {
+    console.error('[SONGREQUEST] Erreur commande:', e.message);
+    return sendChat(`@${username} Song Request indisponible pour le moment.`);
+  }
+
   // Commandes système
   if (SYSTEM_COMMANDS.includes(cmd)) {
     const enabled = await db.isSystemCmdEnabled(cmd);

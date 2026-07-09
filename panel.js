@@ -1054,76 +1054,103 @@ async function resolveSongRequest(song) {
   if (found) return { song: found.title || raw, query: raw, ...found };
   return { song: raw, query: raw, url: '', videoId: '', title: raw, author: '', thumbnail: '', duration: 0, durationText: '' };
 }
-// Etat mémoire Song Request pour rendre les macros quasi instantanées.
-// Le clic macro ne doit pas attendre Turso avant de partir vers l'overlay OBS.
-let songRequestControlSeqMemory = Date.now();
-let songRequestDesiredStatusMemory = null;
+// Etat mémoire Song Request V2 : 100 % isolé par streamer.
+// Chaque streamer a sa file, son lecteur, son volume et ses commandes OBS.
+const songRequestControlSeqByStreamer = new Map();
+const songRequestDesiredStatusByStreamer = new Map();
 
-async function getSongRequestPlayerState() {
-  let state = {};
-  try { state = JSON.parse(await db.getSettingStr('songrequest_player_state', '{}')); } catch(e) { state = {}; }
+function getSongRequestTM(reqOrTm = null) {
+  if (reqOrTm && typeof reqOrTm.getSetting === 'function') return reqOrTm;
+  if (reqOrTm?.tenantManager) return reqOrTm.tenantManager;
+  return createTenantManager({ db, io, req: reqOrTm || null, streamer: reqOrTm?.streamer || null });
+}
+function songRequestSlug(tm) {
+  return tenant.normalizeSlug(tm?.slug || tenant.getCurrentStreamerSlug());
+}
+function getSongRequestSeq(tm) {
+  const slug = songRequestSlug(tm);
+  if (!songRequestControlSeqByStreamer.has(slug)) songRequestControlSeqByStreamer.set(slug, Date.now());
+  return songRequestControlSeqByStreamer.get(slug);
+}
+function nextSongRequestSeq(tm) {
+  const slug = songRequestSlug(tm);
+  const seq = getSongRequestSeq(tm) + 1;
+  songRequestControlSeqByStreamer.set(slug, seq);
+  return seq;
+}
+function getSongRequestDesiredStatus(tm) {
+  return songRequestDesiredStatusByStreamer.get(songRequestSlug(tm)) || null;
+}
+function setSongRequestDesiredStatus(tm, status) {
+  if (!status) songRequestDesiredStatusByStreamer.delete(songRequestSlug(tm));
+  else songRequestDesiredStatusByStreamer.set(songRequestSlug(tm), status);
+}
+
+async function getSongRequestPlayerState(reqOrTm = null) {
+  const tm = getSongRequestTM(reqOrTm);
+  const state = await tm.getJson('songrequest_player_state', {});
   return {
-    itemId: state.itemId || '',
-    status: state.status || 'stopped',
-    currentTime: Number(state.currentTime || 0),
-    duration: Number(state.duration || 0),
-    volume: Math.max(0, Math.min(100, parseInt(state.volume ?? 100) || 100)),
-    updatedAt: state.updatedAt || null
+    itemId: state?.itemId || '',
+    status: state?.status || 'stopped',
+    currentTime: Number(state?.currentTime || 0),
+    duration: Number(state?.duration || 0),
+    volume: Math.max(0, Math.min(100, parseInt(state?.volume ?? 100) || 100)),
+    updatedAt: state?.updatedAt || null
   };
 }
-async function saveSongRequestPlayerState(patch = {}, emit = true) {
-  const prev = await getSongRequestPlayerState();
-  const next = { ...prev, ...patch, updatedAt: new Date().toISOString() };
-  await db.setSettingStr('songrequest_player_state', JSON.stringify(next));
-  if (emit) io.emit('songrequest-player-state', next);
+async function saveSongRequestPlayerState(patch = {}, emit = true, reqOrTm = null) {
+  const tm = getSongRequestTM(reqOrTm);
+  const prev = await getSongRequestPlayerState(tm);
+  const next = { ...prev, ...patch, streamer: songRequestSlug(tm), updatedAt: new Date().toISOString() };
+  await tm.setJson('songrequest_player_state', next);
+  if (emit) tm.emit('songrequest-player-state', next);
   return next;
 }
 
-async function getSongRequestControl() {
-  let control = {};
-  try { control = JSON.parse(await db.getSettingStr('songrequest_control', '{}')); } catch(e) { control = {}; }
+async function getSongRequestControl(reqOrTm = null) {
+  const tm = getSongRequestTM(reqOrTm);
+  const control = await tm.getJson('songrequest_control', {});
   return {
-    seq: Number(control.seq || songRequestControlSeqMemory || 0),
-    action: control.action || '',
-    seconds: Number(control.seconds || 0),
-    volume: Number(control.volume ?? 100),
-    at: control.at || null
+    seq: Number(control?.seq || getSongRequestSeq(tm) || 0),
+    action: control?.action || '',
+    seconds: Number(control?.seconds || 0),
+    volume: Number(control?.volume ?? 100),
+    at: control?.at || null
   };
 }
-function emitSongRequestControlNow(action, payload = {}) {
+function emitSongRequestControlNow(action, payload = {}, reqOrTm = null) {
+  const tm = getSongRequestTM(reqOrTm);
   const control = {
-    seq: ++songRequestControlSeqMemory,
+    seq: nextSongRequestSeq(tm),
     action,
     ...payload,
+    streamer: songRequestSlug(tm),
     at: new Date().toISOString()
   };
-  io.emit('songrequest-control', control);
+  tm.emit('songrequest-control', control);
   return control;
 }
-async function issueSongRequestControl(action, payload = {}) {
-  // IMPORTANT : émission OBS immédiate, sauvegarde après.
-  // Avant, la macro attendait l'écriture DB avant d'arriver dans OBS, ce qui ajoutait une latence visible.
-  const control = emitSongRequestControlNow(action, payload);
-  db.setSettingStr('songrequest_control', JSON.stringify(control)).catch(e => {
-    console.warn('[SONGREQUEST] Sauvegarde contrôle macro impossible:', e.message);
+async function issueSongRequestControl(action, payload = {}, reqOrTm = null) {
+  const tm = getSongRequestTM(reqOrTm);
+  const control = emitSongRequestControlNow(action, payload, tm);
+  tm.setJson('songrequest_control', control).catch(e => {
+    console.warn(`[SONGREQUEST:${songRequestSlug(tm)}] Sauvegarde contrôle impossible:`, e.message);
   });
   return control;
 }
 
-async function getSongRequestState() {
-  let queue = [];
-  try { queue = JSON.parse(await db.getSettingStr('songrequest_queue', '[]')); } catch(e) { queue = []; }
+async function getSongRequestState(reqOrTm = null) {
+  const tm = getSongRequestTM(reqOrTm);
+  let queue = await tm.getJson('songrequest_queue', []);
   queue = Array.isArray(queue) ? queue : [];
-  const player = await getSongRequestPlayerState();
+  const player = await getSongRequestPlayerState(tm);
   const currentItem = queue[0] || null;
-  // Sécurité anti état fantôme : si la file est vide, le panel ne doit jamais afficher PLAYING.
   if (!currentItem) {
     player.itemId = '';
     player.status = 'stopped';
     player.currentTime = 0;
     player.duration = 0;
   } else if (player.itemId && player.itemId !== currentItem.id) {
-    // Si le lecteur OBS remonte un ancien item, on garde la file comme vérité.
     player.itemId = currentItem.id;
     player.currentTime = 0;
     player.duration = currentItem.duration || 0;
@@ -1131,33 +1158,37 @@ async function getSongRequestState() {
   } else if (!player.itemId) {
     player.itemId = currentItem.id;
   }
-  if (currentItem && ['playing','paused','stopped'].includes(songRequestDesiredStatusMemory || '')) {
-    player.status = songRequestDesiredStatusMemory;
+  const desired = getSongRequestDesiredStatus(tm);
+  if (currentItem && ['playing','paused','stopped'].includes(desired || '')) {
+    player.status = desired;
   }
   return {
-    enabled: await db.getSetting('songrequest_enabled'),
-    command: await db.getSettingStr('songrequest_command', '!sr'),
-    confirmMessage: await db.getSettingStr('songrequest_confirm', '🎵 @{username}, ta musique a été ajoutée à la file !'),
-    chatConfirmEnabled: (await db.getSettingStr('songrequest_chat_confirm_enabled', '0')) === '1',
-    maxQueue: parseInt(await db.getSettingStr('songrequest_max_queue', '30')) || 30,
+    streamer: songRequestSlug(tm),
+    enabled: await tm.getBool('songrequest_enabled', true),
+    command: await tm.getSetting('songrequest_command', '!sr'),
+    confirmMessage: await tm.getSetting('songrequest_confirm', '🎵 @{username}, ta musique a été ajoutée à la file !'),
+    chatConfirmEnabled: (await tm.getSetting('songrequest_chat_confirm_enabled', '0')) === '1',
+    maxQueue: parseInt(await tm.getSetting('songrequest_max_queue', '30')) || 30,
     queue,
     player,
-    control: await getSongRequestControl()
+    control: await getSongRequestControl(tm)
   };
 }
 
-async function saveSongRequestQueue(queue) {
+async function saveSongRequestQueue(queue, reqOrTm = null) {
+  const tm = getSongRequestTM(reqOrTm);
   const clean = Array.isArray(queue) ? queue.slice(0, 100) : [];
-  await db.setSettingStr('songrequest_queue', JSON.stringify(clean));
+  await tm.setJson('songrequest_queue', clean);
   if (!clean.length) {
-    await saveSongRequestPlayerState({ itemId:'', status:'stopped', currentTime:0, duration:0 }, false);
+    await saveSongRequestPlayerState({ itemId:'', status:'stopped', currentTime:0, duration:0 }, false, tm);
   }
-  io.emit('songrequest-update', { queue: clean });
+  tm.emit('songrequest-update', { streamer: songRequestSlug(tm), queue: clean });
   return clean;
 }
 
-async function addSongRequest(username, song) {
-  const state = await getSongRequestState();
+async function addSongRequest(username, song, reqOrTm = null) {
+  const tm = getSongRequestTM(reqOrTm);
+  const state = await getSongRequestState(tm);
   const data = await resolveSongRequest(song);
   if (!data.song) throw new Error('Musique requise');
   if (state.queue.length >= state.maxQueue) throw new Error('File pleine');
@@ -1177,17 +1208,24 @@ async function addSongRequest(username, song) {
     at: new Date().toISOString()
   };
   state.queue.push(item);
-  await saveSongRequestQueue(state.queue);
-  console.log(`[SONGREQUEST] Ajouté: ${item.title || item.song} (${item.videoId || 'sans vidéo'})`);
+  await saveSongRequestQueue(state.queue, tm);
+  console.log(`[SONGREQUEST:${songRequestSlug(tm)}] Ajouté: ${item.title || item.song} (${item.videoId || 'sans vidéo'})`);
   return item;
 }
 
 try {
-  shared.registerSongRequestAdder(async (username, song) => {
-    const item = await addSongRequest(username, song);
-    return { ok: true, item };
+  shared.registerSongRequestAdder(async (username, song, ctx = null) => {
+    const run = async () => {
+      const tm = createTenantManager({ db, io, streamer: ctx?.streamer || (ctx?.streamerId ? { id: ctx.streamerId, slug: ctx.slug } : null) });
+      const item = await addSongRequest(username, song, tm);
+      return { ok: true, item, streamer: songRequestSlug(tm) };
+    };
+    if (ctx?.streamerId && tenant?.runWithStreamer) {
+      return tenant.runWithStreamer({ id: ctx.streamerId, slug: ctx.slug }, run);
+    }
+    return run();
   });
-  console.log('[SONGREQUEST] Pont panel/bot enregistré ✓');
+  console.log('[SONGREQUEST] Pont panel/bot V2 enregistré ✓');
 } catch(e) {
   console.warn("[SONGREQUEST] Impossible d'enregistrer le pont panel/bot:", e.message);
 }
@@ -1196,193 +1234,196 @@ app.get('/api/widgets/songrequest', async (req, res) => {
   res.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
   res.set('Pragma', 'no-cache');
   res.set('Expires', '0');
-  try { res.json(await getSongRequestState()); }
+  try { res.json(await getSongRequestState(req)); }
   catch(e) { res.json({ enabled:false, command:'!sr', confirmMessage:'', maxQueue:30, queue:[], player:{status:'stopped'} }); }
 });
 
 app.post('/api/admin/widgets/songrequest/settings', requireAuth, async (req, res) => {
   try {
-    if (typeof req.body.enabled === 'boolean') await db.setSetting('songrequest_enabled', req.body.enabled);
+    const tm = getSongRequestTM(req);
+    if (typeof req.body.enabled === 'boolean') await tm.setBool('songrequest_enabled', req.body.enabled);
     if (typeof req.body.command === 'string') {
       let command = req.body.command.trim().slice(0,20) || '!sr';
       if (!command.startsWith('!')) command = '!' + command;
-      await db.setSettingStr('songrequest_command', command.toLowerCase());
+      await tm.setSetting('songrequest_command', command.toLowerCase());
     }
-    if (typeof req.body.confirmMessage === 'string') await db.setSettingStr('songrequest_confirm', req.body.confirmMessage.trim().slice(0,180));
-    if (typeof req.body.chatConfirmEnabled === 'boolean') await db.setSettingStr('songrequest_chat_confirm_enabled', req.body.chatConfirmEnabled ? '1' : '0');
-    if (req.body.maxQueue !== undefined) await db.setSettingStr('songrequest_max_queue', String(Math.min(100, Math.max(1, parseInt(req.body.maxQueue) || 30))));
-    res.json({ success:true, ...(await getSongRequestState()) });
+    if (typeof req.body.confirmMessage === 'string') await tm.setSetting('songrequest_confirm', req.body.confirmMessage.trim().slice(0,180));
+    if (typeof req.body.chatConfirmEnabled === 'boolean') await tm.setSetting('songrequest_chat_confirm_enabled', req.body.chatConfirmEnabled ? '1' : '0');
+    if (req.body.maxQueue !== undefined) await tm.setSetting('songrequest_max_queue', String(Math.min(100, Math.max(1, parseInt(req.body.maxQueue) || 30))));
+    const state = await getSongRequestState(tm);
+    tm.emit('songrequest-settings-update', state);
+    res.json({ success:true, ...state });
   } catch(e) { res.status(500).json({ error:e.message }); }
 });
 
 app.post('/api/admin/widgets/songrequest/add', requireAuth, async (req, res) => {
-  try { const item = await addSongRequest(req.body.username || 'Streamer', req.body.song || ''); res.json({ success:true, item, ...(await getSongRequestState()) }); }
-  catch(e) { res.status(400).json({ error:e.message }); }
+  try {
+    const tm = getSongRequestTM(req);
+    const item = await addSongRequest(req.body.username || 'Streamer', req.body.song || '', tm);
+    res.json({ success:true, item, ...(await getSongRequestState(tm)) });
+  } catch(e) { res.status(400).json({ error:e.message }); }
 });
 
 app.post('/api/admin/widgets/songrequest/delete', requireAuth, async (req, res) => {
   try {
-    const state = await getSongRequestState();
+    const tm = getSongRequestTM(req);
+    const state = await getSongRequestState(tm);
     const id = req.body.id;
     const wasCurrent = state.queue[0]?.id === id;
-    await saveSongRequestQueue(state.queue.filter(x => x.id !== id));
-    if (wasCurrent) await issueSongRequestControl('load-current');
-    res.json({ success:true, ...(await getSongRequestState()) });
+    await saveSongRequestQueue(state.queue.filter(x => x.id !== id), tm);
+    if (wasCurrent) await issueSongRequestControl('load-current', {}, tm);
+    res.json({ success:true, ...(await getSongRequestState(tm)) });
   } catch(e) { res.status(500).json({ error:e.message }); }
 });
 
-
 app.post('/api/widgets/songrequest/next', async (req, res) => {
   try {
-    const state = await getSongRequestState();
+    const tm = getSongRequestTM(req);
+    const state = await getSongRequestState(tm);
     state.queue.shift();
-    await saveSongRequestQueue(state.queue);
-    songRequestDesiredStatusMemory = state.queue[0] ? 'playing' : 'stopped';
-    await saveSongRequestPlayerState({ itemId: state.queue[0]?.id || '', status: state.queue[0] ? 'playing' : 'stopped', currentTime: 0, duration: state.queue[0]?.duration || 0 });
-    await issueSongRequestControl('next');
-    res.json({ success:true, ...(await getSongRequestState()) });
+    await saveSongRequestQueue(state.queue, tm);
+    setSongRequestDesiredStatus(tm, state.queue[0] ? 'playing' : 'stopped');
+    await saveSongRequestPlayerState({ itemId: state.queue[0]?.id || '', status: state.queue[0] ? 'playing' : 'stopped', currentTime: 0, duration: state.queue[0]?.duration || 0 }, true, tm);
+    await issueSongRequestControl('next', {}, tm);
+    res.json({ success:true, ...(await getSongRequestState(tm)) });
   } catch(e) { res.status(500).json({ error:e.message }); }
 });
 
 app.post('/api/admin/widgets/songrequest/next', requireAuth, async (req, res) => {
   try {
-    const state = await getSongRequestState();
+    const tm = getSongRequestTM(req);
+    const state = await getSongRequestState(tm);
     state.queue.shift();
-    await saveSongRequestQueue(state.queue);
-    songRequestDesiredStatusMemory = state.queue[0] ? 'playing' : 'stopped';
-    await saveSongRequestPlayerState({ itemId: state.queue[0]?.id || '', status: state.queue[0] ? 'playing' : 'stopped', currentTime: 0, duration: state.queue[0]?.duration || 0 });
-    await issueSongRequestControl('next');
-    res.json({ success:true, ...(await getSongRequestState()) });
+    await saveSongRequestQueue(state.queue, tm);
+    setSongRequestDesiredStatus(tm, state.queue[0] ? 'playing' : 'stopped');
+    await saveSongRequestPlayerState({ itemId: state.queue[0]?.id || '', status: state.queue[0] ? 'playing' : 'stopped', currentTime: 0, duration: state.queue[0]?.duration || 0 }, true, tm);
+    await issueSongRequestControl('next', {}, tm);
+    res.json({ success:true, ...(await getSongRequestState(tm)) });
   } catch(e) { res.status(500).json({ error:e.message }); }
 });
 
 app.post('/api/admin/widgets/songrequest/clear', requireAuth, async (req, res) => {
   try {
-    await saveSongRequestQueue([]);
-    songRequestDesiredStatusMemory = 'stopped';
-    await saveSongRequestPlayerState({ itemId:'', status:'stopped', currentTime:0, duration:0 });
-    await issueSongRequestControl('stop');
-    res.json({ success:true, ...(await getSongRequestState()) });
+    const tm = getSongRequestTM(req);
+    await saveSongRequestQueue([], tm);
+    setSongRequestDesiredStatus(tm, 'stopped');
+    await saveSongRequestPlayerState({ itemId:'', status:'stopped', currentTime:0, duration:0 }, true, tm);
+    await issueSongRequestControl('stop', {}, tm);
+    res.json({ success:true, ...(await getSongRequestState(tm)) });
   }
   catch(e) { res.status(500).json({ error:e.message }); }
 });
 
 app.post('/api/admin/widgets/songrequest/play', requireAuth, async (req, res) => {
   try {
-    const state = await getSongRequestState();
+    const tm = getSongRequestTM(req);
+    const state = await getSongRequestState(tm);
     const cur = state.queue[0];
-    songRequestDesiredStatusMemory = cur ? 'playing' : 'stopped';
-    const next = await saveSongRequestPlayerState({ itemId: cur?.id || '', status: cur ? 'playing' : 'stopped' });
-    await issueSongRequestControl('play');
+    setSongRequestDesiredStatus(tm, cur ? 'playing' : 'stopped');
+    const next = await saveSongRequestPlayerState({ itemId: cur?.id || '', status: cur ? 'playing' : 'stopped' }, true, tm);
+    await issueSongRequestControl('play', {}, tm);
     res.json({ success:true, player: next });
   } catch(e) { res.status(500).json({ error:e.message }); }
 });
 app.post('/api/admin/widgets/songrequest/pause', requireAuth, async (req, res) => {
   try {
-    songRequestDesiredStatusMemory = 'paused';
-    const next = await saveSongRequestPlayerState({ status:'paused' });
-    await issueSongRequestControl('pause');
+    const tm = getSongRequestTM(req);
+    setSongRequestDesiredStatus(tm, 'paused');
+    const next = await saveSongRequestPlayerState({ status:'paused' }, true, tm);
+    await issueSongRequestControl('pause', {}, tm);
     res.json({ success:true, player: next });
   } catch(e) { res.status(500).json({ error:e.message }); }
 });
 app.post('/api/admin/widgets/songrequest/seek', requireAuth, async (req, res) => {
   try {
+    const tm = getSongRequestTM(req);
     const seconds = Math.max(0, parseFloat(req.body.seconds || 0) || 0);
-    const next = await saveSongRequestPlayerState({ currentTime: seconds });
-    await issueSongRequestControl('seek', { seconds });
+    const next = await saveSongRequestPlayerState({ currentTime: seconds }, true, tm);
+    await issueSongRequestControl('seek', { seconds }, tm);
     res.json({ success:true, player: next });
   } catch(e) { res.status(500).json({ error:e.message }); }
 });
 app.post('/api/admin/widgets/songrequest/volume', requireAuth, async (req, res) => {
   try {
-    // Volume ultra réactif : on envoie l'ordre OBS avant l'écriture Turso.
-    // Et on garde bien 0 comme valeur valide (ancien code : 0 redevenait 100).
+    const tm = getSongRequestTM(req);
     const raw = Number(req.body.volume ?? 100);
     const volume = Math.max(0, Math.min(100, Number.isFinite(raw) ? Math.round(raw) : 100));
-    const state = await getSongRequestPlayerState();
-    const next = { ...state, volume, updatedAt: new Date().toISOString() };
-    io.emit('songrequest-player-state', next);
-    await issueSongRequestControl('volume', { volume });
-    db.setSettingStr('songrequest_player_state', JSON.stringify(next)).catch(e => {
-      console.warn('[SONGREQUEST] Sauvegarde volume impossible:', e.message);
+    const state = await getSongRequestPlayerState(tm);
+    const next = { ...state, streamer: songRequestSlug(tm), volume, updatedAt: new Date().toISOString() };
+    tm.emit('songrequest-player-state', next);
+    await issueSongRequestControl('volume', { volume }, tm);
+    tm.setJson('songrequest_player_state', next).catch(e => {
+      console.warn(`[SONGREQUEST:${songRequestSlug(tm)}] Sauvegarde volume impossible:`, e.message);
     });
     res.json({ success:true, player: next });
   } catch(e) { res.status(500).json({ error:e.message }); }
 });
 app.post('/api/widgets/songrequest/player-state', async (req, res) => {
   try {
-    const state = await getSongRequestState();
+    const tm = getSongRequestTM(req);
+    const state = await getSongRequestState(tm);
     const currentItem = state.queue[0] || null;
     const bodyItemId = typeof req.body.itemId === 'string' ? req.body.itemId : '';
-    // Ignore les retours d'un ancien overlay/lecteur OBS, sinon il peut remettre PLAY tout seul
-    // ou afficher une ancienne musique alors que la file a changé.
     if (!currentItem) {
-      const next = await saveSongRequestPlayerState({ itemId:'', status:'stopped', currentTime:0, duration:0 }, true);
+      const next = await saveSongRequestPlayerState({ itemId:'', status:'stopped', currentTime:0, duration:0 }, true, tm);
       return res.json({ success:true, ignored:true, player: next });
     }
     if (bodyItemId && bodyItemId !== currentItem.id) {
       return res.json({ success:true, ignored:true, player: state.player });
     }
     const patch = { itemId: currentItem.id };
-    // IMPORTANT QUALITÉ : l'overlay OBS ne décide plus de l'état lecture/pause.
-    // Il remonte seulement le temps et la durée. Sinon YouTube peut envoyer PLAYING/PAUSED
-    // pendant un buffering, un refresh OBS ou une mise à jour de file, et le panel se met
-    // à jouer/pauser tout seul. Seules les commandes panel/macros modifient le statut.
     if (typeof req.body.status === 'string' && req.body.status === 'ended') {
       patch.status = 'stopped';
-      songRequestDesiredStatusMemory = 'stopped';
+      setSongRequestDesiredStatus(tm, 'stopped');
     }
     if (req.body.currentTime !== undefined) patch.currentTime = Math.max(0, parseFloat(req.body.currentTime) || 0);
     if (req.body.duration !== undefined) patch.duration = Math.max(0, parseFloat(req.body.duration) || 0);
     if (req.body.volume !== undefined) patch.volume = Math.max(0, Math.min(100, parseInt(req.body.volume) || 100));
-    const next = await saveSongRequestPlayerState(patch, true);
+    const next = await saveSongRequestPlayerState(patch, true, tm);
     res.json({ success:true, player: next });
   } catch(e) { res.status(500).json({ error:e.message }); }
 });
 
-
-
-async function runSongRequestMacro(action) {
-  const state = await getSongRequestState();
+async function runSongRequestMacro(action, reqOrTm = null) {
+  const tm = getSongRequestTM(reqOrTm);
+  const state = await getSongRequestState(tm);
   const cur = state.queue[0] || null;
 
   if (action === 'toggle') {
-    const currentStatus = songRequestDesiredStatusMemory || state.player?.status || 'stopped';
+    const currentStatus = getSongRequestDesiredStatus(tm) || state.player?.status || 'stopped';
     action = currentStatus === 'playing' ? 'pause' : 'play';
   }
 
   if (action === 'play') {
-    songRequestDesiredStatusMemory = cur ? 'playing' : 'stopped';
-    // Commande OBS en premier pour réaction immédiate.
-    await issueSongRequestControl('play');
+    setSongRequestDesiredStatus(tm, cur ? 'playing' : 'stopped');
+    await issueSongRequestControl('play', {}, tm);
     const patch = { itemId: cur?.id || '', status: cur ? 'playing' : 'stopped' };
-    saveSongRequestPlayerState(patch).catch(e => console.warn('[SONGREQUEST] Sauvegarde play macro impossible:', e.message));
+    saveSongRequestPlayerState(patch, true, tm).catch(e => console.warn(`[SONGREQUEST:${songRequestSlug(tm)}] Sauvegarde play macro impossible:`, e.message));
     return { action:'play', player: { ...(state.player || {}), ...patch } };
   }
 
   if (action === 'pause') {
-    songRequestDesiredStatusMemory = 'paused';
-    // Commande OBS en premier pour réaction immédiate.
-    await issueSongRequestControl('pause');
+    setSongRequestDesiredStatus(tm, 'paused');
+    await issueSongRequestControl('pause', {}, tm);
     const patch = { status:'paused' };
-    saveSongRequestPlayerState(patch).catch(e => console.warn('[SONGREQUEST] Sauvegarde pause macro impossible:', e.message));
+    saveSongRequestPlayerState(patch, true, tm).catch(e => console.warn(`[SONGREQUEST:${songRequestSlug(tm)}] Sauvegarde pause macro impossible:`, e.message));
     return { action:'pause', player: { ...(state.player || {}), ...patch } };
   }
 
   if (action === 'next') {
     state.queue.shift();
-    await saveSongRequestQueue(state.queue);
+    await saveSongRequestQueue(state.queue, tm);
     const nextItem = state.queue[0] || null;
-    songRequestDesiredStatusMemory = nextItem ? 'playing' : 'stopped';
-    await issueSongRequestControl('next');
-    const next = await saveSongRequestPlayerState({ itemId: nextItem?.id || '', status: nextItem ? 'playing' : 'stopped', currentTime: 0, duration: nextItem?.duration || 0 });
+    setSongRequestDesiredStatus(tm, nextItem ? 'playing' : 'stopped');
+    await issueSongRequestControl('next', {}, tm);
+    const next = await saveSongRequestPlayerState({ itemId: nextItem?.id || '', status: nextItem ? 'playing' : 'stopped', currentTime: 0, duration: nextItem?.duration || 0 }, true, tm);
     return { action:'next', player: next };
   }
 
   if (action === 'stop') {
-    songRequestDesiredStatusMemory = 'stopped';
-    await issueSongRequestControl('stop');
-    const next = await saveSongRequestPlayerState({ status:'stopped', currentTime:0 });
+    setSongRequestDesiredStatus(tm, 'stopped');
+    await issueSongRequestControl('stop', {}, tm);
+    const next = await saveSongRequestPlayerState({ status:'stopped', currentTime:0 }, true, tm);
     return { action:'stop', player: next };
   }
 
@@ -1396,14 +1437,13 @@ async function songRequestMacroHandler(req, res) {
     res.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
     res.set('Pragma', 'no-cache');
     res.set('Expires', '0');
-    const result = await runSongRequestMacro(action);
-    res.json({ success:true, ...result, ...(await getSongRequestState()) });
+    const tm = getSongRequestTM(req);
+    const result = await runSongRequestMacro(action, tm);
+    res.json({ success:true, streamer: songRequestSlug(tm), ...result, ...(await getSongRequestState(tm)) });
   } catch(e) { res.status(500).json({ error:e.message }); }
 }
 app.get('/api/widgets/songrequest/macro/:action', songRequestMacroHandler);
 app.post('/api/widgets/songrequest/macro/:action', songRequestMacroHandler);
-// Alias public plus simple pour Kick Bot Companion :
-// https://ton-render.onrender.com/api/songrequest/macro/toggle
 app.get('/api/songrequest/macro/:action', songRequestMacroHandler);
 app.post('/api/songrequest/macro/:action', songRequestMacroHandler);
 

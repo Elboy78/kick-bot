@@ -24,8 +24,8 @@ module.exports = {
   },
 
   registerSongRequestAdder(fn) { _songRequestAdder = fn; },
-  addSongRequest(username, song) {
-    if (_songRequestAdder) return _songRequestAdder(username, song);
+  addSongRequest(username, song, ctx = null) {
+    if (_songRequestAdder) return _songRequestAdder(username, song, ctx);
     return Promise.resolve({ error: 'Song Request pas encore initialisé.' });
   },
 
