@@ -386,35 +386,61 @@ const SUB_COUNTER_DEFAULTS = {
   latest: []
 };
 
-async function getSubCounterState() {
-  const latestRaw = await db.getSettingStr('subcounter_latest', '[]');
+function getSubCounterManager(source = null) {
+  if (source?.getSetting && source?.setSetting) return source;
+  if (source?.tenantManager) return source.tenantManager;
+  const streamer = source?.streamer || source?.__streamerContext || source || null;
+  return createTenantManager({ db, io, req: source?.headers ? source : null, streamer });
+}
+
+async function getSubCounterState(source = null) {
+  const tm = getSubCounterManager(source);
+  const latestRaw = await tm.getSetting('subcounter_latest', '[]');
   let latest = [];
   try { latest = JSON.parse(latestRaw); } catch(e) { latest = []; }
+  const totalRaw = await tm.getSetting('subcounter_total', await tm.getSetting('subgoal_current', '0'));
   return {
-    total: parseInt(await db.getSettingStr('subcounter_total', await db.getSettingStr('subgoal_current', '0'))) || 0,
-    session: parseInt(await db.getSettingStr('subcounter_session', '0')) || 0,
-    renewals: parseInt(await db.getSettingStr('subcounter_renewals', '0')) || 0,
-    gifts: parseInt(await db.getSettingStr('subcounter_gifts', '0')) || 0,
-    target: parseInt(await db.getSettingStr('subgoal_target', '50')) || 50,
-    label: await db.getSettingStr('subgoal_label', 'Sub Goal'),
-    textPosition: await db.getSettingStr('subgoal_text_position', 'inside'),
-    countPosition: await db.getSettingStr('subgoal_count_position', 'inside'),
-    progressDisplay: await db.getSettingStr('subgoal_progress_display', 'count'),
-    textAlign: await db.getSettingStr('subgoal_text_align', 'center'),
+    streamer: tm.slug,
+    total: Math.max(0, parseInt(totalRaw) || 0),
+    session: Math.max(0, parseInt(await tm.getSetting('subcounter_session', '0')) || 0),
+    renewals: Math.max(0, parseInt(await tm.getSetting('subcounter_renewals', '0')) || 0),
+    gifts: Math.max(0, parseInt(await tm.getSetting('subcounter_gifts', '0')) || 0),
+    target: Math.max(1, parseInt(await tm.getSetting('subgoal_target', '50')) || 50),
+    label: await tm.getSetting('subgoal_label', 'Sub Goal'),
+    textPosition: await tm.getSetting('subgoal_text_position', 'inside'),
+    countPosition: await tm.getSetting('subgoal_count_position', 'inside'),
+    progressDisplay: await tm.getSetting('subgoal_progress_display', 'count'),
+    textAlign: await tm.getSetting('subgoal_text_align', 'center'),
     latest: Array.isArray(latest) ? latest.slice(0, 12) : []
   };
 }
 
-async function emitSubCounterState() {
-  const state = await getSubCounterState();
-  io.emit('subcounter-update', state);
-  io.emit('subgoal-update', { current: state.total, target: state.target, label: state.label, textPosition: state.textPosition, countPosition: state.countPosition, progressDisplay: state.progressDisplay, textAlign: state.textAlign });
+function publicSubGoalState(state) {
+  return {
+    streamer: state.streamer,
+    current: state.total,
+    target: state.target,
+    label: state.label,
+    textPosition: state.textPosition,
+    countPosition: state.countPosition,
+    progressDisplay: state.progressDisplay,
+    textAlign: state.textAlign,
+    updatedAt: new Date().toISOString()
+  };
+}
+
+async function emitSubCounterState(source = null) {
+  const tm = getSubCounterManager(source);
+  const state = await getSubCounterState(tm);
+  tm.emit('subcounter-update', state);
+  tm.emit('subgoal-update', publicSubGoalState(state));
   return state;
 }
 
-async function recordSubEvent(type, payload = {}) {
+async function recordSubEvent(type, payload = {}, source = null) {
   try {
-    const state = await getSubCounterState();
+    const tm = getSubCounterManager(source || payload?.__streamerContext || null);
+    const state = await getSubCounterState(tm);
     const amount = Math.max(1, parseInt(payload.count || 1) || 1);
     const event = {
       type,
@@ -425,30 +451,35 @@ async function recordSubEvent(type, payload = {}) {
       at: new Date().toISOString()
     };
 
+    // Le total représente le nombre actif suivi par le bot : nouveau sub et gifts l'augmentent.
+    // Un renouvellement ne l'augmente pas, mais compte dans la session.
     if (type === 'new' || type === 'gift') {
       state.total += amount;
       state.session += amount;
     }
     if (type === 'gift') state.gifts += amount;
     if (type === 'renewal') {
-      // Un renouvellement ne change pas forcément le nombre de subs actifs,
-      // mais il doit bien compter dans les subs de la session live.
       state.session += amount;
       state.renewals += amount;
     }
 
     state.latest = [event, ...state.latest].slice(0, 12);
-    await db.setSettingStr('subcounter_total', String(state.total));
-    await db.setSettingStr('subcounter_session', String(state.session));
-    await db.setSettingStr('subcounter_renewals', String(state.renewals));
-    await db.setSettingStr('subcounter_gifts', String(state.gifts));
-    await db.setSettingStr('subgoal_current', String(state.total));
-    await db.setSettingStr('subcounter_latest', JSON.stringify(state.latest));
-    io.emit('subcounter-update', state);
-    io.emit('subgoal-update', { current: state.total, target: state.target, label: state.label, textPosition: state.textPosition, countPosition: state.countPosition, progressDisplay: state.progressDisplay, textAlign: state.textAlign });
-    console.log(`[SUBCOUNTER] Update ${type} → total=${state.total} session=${state.session} gifts=${state.gifts} renewals=${state.renewals}`);
+    await Promise.all([
+      tm.setSetting('subcounter_total', String(state.total)),
+      tm.setSetting('subcounter_session', String(state.session)),
+      tm.setSetting('subcounter_renewals', String(state.renewals)),
+      tm.setSetting('subcounter_gifts', String(state.gifts)),
+      tm.setSetting('subgoal_current', String(state.total)),
+      tm.setSetting('subcounter_latest', JSON.stringify(state.latest))
+    ]);
+    tm.emit('subcounter-update', state);
+    tm.emit('subgoal-update', publicSubGoalState(state));
+    console.log(`[SUBCOUNTER:${tm.slug}] ${type} +${amount} → total=${state.total} session=${state.session}`);
     return state;
-  } catch(e) { console.error('[SUBCOUNTER] Erreur event:', e.message); }
+  } catch(e) {
+    console.error('[SUBCOUNTER] Erreur event:', e.message);
+    throw e;
+  }
 }
 
 // ── Traitement commun events Kick : webhook + websocket bot ────────────────────
@@ -529,9 +560,11 @@ async function sendAnnouncementToChat(message, logLabel) {
   }
 }
 async function processKickEvent(eventTypeRaw, payload = {}) {
+  const eventContext = payload?.__streamerContext || payload?.streamer || null;
+  const tm = getSubCounterManager(eventContext);
   const eventType = normalizeKickEventType(eventTypeRaw || payload?.event || payload?.type || '');
   const data = getPayloadData(payload);
-  const dedupe = eventDedupeKey(eventType, payload);
+  const dedupe = `${tm.slug}:${eventDedupeKey(eventType, payload)}`;
   cleanupProcessedKickEvents();
   if (processedKickEvents.has(dedupe)) return { ok: true, duplicate: true, eventType };
   processedKickEvents.set(dedupe, Date.now());
@@ -557,7 +590,7 @@ async function processKickEvent(eventTypeRaw, payload = {}) {
 
   if (eventType === 'channel.subscription.new') {
     const info = extractSubInfo(payload);
-    await recordSubEvent('new', { username: info.username, count: 1 });
+    await recordSubEvent('new', { username: info.username, count: 1 }, tm);
     await pushObsAlert('sub', { username: info.username }).catch(e=>console.warn('[ALERT OBS] sub ignorée:', e.message));
     const enabled = await db.getSetting('sub_announce_enabled');
     if (enabled) {
@@ -570,7 +603,7 @@ async function processKickEvent(eventTypeRaw, payload = {}) {
 
   if (eventType === 'channel.subscription.renewal') {
     const info = extractSubInfo(payload);
-    await recordSubEvent('renewal', { username: info.username, months: info.months });
+    await recordSubEvent('renewal', { username: info.username, months: info.months }, tm);
     await pushObsAlert('renew', { username: info.username, months: info.months }).catch(e=>console.warn('[ALERT OBS] renew ignorée:', e.message));
     const enabled = await db.getSetting('sub_announce_enabled');
     if (enabled) {
@@ -586,7 +619,7 @@ async function processKickEvent(eventTypeRaw, payload = {}) {
     const gifterRaw = pick(data?.gifter?.username, data?.user?.username, data?.username, data?.gifter?.name, data?.user?.name);
     const gifter = isAnon ? 'un anonyme' : (gifterRaw || 'Anonyme');
     const count = parseInt(data?.count || data?.gift_count || data?.giftees?.length || data?.recipients?.length || 1) || 1;
-    await recordSubEvent('gift', { gifter, count });
+    await recordSubEvent('gift', { gifter, count }, tm);
     await pushObsAlert('gift', { gifter, count }).catch(e=>console.warn('[ALERT OBS] gift ignorée:', e.message));
     const enabled = await db.getSetting('sub_announce_enabled');
     if (enabled) {
@@ -920,13 +953,13 @@ const { createTenantManager } = require('./tenant-manager');
 
 app.get('/api/widgets/subgoal', async (req, res) => {
   try {
-    const state = await getSubCounterState();
+    const state = await getSubCounterState(req.tenantManager || req);
     res.json({ current: state.total, target: state.target, label: state.label, textPosition: state.textPosition, countPosition: state.countPosition, progressDisplay: state.progressDisplay, textAlign: state.textAlign });
   } catch(e) { res.json({ current: 0, target: 50, label: 'Sub Goal', textPosition: 'inside', countPosition: 'inside', progressDisplay: 'count', textAlign: 'center' }); }
 });
 
 app.get('/api/widgets/subcounter', async (req, res) => {
-  try { res.json(await getSubCounterState()); }
+  try { res.json(await getSubCounterState(req.tenantManager || req)); }
   catch(e) { res.json(SUB_COUNTER_DEFAULTS); }
 });
 
@@ -936,7 +969,7 @@ app.post('/api/admin/widgets/subcounter/test', requireAuth, async (req, res) => 
     const username = String(req.body.username || 'TestSub').slice(0, 40);
     const count = Math.max(1, parseInt(req.body.count || 1) || 1);
     const months = Math.max(1, parseInt(req.body.months || 1) || 1);
-    const state = await recordSubEvent(type, { username, gifter: username, count, months });
+    const state = await recordSubEvent(type, { username, gifter: username, count, months }, req.tenantManager || req);
     res.json({ success: true, state });
   } catch(e) { res.status(500).json({ error: e.message }); }
 });
@@ -944,19 +977,19 @@ app.post('/api/admin/widgets/subcounter/test', requireAuth, async (req, res) => 
 app.post('/api/admin/widgets/subcounter/total', requireAuth, async (req, res) => {
   try {
     const total = Math.max(0, parseInt(req.body.total) || 0);
-    await db.setSettingStr('subcounter_total', String(total));
-    await db.setSettingStr('subgoal_current', String(total));
-    res.json({ success: true, ...(await emitSubCounterState()) });
+    await req.tenantManager.setSetting('subcounter_total', String(total));
+    await req.tenantManager.setSetting('subgoal_current', String(total));
+    res.json({ success: true, ...(await emitSubCounterState(req.tenantManager || req)) });
   } catch(e) { res.status(500).json({ error: e.message }); }
 });
 
 app.post('/api/admin/widgets/subcounter/session/reset', requireAuth, async (req, res) => {
   try {
-    await db.setSettingStr('subcounter_session', '0');
-    await db.setSettingStr('subcounter_renewals', '0');
-    await db.setSettingStr('subcounter_gifts', '0');
-    await db.setSettingStr('subcounter_latest', '[]');
-    res.json({ success: true, ...(await emitSubCounterState()) });
+    await req.tenantManager.setSetting('subcounter_session', '0');
+    await req.tenantManager.setSetting('subcounter_renewals', '0');
+    await req.tenantManager.setSetting('subcounter_gifts', '0');
+    await req.tenantManager.setSetting('subcounter_latest', '[]');
+    res.json({ success: true, ...(await emitSubCounterState(req.tenantManager || req)) });
   } catch(e) { res.status(500).json({ error: e.message }); }
 });
 
@@ -964,8 +997,8 @@ app.post('/api/admin/widgets/subcounter/session/reset', requireAuth, async (req,
 app.post('/api/admin/widgets/subgoal/label', requireAuth, async (req, res) => {
   try {
     const label = String(req.body.label || 'Sub Goal').trim().slice(0, 40) || 'Sub Goal';
-    await db.setSettingStr('subgoal_label', label);
-    res.json({ success: true, ...(await emitSubCounterState()) });
+    await req.tenantManager.setSetting('subgoal_label', label);
+    res.json({ success: true, ...(await emitSubCounterState(req.tenantManager || req)) });
   } catch(e) { res.status(500).json({ error: e.message }); }
 });
 
@@ -980,36 +1013,36 @@ app.post('/api/admin/widgets/subgoal/layout', requireAuth, async (req, res) => {
     const countPosition = allowedCountPositions.includes(req.body.countPosition) ? req.body.countPosition : 'inside';
     const progressDisplay = allowedDisplays.includes(req.body.progressDisplay) ? req.body.progressDisplay : 'count';
     const textAlign = allowedAligns.includes(req.body.textAlign) ? req.body.textAlign : 'center';
-    await db.setSettingStr('subgoal_text_position', textPosition);
-    await db.setSettingStr('subgoal_count_position', countPosition);
-    await db.setSettingStr('subgoal_progress_display', progressDisplay);
-    await db.setSettingStr('subgoal_text_align', textAlign);
-    res.json({ success: true, ...(await emitSubCounterState()) });
+    await req.tenantManager.setSetting('subgoal_text_position', textPosition);
+    await req.tenantManager.setSetting('subgoal_count_position', countPosition);
+    await req.tenantManager.setSetting('subgoal_progress_display', progressDisplay);
+    await req.tenantManager.setSetting('subgoal_text_align', textAlign);
+    res.json({ success: true, ...(await emitSubCounterState(req.tenantManager || req)) });
   } catch(e) { res.status(500).json({ error: e.message }); }
 });
 
 app.post('/api/admin/widgets/subgoal/target', requireAuth, async (req, res) => {
   try {
     const target = Math.max(1, parseInt(req.body.target) || 50);
-    await db.setSettingStr('subgoal_target', String(target));
-    res.json({ success: true, ...(await emitSubCounterState()) });
+    await req.tenantManager.setSetting('subgoal_target', String(target));
+    res.json({ success: true, ...(await emitSubCounterState(req.tenantManager || req)) });
   } catch(e) { res.status(500).json({ error: e.message }); }
 });
 app.post('/api/admin/widgets/subgoal/adjust', requireAuth, async (req, res) => {
   try {
     const delta = parseInt(req.body.delta) || 0;
-    const state = await getSubCounterState();
+    const state = await getSubCounterState(req.tenantManager || req);
     const total = Math.max(0, state.total + delta);
-    await db.setSettingStr('subcounter_total', String(total));
-    await db.setSettingStr('subgoal_current', String(total));
-    res.json({ success: true, ...(await emitSubCounterState()) });
+    await req.tenantManager.setSetting('subcounter_total', String(total));
+    await req.tenantManager.setSetting('subgoal_current', String(total));
+    res.json({ success: true, ...(await emitSubCounterState(req.tenantManager || req)) });
   } catch(e) { res.status(500).json({ error: e.message }); }
 });
 app.post('/api/admin/widgets/subgoal/reset', requireAuth, async (req, res) => {
   try {
-    await db.setSettingStr('subcounter_total', '0');
-    await db.setSettingStr('subgoal_current', '0');
-    res.json({ success: true, ...(await emitSubCounterState()) });
+    await req.tenantManager.setSetting('subcounter_total', '0');
+    await req.tenantManager.setSetting('subgoal_current', '0');
+    res.json({ success: true, ...(await emitSubCounterState(req.tenantManager || req)) });
   } catch(e) { res.status(500).json({ error: e.message }); }
 });
 

@@ -1,247 +1,80 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="fr">
 <head>
-<meta charset="UTF-8">
-<title>🎯 Sub Goal</title>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Sub Goal</title>
 <style>
-  html, body { margin:0; padding:0; background:transparent; overflow:hidden; font-family:'Segoe UI',system-ui,sans-serif; }
-
-  #wrap {
-    position:fixed; top:0; left:0; width:520px; padding:20px;
-    display:flex; flex-direction:column; gap:8px;
-  }
-
-  #topLabel {
-    display:none; align-items:baseline; justify-content:space-between; gap:12px;
-    color:#fff; text-shadow:0 2px 6px rgba(0,0,0,.85);
-    font-weight:850; letter-spacing:.5px;
-  }
-  #topLabel .title { font-size:18px; text-transform:uppercase; }
-  #topLabel .count { font-size:22px; white-space:nowrap; }
-  .count b { color:#3dff7a; }
-  .count span { color:#cfcfcf; font-weight:700; }
-
-  #track {
-    position:relative; width:100%; height:40px;
-    background:rgba(10,10,14,.55); border:2px solid rgba(255,255,255,.18);
-    border-radius:999px; overflow:hidden;
-    box-shadow:inset 0 2px 6px rgba(0,0,0,.5), 0 6px 18px rgba(0,0,0,.35);
-  }
-  #fill {
-    position:absolute; top:0; left:0; height:100%; width:0%;
-    border-radius:999px;
-    background:linear-gradient(90deg,#0f8a34,#2ee85f 55%,#7dffa6);
-    box-shadow:0 0 18px rgba(46,232,95,.65), inset 0 2px 4px rgba(255,255,255,.35);
-    transition:width .6s cubic-bezier(.22,.8,.3,1);
-  }
-  #fill::after {
-    content:''; position:absolute; inset:0;
-    background:repeating-linear-gradient(120deg, rgba(255,255,255,.12) 0 10px, transparent 10px 20px);
-    opacity:.5;
-  }
-  #glow {
-    position:absolute; top:0; left:0; height:100%; width:0%;
-    border-radius:999px; pointer-events:none; opacity:0;
-    box-shadow:0 0 30px 6px rgba(120,255,160,.9);
-    transition:opacity .4s ease;
-  }
-  #glow.pop { opacity:1; }
-
-  #inside {
-    position:absolute; inset:0; z-index:2;
-    display:flex; align-items:center; justify-content:center; gap:10px;
-    padding:0 18px; box-sizing:border-box;
-    font-size:14px; font-weight:950; color:#fff; text-shadow:0 1px 4px rgba(0,0,0,.85);
-    white-space:nowrap;
-  }
-  #inside.left { justify-content:flex-start; }
-  #inside.center { justify-content:center; }
-  #inside.right { justify-content:flex-end; }
-  #inside.split { justify-content:space-between; }
-  #insideLabel { text-transform:uppercase; letter-spacing:.5px; overflow:hidden; text-overflow:ellipsis; min-width:0; }
-  #insideCount { font-size:15px; }
+  :root{--fill:#26e07f;--track:rgba(15,18,24,.82);--text:#fff;--muted:rgba(255,255,255,.82)}
+  *{box-sizing:border-box}
+  html,body{width:100%;height:100%;margin:0;overflow:hidden;background:transparent;font-family:Inter,Arial,sans-serif}
+  body{display:flex;align-items:center;justify-content:center;padding:10px}
+  .widget{width:min(760px,100%);filter:drop-shadow(0 8px 22px rgba(0,0,0,.32))}
+  .above{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:0 8px 8px;color:var(--text);font-weight:800;text-shadow:0 2px 8px rgba(0,0,0,.8)}
+  .above.hidden{display:none}
+  .bar{position:relative;height:58px;border:1px solid rgba(255,255,255,.15);border-radius:16px;background:var(--track);overflow:hidden;backdrop-filter:blur(12px)}
+  .fill{position:absolute;inset:0 auto 0 0;width:0%;background:linear-gradient(90deg,var(--fill),#73f1a9);border-radius:inherit;transition:width .8s cubic-bezier(.22,.85,.25,1);will-change:width}
+  .shine{position:absolute;inset:0;background:linear-gradient(105deg,transparent 35%,rgba(255,255,255,.22) 50%,transparent 65%);transform:translateX(-120%);animation:shine 4s ease-in-out infinite;pointer-events:none}
+  @keyframes shine{0%,55%{transform:translateX(-120%)}85%,100%{transform:translateX(120%)}}
+  .inside{position:absolute;inset:0;display:grid;grid-template-columns:1fr auto 1fr;align-items:center;padding:0 18px;color:var(--text);font-weight:900;text-shadow:0 2px 8px rgba(0,0,0,.72);pointer-events:none}
+  .inside.left{text-align:left}.inside.center{text-align:center}.inside.right{text-align:right}
+  .label{grid-column:1/4;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .count{grid-column:1/4;white-space:nowrap}
+  .inside.both .label{grid-column:1/3;text-align:left}.inside.both .count{grid-column:3;text-align:right}
+  .hidden{display:none!important}
+  .invalid{display:none;color:#fff;background:rgba(130,12,24,.9);padding:14px 18px;border-radius:12px;font-weight:800;text-align:center}
 </style>
-
-<script>
-window.__STREAMER_SLUG__ = window.__STREAMER_SLUG__ || new URLSearchParams(location.search).get('streamer') || (location.pathname.match(/^\/s\/([^\/]+)/)||[])[1] || '';
-function tenantApiUrl(url){
-  const slug = window.__STREAMER_SLUG__ || '';
-  if(!slug) return url;
-  return url + (url.includes('?') ? '&' : '?') + 'streamer=' + encodeURIComponent(slug);
-}
-function tenantSocketOptions(extra){
-  const slug = window.__STREAMER_SLUG__ || '';
-  return Object.assign({transports:['websocket','polling'], query: slug ? {streamer:slug} : {}}, extra || {});
-}
-</script>
 </head>
 <body>
-
-<div id="wrap">
-  <div id="topLabel">
-    <span class="title" id="top-title">🎯 Sub Goal</span>
-    <span class="count" id="top-count"><b id="top-cur">0</b><span> / <span id="top-tgt">50</span> subs</span></span>
+<div class="widget" id="widget">
+  <div class="above" id="above"><span id="aboveLabel"></span><span id="aboveCount"></span></div>
+  <div class="bar">
+    <div class="fill" id="fill"></div><div class="shine"></div>
+    <div class="inside both center" id="inside"><span class="label" id="insideLabel"></span><span class="count" id="insideCount"></span></div>
   </div>
-  <div id="track">
-    <div id="fill"></div>
-    <div id="glow"></div>
-    <div id="inside" class="center">
-      <span id="insideLabel">Sub Goal</span>
-      <span id="insideCount">0 subs</span>
-    </div>
-  </div>
+  <div class="invalid" id="invalid">Ce lien d’overlay n’est plus valide.</div>
 </div>
-
 <script src="/socket.io/socket.io.js"></script>
 <script>
-const socket = io(tenantSocketOptions());
-const fill = document.getElementById('fill');
-const glow = document.getElementById('glow');
-const topLabel = document.getElementById('topLabel');
-const topTitle = document.getElementById('top-title');
-const topCount = document.getElementById('top-count');
-const topCur = document.getElementById('top-cur');
-const topTgt = document.getElementById('top-tgt');
-const inside = document.getElementById('inside');
-const insideLabel = document.getElementById('insideLabel');
-const insideCount = document.getElementById('insideCount');
-
-let lastCurrent = null;
-
-function clampChoice(value, allowed, fallback) {
-  return allowed.includes(value) ? value : fallback;
+const slug = window.__STREAMER_SLUG__ || new URLSearchParams(location.search).get('streamer') || (location.pathname.match(/^\/s\/([^/]+)/)||[])[1] || '';
+const apiUrl = p => p + (p.includes('?') ? '&' : '?') + 'streamer=' + encodeURIComponent(slug);
+const socket = io({ transports:['websocket','polling'], query: slug ? {streamer:slug} : {} });
+let last = null;
+const $ = id => document.getElementById(id);
+function countText(d){
+  const current = Number(d.current ?? d.total ?? 0), target = Math.max(1,Number(d.target||50));
+  if(d.progressDisplay==='percent') return Math.round(current/target*100)+'%';
+  if(d.progressDisplay==='hidden') return '';
+  return current+' / '+target;
 }
-
-function countText(current, target, mode) {
-  const pct = target > 0 ? Math.min(100, Math.round((current / target) * 100)) : 0;
-  if (mode === 'percent') return pct + '%';
-  if (mode === 'progress') return current + ' / ' + target + ' subs';
-  if (mode === 'hidden') return '';
-  return current + ' subs';
+function render(d){
+  if(!d) return; last=d;
+  const current=Math.max(0,Number(d.current ?? d.total ?? 0));
+  const target=Math.max(1,Number(d.target||50));
+  const pct=Math.max(0,Math.min(100,current/target*100));
+  $('fill').style.width=pct+'%';
+  const label=String(d.label||'Sub Goal'); const count=countText(d);
+  $('aboveLabel').textContent=label; $('aboveCount').textContent=count;
+  $('insideLabel').textContent=label; $('insideCount').textContent=count;
+  const tp=d.textPosition||'inside', cp=d.countPosition||'inside', align=d.textAlign||'center';
+  $('aboveLabel').classList.toggle('hidden',tp!=='above');
+  $('aboveCount').classList.toggle('hidden',cp!=='above'&&cp!=='right');
+  $('above').classList.toggle('hidden',tp!=='above'&&cp!=='above'&&cp!=='right');
+  $('insideLabel').classList.toggle('hidden',tp!=='inside');
+  $('insideCount').classList.toggle('hidden',cp!=='inside');
+  $('inside').className='inside '+align+((tp==='inside'&&cp==='inside')?' both':'');
 }
-
-function render(current, target, options = {}) {
-  current = parseInt(current || 0) || 0;
-  target = Math.max(1, parseInt(target || 50) || 50);
-
-  const label = options.label || 'Sub Goal';
-  const textPosition = clampChoice(options.textPosition, ['above','inside','hidden'], 'inside');
-  const countPosition = clampChoice(options.countPosition, ['above','inside','right','hidden'], 'inside');
-  const progressDisplay = clampChoice(options.progressDisplay, ['count','progress','percent','hidden'], 'count');
-  const textAlign = clampChoice(options.textAlign, ['left','center','right'], 'center');
-  const pct = Math.min(100, Math.round((current / target) * 100));
-  const txt = countText(current, target, progressDisplay);
-
-  topTitle.textContent = '🎯 ' + label;
-  topCur.textContent = current;
-  topTgt.textContent = target;
-  topTitle.style.display = textPosition === 'above' ? '' : 'none';
-  topCount.style.display = countPosition === 'above' ? '' : 'none';
-  topLabel.style.display = (textPosition === 'above' || countPosition === 'above') ? 'flex' : 'none';
-
-  inside.className = textAlign;
-  inside.style.justifyContent = '';
-  insideLabel.textContent = label;
-  insideLabel.style.display = textPosition === 'inside' ? '' : 'none';
-  insideCount.textContent = txt;
-  insideCount.style.display = (countPosition === 'inside' || countPosition === 'right') && txt ? '' : 'none';
-
-  if (textPosition === 'inside' && countPosition === 'right') inside.className = 'split';
-  if (textPosition !== 'inside' && countPosition === 'right') inside.className = 'right';
-
-  fill.style.width = pct + '%';
-  glow.style.width = pct + '%';
-
-  if (lastCurrent !== null && current > lastCurrent) {
-    glow.classList.add('pop');
-    setTimeout(() => glow.classList.remove('pop'), 700);
-  }
-  lastCurrent = current;
+async function load(){
+  try{
+    const r=await fetch(apiUrl('/api/widgets/subgoal?ts='+Date.now()),{cache:'no-store'});
+    if(r.status===401||r.status===403||r.status===404){$('invalid').style.display='block';$('above').style.display='none';document.querySelector('.bar').style.display='none';return;}
+    render(await r.json());
+  }catch(e){}
 }
-
-async function loadInitial() {
-  try {
-    const r = await fetch(tenantApiUrl('/api/widgets/subgoal?ts=' + Date.now()), { cache: 'no-store' });
-    const d = await r.json();
-    render(d.current || 0, d.target || 50, d);
-  } catch(e) { console.error('[SUBGOAL] Erreur chargement initial', e); }
-}
-
-socket.on('subgoal-update', (d) => render(d.current || 0, d.target || 50, d));
-loadInitial();
-setInterval(loadInitial, 2000);
-</script>
-<script>
-const socket = io(tenantSocketOptions());
-const fill = document.getElementById('fill');
-const glow = document.getElementById('glow');
-const topLabel = document.getElementById('topLabel');
-const topTitle = document.getElementById('top-title');
-const topCount = document.getElementById('top-count');
-const topCur = document.getElementById('top-cur');
-const topTgt = document.getElementById('top-tgt');
-const inside = document.getElementById('inside');
-const insideLabel = document.getElementById('insideLabel');
-const insideCount = document.getElementById('insideCount');
-
-let lastCurrent = null;
-
-function clampChoice(value, allowed, fallback) {
-  return allowed.includes(value) ? value : fallback;
-}
-
-function countText(current, target, mode) {
-  const pct = target > 0 ? Math.min(100, Math.round((current / target) * 100)) : 0;
-  if (mode === 'percent') return pct + '%';
-  if (mode === 'progress') return current + ' / ' + target + ' subs';
-  if (mode === 'hidden') return '';
-  return current + ' subs';
-}
-
-function render(current, target, options = {}) {
-  const label = options.label || 'Sub Goal';
-  const textPosition = clampChoice(options.textPosition, ['above','inside','hidden'], 'inside');
-  const countPosition = clampChoice(options.countPosition, ['above','inside','right','hidden'], 'inside');
-  const progressDisplay = clampChoice(options.progressDisplay, ['count','progress','percent','hidden'], 'count');
-  const textAlign = clampChoice(options.textAlign, ['left','center','right'], 'center');
-  const pct = target > 0 ? Math.min(100, Math.round((current / target) * 100)) : 0;
-  const txt = countText(current, target, progressDisplay);
-
-  topTitle.textContent = '🎯 ' + label;
-  topCur.textContent = current;
-  topTgt.textContent = target;
-  topTitle.style.display = textPosition === 'above' ? '' : 'none';
-  topCount.style.display = countPosition === 'above' ? '' : 'none';
-  topLabel.style.display = (textPosition === 'above' || countPosition === 'above') ? 'flex' : 'none';
-
-  inside.className = textAlign;
-  insideLabel.textContent = label;
-  insideLabel.style.display = textPosition === 'inside' ? '' : 'none';
-  insideCount.textContent = txt;
-  insideCount.style.display = (countPosition === 'inside' || countPosition === 'right') && txt ? '' : 'none';
-  if (countPosition === 'right') inside.style.justifyContent = 'space-between';
-
-  fill.style.width = pct + '%';
-  glow.style.width = pct + '%';
-
-  if (lastCurrent !== null && current > lastCurrent) {
-    glow.classList.add('pop');
-    setTimeout(() => glow.classList.remove('pop'), 700);
-  }
-  lastCurrent = current;
-}
-
-async function loadInitial() {
-  try {
-    const r = await fetch(tenantApiUrl('/api/widgets/subgoal'));
-    const d = await r.json();
-    render(d.current || 0, d.target || 50, d);
-  } catch(e) { console.error('[SUBGOAL] Erreur chargement initial', e); }
-}
-
-socket.on('subgoal-update', (d) => render(d.current || 0, d.target || 50, d));
-
-loadInitial();
+socket.on('subgoal-update',render);
+socket.on('connect',()=>{ if(slug) socket.emit('tenant-join',slug); load(); });
+setInterval(load,30000); // simple resynchronisation de sécurité, pas d'animation saccadée
+load();
 </script>
 </body>
 </html>

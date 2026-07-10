@@ -238,10 +238,11 @@ function looksLikeSubFollowRaidEvent(event, payload) {
       || /"subscription"|"subscriber"|"gifter"|"giftees"|"gift_count"|"follower"|"raid"/.test(preview);
 }
 
-async function forwardKickEventToPanel(event, payload) {
+async function forwardKickEventToPanel(event, payload, ctx = null) {
   try {
     if (shared && typeof shared.processKickEvent === 'function') {
-      const result = await shared.processKickEvent(event, payload);
+      const enriched = { ...(payload || {}), __streamerContext: ctx || currentChatContext() || undefined };
+      const result = await shared.processKickEvent(event, enriched);
       if (result && !result.ignored && !result.duplicate) {
         console.log(`[KICK EVENT] transmis au panel: ${event}`);
       }
@@ -328,7 +329,7 @@ function handleEvent(msg) {
     case 'App\\Events\\RaidEvent':
     case 'RaidEvent': {
       const p = parseKickEventData(data);
-      forwardKickEventToPanel(event, p);
+      forwardKickEventToPanel(event, p, contextFromPusherChannel(channel, p));
       break;
     }
 
@@ -349,7 +350,7 @@ function handleEvent(msg) {
       if (event && !event.startsWith('pusher:') && !event.startsWith('pusher_internal:')) {
         let preview = parseKickEventData(data);
         if (looksLikeSubFollowRaidEvent(event, preview)) {
-          forwardKickEventToPanel(event, preview);
+          forwardKickEventToPanel(event, preview, contextFromPusherChannel(channel, preview));
         }
         console.log(`[EVENT INCONNU] "${event}" —`, JSON.stringify(preview).slice(0, 1500));
       }
