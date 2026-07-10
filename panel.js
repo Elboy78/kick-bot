@@ -2394,7 +2394,7 @@ app.post('/api/admin/widgets/alerts/:type/test', requireAuth, async (req, res) =
   catch(e){res.status(500).json({error:e.message});}
 });
 
-// ── Chat Overlay OBS ──────────────────────────────────────────────────────────
+// ── Chat Overlay OBS V2 — 100 % isolé par streamer ───────────────────────────
 
 const CHAT_OVERLAY_DEFAULTS = {
   enabled: true,
@@ -2410,51 +2410,91 @@ const CHAT_OVERLAY_DEFAULTS = {
   maxMessages: 8
 };
 
-async function getChatOverlaySettings() {
+function getChatOverlayTM(source = null) {
+  if (source?.tenantManager) return source.tenantManager;
+  if (source?.streamerId || source?.slug) {
+    return createTenantManager({ db, io, streamer: {
+      id: source.streamerId || source.id,
+      slug: source.slug,
+      display_name: source.displayName || source.slug
+    }});
+  }
+  return createTenantManager({ db, io, req: source?.headers ? source : null, streamer: source?.streamer || null });
+}
+
+async function getChatOverlayToken(tm) {
+  try {
+    if (!tm?.streamerId || typeof db.getOrCreateOverlayToken !== 'function') return '';
+    const row = await db.getOrCreateOverlayToken(tm.streamerId, 'chat');
+    return String(row?.token || '');
+  } catch(e) { return ''; }
+}
+
+async function getChatOverlaySettings(source = null) {
+  const tm = getChatOverlayTM(source);
+  const get = (key, fallback) => tm.getSetting(key, fallback);
   return {
-    enabled: (await db.getSettingStr('chat_overlay_enabled', '1')) === '1',
-    hideBots: (await db.getSettingStr('chat_overlay_hide_bots', '1')) === '1',
-    ignoredUsers: await db.getSettingStr('chat_overlay_ignored_users', CHAT_OVERLAY_DEFAULTS.ignoredUsers),
-    hideCommands: (await db.getSettingStr('chat_overlay_hide_commands', '1')) === '1',
-    showPlatformIcon: (await db.getSettingStr('chat_overlay_show_platform_icon', '1')) === '1',
-    showTime: (await db.getSettingStr('chat_overlay_show_time', '0')) === '1',
-    fontSize: Math.min(42, Math.max(10, parseInt(await db.getSettingStr('chat_overlay_font_size', String(CHAT_OVERLAY_DEFAULTS.fontSize))) || CHAT_OVERLAY_DEFAULTS.fontSize)),
-    messageDuration: Math.min(60, Math.max(0, parseInt(await db.getSettingStr('chat_overlay_message_duration', String(CHAT_OVERLAY_DEFAULTS.messageDuration))) || CHAT_OVERLAY_DEFAULTS.messageDuration)),
-    animation: await db.getSettingStr('chat_overlay_animation', CHAT_OVERLAY_DEFAULTS.animation),
-    design: await db.getSettingStr('chat_overlay_design', CHAT_OVERLAY_DEFAULTS.design),
-    maxMessages: Math.min(30, Math.max(1, parseInt(await db.getSettingStr('chat_overlay_max_messages', String(CHAT_OVERLAY_DEFAULTS.maxMessages))) || CHAT_OVERLAY_DEFAULTS.maxMessages))
+    enabled: (await get('chat_overlay_enabled', '1')) === '1',
+    hideBots: (await get('chat_overlay_hide_bots', '1')) === '1',
+    ignoredUsers: await get('chat_overlay_ignored_users', CHAT_OVERLAY_DEFAULTS.ignoredUsers),
+    hideCommands: (await get('chat_overlay_hide_commands', '1')) === '1',
+    showPlatformIcon: (await get('chat_overlay_show_platform_icon', '1')) === '1',
+    showTime: (await get('chat_overlay_show_time', '0')) === '1',
+    fontSize: Math.min(42, Math.max(10, parseInt(await get('chat_overlay_font_size', String(CHAT_OVERLAY_DEFAULTS.fontSize))) || CHAT_OVERLAY_DEFAULTS.fontSize)),
+    messageDuration: Math.min(60, Math.max(0, parseInt(await get('chat_overlay_message_duration', String(CHAT_OVERLAY_DEFAULTS.messageDuration))) || CHAT_OVERLAY_DEFAULTS.messageDuration)),
+    animation: await get('chat_overlay_animation', CHAT_OVERLAY_DEFAULTS.animation),
+    design: await get('chat_overlay_design', CHAT_OVERLAY_DEFAULTS.design),
+    maxMessages: Math.min(30, Math.max(1, parseInt(await get('chat_overlay_max_messages', String(CHAT_OVERLAY_DEFAULTS.maxMessages))) || CHAT_OVERLAY_DEFAULTS.maxMessages)),
+    streamer: tm.slug
   };
 }
 
 function normalizeIgnoredUsers(raw) {
-  return String(raw || '').split(',').map(x => x.trim().toLowerCase()).filter(Boolean);
+  return String(raw || '').split(/[\n,;]+/).map(x => x.trim().replace(/^@+/, '').toLowerCase()).filter(Boolean);
 }
 
-async function emitChatOverlayMessage(msg = {}) {
+function normalizeChatBadges(badges) {
+  return (Array.isArray(badges) ? badges : []).slice(0, 8).map(b => ({
+    type: String(b?.type || b?.name || '').slice(0, 40),
+    text: String(b?.text || b?.type || b?.name || '').slice(0, 40),
+    count: Number(b?.count || 0) || 0
+  }));
+}
+
+async function emitChatOverlayMessage(msg = {}, ctx = null) {
   try {
-    const cfg = await getChatOverlaySettings();
+    const tm = getChatOverlayTM(ctx || msg?.ctx || null);
+    if (!tm?.slug) return false;
+    const cfg = await getChatOverlaySettings(tm);
     const username = String(msg.username || '').trim();
     const content = String(msg.content || '').trim();
     if (!cfg.enabled || !username || !content) return false;
-    const lower = username.toLowerCase();
+
+    const lower = username.replace(/^@+/, '').toLowerCase();
     const ignored = normalizeIgnoredUsers(cfg.ignoredUsers);
-    const badgeTypes = Array.isArray(msg.badges) ? msg.badges.map(b => String(b?.type || b?.name || '').toLowerCase()) : [];
+    const badges = normalizeChatBadges(msg.badges);
+    const badgeTypes = badges.map(b => b.type.toLowerCase());
     const looksLikeBot = /bot$/i.test(username) || lower === 'botrix' || badgeTypes.includes('bot');
     if (ignored.includes(lower)) return false;
     if (cfg.hideBots && looksLikeBot) return false;
     if (cfg.hideCommands && content.startsWith('!')) return false;
+
+    const overlayToken = await getChatOverlayToken(tm);
     const payload = {
       id: `${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
-      username: username.slice(0, 40),
-      content: content.slice(0, 500),
+      streamer: tm.slug,
+      overlayToken,
+      username: username.slice(0, 60),
+      content: content.slice(0, 800),
+      badges,
       platform: msg.platform || 'Kick',
-      color: msg.color || '',
+      color: String(msg.color || '').slice(0, 30),
       at: msg.at || new Date().toISOString()
     };
-    io.emit('chat-overlay-message', payload);
+    tm.emit('chat-overlay-message', payload);
     return true;
   } catch(e) {
-    console.warn('[CHAT OVERLAY] Message ignoré:', e.message);
+    console.warn('[CHAT OVERLAY V2] Message ignoré:', e.message);
     return false;
   }
 }
@@ -2462,34 +2502,52 @@ async function emitChatOverlayMessage(msg = {}) {
 shared.registerChatOverlayEmitter(emitChatOverlayMessage);
 
 app.get('/api/widgets/chat-overlay', async (req, res) => {
-  try { res.json(await getChatOverlaySettings()); }
-  catch(e) { res.status(500).json({ error: e.message }); }
+  try {
+    if (req.overlayTokenInvalid) return res.status(404).json({ error:'overlay_invalid', enabled:false });
+    const tm = req.tenantManager || getChatOverlayTM(req);
+    const settings = await getChatOverlaySettings(tm);
+    const currentToken = await getChatOverlayToken(tm);
+    const requestedToken = String(req.query.overlayToken || '').trim();
+    if (requestedToken && requestedToken !== currentToken) return res.status(404).json({ error:'overlay_invalid', enabled:false });
+    res.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+    res.json({ ...settings, overlayToken: currentToken, tokenValid:true });
+  } catch(e) { res.status(500).json({ error: e.message }); }
 });
 
 app.post('/api/admin/widgets/chat-overlay/settings', requireAuth, async (req, res) => {
   try {
+    const tm = req.tenantManager || getChatOverlayTM(req);
     const b = req.body || {};
-    if (typeof b.enabled === 'boolean') await db.setSettingStr('chat_overlay_enabled', b.enabled ? '1' : '0');
-    if (typeof b.hideBots === 'boolean') await db.setSettingStr('chat_overlay_hide_bots', b.hideBots ? '1' : '0');
-    if (typeof b.hideCommands === 'boolean') await db.setSettingStr('chat_overlay_hide_commands', b.hideCommands ? '1' : '0');
-    if (typeof b.showPlatformIcon === 'boolean') await db.setSettingStr('chat_overlay_show_platform_icon', b.showPlatformIcon ? '1' : '0');
-    if (typeof b.showTime === 'boolean') await db.setSettingStr('chat_overlay_show_time', b.showTime ? '1' : '0');
-    if (typeof b.ignoredUsers === 'string') await db.setSettingStr('chat_overlay_ignored_users', b.ignoredUsers.slice(0, 300));
-    if (b.fontSize !== undefined) await db.setSettingStr('chat_overlay_font_size', String(Math.min(42, Math.max(10, parseInt(b.fontSize) || CHAT_OVERLAY_DEFAULTS.fontSize))));
-    if (b.messageDuration !== undefined) await db.setSettingStr('chat_overlay_message_duration', String(Math.min(60, Math.max(0, parseInt(b.messageDuration) || CHAT_OVERLAY_DEFAULTS.messageDuration))));
-    if (b.maxMessages !== undefined) await db.setSettingStr('chat_overlay_max_messages', String(Math.min(30, Math.max(1, parseInt(b.maxMessages) || CHAT_OVERLAY_DEFAULTS.maxMessages))));
-    if (typeof b.animation === 'string') await db.setSettingStr('chat_overlay_animation', b.animation.slice(0, 30));
-    if (typeof b.design === 'string') await db.setSettingStr('chat_overlay_design', b.design.slice(0, 30));
-    const cfg = await getChatOverlaySettings();
-    io.emit('chat-overlay-settings', cfg);
-    res.json({ success: true, settings: cfg });
+    if (typeof b.enabled === 'boolean') await tm.setSetting('chat_overlay_enabled', b.enabled ? '1' : '0');
+    if (typeof b.hideBots === 'boolean') await tm.setSetting('chat_overlay_hide_bots', b.hideBots ? '1' : '0');
+    if (typeof b.hideCommands === 'boolean') await tm.setSetting('chat_overlay_hide_commands', b.hideCommands ? '1' : '0');
+    if (typeof b.showPlatformIcon === 'boolean') await tm.setSetting('chat_overlay_show_platform_icon', b.showPlatformIcon ? '1' : '0');
+    if (typeof b.showTime === 'boolean') await tm.setSetting('chat_overlay_show_time', b.showTime ? '1' : '0');
+    if (typeof b.ignoredUsers === 'string') await tm.setSetting('chat_overlay_ignored_users', b.ignoredUsers.slice(0, 500));
+    if (b.fontSize !== undefined) await tm.setSetting('chat_overlay_font_size', String(Math.min(42, Math.max(10, parseInt(b.fontSize) || CHAT_OVERLAY_DEFAULTS.fontSize))));
+    if (b.messageDuration !== undefined) await tm.setSetting('chat_overlay_message_duration', String(Math.min(60, Math.max(0, parseInt(b.messageDuration) || CHAT_OVERLAY_DEFAULTS.messageDuration))));
+    if (b.maxMessages !== undefined) await tm.setSetting('chat_overlay_max_messages', String(Math.min(30, Math.max(1, parseInt(b.maxMessages) || CHAT_OVERLAY_DEFAULTS.maxMessages))));
+    if (typeof b.animation === 'string') await tm.setSetting('chat_overlay_animation', b.animation.slice(0, 30));
+    if (typeof b.design === 'string') await tm.setSetting('chat_overlay_design', b.design.slice(0, 30));
+    const cfg = await getChatOverlaySettings(tm);
+    const overlayToken = await getChatOverlayToken(tm);
+    tm.emit('chat-overlay-settings', { ...cfg, overlayToken });
+    res.json({ success: true, streamer:tm.slug, settings: cfg });
   } catch(e) { res.status(500).json({ error: e.message }); }
 });
 
 app.post('/api/admin/widgets/chat-overlay/test', requireAuth, async (req, res) => {
   try {
-    await emitChatOverlayMessage({ username: 'TestChat', content: req.body?.message || 'Message test overlay chat ✨', platform: 'Kick', at: new Date().toISOString() });
-    res.json({ success: true });
+    const tm = req.tenantManager || getChatOverlayTM(req);
+    await emitChatOverlayMessage({
+      username: req.body?.username || 'TestChat',
+      content: req.body?.message || 'Message test overlay chat ✨ [emote:37243:gachiGASM]',
+      badges: [{type:'moderator', text:'Modo'}],
+      platform: 'Kick',
+      color: '#53fc18',
+      at: new Date().toISOString()
+    }, tm);
+    res.json({ success: true, streamer:tm.slug });
   } catch(e) { res.status(500).json({ error: e.message }); }
 });
 

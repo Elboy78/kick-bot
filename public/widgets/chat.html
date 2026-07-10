@@ -1,80 +1,106 @@
 <!doctype html>
 <html lang="fr">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>Chat Overlay</title>
   <script src="/socket.io/socket.io.js"></script>
   <style>
-    html,body{margin:0;width:100%;height:100%;overflow:hidden;background:transparent;font-family:Inter,Arial,sans-serif;color:#fff}
+    :root{--fs:21px;--accent:#53fc18}
     *{box-sizing:border-box}
+    html,body{margin:0;width:100%;height:100%;overflow:hidden;background:transparent;font-family:Inter,Arial,sans-serif;color:#fff}
     #wrap{position:fixed;inset:0;padding:24px;display:flex;align-items:flex-end;justify-content:flex-start;pointer-events:none}
-    #messages{width:min(720px,100%);display:flex;flex-direction:column;justify-content:flex-end;gap:10px}
-    .msg{max-width:100%;display:block;line-height:1.28;font-weight:900;text-shadow:0 2px 0 #000,0 0 12px rgba(0,0,0,.8);filter:drop-shadow(0 8px 16px rgba(0,0,0,.45));animation:pop .24s ease-out both;transform-origin:left bottom}
-    .msg.glass{background:rgba(5,8,16,.54);border:1px solid rgba(255,255,255,.12);border-radius:14px;padding:8px 12px;backdrop-filter:blur(10px)}
-    .msg.minimal{background:transparent;border:0;padding:1px 0}
-    .msg.neon{background:rgba(0,0,0,.48);border:1px solid rgba(34,197,94,.45);box-shadow:0 0 18px rgba(34,197,94,.18);border-radius:14px;padding:8px 12px}
-    .name{font-weight:1000;margin-right:6px;color:#22c55e}.platform{display:inline-flex;width:17px;height:17px;border-radius:5px;align-items:center;justify-content:center;background:#22c55e;color:#05110a;font-size:.68em;margin-right:5px;text-shadow:none;vertical-align:1px}.time{font-size:.68em;opacity:.72;margin-right:6px;font-weight:800}.text{color:#fff;overflow-wrap:anywhere}.kick-emote{height:1.45em;max-width:3.2em;object-fit:contain;vertical-align:-.34em;margin:0 .08em;display:inline-block;text-shadow:none;filter:drop-shadow(0 2px 3px rgba(0,0,0,.55))}.kick-emote-broken{display:none}.fadeout{animation:out .22s ease-in forwards!important}@keyframes pop{from{opacity:0;transform:translateY(12px) scale(.96)}to{opacity:1;transform:none}}@keyframes slide{from{opacity:0;transform:translateX(-24px)}to{opacity:1;transform:none}}@keyframes fade{from{opacity:0}to{opacity:1}}@keyframes out{to{opacity:0;transform:translateY(-8px) scale(.98)}}
+    #messages{width:min(760px,100%);display:flex;flex-direction:column;justify-content:flex-end;gap:9px;font-size:var(--fs)}
+    .msg{max-width:100%;line-height:1.32;font-weight:800;text-shadow:0 2px 3px rgba(0,0,0,.95),0 0 14px rgba(0,0,0,.72);filter:drop-shadow(0 7px 15px rgba(0,0,0,.38));transform-origin:left bottom;will-change:transform,opacity}
+    .msg.glass{background:linear-gradient(135deg,rgba(8,12,21,.72),rgba(12,17,29,.48));border:1px solid rgba(255,255,255,.13);border-radius:14px;padding:9px 13px;backdrop-filter:blur(12px);box-shadow:inset 0 1px rgba(255,255,255,.05)}
+    .msg.minimal{background:transparent;border:0;padding:2px 0}
+    .msg.neon{background:rgba(2,7,5,.66);border:1px solid rgba(83,252,24,.52);box-shadow:0 0 20px rgba(83,252,24,.16),inset 0 0 20px rgba(83,252,24,.04);border-radius:14px;padding:9px 13px}
+    .platform{display:inline-flex;width:18px;height:18px;border-radius:5px;align-items:center;justify-content:center;background:#53fc18;color:#071106;font-size:.64em;font-weight:1000;margin-right:6px;text-shadow:none;vertical-align:2px}
+    .time{font-size:.66em;opacity:.65;margin-right:7px;font-weight:800}
+    .badges{display:inline-flex;gap:4px;margin-right:5px;vertical-align:2px}
+    .badge{display:inline-flex;align-items:center;justify-content:center;min-width:17px;height:17px;padding:0 4px;border-radius:5px;background:rgba(255,255,255,.14);font-size:.55em;font-weight:1000;text-shadow:none}
+    .badge.broadcaster{background:#53fc18;color:#071106}.badge.moderator{background:#60a5fa;color:#06101e}.badge.subscriber{background:#a78bfa;color:#10091e}
+    .name{font-weight:1000;margin-right:6px;color:var(--name-color,#53fc18)}
+    .text{color:#fff;overflow-wrap:anywhere;word-break:break-word}
+    .kick-emote{height:1.5em;max-width:3.4em;object-fit:contain;vertical-align:-.36em;margin:0 .08em;display:inline-block;text-shadow:none;filter:drop-shadow(0 2px 3px rgba(0,0,0,.55))}
+    .enter-pop{animation:pop .22s cubic-bezier(.2,.85,.25,1.15) both}.enter-slide{animation:slide .24s ease-out both}.enter-fade{animation:fade .2s ease-out both}
+    .fadeout{animation:out .22s ease-in forwards!important}
+    @keyframes pop{from{opacity:0;transform:translateY(12px) scale(.96)}to{opacity:1;transform:none}}
+    @keyframes slide{from{opacity:0;transform:translateX(-28px)}to{opacity:1;transform:none}}
+    @keyframes fade{from{opacity:0}to{opacity:1}}
+    @keyframes out{to{opacity:0;transform:translateY(-8px) scale(.98)}}
   </style>
-
-<script>
-window.__STREAMER_SLUG__ = window.__STREAMER_SLUG__ || new URLSearchParams(location.search).get('streamer') || (location.pathname.match(/^\/s\/([^\/]+)/)||[])[1] || '';
-function tenantApiUrl(url){
-  const slug = window.__STREAMER_SLUG__ || '';
-  if(!slug) return url;
-  return url + (url.includes('?') ? '&' : '?') + 'streamer=' + encodeURIComponent(slug);
-}
-function tenantSocketOptions(extra){
-  const slug = window.__STREAMER_SLUG__ || '';
-  return Object.assign({transports:['websocket','polling'], query: slug ? {streamer:slug} : {}}, extra || {});
-}
-</script>
 </head>
 <body>
-  <div id="wrap"><div id="messages"></div></div>
+<div id="wrap"><div id="messages"></div></div>
 <script>
-const socket = io(tenantSocketOptions());
-const CHAT_OVERLAY_LOCAL_KEY = 'bot7up_chat_overlay_settings_backup';
-let settings = { enabled:true, hideBots:true, ignoredUsers:'BotRix,botrix', hideCommands:true, showPlatformIcon:true, showTime:false, fontSize:21, messageDuration:10, animation:'pop', design:'glass', maxMessages:8 };
-const messages = document.getElementById('messages');
-function esc(s){return String(s??'').replace(/[&<>'"]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[m]));}
-function renderContentWithKickEmotes(content){
-  const raw = String(content ?? '');
-  const re = /\[emote:(\d+):([^\]\r\n]+)\]/g;
-  let html = '';
-  let last = 0;
-  let match;
-  while ((match = re.exec(raw)) !== null) {
-    html += esc(raw.slice(last, match.index));
-    const id = match[1];
-    const name = String(match[2] || 'emote').slice(0, 64);
-    const safeName = esc(name);
-    html += `<img class="kick-emote" src="https://files.kick.com/emotes/${id}/fullsize" alt="${safeName}" title="${safeName}" loading="lazy" decoding="async" onerror="this.className='kick-emote-broken';this.outerHTML='${safeName}'">`;
-    last = re.lastIndex;
+(() => {
+  'use strict';
+  const pathToken = (location.pathname.match(/^\/o\/([^/]+)\/chat(?:\.html)?$/i)||[])[1] || '';
+  const query = new URLSearchParams(location.search);
+  const slug = query.get('streamer') || (location.pathname.match(/^\/s\/([^/]+)/)||[])[1] || '';
+  const overlayToken = pathToken || query.get('overlayToken') || '';
+  const storageKey = `bot7up_chat_overlay_v2_${overlayToken || slug || 'default'}`;
+  const messages = document.getElementById('messages');
+  let active = true;
+  let settings = {enabled:true,showPlatformIcon:true,showTime:false,fontSize:21,messageDuration:10,animation:'pop',design:'glass',maxMessages:8};
+
+  function apiUrl(path){
+    const u = new URL(path, location.origin);
+    if (overlayToken) u.searchParams.set('overlayToken', overlayToken);
+    else if (slug) u.searchParams.set('streamer', slug);
+    u.searchParams.set('_', Date.now());
+    return u.pathname + u.search;
   }
-  html += esc(raw.slice(last));
-  return html;
-}
-function hhmm(iso){try{return new Date(iso||Date.now()).toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'});}catch(e){return ''}}
-async function loadSettings(){
-  try {
-    const saved = JSON.parse(localStorage.getItem(CHAT_OVERLAY_LOCAL_KEY) || 'null');
-    if (saved) { settings = Object.assign(settings, saved); applySettings(); }
-  } catch(e) {}
-  try{
-    const r=await fetch(tenantApiUrl('/api/widgets/chat-overlay?ts='+Date.now()),{cache:'no-store'});
-    const fresh = await r.json();
-    settings=Object.assign(settings,fresh);
-    try { localStorage.setItem(CHAT_OVERLAY_LOCAL_KEY, JSON.stringify(settings)); } catch(e) {}
-    applySettings();
-  }catch(e){}
-}
-function applySettings(){messages.style.fontSize=(settings.fontSize||21)+'px';document.querySelectorAll('.msg').forEach(el=>{el.className='msg '+(settings.design||'glass');el.style.animationName=settings.animation==='none'?'none':settings.animation;});trim();}
-function trim(){const max=Number(settings.maxMessages||8);while(messages.children.length>max) messages.firstElementChild?.remove();}
-function addMessage(m){if(!settings.enabled)return;const el=document.createElement('div');el.className='msg '+(settings.design||'glass');el.style.animationName=settings.animation==='none'?'none':(settings.animation||'pop');const platform=settings.showPlatformIcon?'<span class="platform">K</span>':'';const time=settings.showTime?`<span class="time">${hhmm(m.at)}</span>`:'';el.innerHTML=`${platform}${time}<span class="name">${esc(m.username)} :</span><span class="text">${renderContentWithKickEmotes(m.content)}</span>`;messages.appendChild(el);trim();const dur=Number(settings.messageDuration||0);if(dur>0){setTimeout(()=>{el.classList.add('fadeout');setTimeout(()=>el.remove(),260)},dur*1000);}}
-socket.on('chat-overlay-message', addMessage);
-socket.on('chat-overlay-settings', cfg=>{settings=Object.assign(settings,cfg||{});try{localStorage.setItem(CHAT_OVERLAY_LOCAL_KEY, JSON.stringify(settings));}catch(e){}applySettings();});
-loadSettings();setInterval(loadSettings,15000);
+  const socket = io({
+    transports:['websocket','polling'],
+    query:{...(slug?{streamer:slug}:{}),...(overlayToken?{overlayToken}: {})}
+  });
+  function esc(s){return String(s??'').replace(/[&<>'"]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[m]));}
+  function emotes(content){
+    const raw=String(content??''); const re=/\[emote:(\d+):([^\]\r\n]+)\]/g; let html='',last=0,m;
+    while((m=re.exec(raw))){html+=esc(raw.slice(last,m.index));const id=m[1],name=String(m[2]||'emote').slice(0,64);html+=`<img class="kick-emote" src="https://files.kick.com/emotes/${id}/fullsize" alt="${esc(name)}" title="${esc(name)}" loading="eager" decoding="async">`;last=re.lastIndex;}
+    return html+esc(raw.slice(last));
+  }
+  function time(iso){try{return new Date(iso||Date.now()).toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'})}catch{return ''}}
+  function badgeHtml(list){return (Array.isArray(list)?list:[]).slice(0,4).map(b=>{const t=String(b.type||'').toLowerCase();const label=t==='broadcaster'?'LIVE':t==='moderator'?'MOD':t==='subscriber'?'SUB':esc((b.text||t||'').slice(0,4).toUpperCase());return `<span class="badge ${esc(t)}">${label}</span>`}).join('')}
+  function animationClass(){return settings.animation==='slide'?'enter-slide':settings.animation==='fade'?'enter-fade':settings.animation==='none'?'':'enter-pop'}
+  function trim(){const max=Math.max(1,Number(settings.maxMessages||8));while(messages.children.length>max)messages.firstElementChild?.remove()}
+  function apply(){document.documentElement.style.setProperty('--fs',`${Number(settings.fontSize||21)}px`);document.querySelectorAll('.msg').forEach(el=>{el.classList.remove('glass','minimal','neon');el.classList.add(settings.design||'glass')});trim()}
+  function invalidate(){active=false;messages.innerHTML='';try{socket.disconnect()}catch{};}
+  function accepts(payload){
+    if(!active||!settings.enabled)return false;
+    if(overlayToken && payload?.overlayToken !== overlayToken)return false;
+    if(slug && payload?.streamer && String(payload.streamer).toLowerCase()!==String(slug).toLowerCase())return false;
+    return true;
+  }
+  function add(payload){
+    if(!accepts(payload))return;
+    const el=document.createElement('div');el.className=`msg ${settings.design||'glass'} ${animationClass()}`;
+    const platform=settings.showPlatformIcon?'<span class="platform">K</span>':'';
+    const clock=settings.showTime?`<span class="time">${time(payload.at)}</span>`:'';
+    const badges=badgeHtml(payload.badges);const badgesWrap=badges?`<span class="badges">${badges}</span>`:'';
+    const color=/^#[0-9a-f]{3,8}$/i.test(payload.color||'')?payload.color:'#53fc18';
+    el.style.setProperty('--name-color',color);
+    el.innerHTML=`${platform}${clock}${badgesWrap}<span class="name">${esc(payload.username)} :</span><span class="text">${emotes(payload.content)}</span>`;
+    el.querySelectorAll('img.kick-emote').forEach(img=>img.addEventListener('error',()=>{const t=document.createTextNode(img.alt||'');img.replaceWith(t)},{once:true}));
+    messages.appendChild(el);trim();
+    const dur=Number(settings.messageDuration||0);if(dur>0)setTimeout(()=>{if(!el.isConnected)return;el.classList.add('fadeout');setTimeout(()=>el.remove(),260)},dur*1000);
+  }
+  async function load(){
+    try{const cached=JSON.parse(localStorage.getItem(storageKey)||'null');if(cached){settings={...settings,...cached};apply()}}catch{}
+    try{
+      const r=await fetch(apiUrl('/api/widgets/chat-overlay'),{cache:'no-store'});
+      const data=await r.json().catch(()=>({}));
+      if(!r.ok||data.error==='overlay_invalid'||data.tokenValid===false){invalidate();return}
+      if(overlayToken && data.overlayToken!==overlayToken){invalidate();return}
+      settings={...settings,...data};localStorage.setItem(storageKey,JSON.stringify(settings));apply();
+    }catch{}
+  }
+  socket.on('chat-overlay-message',add);
+  socket.on('chat-overlay-settings',cfg=>{if(!accepts(cfg))return;settings={...settings,...cfg};try{localStorage.setItem(storageKey,JSON.stringify(settings))}catch{}apply()});
+  load();setInterval(load,12000);
+})();
 </script>
 </body>
 </html>

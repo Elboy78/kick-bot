@@ -454,7 +454,7 @@ async function handleChatMessageScoped(payload, ctx = null) {
       color: payload?.sender?.identity?.color || payload?.sender?.color || '',
       platform: 'Kick',
       at: new Date().toISOString()
-    });
+    }, ctx || currentChatContext());
   } catch(e) {}
 
   // Vérifier les mots bannis

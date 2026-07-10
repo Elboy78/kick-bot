@@ -30,8 +30,8 @@ module.exports = {
   },
 
   registerChatOverlayEmitter(fn) { _chatOverlayEmitter = fn; },
-  emitChatOverlayMessage(message) {
-    if (_chatOverlayEmitter) return _chatOverlayEmitter(message);
+  emitChatOverlayMessage(message, ctx = null) {
+    if (_chatOverlayEmitter) return _chatOverlayEmitter(message, ctx);
     return Promise.resolve(false);
   },
 
