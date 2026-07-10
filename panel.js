@@ -579,7 +579,7 @@ async function processKickEvent(eventTypeRaw, payload = {}) {
     const enabled = await db.getSetting('follow_announce_enabled');
     // Synchronise aussi l'ancien réglage utilisé par le tracker followers de bot.js
     await db.setSetting('follow_alerts', enabled).catch(()=>{});
-    await pushObsAlert('follow', { username }).catch(e=>console.warn('[ALERT OBS] follow ignorée:', e.message));
+    await pushObsAlert('follow', { username }, false, tm).catch(e=>console.warn('[ALERT OBS] follow ignorée:', e.message));
     if (enabled) {
       const template = await db.getSettingStr('follow_announce_message', DEFAULT_FOLLOW_MSG);
       const message = template.replace(/\{username\}/gi, username).replace(/@\s*@/g, '@');
@@ -591,7 +591,7 @@ async function processKickEvent(eventTypeRaw, payload = {}) {
   if (eventType === 'channel.subscription.new') {
     const info = extractSubInfo(payload);
     await recordSubEvent('new', { username: info.username, count: 1 }, tm);
-    await pushObsAlert('sub', { username: info.username }).catch(e=>console.warn('[ALERT OBS] sub ignorée:', e.message));
+    await pushObsAlert('sub', { username: info.username }, false, tm).catch(e=>console.warn('[ALERT OBS] sub ignorée:', e.message));
     const enabled = await db.getSetting('sub_announce_enabled');
     if (enabled) {
       const template = await db.getSettingStr('sub_announce_new', DEFAULT_SUB_NEW_MSG);
@@ -604,7 +604,7 @@ async function processKickEvent(eventTypeRaw, payload = {}) {
   if (eventType === 'channel.subscription.renewal') {
     const info = extractSubInfo(payload);
     await recordSubEvent('renewal', { username: info.username, months: info.months }, tm);
-    await pushObsAlert('renew', { username: info.username, months: info.months }).catch(e=>console.warn('[ALERT OBS] renew ignorée:', e.message));
+    await pushObsAlert('renew', { username: info.username, months: info.months }, false, tm).catch(e=>console.warn('[ALERT OBS] renew ignorée:', e.message));
     const enabled = await db.getSetting('sub_announce_enabled');
     if (enabled) {
       const template = await db.getSettingStr('sub_announce_renew', DEFAULT_SUB_RENEW_MSG);
@@ -620,7 +620,7 @@ async function processKickEvent(eventTypeRaw, payload = {}) {
     const gifter = isAnon ? 'un anonyme' : (gifterRaw || 'Anonyme');
     const count = parseInt(data?.count || data?.gift_count || data?.giftees?.length || data?.recipients?.length || 1) || 1;
     await recordSubEvent('gift', { gifter, count }, tm);
-    await pushObsAlert('gift', { gifter, count }).catch(e=>console.warn('[ALERT OBS] gift ignorée:', e.message));
+    await pushObsAlert('gift', { gifter, count }, false, tm).catch(e=>console.warn('[ALERT OBS] gift ignorée:', e.message));
     const enabled = await db.getSetting('sub_announce_enabled');
     if (enabled) {
       const template = await db.getSettingStr('sub_announce_gift', DEFAULT_SUB_GIFT_MSG);
@@ -628,6 +628,14 @@ async function processKickEvent(eventTypeRaw, payload = {}) {
       await sendAnnouncementToChat(message, `SUB GIFT ${gifter} x${count}`);
     }
     return { ok: true, eventType, gifter, count };
+  }
+
+
+  if (String(eventTypeRaw || eventType || '').toLowerCase().includes('raid')) {
+    const username = pick(data?.raider?.username, data?.user?.username, data?.username, data?.raider?.name, data?.user?.name) || "quelqu'un";
+    const count = parseInt(data?.viewer_count || data?.viewers || data?.count || data?.amount || 1) || 1;
+    await pushObsAlert('raid', { username, count, viewerCount: count }, false, tm).catch(e=>console.warn('[ALERT OBS] raid ignorée:', e.message));
+    return { ok:true, eventType:'channel.raid', username, count };
   }
 
   return { ok: true, ignored: true, eventType };
@@ -1873,6 +1881,9 @@ app.post('/webhook/donation', async (req, res) => {
     const amount   = parseFloat(req.body.amount || 0);
     let message    = String(req.body.message || '').trim();
 
+    const donationTM = getAlertTM(req);
+    await pushObsAlert('donation', { username, amount: amount.toFixed(2), message }, false, donationTM).catch(e => console.warn('[ALERT OBS] donation ignorée:', e.message));
+
     if (!await db.getSetting('tts_enabled')) {
       return res.json({ ignored: true, reason: 'tts_disabled' });
     }
@@ -2235,102 +2246,152 @@ app.get('/api/bot-status', async (req, res) => {
 
 // ── Alertes OBS ───────────────────────────────────────────────────────────────
 const ALERT_TYPES = ['follow','sub','renew','gift','raid','donation','bits','custom'];
-const ALERT_LABELS = {
-  follow:'Follow', sub:'Abonnement', renew:'Renouvellement', gift:'Sub offerte', raid:'Raid', donation:'Don', bits:'Bits', custom:'Alerte personnalisée'
-};
+const ALERT_LABELS = { follow:'Follow', sub:'Abonnement', renew:'Renouvellement', gift:'Sub offerte', raid:'Raid', donation:'Donation', bits:'Bits', custom:'Alerte personnalisée' };
 const ALERT_DEFAULTS = {
-  follow:   { enabled:true,  title:'Nouveau follow',       message:'{username} vient de follow !', image:'', sound:'', volume:35, duration:6, animation:'fade', layout:'image_top', textTop:'#ffffff', textBottom:'#22c55e' },
-  sub:      { enabled:true,  title:'Nouvel abonnement',    message:'{username} vient de s’abonner !', image:'', sound:'', volume:40, duration:7, animation:'pop', layout:'image_top', textTop:'#ffffff', textBottom:'#22c55e' },
-  renew:    { enabled:true,  title:'Renouvellement',       message:'{username} est sub depuis {months} mois !', image:'', sound:'', volume:40, duration:7, animation:'pop', layout:'image_top', textTop:'#ffffff', textBottom:'#22c55e' },
-  gift:     { enabled:true,  title:'Sub offerte',          message:'{gifter} offre {count} sub !', image:'', sound:'', volume:40, duration:7, animation:'pop', layout:'image_top', textTop:'#ffffff', textBottom:'#22c55e' },
-  raid:     { enabled:true,  title:'Raid',                 message:'{username} raid avec {count} viewers !', image:'', sound:'', volume:45, duration:8, animation:'slide', layout:'image_left', textTop:'#ffffff', textBottom:'#38bdf8' },
-  donation: { enabled:false, title:'Donation',             message:'{username} donne {amount}€ : {message}', image:'', sound:'', volume:40, duration:8, animation:'pop', layout:'image_top', textTop:'#ffffff', textBottom:'#f59e0b' },
-  bits:     { enabled:false, title:'Bits',                 message:'{username} envoie {amount} bits !', image:'', sound:'', volume:40, duration:7, animation:'pop', layout:'image_top', textTop:'#ffffff', textBottom:'#a78bfa' },
-  custom:   { enabled:true,  title:'Alerte personnalisée', message:'Alerte test pour {username}', image:'', sound:'', volume:35, duration:6, animation:'fade', layout:'image_top', textTop:'#ffffff', textBottom:'#22c55e' }
+  follow:   { enabled:true,  title:'Nouveau follow',       message:'{username} vient de follow !', media:'', mediaType:'image', sound:'', volume:35, duration:6, enterAnimation:'pop', exitAnimation:'fade', layout:'image_top', position:'center', font:'Inter', titleSize:36, messageSize:24, textTop:'#ffffff', textBottom:'#22c55e', accent:'#22c55e', background:'rgba(7,10,18,.86)', showLabel:true },
+  sub:      { enabled:true,  title:'Nouvel abonnement',    message:'{username} vient de s’abonner !', media:'', mediaType:'image', sound:'', volume:40, duration:7, enterAnimation:'bounce', exitAnimation:'fade', layout:'image_top', position:'center', font:'Inter', titleSize:36, messageSize:24, textTop:'#ffffff', textBottom:'#22c55e', accent:'#22c55e', background:'rgba(7,10,18,.86)', showLabel:true },
+  renew:    { enabled:true,  title:'Renouvellement',       message:'{username} est sub depuis {months} mois !', media:'', mediaType:'image', sound:'', volume:40, duration:7, enterAnimation:'pop', exitAnimation:'fade', layout:'image_top', position:'center', font:'Inter', titleSize:36, messageSize:24, textTop:'#ffffff', textBottom:'#22c55e', accent:'#22c55e', background:'rgba(7,10,18,.86)', showLabel:true },
+  gift:     { enabled:true,  title:'Sub offerte',          message:'{gifter} offre {count} sub !', media:'', mediaType:'image', sound:'', volume:40, duration:7, enterAnimation:'bounce', exitAnimation:'fade', layout:'image_top', position:'center', font:'Inter', titleSize:36, messageSize:24, textTop:'#ffffff', textBottom:'#f59e0b', accent:'#f59e0b', background:'rgba(7,10,18,.86)', showLabel:true },
+  raid:     { enabled:true,  title:'Raid',                 message:'{username} raid avec {count} viewers !', media:'', mediaType:'image', sound:'', volume:45, duration:8, enterAnimation:'slide_left', exitAnimation:'slide_right', layout:'image_left', position:'center', font:'Inter', titleSize:38, messageSize:24, textTop:'#ffffff', textBottom:'#38bdf8', accent:'#38bdf8', background:'rgba(7,10,18,.86)', showLabel:true },
+  donation: { enabled:false, title:'Donation',             message:'{username} donne {amount}€ : {message}', media:'', mediaType:'image', sound:'', volume:40, duration:8, enterAnimation:'pop', exitAnimation:'fade', layout:'image_top', position:'center', font:'Inter', titleSize:36, messageSize:24, textTop:'#ffffff', textBottom:'#f59e0b', accent:'#f59e0b', background:'rgba(7,10,18,.86)', showLabel:true },
+  bits:     { enabled:false, title:'Bits',                 message:'{username} envoie {amount} bits !', media:'', mediaType:'image', sound:'', volume:40, duration:7, enterAnimation:'zoom', exitAnimation:'fade', layout:'image_top', position:'center', font:'Inter', titleSize:36, messageSize:24, textTop:'#ffffff', textBottom:'#a78bfa', accent:'#a78bfa', background:'rgba(7,10,18,.86)', showLabel:true },
+  custom:   { enabled:true,  title:'Alerte personnalisée', message:'Alerte test pour {username}', media:'', mediaType:'image', sound:'', volume:35, duration:6, enterAnimation:'fade', exitAnimation:'fade', layout:'image_top', position:'center', font:'Inter', titleSize:36, messageSize:24, textTop:'#ffffff', textBottom:'#22c55e', accent:'#22c55e', background:'rgba(7,10,18,.86)', showLabel:true }
 };
 
 function sanitizeAlertType(type) {
   const t = String(type || '').toLowerCase().trim();
   return ALERT_TYPES.includes(t) ? t : 'custom';
 }
+function sanitizeProfileId(value) {
+  return String(value || 'default').toLowerCase().trim().replace(/[^a-z0-9_-]+/g,'-').replace(/^-+|-+$/g,'').slice(0,40) || 'default';
+}
 function normalizeAlertCfg(type, raw={}) {
   const d = ALERT_DEFAULTS[sanitizeAlertType(type)] || ALERT_DEFAULTS.custom;
+  const animations = ['fade','pop','zoom','bounce','shake','flip','glitch','slide_left','slide_right','slide_up','slide_down'];
+  const legacyAnimation = String(raw.animation || '');
+  const media = String(raw.media ?? raw.image ?? d.media).slice(0, 7_000_000);
   return {
     enabled: raw.enabled !== undefined ? !!raw.enabled : !!d.enabled,
-    title: String(raw.title ?? d.title).slice(0, 80),
-    message: String(raw.message ?? d.message).slice(0, 250),
-    image: String(raw.image ?? d.image).slice(0, 500),
-    sound: String(raw.sound ?? d.sound).slice(0, 500),
-    volume: Math.min(100, Math.max(0, parseInt(raw.volume ?? d.volume) || d.volume)),
-    duration: Math.min(30, Math.max(2, parseInt(raw.duration ?? d.duration) || d.duration)),
-    animation: ['fade','pop','slide','zoom'].includes(String(raw.animation ?? d.animation)) ? String(raw.animation ?? d.animation) : d.animation,
-    layout: ['image_top','image_left','text_only'].includes(String(raw.layout ?? d.layout)) ? String(raw.layout ?? d.layout) : d.layout,
+    title: String(raw.title ?? d.title).slice(0, 120),
+    message: String(raw.message ?? d.message).slice(0, 400),
+    media,
+    image: media,
+    mediaType: ['image','video'].includes(String(raw.mediaType ?? d.mediaType)) ? String(raw.mediaType ?? d.mediaType) : 'image',
+    sound: String(raw.sound ?? d.sound).slice(0, 7_000_000),
+    volume: Math.min(100, Math.max(0, Number(raw.volume ?? d.volume) || d.volume)),
+    duration: Math.min(60, Math.max(1, Number(raw.duration ?? d.duration) || d.duration)),
+    enterAnimation: animations.includes(String(raw.enterAnimation || legacyAnimation || d.enterAnimation)) ? String(raw.enterAnimation || legacyAnimation || d.enterAnimation) : d.enterAnimation,
+    exitAnimation: animations.includes(String(raw.exitAnimation || d.exitAnimation)) ? String(raw.exitAnimation || d.exitAnimation) : d.exitAnimation,
+    animation: animations.includes(String(raw.enterAnimation || legacyAnimation || d.enterAnimation)) ? String(raw.enterAnimation || legacyAnimation || d.enterAnimation) : d.enterAnimation,
+    layout: ['image_top','image_left','image_right','text_only','fullscreen'].includes(String(raw.layout ?? d.layout)) ? String(raw.layout ?? d.layout) : d.layout,
+    position: ['top_left','top_center','top_right','center','bottom_left','bottom_center','bottom_right'].includes(String(raw.position ?? d.position)) ? String(raw.position ?? d.position) : d.position,
+    font: String(raw.font ?? d.font).replace(/[^a-zA-Z0-9 _-]/g,'').slice(0,60) || 'Inter',
+    titleSize: Math.min(96, Math.max(14, parseInt(raw.titleSize ?? d.titleSize) || d.titleSize)),
+    messageSize: Math.min(72, Math.max(12, parseInt(raw.messageSize ?? d.messageSize) || d.messageSize)),
     textTop: /^#[0-9a-f]{6}$/i.test(String(raw.textTop ?? d.textTop)) ? String(raw.textTop ?? d.textTop) : d.textTop,
-    textBottom: /^#[0-9a-f]{6}$/i.test(String(raw.textBottom ?? d.textBottom)) ? String(raw.textBottom ?? d.textBottom) : d.textBottom
+    textBottom: /^#[0-9a-f]{6}$/i.test(String(raw.textBottom ?? d.textBottom)) ? String(raw.textBottom ?? d.textBottom) : d.textBottom,
+    accent: /^#[0-9a-f]{6}$/i.test(String(raw.accent ?? d.accent)) ? String(raw.accent ?? d.accent) : d.accent,
+    background: String(raw.background ?? d.background).slice(0,80),
+    showLabel: raw.showLabel !== undefined ? !!raw.showLabel : !!d.showLabel
   };
 }
-async function getAlertConfig(type) {
-  type = sanitizeAlertType(type);
-  const raw = await db.getSettingStr('alert_config_' + type, '');
-  let parsed = {};
-  if (raw) { try { parsed = JSON.parse(raw); } catch { parsed = {}; } }
+function getAlertTM(reqOrTm=null) {
+  if (reqOrTm && typeof reqOrTm.getSetting === 'function') return reqOrTm;
+  if (reqOrTm?.tenantManager) return reqOrTm.tenantManager;
+  return createTenantManager({ db, io, req:reqOrTm || null, streamer:reqOrTm?.streamer || null });
+}
+async function getAlertProfiles(tm) {
+  tm = getAlertTM(tm);
+  let profiles = await tm.getJson('alert_profiles', null);
+  if (!Array.isArray(profiles) || !profiles.length) profiles = [{ id:'default', name:'Défaut' }];
+  return profiles.map(p=>({ id:sanitizeProfileId(p.id), name:String(p.name || p.id || 'Profil').slice(0,50) }));
+}
+async function getActiveAlertProfile(tm) {
+  tm = getAlertTM(tm);
+  const profiles = await getAlertProfiles(tm);
+  const wanted = sanitizeProfileId(await tm.getSetting('alert_active_profile','default'));
+  return profiles.find(p=>p.id===wanted)?.id || profiles[0].id;
+}
+async function getAlertConfig(type, tm, profileId=null) {
+  tm = getAlertTM(tm); type = sanitizeAlertType(type);
+  const profile = sanitizeProfileId(profileId || await getActiveAlertProfile(tm));
+  let raw = await tm.getSetting(`alert_profile_${profile}_${type}`, '');
+  if (!raw && profile === 'default') raw = await tm.getSetting('alert_config_' + type, '');
+  let parsed = {}; if (raw) { try { parsed = JSON.parse(raw); } catch {} }
   return normalizeAlertCfg(type, parsed);
 }
-async function getAllAlertConfigs() {
-  const out = {};
-  for (const t of ALERT_TYPES) out[t] = await getAlertConfig(t);
+async function getAllAlertConfigs(tm, profileId=null) {
+  tm = getAlertTM(tm); const out = {};
+  for (const t of ALERT_TYPES) out[t] = await getAlertConfig(t, tm, profileId);
   return out;
 }
 function fillAlertTemplate(str, vars={}) {
-  return String(str || '').replace(/\{(username|months|gifter|count|amount|message)\}/gi, (_, k) => String(vars[String(k).toLowerCase()] ?? ''));
+  return String(str || '').replace(/\{(username|months|gifter|count|amount|message|viewerCount|goal|subtier)\}/gi, (_, k) => String(vars[String(k).toLowerCase()] ?? ''));
 }
-async function pushObsAlert(type, vars={}, force=false) {
-  type = sanitizeAlertType(type);
-  const cfg = await getAlertConfig(type);
-  if (!force && !cfg.enabled) return { success:true, ignored:true, reason:'disabled', type };
+async function appendAlertHistory(tm, payload) {
+  const hist = await tm.getJson('alert_history', []);
+  const next = [payload, ...(Array.isArray(hist)?hist:[])].slice(0,100);
+  await tm.setJson('alert_history', next);
+}
+async function pushObsAlert(type, vars={}, force=false, reqOrTm=null) {
+  const tm = getAlertTM(reqOrTm); type = sanitizeAlertType(type);
+  const profile = await getActiveAlertProfile(tm);
+  const cfg = await getAlertConfig(type, tm, profile);
+  if (!force && !cfg.enabled) return { success:true, ignored:true, reason:'disabled', type, streamer:tm.slug };
   const payload = {
     id: `${Date.now()}_${Math.random().toString(36).slice(2,8)}`,
-    type,
-    label: ALERT_LABELS[type] || type,
-    title: fillAlertTemplate(cfg.title, vars),
-    message: fillAlertTemplate(cfg.message, vars),
-    vars,
-    cfg,
-    createdAt: new Date().toISOString()
+    streamer: tm.slug, profile, type, label: ALERT_LABELS[type] || type,
+    title: fillAlertTemplate(cfg.title, vars), message: fillAlertTemplate(cfg.message, vars),
+    vars, cfg, createdAt: new Date().toISOString()
   };
-  io.emit('alert-overlay-event', payload);
-  console.log('[ALERT OBS]', type, payload.message);
-  return { success:true, alert: payload };
+  tm.emit('alert-overlay-event', payload);
+  await appendAlertHistory(tm, { id:payload.id, profile, type, label:payload.label, title:payload.title, message:payload.message, createdAt:payload.createdAt }).catch(()=>{});
+  console.log(`[ALERT OBS:${tm.slug}]`, type, payload.message);
+  return { success:true, alert:payload };
 }
 function kickEventToAlertType(eventType) {
   const t = normalizeKickEventType(eventType || '');
-  if (t === 'channel.followed') return 'follow';
-  if (t === 'channel.subscription.new') return 'sub';
-  if (t === 'channel.subscription.renewal') return 'renew';
-  if (t === 'channel.subscription.gifts') return 'gift';
-  if (String(eventType || '').toLowerCase().includes('raid')) return 'raid';
-  return '';
+  if (t === 'channel.followed') return 'follow'; if (t === 'channel.subscription.new') return 'sub';
+  if (t === 'channel.subscription.renewal') return 'renew'; if (t === 'channel.subscription.gifts') return 'gift';
+  if (String(eventType || '').toLowerCase().includes('raid')) return 'raid'; return '';
 }
 
 app.get('/api/widgets/alerts', async (req, res) => {
-  try { res.json({ types: ALERT_TYPES, labels: ALERT_LABELS, configs: await getAllAlertConfigs() }); }
-  catch(e) { res.status(500).json({ error: e.message }); }
+  try {
+    if (req.overlayTokenInvalid) return res.status(410).json({ error:'Lien OBS expiré', invalidOverlay:true });
+    const tm = getAlertTM(req), profiles = await getAlertProfiles(tm), activeProfile = await getActiveAlertProfile(tm);
+    res.set('Cache-Control','no-store');
+    res.json({ streamer:tm.slug, types:ALERT_TYPES, labels:ALERT_LABELS, profiles, activeProfile, configs:await getAllAlertConfigs(tm, activeProfile) });
+  } catch(e) { res.status(500).json({ error:e.message }); }
+});
+app.get('/api/widgets/alerts/history', async (req,res)=>{
+  try { const tm=getAlertTM(req); res.json({ streamer:tm.slug, data:await tm.getJson('alert_history',[]) }); }
+  catch(e){ res.status(500).json({error:e.message}); }
+});
+app.post('/api/admin/widgets/alerts/profiles', requireAuth, async (req,res)=>{
+  try {
+    const tm=getAlertTM(req), id=sanitizeProfileId(req.body.id || req.body.name), name=String(req.body.name || id).trim().slice(0,50);
+    let profiles=await getAlertProfiles(tm); if(!profiles.some(p=>p.id===id)) profiles.push({id,name});
+    await tm.setJson('alert_profiles',profiles); await tm.setSetting('alert_active_profile',id);
+    tm.emit('alert-overlay-settings',{activeProfile:id,configs:await getAllAlertConfigs(tm,id)});
+    res.json({success:true,profiles,activeProfile:id});
+  } catch(e){res.status(500).json({error:e.message});}
+});
+app.post('/api/admin/widgets/alerts/profile/activate', requireAuth, async (req,res)=>{
+  try { const tm=getAlertTM(req), id=sanitizeProfileId(req.body.id); const profiles=await getAlertProfiles(tm); if(!profiles.some(p=>p.id===id)) return res.status(404).json({error:'Profil introuvable'}); await tm.setSetting('alert_active_profile',id); const configs=await getAllAlertConfigs(tm,id); tm.emit('alert-overlay-settings',{activeProfile:id,configs}); res.json({success:true,activeProfile:id,configs}); }
+  catch(e){res.status(500).json({error:e.message});}
+});
+app.delete('/api/admin/widgets/alerts/profiles/:id', requireAuth, async (req,res)=>{
+  try { const tm=getAlertTM(req), id=sanitizeProfileId(req.params.id); if(id==='default') return res.status(400).json({error:'Le profil Défaut ne peut pas être supprimé'}); let profiles=(await getAlertProfiles(tm)).filter(p=>p.id!==id); if(!profiles.length) profiles=[{id:'default',name:'Défaut'}]; await tm.setJson('alert_profiles',profiles); const active=await getActiveAlertProfile(tm); if(active===id) await tm.setSetting('alert_active_profile',profiles[0].id); res.json({success:true,profiles,activeProfile:await getActiveAlertProfile(tm)}); }
+  catch(e){res.status(500).json({error:e.message});}
 });
 app.post('/api/admin/widgets/alerts/:type', requireAuth, async (req, res) => {
-  try {
-    const type = sanitizeAlertType(req.params.type);
-    const cfg = normalizeAlertCfg(type, req.body || {});
-    await db.setSettingStr('alert_config_' + type, JSON.stringify(cfg));
-    io.emit('alert-overlay-settings', { configs: await getAllAlertConfigs() });
-    res.json({ success:true, type, cfg });
-  } catch(e) { res.status(500).json({ error: e.message }); }
+  try { const tm=getAlertTM(req), type=sanitizeAlertType(req.params.type), profile=sanitizeProfileId(req.body.profile || await getActiveAlertProfile(tm)), cfg=normalizeAlertCfg(type,req.body||{}); await tm.setSetting(`alert_profile_${profile}_${type}`,JSON.stringify(cfg)); tm.emit('alert-overlay-settings',{activeProfile:profile,configs:await getAllAlertConfigs(tm,profile)}); res.json({success:true,streamer:tm.slug,profile,type,cfg}); }
+  catch(e){res.status(500).json({error:e.message});}
 });
 app.post('/api/admin/widgets/alerts/:type/test', requireAuth, async (req, res) => {
-  try {
-    const type = sanitizeAlertType(req.params.type);
-    const vars = Object.assign({ username:'Elboy78', months:3, gifter:'TestGift', count:5, amount:'10', message:'Message test' }, req.body || {});
-    res.json(await pushObsAlert(type, vars, true));
-  } catch(e) { res.status(500).json({ error: e.message }); }
+  try { const tm=getAlertTM(req), type=sanitizeAlertType(req.params.type), vars=Object.assign({username:'Elboy78',months:3,gifter:'TestGift',count:5,amount:'10',message:'Message test',viewerCount:125,goal:50,subtier:'Tier 1'},req.body||{}); res.json(await pushObsAlert(type,vars,true,tm)); }
+  catch(e){res.status(500).json({error:e.message});}
 });
 
 // ── Chat Overlay OBS ──────────────────────────────────────────────────────────
