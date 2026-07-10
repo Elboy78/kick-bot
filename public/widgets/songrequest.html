@@ -54,6 +54,7 @@ let desiredStatus='stopped';
 let volume=100;
 let displayTime=0, duration=0, lastClock=Date.now();
 let loadingUntil=0, lastStatePost=0, lastControlPoll=0, suppressStateUntil=0;
+let overlayInvalid=false;
 
 function esc(v){return String(v||'').replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));}
 function fmt(s){s=Math.max(0,Math.floor(Number(s)||0));return Math.floor(s/60)+':'+String(s%60).padStart(2,'0');}
@@ -62,6 +63,18 @@ function pstate(){try{return player&&player.getPlayerState?player.getPlayerState
 function ptime(){try{return player&&player.getCurrentTime?Number(player.getCurrentTime()||0):0}catch(e){return 0}}
 function pdur(){try{return player&&player.getDuration?Number(player.getDuration()||0):0}catch(e){return 0}}
 function clampVol(v){v=Number(v);return Number.isFinite(v)?Math.max(0,Math.min(100,Math.round(v))):100;}
+
+function invalidateOverlay(){
+  overlayInvalid=true;
+  queue=[]; enabled=false; desiredStatus='stopped';
+  try{ if(player){ player.pauseVideo&&player.pauseVideo(); player.stopVideo&&player.stopVideo(); } }catch(e){}
+  currentItemId=''; currentVideoId=''; duration=0; syncClockFrom(0);
+  el.card.classList.add('empty'); el.dot.classList.add('paused');
+  el.state.textContent='Lien expiré';
+  el.song.textContent='Lien OBS régénéré';
+  el.by.textContent='Copie le nouveau lien Song Request depuis le panel.';
+  el.next.style.display='none'; el.fill.style.width='0%'; el.cur.textContent='0:00'; el.dur.textContent='0:00';
+}
 
 function syncClockFrom(sec){displayTime=Math.max(0,Number(sec)||0); lastClock=Date.now();}
 function getSmoothTime(){
@@ -166,13 +179,17 @@ function onPlayerStateChange(e){
 }
 
 async function postState(status,force){
+  if(overlayInvalid)return;
   const now=Date.now(); if(!force&&now-lastStatePost<1200)return; lastStatePost=now;
   const cur=queue[0]; if(!cur)return;
   const d=duration||pdur()||Number(cur.duration||0)||0;
-  fetch(apiUrl('/api/widgets/songrequest/player-state'),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({itemId:cur.id,status,currentTime:getSmoothTime(),duration:d,volume})}).catch(()=>{});
+  // Le widget ne remonte plus le volume : seul le panel/Companion décide du volume.
+  fetch(apiUrl('/api/widgets/songrequest/player-state'),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({itemId:cur.id,status,currentTime:getSmoothTime(),duration:d})}).catch(()=>{});
 }
-async function nextPublic(){try{await fetch(apiUrl('/api/widgets/songrequest/next'),{method:'POST'});}catch(e){}}
+async function nextPublic(){if(overlayInvalid)return;try{const r=await fetch(apiUrl('/api/widgets/songrequest/next'),{method:'POST'}); if(r.status===410) invalidateOverlay();}catch(e){}}
 function applyServerState(st,initial=false){
+  if(overlayInvalid)return;
+  if(st?.invalidOverlay){invalidateOverlay();return;}
   if(st?.streamer) adoptStreamer(st.streamer);
   enabled=!!st.enabled;
   const oldId=queue[0]?.id||'';
@@ -186,9 +203,9 @@ function applyServerState(st,initial=false){
   render();
   if(st.control) handleControl(st.control);
 }
-async function load(initial=false){try{const r=await fetch(apiUrl('/api/widgets/songrequest?ts='+Date.now()),{cache:'no-store'}); const st=await r.json(); applyServerState(st,initial);}catch(e){}}
+async function load(initial=false){if(overlayInvalid)return;try{const r=await fetch(apiUrl('/api/widgets/songrequest?ts='+Date.now()),{cache:'no-store'}); if(r.status===410){invalidateOverlay();return;} const st=await r.json(); if(st?.invalidOverlay){invalidateOverlay();return;} applyServerState(st,initial);}catch(e){}}
 function handleControl(c){
-  if(!c)return;
+  if(overlayInvalid||!c)return;
   if(c.streamer){ adoptStreamer(c.streamer); if(STREAMER_SLUG&&String(c.streamer).toLowerCase()!==String(STREAMER_SLUG).toLowerCase())return; }
   const seq=Number(c.seq||0); if(seq && seq<=lastSeq)return; if(seq) lastSeq=seq;
   const a=String(c.action||'');
@@ -197,11 +214,12 @@ function handleControl(c){
   else if(a==='stop'){stopLocal(true);} 
   else if(a==='next'||a==='load-current'){load(false);} 
   else if(a==='seek'){const sec=Math.max(0,Number(c.seconds||0)); syncClockFrom(sec); try{player&&player.seekTo&&player.seekTo(sec,true);}catch(e){} render(); postState(desiredStatus,true);} 
-  else if(a==='volume'){setVolumeLocal(c.volume,true);} 
+  else if(a==='volume'){setVolumeLocal(c.volume,false);} 
 }
 async function pollControl(){
+  if(overlayInvalid)return;
   const now=Date.now(); if(now-lastControlPoll<650)return; lastControlPoll=now;
-  try{const r=await fetch(apiUrl('/api/widgets/songrequest?controlOnly=1&ts='+Date.now()),{cache:'no-store'}); const st=await r.json(); if(st?.streamer) adoptStreamer(st.streamer); if(st?.control) handleControl(st.control); if(st?.player&&Number.isFinite(Number(st.player.volume))) setVolumeLocal(st.player.volume,false);}catch(e){}
+  try{const r=await fetch(apiUrl('/api/widgets/songrequest?controlOnly=1&ts='+Date.now()),{cache:'no-store'}); if(r.status===410){invalidateOverlay();return;} const st=await r.json(); if(st?.invalidOverlay){invalidateOverlay();return;} if(st?.streamer) adoptStreamer(st.streamer); if(st?.control) handleControl(st.control); if(st?.player&&Number.isFinite(Number(st.player.volume))) setVolumeLocal(st.player.volume,false);}catch(e){}
 }
 
 window.onYouTubeIframeAPIReady=function(){ytReady=true; ensurePlayer(); applyPlayback('yt-ready');};
@@ -213,7 +231,8 @@ try{
   srSocket.on('connect',()=>joinStreamerRoom(STREAMER_SLUG));
   srSocket.on('songrequest-control',handleControl);
   srSocket.on('songrequest-update',d=>{ if(d?.streamer){adoptStreamer(d.streamer); if(STREAMER_SLUG&&String(d.streamer).toLowerCase()!==String(STREAMER_SLUG).toLowerCase())return;} const old=queue[0]?.id||''; queue=Array.isArray(d.queue)?d.queue:[]; if((queue[0]?.id||'')!==old){currentItemId=''; currentVideoId=''; syncClockFrom(0); desiredStatus=queue[0]?'playing':'stopped';} if(!queue[0])stopLocal(false); else applyPlayback('queue'); render();});
-  srSocket.on('songrequest-player-state',st=>{ if(st?.streamer){adoptStreamer(st.streamer); if(STREAMER_SLUG&&String(st.streamer).toLowerCase()!==String(STREAMER_SLUG).toLowerCase())return;} if(st&&Number.isFinite(Number(st.volume))) setVolumeLocal(st.volume,false); });
+  srSocket.on('songrequest-player-state',st=>{ if(overlayInvalid)return; if(st?.streamer){adoptStreamer(st.streamer); if(STREAMER_SLUG&&String(st.streamer).toLowerCase()!==String(STREAMER_SLUG).toLowerCase())return;} if(st&&Number.isFinite(Number(st.volume))) setVolumeLocal(st.volume,false); });
+  srSocket.on('overlay-token-regenerated',d=>{ if(String(d?.widget||'').toLowerCase()==='songrequest' && OVERLAY_TOKEN) invalidateOverlay(); });
 }catch(e){}
 </script>
 </body>

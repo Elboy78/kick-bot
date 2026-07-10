@@ -115,6 +115,16 @@ app.post('/api/v2/admin/overlay-tokens/:widget/regenerate', requireAuth, waitDB,
     const streamer = req.streamer || await db.ensureDefaultStreamer(tenant.getDefaultStreamerSeed());
     const widget = String(req.params.widget || '').replace(/\.html$/,'').toLowerCase();
     const row = await db.regenerateOverlayToken(streamer.id, widget);
+    try {
+      // Sécurité V2 : invalide immédiatement les anciennes sources OBS déjà ouvertes.
+      // Sans ça, une ancienne source /o/<ancien-token>/songrequest.html peut continuer
+      // à jouer jusqu'à son prochain refresh OBS.
+      io.to(tenant.roomName(streamer.slug)).emit('overlay-token-regenerated', {
+        streamer: streamer.slug,
+        widget,
+        at: new Date().toISOString()
+      });
+    } catch(e) {}
     res.json({ success:true, data:{ widget, url:`${base}/o/${row.token}/${widget}.html`, token:String(row.token).slice(0,6)+'…'+String(row.token).slice(-6) } });
   } catch(e) { res.status(500).json({ error: e.message }); }
 });
@@ -179,12 +189,17 @@ app.use(async (req, res, next) => {
     const overlayToken = String(req.query?.overlayToken || req.headers?.['x-overlay-token'] || '').trim();
     if (overlayToken && typeof db.getOverlayTokenByValue === 'function') {
       const tokenRow = await db.getOverlayTokenByValue(overlayToken);
-      if (tokenRow?.streamer_id && typeof db.getStreamerById === 'function') {
-        const streamer = await db.getStreamerById(tokenRow.streamer_id);
-        if (streamer) {
-          req.streamer = streamer;
-          req.streamerSlug = streamer.slug;
-          res.setHeader('X-Streamer-Slug', streamer.slug);
+      if (!tokenRow) {
+        req.overlayTokenInvalid = true;
+      } else {
+        req.overlayTokenRow = tokenRow;
+        if (tokenRow?.streamer_id && typeof db.getStreamerById === 'function') {
+          const streamer = await db.getStreamerById(tokenRow.streamer_id);
+          if (streamer) {
+            req.streamer = streamer;
+            req.streamerSlug = streamer.slug;
+            res.setHeader('X-Streamer-Slug', streamer.slug);
+          }
         }
       }
     }
@@ -1128,6 +1143,19 @@ function getSongRequestTM(reqOrTm = null) {
 function songRequestSlug(tm) {
   return tenant.normalizeSlug(tm?.slug || tenant.getCurrentStreamerSlug());
 }
+function rejectInvalidSongRequestOverlay(req, res) {
+  // Si une source OBS utilise /o/<token>/songrequest.html, le token doit rester valide.
+  // On ne doit jamais retomber sur le cookie streamer, sinon un ancien lien régénéré
+  // continue à piloter/écouter le lecteur.
+  const token = String(req?.query?.overlayToken || req?.headers?.['x-overlay-token'] || '').trim();
+  if (!token) return false;
+  const widget = String(req?.overlayTokenRow?.widget || '').toLowerCase();
+  if (req.overlayTokenInvalid || widget !== 'songrequest') {
+    res.status(410).json({ success:false, invalidOverlay:true, error:'Lien OBS Song Request expiré ou régénéré.' });
+    return true;
+  }
+  return false;
+}
 function getSongRequestSeq(tm) {
   const slug = songRequestSlug(tm);
   if (!songRequestControlSeqByStreamer.has(slug)) songRequestControlSeqByStreamer.set(slug, Date.now());
@@ -1292,6 +1320,7 @@ try {
 }
 
 app.get('/api/widgets/songrequest', async (req, res) => {
+  if (rejectInvalidSongRequestOverlay(req, res)) return;
   res.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
   res.set('Pragma', 'no-cache');
   res.set('Expires', '0');
@@ -1338,6 +1367,7 @@ app.post('/api/admin/widgets/songrequest/delete', requireAuth, async (req, res) 
 });
 
 app.post('/api/widgets/songrequest/next', async (req, res) => {
+  if (rejectInvalidSongRequestOverlay(req, res)) return;
   try {
     const tm = getSongRequestTM(req);
     const state = await getSongRequestState(tm);
@@ -1420,6 +1450,7 @@ app.post('/api/admin/widgets/songrequest/volume', requireAuth, async (req, res) 
   } catch(e) { res.status(500).json({ error:e.message }); }
 });
 app.post('/api/widgets/songrequest/player-state', async (req, res) => {
+  if (rejectInvalidSongRequestOverlay(req, res)) return;
   try {
     const tm = getSongRequestTM(req);
     const state = await getSongRequestState(tm);
@@ -1445,7 +1476,8 @@ app.post('/api/widgets/songrequest/player-state', async (req, res) => {
     }
     if (req.body.currentTime !== undefined) patch.currentTime = Math.max(0, parseFloat(req.body.currentTime) || 0);
     if (req.body.duration !== undefined) patch.duration = Math.max(0, parseFloat(req.body.duration) || 0);
-    if (req.body.volume !== undefined) { const v = Number(req.body.volume); patch.volume = Number.isFinite(v) ? Math.max(0, Math.min(100, Math.round(v))) : state.player.volume; }
+    // IMPORTANT : le volume est un réglage demandé par le panel/Companion, pas un état remonté par OBS.
+    // Les widgets OBS, surtout les anciens liens encore ouverts, ne peuvent donc plus remettre le volume à 100.
     const next = await saveSongRequestPlayerState(patch, true, tm);
     res.json({ success:true, player: next });
   } catch(e) { res.status(500).json({ error:e.message }); }
@@ -1498,6 +1530,7 @@ async function runSongRequestMacro(action, reqOrTm = null) {
 }
 
 async function songRequestMacroHandler(req, res) {
+  if (rejectInvalidSongRequestOverlay(req, res)) return;
   try {
     const action = String(req.params.action || req.body?.action || 'toggle').toLowerCase();
     if (!['toggle','play','pause','next','stop'].includes(action)) return res.status(400).json({ error:'Action invalide' });
