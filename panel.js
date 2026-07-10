@@ -10,6 +10,7 @@ const kickOAuth = require('./kick-oauth');
 const shared = require('./shared');
 const tenant = require('./tenant');
 const { createTenantManager } = require('./tenant-manager');
+const widgetEngine = require('./widget-engine');
 
 const app    = express();
 const PORT   = parseInt(process.env.PANEL_PORT || '3000');
@@ -84,6 +85,38 @@ app.post('/api/v2/admin/streamers', requireAuth, waitDB, async (req, res) => {
     });
     res.json({ success: true, data: streamer });
   } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+
+app.get('/api/v2/widgets', waitDB, async (req, res) => {
+  try {
+    const protocol = req.headers['x-forwarded-proto'] || req.protocol || 'https';
+    const host = req.get('host');
+    const base = `${protocol}://${host}`;
+    const streamer = req.streamer || await db.ensureDefaultStreamer(tenant.getDefaultStreamerSeed());
+    const tokens = await db.getOverlayTokensForStreamer(streamer.id);
+    const tm = createTenantManager({ db, io, streamer });
+    const widgets = [];
+    for (const definition of widgetEngine.listWidgets()) {
+      const tokenRow = tokens[definition.id] || await db.getOrCreateOverlayToken(streamer.id, definition.id);
+      let enabled = true;
+      if (definition.enabledSetting) {
+        const raw = await tm.getSetting(definition.enabledSetting, '1');
+        enabled = !['0', 'false', 'off', 'disabled'].includes(String(raw).toLowerCase());
+      }
+      widgets.push({
+        ...definition,
+        enabled,
+        url: `${base}/o/${tokenRow.token}/${definition.id}.html`,
+        maskedToken: `${String(tokenRow.token).slice(0, 6)}…${String(tokenRow.token).slice(-6)}`,
+        lastUsedAt: tokenRow.last_used_at || null
+      });
+    }
+    res.set('Cache-Control', 'no-store');
+    res.json({ data: { streamer: streamer.slug, widgets } });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
 });
 
 app.get('/api/v2/obs-links', waitDB, async (req, res) => {

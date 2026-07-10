@@ -347,6 +347,21 @@ hr.div{border:none;border-top:1px solid var(--brd);margin:12px 0}
 
 
 .obs-link-code{filter:blur(4px);transition:.18s}.obs-link-row:hover .obs-link-code,.obs-link-code:hover{filter:none}.obs-regenerate-btn{border:1px solid rgba(255,255,255,.14);background:rgba(255,255,255,.06);color:#fff;border-radius:10px;padding:7px 10px;font-weight:800;cursor:pointer;margin-left:8px}.obs-regenerate-btn:hover{background:rgba(255,255,255,.12)}
+
+.widget-engine-summary{display:flex;align-items:center;justify-content:space-between;gap:14px;padding:16px 18px;margin-bottom:14px;background:linear-gradient(135deg,rgba(40,255,102,.08),rgba(59,130,246,.06));border:1px solid rgba(148,163,184,.16);border-radius:16px}
+.widget-engine-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(270px,1fr));gap:14px}
+.widget-engine-card{position:relative;overflow:hidden;min-height:230px;padding:18px;border-radius:16px;background:var(--card);border:1px solid var(--brd);box-shadow:0 16px 38px rgba(0,0,0,.22)}
+.widget-engine-glow{position:absolute;right:-42px;top:-52px;width:150px;height:150px;border-radius:50%;filter:blur(2px);pointer-events:none}
+.widget-engine-top{display:flex;align-items:center;justify-content:space-between;gap:10px;position:relative}
+.widget-engine-icon{width:48px;height:48px;border-radius:16px;display:flex;align-items:center;justify-content:center;font-size:25px;border:1px solid currentColor}
+.widget-engine-status{font-size:9px;font-weight:950;letter-spacing:.7px;text-transform:uppercase;padding:5px 9px;border-radius:999px;background:rgba(255,255,255,.05);border:1px solid var(--brd)}
+.widget-engine-name{font-size:21px;font-weight:950;color:var(--text);margin-top:16px;letter-spacing:-.35px;position:relative}
+.widget-engine-desc{font-size:10px;line-height:1.6;color:var(--muted);min-height:32px;margin-top:6px;position:relative}
+.widget-engine-link{margin-top:14px;padding:9px 10px;border-radius:10px;background:rgba(0,0,0,.22);border:1px solid var(--brd);font:10px/1.3 monospace;color:var(--muted);filter:blur(3px);transition:.2s;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;user-select:none}
+.widget-engine-link:hover{filter:blur(1px)}
+.widget-engine-actions{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-top:10px;position:relative}
+.widget-engine-actions button{justify-content:center;min-height:35px}
+
 </style>
 
 <script>
@@ -835,65 +850,15 @@ Option 3" rows="4"></textarea><div style="display:flex;gap:6px;margin-top:10px">
     <div class="header"><div><h1>Widgets</h1><p>Choisis un widget puis règle son overlay OBS</p></div></div>
 
     <div id="widgets-home">
-      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:14px">
-        <button onclick="openWidgetSettings('subgoal')" style="text-align:left;padding:0;border:0;background:transparent;cursor:pointer">
-          <div class="panel" style="min-height:150px;position:relative;overflow:hidden;border-color:rgba(40,255,102,.28);box-shadow:0 16px 38px rgba(0,0,0,.22)">
-            <div style="position:absolute;right:-34px;top:-42px;width:130px;height:130px;border-radius:50%;background:radial-gradient(circle,rgba(40,255,102,.22),transparent 68%)"></div>
-            <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:18px">
-              <div style="width:46px;height:46px;border-radius:16px;background:rgba(40,255,102,.12);border:1px solid rgba(40,255,102,.28);display:flex;align-items:center;justify-content:center;font-size:24px">🎯</div>
-              <span style="font-size:9px;color:var(--accent);font-weight:900;letter-spacing:.7px;text-transform:uppercase">OBS Overlay</span>
-            </div>
-            <div style="font-size:22px;font-weight:950;color:var(--text);letter-spacing:-.4px">Sub Goal</div>
-            <div style="font-size:10px;color:var(--muted);line-height:1.6;margin-top:6px">Barre d’objectif subs, compteur live, session et derniers événements.</div>
-            <div style="margin-top:16px;font-size:10px;font-weight:900;color:var(--accent)">Ouvrir les paramètres →</div>
-          </div>
-        </button>
-
-        <button onclick="openWidgetSettings('tts')" style="text-align:left;padding:0;border:0;background:transparent;cursor:pointer">
-          <div class="panel" style="min-height:150px;position:relative;overflow:hidden;border-color:rgba(168,85,247,.30);box-shadow:0 16px 38px rgba(0,0,0,.22)">
-            <div style="position:absolute;right:-34px;top:-42px;width:130px;height:130px;border-radius:50%;background:radial-gradient(circle,rgba(168,85,247,.24),transparent 68%)"></div>
-            <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:18px">
-              <div style="width:46px;height:46px;border-radius:16px;background:rgba(168,85,247,.13);border:1px solid rgba(168,85,247,.30);display:flex;align-items:center;justify-content:center;font-size:24px">🔊</div>
-              <span style="font-size:9px;color:#c084fc;font-weight:900;letter-spacing:.7px;text-transform:uppercase">OBS Overlay</span>
-            </div>
-            <div style="font-size:22px;font-weight:950;color:var(--text);letter-spacing:-.4px">TTS</div>
-            <div style="font-size:10px;color:var(--muted);line-height:1.6;margin-top:6px">Lecture vocale ElevenLabs pour les dons, voix, seuil, blacklist et historique.</div>
-            <div style="margin-top:16px;font-size:10px;font-weight:900;color:#c084fc">Ouvrir les paramètres →</div>
-          </div>
-        </button>
-
-
-        <button onclick="openWidgetSettings('songrequest')" style="text-align:left;padding:0;border:0;background:transparent;cursor:pointer">
-          <div class="panel" style="min-height:150px;position:relative;overflow:hidden;border-color:rgba(59,130,246,.30);box-shadow:0 16px 38px rgba(0,0,0,.22)">
-            <div style="position:absolute;right:-34px;top:-42px;width:130px;height:130px;border-radius:50%;background:radial-gradient(circle,rgba(59,130,246,.24),transparent 68%)"></div>
-            <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:18px">
-              <div style="width:46px;height:46px;border-radius:16px;background:rgba(59,130,246,.13);border:1px solid rgba(59,130,246,.30);display:flex;align-items:center;justify-content:center;font-size:24px">🎵</div>
-              <span style="font-size:9px;color:#93c5fd;font-weight:900;letter-spacing:.7px;text-transform:uppercase">Chat Request</span>
-            </div>
-            <div style="font-size:22px;font-weight:950;color:var(--text);letter-spacing:-.4px">Song Request</div>
-            <div style="font-size:10px;color:var(--muted);line-height:1.6;margin-top:6px">Les viewers proposent des musiques avec !sr, tu acceptes/refuses depuis le panel.</div>
-            <div style="margin-top:16px;font-size:10px;font-weight:900;color:#93c5fd">Ouvrir les paramètres →</div>
-          </div>
-        </button>
-
-        <button onclick="openWidgetSettings('chat')" style="text-align:left;padding:0;border:0;background:transparent;cursor:pointer">
-          <div class="panel" style="min-height:150px;position:relative;overflow:hidden;border-color:rgba(34,197,94,.30);box-shadow:0 16px 38px rgba(0,0,0,.22)">
-            <div style="position:absolute;right:-34px;top:-42px;width:130px;height:130px;border-radius:50%;background:radial-gradient(circle,rgba(34,197,94,.24),transparent 68%)"></div>
-            <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:18px">
-              <div style="width:46px;height:46px;border-radius:16px;background:rgba(34,197,94,.13);border:1px solid rgba(34,197,94,.30);display:flex;align-items:center;justify-content:center;font-size:24px">💬</div>
-              <span style="font-size:9px;color:#86efac;font-weight:900;letter-spacing:.7px;text-transform:uppercase">OBS Overlay</span>
-            </div>
-            <div style="font-size:22px;font-weight:950;color:var(--text);letter-spacing:-.4px">Chat Overlay</div>
-            <div style="font-size:10px;color:var(--muted);line-height:1.6;margin-top:6px">Affiche le chat du live dans OBS, avec filtres, durée, style et bots ignorés.</div>
-            <div style="margin-top:16px;font-size:10px;font-weight:900;color:#86efac">Ouvrir les paramètres →</div>
-          </div>
-        </button>
-
-        <div class="panel" style="min-height:150px;opacity:.55;border-style:dashed;display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center">
-          <div style="font-size:28px;margin-bottom:8px">＋</div>
-          <div style="font-size:14px;font-weight:900;color:var(--text)">Nouveau widget</div>
-          <div style="font-size:10px;color:var(--muted);margin-top:6px;line-height:1.5">Emplacement prêt pour ajouter d’autres widgets plus tard.</div>
+      <div class="widget-engine-summary">
+        <div>
+          <div style="font-size:15px;font-weight:950;color:var(--text)">Mes overlays OBS</div>
+          <div style="font-size:10px;color:var(--muted);margin-top:4px">Tous les widgets utilisent le même moteur, la room du streamer connecté et un lien privé indépendant.</div>
         </div>
+        <button class="dark-btn" onclick="loadWidgetEngine(true)">↻ Actualiser</button>
+      </div>
+      <div id="widget-engine-grid" class="widget-engine-grid">
+        <div class="panel" style="grid-column:1/-1;text-align:center;color:var(--muted)">Chargement des widgets…</div>
       </div>
     </div>
 
@@ -1854,7 +1819,7 @@ function showPage(name) {
   if(name==='vods') loadVods();
   if(name==='logs') loadModerationLogs();
   if(name==='chests') loadChests();
-  if(name==='widgets') { backToWidgetsHome(); loadSubGoal(); }
+  if(name==='widgets') { backToWidgetsHome(); loadWidgetEngine(); }
   if(name==='alertes') loadAlertsPanel();
   if(name==='admin') { loadCmds(); loadAdminLevels(); loadAccessRequests(); }
   if(name==='commands') { loadCommandsPage(); loadSystemCommands(); }
@@ -4824,6 +4789,75 @@ async function clearSongRequests() {
 }
 
 
+
+let WIDGET_ENGINE_CACHE = null;
+async function loadWidgetEngine(force = false) {
+  if (WIDGET_ENGINE_CACHE && !force) return renderWidgetEngine(WIDGET_ENGINE_CACHE);
+  const grid = document.getElementById('widget-engine-grid');
+  if (grid) grid.innerHTML = '<div class="panel" style="grid-column:1/-1;text-align:center;color:var(--muted)">Chargement des widgets…</div>';
+  try {
+    const r = await fetch(API + '/api/v2/widgets?ts=' + Date.now(), { cache:'no-store' });
+    const j = await r.json();
+    if (!r.ok) throw new Error(j.error || 'Impossible de charger les widgets');
+    WIDGET_ENGINE_CACHE = j.data || { widgets:[] };
+    renderWidgetEngine(WIDGET_ENGINE_CACHE);
+  } catch (e) {
+    if (grid) grid.innerHTML = `<div class="panel" style="grid-column:1/-1;color:#fb7185">${escapeHtml(e.message)}</div>`;
+  }
+}
+function renderWidgetEngine(data) {
+  const grid = document.getElementById('widget-engine-grid');
+  if (!grid) return;
+  const widgets = Array.isArray(data?.widgets) ? data.widgets : [];
+  grid.innerHTML = widgets.map(w => {
+    const color = w.color || '#94a3b8';
+    const status = w.enabled ? 'Actif' : 'Désactivé';
+    return `<article class="widget-engine-card">
+      <div class="widget-engine-glow" style="background:radial-gradient(circle,${color}38,transparent 68%)"></div>
+      <div class="widget-engine-top">
+        <div class="widget-engine-icon" style="color:${color};background:${color}16">${escapeHtml(w.icon || '🧩')}</div>
+        <span class="widget-engine-status" style="color:${w.enabled ? '#86efac' : '#94a3b8'}">${status}</span>
+      </div>
+      <div class="widget-engine-name">${escapeHtml(w.name)}</div>
+      <div class="widget-engine-desc">${escapeHtml(w.description || '')}</div>
+      <div class="widget-engine-link" id="widget-engine-link-${escapeAttr(w.id)}">${escapeHtml(w.url || '')}</div>
+      <div class="widget-engine-actions">
+        <button class="dark-btn" onclick="configureEngineWidget('${escapeAttr(w.id)}')">⚙ Configurer</button>
+        <button class="dark-btn" onclick="copyEngineWidget('${escapeAttr(w.id)}')">⧉ Copier</button>
+        <button class="dark-btn" onclick="openEngineWidget('${escapeAttr(w.id)}')">↗ Ouvrir</button>
+        <button class="dark-btn" onclick="regenerateEngineWidget('${escapeAttr(w.id)}')">⟳ Régénérer</button>
+      </div>
+    </article>`;
+  }).join('') || '<div class="panel" style="grid-column:1/-1;color:var(--muted)">Aucun widget disponible.</div>';
+}
+function getEngineWidget(id) {
+  return WIDGET_ENGINE_CACHE?.widgets?.find(w => w.id === id) || null;
+}
+function configureEngineWidget(id) {
+  if (id === 'alerts') return showPage('alerts');
+  openWidgetSettings(id);
+}
+async function copyEngineWidget(id) {
+  const widget = getEngineWidget(id);
+  if (!widget?.url) return toast('Lien indisponible');
+  try { await navigator.clipboard.writeText(widget.url); toast('Lien OBS copié ✓'); }
+  catch(e) { const ta=document.createElement('textarea');ta.value=widget.url;document.body.appendChild(ta);ta.select();document.execCommand('copy');ta.remove();toast('Lien OBS copié ✓'); }
+}
+function openEngineWidget(id) {
+  const widget = getEngineWidget(id);
+  if (widget?.url) window.open(widget.url, '_blank', 'noopener');
+}
+async function regenerateEngineWidget(id) {
+  if (!confirm('Régénérer ce lien OBS ? L’ancien lien sera immédiatement invalidé.')) return;
+  const r = await fetch(API + '/api/v2/admin/overlay-tokens/' + encodeURIComponent(id) + '/regenerate', { method:'POST' });
+  const j = await r.json().catch(()=>({}));
+  if (!r.ok) return toast(j.error || 'Erreur régénération');
+  OBS_LINKS = null;
+  WIDGET_ENGINE_CACHE = null;
+  await Promise.all([loadWidgetEngine(true), hydrateAllObsLinks(true)]);
+  toast('Nouveau lien privé généré ✓');
+}
+
 async function copyObsUrl(id) {
   const el = document.getElementById(id);
   const value = (el?.textContent || '').trim();
@@ -5836,7 +5870,7 @@ function logout() {
 // Vérifier auth puis charger
 applyStoredPrefs();
 checkPanelAuth().then(ok => { if (ok) { hydrateAllObsLinks(); loadAll(); } });
-setTimeout(hydrateAllObsLinks, 250);
+setTimeout(() => { hydrateAllObsLinks(); if (document.getElementById('widget-engine-grid')) loadWidgetEngine(); }, 250);
 setInterval(loadAll,30000);
 setInterval(loadLiveStatus, 60000);
 setInterval(()=>{if(document.getElementById('page-lobby').classList.contains('active'))loadLobby();},10000);
