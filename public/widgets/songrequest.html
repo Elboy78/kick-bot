@@ -163,19 +163,39 @@ function setVolumeLocal(v, report=true){
 }
 function onPlayerStateChange(e){
   if(Date.now()<suppressStateUntil) return;
-  if(e.data===YT.PlayerState.PLAYING){
+  const ytState = e.data;
+
+  // IMPORTANT V2 : le lecteur OBS ne décide plus de l'état play/pause.
+  // Le panel/Companion est la seule source de vérité.
+  // YouTube déclenche parfois PAUSED/PLAYING pendant un loadVideoById ou un buffering ;
+  // avant, ces événements écrasaient desiredStatus et créaient la boucle Pause/Lecture.
+  if(ytState===YT.PlayerState.PLAYING){
     const d=pdur(); if(d) duration=d;
-    if(desiredStatus==='paused'){ pauseLocal(true); return; }
-    if(desiredStatus!=='playing') desiredStatus='playing';
-    syncClockFrom(ptime()); postState('playing',false); render(); return;
-  }
-  if(e.data===YT.PlayerState.PAUSED){
     syncClockFrom(ptime());
-    // Ne jamais relancer automatiquement une pause : c'était la source des play/pause fantômes.
-    if(desiredStatus!=='paused' && desiredStatus!=='stopped') desiredStatus='paused';
-    postState('paused',false); render(); return;
+    if(desiredStatus==='paused') {
+      try{ player&&player.pauseVideo&&player.pauseVideo(); }catch(e){}
+    }
+    postState(desiredStatus || 'playing', false);
+    render();
+    return;
   }
-  if(e.data===YT.PlayerState.ENDED){ postState('ended',true); nextPublic(); return; }
+
+  if(ytState===YT.PlayerState.PAUSED){
+    syncClockFrom(ptime());
+    if(desiredStatus==='playing') {
+      // Pause involontaire de YouTube : on relance sans changer l'état serveur.
+      setTimeout(()=>{
+        if(!overlayInvalid && desiredStatus==='playing' && player && pstate()!==YT.PlayerState.PLAYING){
+          try{ player.playVideo(); }catch(e){}
+        }
+      }, 180);
+    }
+    postState(desiredStatus || 'paused', false);
+    render();
+    return;
+  }
+
+  if(ytState===YT.PlayerState.ENDED){ postState('ended',true); nextPublic(); return; }
 }
 
 async function postState(status,force){
