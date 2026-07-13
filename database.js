@@ -35,7 +35,7 @@ function getDB() {
       if (!fs.existsSync(dataDir)) fs.mkdirSync(dataDir, { recursive: true });
       const db = new Database(path.join(dataDir, 'viewers.db'));
       db.pragma('journal_mode = WAL');
-      console.log('[DB] SQLite local (fallback) ✓');
+     // console.log('[DB] SQLite local (fallback) ✓');
       return db;
     }
   }
