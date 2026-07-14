@@ -2238,8 +2238,10 @@ app.get('/auth/login', (req, res) => {
   if (!kickOAuth.isConfigured()) {
     return res.status(400).send('KICK_CLIENT_ID, KICK_CLIENT_SECRET ou KICK_REDIRECT_URI manquant dans les variables Render.');
   }
-  const returnTo = String(req.query.returnTo || req.query.redirect || '').slice(0, 300);
-  const url = kickOAuth.getAuthorizationUrl(null, { mode: 'streamer_login', returnTo });
+  const url = kickOAuth.getAuthorizationUrl(null, {
+  mode: 'streamer_login',
+  returnTo: ''
+});
   console.log('[OAUTH LOGIN V2] Connexion streamer Kick lancée');
   res.redirect(url);
 });

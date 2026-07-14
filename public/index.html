@@ -5858,8 +5858,7 @@ async function checkPanelAuth() {
     window.CURRENT_STREAMER = st.slug || st.kickUsername || '';
     return true;
   } catch(e) {
-    const returnTo = encodeURIComponent(window.location.pathname + window.location.search);
-    window.location.href = '/auth/login?returnTo=' + returnTo;
+    window.location.href = '/auth/login';
     return false;
   }
 }
