@@ -453,7 +453,7 @@ hr.div{border:none;border-top:1px solid var(--brd);margin:12px 0}
   <div class="bot-status">
     <p class="bot-status-title">STATUT DU BOT</p>
     <p class="online">● En ligne</p>
-    <p>Chaîne : <b>fack7up</b></p>
+    <p>Chaîne : <b id="sb-channel">—</b></p>
     <p>Uptime : <b id="sb-uptime">—</b></p>
     <p>Followers : <b id="sb-followers">—</b></p>
     <div class="live-pill off" id="live-pill"><div class="lpd" id="live-dot"></div><span id="live-text">Vérification…</span></div>
@@ -484,11 +484,11 @@ hr.div{border:none;border-top:1px solid var(--brd);margin:12px 0}
   <div class="page active" id="page-dashboard">
     <div class="header">
       <div>
-        <h1>Bonjour, fack7up ! 👋</h1>
+        <h1>Bonjour, <span id="dashboard-greeting-name">—</span> ! 👋</h1>
         <p>Voici un aperçu complet de ton bot</p>
       </div>
       <div class="header-right">
-        <button class="btn" onclick="window.open('https://kick.com/fack7up','_blank')">💬 Voir le chat</button>
+        <button class="btn" id="open-kick-chat" onclick="openConnectedKickChannel()">💬 Voir le chat</button>
         <button class="btn btn-connected">● Bot connecté</button>
       </div>
     </div>
@@ -1850,8 +1850,47 @@ async function del(url) {
   await fetch(API+url, { method:'DELETE', headers:{'Content-Type':'application/json','x-panel-key':getKey()} });
 }
 
+// ── Identité du streamer connecté ─────────────────────────────────────────────
+async function loadConnectedStreamerIdentity() {
+  try {
+    const r = await fetch('/api/v2/account', { cache: 'no-store' });
+    if (r.status === 401) { window.location.href = '/login'; return null; }
+    if (!r.ok) throw new Error('Impossible de charger le compte connecté');
+    const payload = await r.json();
+    const profile = payload.data || {};
+    connectedStreamerProfile = profile;
+    activeKickChannel = profile.kickUsername || profile.slug || CURRENT_STREAMER_SLUG || '';
+
+    const displayName = profile.displayName || profile.display_name || profile.kickUsername || profile.slug || 'Streamer';
+    const avatarUrl = profile.avatarUrl || profile.avatar_url || '';
+    const setText = (id, value) => { const el=document.getElementById(id); if(el) el.textContent=value; };
+    setText('dashboard-greeting-name', displayName);
+    setText('sb-channel', activeKickChannel || '—');
+    setText('prof-name', displayName);
+
+    const avatar = document.getElementById('prof-avatar');
+    if (avatar) {
+      avatar.textContent = '';
+      avatar.style.backgroundImage = avatarUrl ? `url("${String(avatarUrl).replace(/"/g, '%22')}")` : '';
+      avatar.style.backgroundSize = 'cover';
+      avatar.style.backgroundPosition = 'center';
+      if (!avatarUrl) avatar.textContent = displayName.charAt(0).toUpperCase() || '?';
+    }
+    return profile;
+  } catch (e) {
+    console.warn('[PANEL] Identité Kick indisponible:', e.message);
+    return null;
+  }
+}
+
+function openConnectedKickChannel() {
+  if (!activeKickChannel) return toast('Chaîne Kick introuvable');
+  window.open(`https://kick.com/${encodeURIComponent(activeKickChannel)}`, '_blank', 'noopener');
+}
+
 // ── Load all ───────────────────────────────────────────────────────────────────
 async function loadAll() {
+  await loadConnectedStreamerIdentity();
   loadLiveStatus();
   checkBotTokenStatus();
   await Promise.all([loadStats(), loadDashLB(), loadDashLogs(), loadCmdUsage(), loadLevels(), loadActiveGiveaway(), loadChatActivityWeek()]);
@@ -1874,10 +1913,6 @@ async function loadStats() {
     setEl('s-top-sub', d.max_points ? d.max_points.toLocaleString('fr')+' pts' : '');
     setEl('chart-stat-viewers', (d.total_viewers||0).toLocaleString('fr') + ' viewers enregistrés');
     setEl('chart-stat-minutes', fmtMin(d.total_minutes_watched||0) + ' regardées');
-    // Profil sidebar
-    const user = localStorage.getItem('kick_panel_user') || '?';
-    setEl('prof-avatar', user[0]?.toUpperCase() || '?');
-    setEl('prof-name', user);
   } catch(e){}
 }
 
@@ -2498,7 +2533,9 @@ const SYS_CMD_DESCS = {
 async function loadLiveStatus() {
   try {
     // Appel direct depuis le navigateur — Kick ne bloque pas les navigateurs
-    const r = await fetch('https://kick.com/api/v2/channels/fack7up');
+    if (!activeKickChannel) await loadConnectedStreamerIdentity();
+    if (!activeKickChannel) throw new Error('Chaîne Kick introuvable pour la session');
+    const r = await fetch(`https://kick.com/api/v2/channels/${encodeURIComponent(activeKickChannel)}`);
     const d = await r.json();
 
     const live      = !!d.livestream;
@@ -3294,7 +3331,8 @@ const VOD_CAT_LABELS = { moment:'🎯 Moment', funny:'😂 Funny', clutch:'🔥 
 let currentVodTab    = 'replays';
 let allVodsData      = [];
 let allClipsData     = [];
-let activeKickChannel = 'fack7up';
+let activeKickChannel = CURRENT_STREAMER_SLUG || '';
+let connectedStreamerProfile = null;
 
 function openOnKick() {
   const map = { replays:'videos', clips:'clips', myclips:'videos' };
@@ -3367,7 +3405,7 @@ async function loadVods() {
   try {
     const infoR = await fetch('/api/channel-info');
     const info  = await infoR.json();
-    activeKickChannel = info.channel || 'fack7up';
+    activeKickChannel = info.channel || info.slug || CURRENT_STREAMER_SLUG || '';
     allVodsData = [];
     for (let p=1; p<=3; p++) {
       const r = await fetch(`https://kick.com/api/v2/channels/${activeKickChannel}/videos?page=${p}&limit=12&sort=desc`,
@@ -3465,9 +3503,9 @@ async function loadClips() {
   if (!grid) return;
   grid.innerHTML = '<div class="empty" style="grid-column:1/-1"><div class="ei">⏳</div><p>Chargement des clips…</p></div>';
   try {
-    if (!activeKickChannel||activeKickChannel==='fack7up') {
+    if (!activeKickChannel) {
       const infoR = await fetch('/api/channel-info');
-      activeKickChannel = (await infoR.json()).channel||'fack7up';
+      { const info = await infoR.json(); activeKickChannel = info.channel || info.slug || CURRENT_STREAMER_SLUG || ''; }
     }
     allClipsData = [];
     for (let p=1; p<=3; p++) {
@@ -5864,7 +5902,7 @@ async function deleteAccess(username) {
 function logout() {
   localStorage.removeItem('kick_panel_approved');
   localStorage.removeItem('kick_panel_user');
-  window.location.href = '/login';
+  window.location.href = '/auth/logout';
 }
 
 // Vérifier auth puis charger
@@ -5883,7 +5921,7 @@ async function resolveFollowDates() {
     const missing = await get('/api/viewers/missing-follow') || [];
     for (const username of missing.slice(0, 5)) {  // max 5 par cycle pour rester léger
       try {
-        const r = await fetch(`https://kick.com/api/v2/channels/${activeKickChannel||'fack7up'}/users/${encodeURIComponent(username)}`,
+        const r = await fetch(`https://kick.com/api/v2/channels/${activeKickChannel || CURRENT_STREAMER_SLUG}/users/${encodeURIComponent(username)}`,
           { headers: { 'Accept': 'application/json', 'Accept-Language': 'en-US' } });
         if (!r.ok) continue;
         const d = await r.json();

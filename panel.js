@@ -375,8 +375,16 @@ app.get('/api/active',         async (req,res) => { try { res.json({data: await 
 // Le serveur gère uniquement le CRUD des moments marqués.
 
 // Expose le slug de la chaîne au client pour les appels directs vers Kick
-app.get('/api/channel-info', (req, res) => {
-  res.json({ channel: req.streamer?.slug || req.streamerSlug || process.env.KICK_CHANNEL || 'fack7up' });
+app.get('/api/channel-info', requireAuth, requireTenant, (req, res) => {
+  const streamer = req.streamer || {};
+  res.set('Cache-Control', 'no-store');
+  res.json({
+    channel: streamer.kick_username || streamer.slug,
+    slug: streamer.slug,
+    displayName: streamer.display_name || streamer.kick_username || streamer.slug,
+    avatarUrl: streamer.avatar_url || '',
+    streamerId: streamer.id
+  });
 });
 
 // ── Follow Announce ────────────────────────────────────────────────────────────
@@ -1805,55 +1813,74 @@ async function fetchKickAPI(channel) {
 app.get('/api/bot-settings',              async (req,res) => { try { res.json({data: await db.getAllSettings(), meta: db.DEFAULT_SETTINGS}); } catch(e){res.json({data:{},meta:{}}); }});
 app.post('/api/admin/bot-settings',       async (req,res) => { try { const {key,enabled}=req.body; if(!key) return res.status(400).json({error:'key requis'}); await db.setSetting(key,enabled); res.json({success:true}); } catch(e){res.status(500).json({error:e.message}); }});
 
-// Followers
-app.get('/api/followers', async (req, res) => {
+// Followers — toujours pour le compte Kick de la session courante.
+app.get('/api/followers', requireAuth, requireTenant, async (req, res) => {
   try {
-    const data = await fetchKickAPI(process.env.KICK_CHANNEL||'');
+    const channel = req.streamer?.kick_username || req.streamer?.slug;
+    if (!channel) return res.status(401).json({ count: 0, error: 'streamer_missing' });
+    const data = await fetchKickAPI(channel);
     if (!data) return res.json({ count: 0 });
     const count = data?.followers_count || data?.followersCount || 0;
-    res.json({ count });
+    res.set('Cache-Control', 'no-store');
+    res.json({ count, channel });
   } catch(e) { res.json({ count: 0 }); }
 });
 
-// Recevoir l'état live depuis le navigateur (qui peut appeler Kick sans être bloqué)
-let liveFromBrowser = { live: false, viewers: 0, followers: 0, updatedAt: null };
+// État live séparé par streamer. Une mise à jour du panel A ne peut plus écraser B.
+const liveFromBrowserByStreamer = new Map();
+const forcedLiveStatusByStreamer = new Map();
+function currentStreamerKey(req) { return Number(req.streamer?.id || req.authSession?.streamerId || 0); }
 
-app.post('/api/live/update', (req, res) => {
+app.post('/api/live/update', requireAuth, requireTenant, (req, res) => {
+  const streamerId = currentStreamerKey(req);
+  if (!streamerId) return res.status(401).json({ error: 'streamer_missing' });
   const { live, viewers, followers, vodUuid, streamTitle, streamStartedAt } = req.body;
-  liveFromBrowser = {
-    live: !!live, viewers: viewers||0, followers: followers||0,
+  liveFromBrowserByStreamer.set(streamerId, {
+    live: !!live, viewers: Number(viewers)||0, followers: Number(followers)||0,
     vodUuid: vodUuid||'', streamTitle: streamTitle||'', streamStartedAt: streamStartedAt||null,
     updatedAt: Date.now()
-  };
+  });
   res.json({ success: true });
 });
 
-// Live force
-let forcedLiveStatus = null;
-app.post('/api/admin/live/force', requireAuth, (req,res) => { const {status}=req.body; forcedLiveStatus=status==='on'?true:status==='off'?false:null; res.json({success:true,forced:forcedLiveStatus}); });
-app.get('/api/admin/live/status', requireAuth, (req,res) => res.json({forced:forcedLiveStatus}));
+app.post('/api/admin/live/force', requireAuth, requireTenant, (req,res) => {
+  const streamerId = currentStreamerKey(req);
+  const { status } = req.body;
+  const forced = status === 'on' ? true : status === 'off' ? false : null;
+  if (forced === null) forcedLiveStatusByStreamer.delete(streamerId);
+  else forcedLiveStatusByStreamer.set(streamerId, forced);
+  res.json({ success:true, forced });
+});
+app.get('/api/admin/live/status', requireAuth, requireTenant, (req,res) => {
+  const streamerId = currentStreamerKey(req);
+  res.json({ forced: forcedLiveStatusByStreamer.has(streamerId) ? forcedLiveStatusByStreamer.get(streamerId) : null });
+});
 
-// Live status
-app.get('/api/live', async (req,res) => {
-  if (forcedLiveStatus !== null) return res.json({live:forcedLiveStatus,viewers:0,forced:true});
+app.get('/api/live', requireAuth, requireTenant, async (req,res) => {
+  const streamerId = currentStreamerKey(req);
+  const forced = forcedLiveStatusByStreamer.has(streamerId) ? forcedLiveStatusByStreamer.get(streamerId) : null;
+  if (forced !== null) return res.json({ live:forced, viewers:0, forced:true });
 
-  // Utiliser les données du navigateur si fraîches (< 2 min)
-  if (liveFromBrowser.updatedAt && Date.now() - liveFromBrowser.updatedAt < 120000) {
-    return res.json({ ...liveFromBrowser, source: 'browser' });
+  const browserState = liveFromBrowserByStreamer.get(streamerId);
+  if (browserState?.updatedAt && Date.now() - browserState.updatedAt < 120000) {
+    return res.json({ ...browserState, source: 'browser' });
   }
 
-  // Sinon essayer l'API serveur
   try {
-    const data = await fetchKickAPI(process.env.KICK_CHANNEL||'');
-    if (!data) return res.json({ live: false, viewers: 0, error: 'api_blocked' });
+    const channel = req.streamer?.kick_username || req.streamer?.slug;
+    if (!channel) return res.status(401).json({ live:false, viewers:0, error:'streamer_missing' });
+    const data = await fetchKickAPI(channel);
+    if (!data) return res.json({ live:false, viewers:0, error:'api_blocked' });
     const live = data?.livestream;
+    res.set('Cache-Control', 'no-store');
     res.json({
-      live: !!(live?.is_live),
+      live: !!live,
       viewers: live?.viewer_count || 0,
       followers: data?.followers_count || data?.followersCount || 0,
+      channel,
       source: 'server',
     });
-  } catch(e) { res.json({ live: false, viewers: 0 }); }
+  } catch(e) { res.json({ live:false, viewers:0 }); }
 });
 
 // ════════════════════════════════════════════════════════════════════
@@ -2066,31 +2093,20 @@ app.get('/classement', (req,res) => res.sendFile(path.join(__dirname,'public','c
 
 
 function getLegacyStreamerCookieOptions() {
-  const secure =
-    process.env.NODE_ENV === 'production' ||
-    Boolean(process.env.RENDER) ||
-    Boolean(process.env.RENDER_EXTERNAL_URL);
-
-  return {
-    path: '/',
-    sameSite: 'lax',
-    secure,
-    httpOnly: true,
-  };
+  const secure = process.env.NODE_ENV === 'production' || Boolean(process.env.RENDER) || Boolean(process.env.RENDER_EXTERNAL_URL);
+  return { path: '/', sameSite: 'lax', secure, httpOnly: true };
 }
-
 function setStreamerSessionCookie(res, slug) {
   const clean = tenant.normalizeSlug(slug);
-
   res.cookie('kb_streamer', clean, {
     ...getLegacyStreamerCookieOptions(),
     maxAge: 60 * 60 * 24 * 365 * 1000,
   });
 }
-
 function clearStreamerCookie(res) {
   res.clearCookie('kb_streamer', getLegacyStreamerCookieOptions());
 }
+
 
 // Connexion du compte BOT unique (ex: BOT7UP). Ce compte est utilisé uniquement
 // pour écrire dans les chats, jamais pour identifier le panel streamer.
@@ -2197,7 +2213,7 @@ app.post('/api/admin/oauth/disconnect', requireAuth, requireTenant, async (req, 
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-app.get('/api/v2/dashboard-summary', async (req, res) => {
+app.get('/api/v2/dashboard-summary', requireAuth, requireTenant, async (req, res) => {
   try {
     const tm = createTenantManager({ db, io, req });
     const sr = await getSongRequestState();
@@ -2215,7 +2231,7 @@ app.get('/api/v2/dashboard-summary', async (req, res) => {
   } catch(e) { res.status(500).json({ error: e.message }); }
 });
 
-app.get('/api/v2/account', async (req, res) => {
+app.get('/api/v2/account', requireAuth, requireTenant, async (req, res) => {
   try {
     const tm = createTenantManager({ db, io, req });
     const st = req.streamer || {};
