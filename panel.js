@@ -14,7 +14,8 @@ const widgetEngine = require('./widget-engine');
 const loadSession = require('./middlewares/loadSession');
 const requireAuth = require('./middlewares/requireAuth');
 const requireTenant = require('./middlewares/requireTenant');
-const { setSessionCookie, clearSessionCookie } = require('./core/auth/session');
+const { setSessionCookie, clearSessionCookie, setAdminTargetCookie, clearAdminTargetCookie } = require('./core/auth/session');
+const { normalizeTarget } = require('./core/auth/platform-admin');
 
 const app    = express();
 const PORT   = parseInt(process.env.PANEL_PORT || '3000');
@@ -39,14 +40,6 @@ let dbReady = false;
 db.ensureInit().then(async () => {
   const defaultStreamer = await db.ensureDefaultStreamer(tenant.getDefaultStreamerSeed());
   console.log(`[V2] Streamer par défaut : ${defaultStreamer.slug} (#${defaultStreamer.id})`);
-  const owner = process.env.PANEL_OWNER || '';
-  if (owner) {
-    try {
-      await db.requestAccess(owner);
-      await db.approveAccess(owner, 'admin');
-      console.log(`[PANEL] Propriétaire auto-approuvé : ${owner}`);
-    } catch(e) {}
-  }
   dbReady = true;
   console.log('[PANEL] DB prête ✓');
 }).catch(err => {
@@ -59,11 +52,67 @@ function waitDB(req, res, next) {
   next();
 }
 
+function requirePlatformAdmin(req, res, next) {
+  if (!req.authStreamer) return res.status(401).json({ error: 'Connexion Kick requise' });
+  if (!req.platformAdmin) return res.status(403).json({ error: 'Accès réservé à l’administrateur ElBot' });
+  next();
+}
+
 // V2 : page d'entrée = login Kick. Le panel complet vit dans /s/:streamer/dashboard.
 app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'public', 'login.html')));
 app.get('/login', (req, res) => res.sendFile(path.join(__dirname, 'public', 'login.html')));
 app.get('/login.html', (req, res) => res.sendFile(path.join(__dirname, 'public', 'login.html')));
 
+
+// ── Administration plateforme : accès support sécurisé ───────────────────────
+app.get('/api/platform-admin/status', requireAuth, requireTenant, waitDB, async (req, res) => {
+  res.set('Cache-Control', 'no-store');
+  res.json({
+    data: {
+      isPlatformAdmin: Boolean(req.platformAdmin),
+      identity: { id: req.authStreamer.id, slug: req.authStreamer.slug, kickUserId: req.authStreamer.kick_user_id || null },
+      activeStreamer: { id: req.streamer.id, slug: req.streamer.slug, displayName: req.streamer.display_name || req.streamer.displayName || req.streamer.slug },
+      impersonating: Boolean(req.isAdminImpersonation)
+    }
+  });
+});
+
+app.get('/api/platform-admin/streamers', requireAuth, requirePlatformAdmin, waitDB, async (req, res) => {
+  try {
+    const rows = await db.listStreamers();
+    res.set('Cache-Control', 'no-store');
+    res.json({ data: rows.map(row => ({
+      id: row.id,
+      slug: row.slug,
+      displayName: row.display_name || row.displayName || row.kick_username || row.slug,
+      avatarUrl: row.avatar_url || row.avatarUrl || '',
+      status: row.status || 'active'
+    })) });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.post('/api/platform-admin/switch', requireAuth, requirePlatformAdmin, waitDB, async (req, res) => {
+  try {
+    const slug = tenant.normalizeSlug(req.body?.slug || '');
+    if (!slug) return res.status(400).json({ error: 'Streamer requis' });
+    const target = await db.getStreamerBySlug(slug).catch(() => null);
+    if (!target) return res.status(404).json({ error: 'Streamer introuvable' });
+    const normalized = normalizeTarget(target);
+    setAdminTargetCookie(req, res, normalized);
+    console.log(`[PLATFORM ADMIN] ${req.authStreamer.slug} ouvre le panel ${target.slug}`);
+    res.json({ success: true, data: { slug: target.slug, redirect: `/s/${target.slug}/dashboard` } });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.post('/api/platform-admin/exit', requireAuth, requirePlatformAdmin, (req, res) => {
+  clearAdminTargetCookie(req, res);
+  console.log(`[PLATFORM ADMIN] ${req.authStreamer.slug} retourne sur son panel`);
+  res.json({ success: true, data: { slug: req.authStreamer.slug, redirect: `/s/${req.authStreamer.slug}/dashboard` } });
+});
 
 // ── V2 Multi-streamer : socle sans casser la V1 ──────────────────────────────
 app.get('/api/v2/streamers/current', requireAuth, requireTenant, waitDB, async (req, res) => {
@@ -74,12 +123,12 @@ app.get('/api/v2/streamers/current', requireAuth, requireTenant, waitDB, async (
   } catch(e) { res.status(500).json({ error: e.message }); }
 });
 
-app.get('/api/v2/streamers', requireAuth, requireTenant, waitDB, async (req, res) => {
+app.get('/api/v2/streamers', requireAuth, requirePlatformAdmin, waitDB, async (req, res) => {
   try { res.json({ data: await db.listStreamers() }); }
   catch(e) { res.status(500).json({ error: e.message }); }
 });
 
-app.post('/api/v2/admin/streamers', requireAuth, requireTenant, waitDB, async (req, res) => {
+app.post('/api/v2/admin/streamers', requireAuth, requirePlatformAdmin, waitDB, async (req, res) => {
   try {
     const streamer = await db.upsertStreamer({
       slug: req.body.slug,
@@ -286,8 +335,9 @@ app.get('/s/:streamer/classement', (req, res) => {
 });
 function requireOwnPanel(req, res, next) {
   const requested = tenant.normalizeSlug(req.params.streamer);
-  const owned = tenant.normalizeSlug(req.authSession?.streamerSlug);
-  if (requested !== owned) return res.redirect(`/s/${owned}/dashboard`);
+  const allowed = tenant.normalizeSlug(req.streamer?.slug || req.authStreamer?.slug);
+  if (!allowed) return res.redirect('/login');
+  if (requested !== allowed) return res.redirect(`/s/${allowed}/dashboard`);
   next();
 }
 app.get('/s/:streamer/dashboard', requireAuth, requireTenant, requireOwnPanel, (req, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));
@@ -993,10 +1043,6 @@ app.post('/api/admin/giveaway/start',  requireAuth, async (req,res) => { try { c
 app.post('/api/admin/giveaway/close',  requireAuth, async (req,res) => { try { const g=await db.getActiveGiveaway(); if(!g) return res.status(404).json({error:'Aucun giveaway'}); const winner=await db.closeGiveaway(g.id); res.json({success:true,winner}); } catch(e){res.status(500).json({error:e.message}); }});
 app.post('/api/admin/lobby/remove', async (req,res) => { try { await db.removeFromLobby(req.body.username); res.json({success:true}); } catch(e){res.status(500).json({error:e.message}); }});
 app.post('/api/admin/lobby/clear',  async (req,res) => { try { await db.clearLobby(); res.json({success:true}); } catch(e){res.status(500).json({error:e.message}); }});
-app.get('/api/admin/access',           requireAuth, async (req,res) => { try { res.json({data: await db.getAllAccessRequests()}); } catch(e){res.json({data:[]}); }});
-app.post('/api/admin/access/approve',  requireAuth, async (req,res) => { try { await db.approveAccess(req.body.username,req.body.role||'viewer'); res.json({success:true}); } catch(e){res.status(500).json({error:e.message}); }});
-app.post('/api/admin/access/revoke',   requireAuth, async (req,res) => { try { await db.revokeAccess(req.body.username); res.json({success:true}); } catch(e){res.status(500).json({error:e.message}); }});
-app.delete('/api/admin/access/:username', requireAuth, async (req,res) => { try { await db.deleteAccessRequest(req.params.username); res.json({success:true}); } catch(e){res.status(500).json({error:e.message}); }});
 app.get('/api/system-commands', async (req,res) => { try { res.json({data: await db.getAllSystemCommandsState()}); } catch(e){res.json({data:[]}); }});
 app.post('/api/admin/system-commands/toggle', requireAuth, async (req,res) => { try { const {trigger,enabled}=req.body; if(!trigger) return res.status(400).json({error:'trigger requis'}); await db.toggleSystemCommand(trigger, enabled); res.json({success:true}); } catch(e){res.status(500).json({error:e.message}); }});
 
