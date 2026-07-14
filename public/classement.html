@@ -17,24 +17,18 @@
   </style>
 
 <script>
-window.__STREAMER_SLUG__ = window.__STREAMER_SLUG__ || new URLSearchParams(location.search).get('streamer') || (location.pathname.match(/^\/s\/([^\/]+)/)||[])[1] || '';
-function tenantApiUrl(url){
-  const slug = window.__STREAMER_SLUG__ || '';
-  if(!slug) return url;
-  return url + (url.includes('?') ? '&' : '?') + 'streamer=' + encodeURIComponent(slug);
-}
-function tenantSocketOptions(extra){
-  const slug = window.__STREAMER_SLUG__ || '';
-  return Object.assign({transports:['websocket','polling'], query: slug ? {streamer:slug} : {}}, extra || {});
-}
+const publicStreamerSlug = (() => {
+  const match = location.pathname.match(/^\/classement\/([^/?#]+)/);
+  return match ? decodeURIComponent(match[1]).trim().toLowerCase() : '';
+})();
 </script>
 </head>
 <body>
   <main class="wrap">
     <section class="hero">
       <div class="badge">🏆 Classement viewers</div>
-      <h1>Top de la communauté</h1>
-      <div class="sub">Classement public mis à jour automatiquement.</div>
+      <h1 id="pageTitle">Top de la communauté</h1>
+      <div class="sub" id="pageSubtitle">Classement public mis à jour automatiquement.</div>
     </section>
     <section class="podium" id="podium"></section>
     <section class="list" id="list"><div class="empty">Chargement du classement...</div></section>
@@ -52,14 +46,31 @@ function levelHtml(name){
   return `<span class="level">${icon}<span>${esc(l.name || name || 'Bronze')}</span></span>`;
 }
 async function loadLevels(){
-  try { const r = await fetch(tenantApiUrl('/api/levels'), {cache:'no-store'}); const j = await r.json(); levels = Array.isArray(j.data) ? j.data : []; } catch(e) { levels = []; }
+  if(!publicStreamerSlug) return;
+  try {
+    const r = await fetch(`/api/public/levels/${encodeURIComponent(publicStreamerSlug)}`, {cache:'no-store'});
+    const j = await r.json();
+    levels = Array.isArray(j.data) ? j.data : [];
+  } catch(e) { levels = []; }
 }
+async function loadStreamer(){
+  if(!publicStreamerSlug) throw new Error('streamer_missing');
+  const r = await fetch(`/api/public/streamer/${encodeURIComponent(publicStreamerSlug)}`, {cache:'no-store'});
+  if(!r.ok) throw new Error('streamer_not_found');
+  const j = await r.json();
+  const streamer = j.data || {};
+  const name = streamer.displayName || streamer.slug || publicStreamerSlug;
+  document.title = `Classement de ${name}`;
+  document.getElementById('pageTitle').textContent = `Communauté de ${name}`;
+  document.getElementById('pageSubtitle').textContent = `Classement public de ${name}, mis à jour automatiquement.`;
+}
+
 async function loadLeaderboard(){
   const podium = document.getElementById('podium');
   const list = document.getElementById('list');
   try{
-    await loadLevels();
-    const r = await fetch(tenantApiUrl('/api/leaderboard?limit=50'), { cache:'no-store' });
+    await Promise.all([loadLevels(), loadStreamer()]);
+    const r = await fetch(`/api/public/leaderboard/${encodeURIComponent(publicStreamerSlug)}?limit=50`, { cache:'no-store' });
     const j = await r.json();
     const data = Array.isArray(j.data) ? j.data : [];
     if(!data.length){ podium.innerHTML=''; list.innerHTML='<div class="empty">Aucun viewer classé pour le moment.</div>'; return; }
@@ -69,7 +80,7 @@ async function loadLeaderboard(){
     podium.innerHTML = top.map((v,i)=> v ? `<article class="pod ${cls[i]}"><div class="rank">${medals[i]}</div><div class="name">${esc(v.username)}</div>${levelHtml(v.level)}<div class="pts">${fmt(v.points)} pts</div></article>` : `<article></article>`).join('');
     list.innerHTML = data.map((v,i)=>`<div class="row"><div class="rnum">#${i+1}</div><div class="rname">${esc(v.username)}</div><div class="rlevel">${levelHtml(v.level)}</div><div class="rpts">${fmt(v.points)} pts</div></div>`).join('');
     document.getElementById('updated').textContent = 'Mis à jour à ' + new Date().toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'});
-  }catch(e){ list.innerHTML='<div class="empty">Impossible de charger le classement.</div>'; }
+  }catch(e){ podium.innerHTML=''; list.innerHTML='<div class="empty">Classement introuvable ou indisponible.</div>'; }
 }
 loadLeaderboard();
 setInterval(loadLeaderboard, 15000);

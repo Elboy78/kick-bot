@@ -25,6 +25,13 @@ app.use(cors());
 app.use(express.json({ limit: '8mb' }));
 app.use(express.static(path.join(__dirname, 'public'), { index: false }));
 app.use(loadSession);
+// Les pages/API publiques de classement doivent uniquement consulter un tenant
+// existant. Un slug inventé ne doit jamais créer automatiquement un streamer.
+app.use((req, res, next) => {
+  req.publicTenantLookupOnly = /^\/classement\/[^/]+(?:\/)?(?:[?#].*)?$/.test(req.originalUrl || req.url || '')
+    || /^\/api\/public\/(?:leaderboard|levels|streamer)\/[^/?#]+/.test(req.originalUrl || req.url || '');
+  next();
+});
 app.use((req, res, next) => tenant.attachTenant(db, req, res, next));
 
 // Init DB avant de démarrer
@@ -266,7 +273,17 @@ app.get('/o/:token/:file', waitDB, async (req, res) => {
     res.status(500).send('Erreur overlay');
   }
 });
-app.get('/s/:streamer/classement', setStreamerCookieMiddleware, (req, res) => res.sendFile(path.join(__dirname, 'public', 'classement.html')));
+app.get('/classement/:streamer', waitDB, (req, res) => {
+  if (!req.streamer || tenant.normalizeSlug(req.params.streamer) !== req.streamer.slug) {
+    return res.status(404).send('Classement introuvable');
+  }
+  res.set('Cache-Control', 'no-store');
+  res.sendFile(path.join(__dirname, 'public', 'classement.html'));
+});
+// Ancienne URL conservée pour compatibilité, redirigée vers l'URL publique canonique.
+app.get('/s/:streamer/classement', (req, res) => {
+  res.redirect(301, `/classement/${encodeURIComponent(tenant.normalizeSlug(req.params.streamer))}`);
+});
 function requireOwnPanel(req, res, next) {
   const requested = tenant.normalizeSlug(req.params.streamer);
   const owned = tenant.normalizeSlug(req.authSession?.streamerSlug);
@@ -350,6 +367,54 @@ app.get('/api/leaderboard',    waitDB,    async (req,res) => {
     res.json({data});
   } catch(e){res.json({data:[]}); }
 });
+
+app.get('/api/public/streamer/:streamer', waitDB, async (req, res) => {
+  const requestedSlug = tenant.normalizeSlug(req.params.streamer);
+  if (!req.streamer || req.streamer.slug !== requestedSlug) {
+    return res.status(404).json({ error: 'Classement introuvable' });
+  }
+  res.set('Cache-Control', 'public, max-age=30');
+  res.json({
+    data: {
+      slug: req.streamer.slug,
+      displayName: req.streamer.display_name || req.streamer.kick_username || req.streamer.slug,
+      avatarUrl: req.streamer.avatar_url || ''
+    }
+  });
+});
+
+app.get('/api/public/leaderboard/:streamer', waitDB, async (req, res) => {
+  try {
+    const requestedSlug = tenant.normalizeSlug(req.params.streamer);
+    if (!req.streamer || req.streamer.slug !== requestedSlug) {
+      return res.status(404).json({ error: 'Classement introuvable', data: [] });
+    }
+    const limit = Math.min(Math.max(parseInt(req.query.limit || '50', 10) || 50, 1), 100);
+    const ignored = await getLeaderboardIgnoredUsers();
+    const rawRows = await db.getLeaderboard(Math.max(limit + ignored.length + 50, limit));
+    const data = filterLeaderboardUsers(rawRows, ignored)
+      .slice(0, limit)
+      .map((viewer, index) => ({ ...viewer, original_rank: viewer.rank, rank: index + 1 }));
+    res.set('Cache-Control', 'public, max-age=15');
+    res.json({ data });
+  } catch (error) {
+    res.status(500).json({ error: 'Impossible de charger le classement', data: [] });
+  }
+});
+
+app.get('/api/public/levels/:streamer', waitDB, async (req, res) => {
+  try {
+    const requestedSlug = tenant.normalizeSlug(req.params.streamer);
+    if (!req.streamer || req.streamer.slug !== requestedSlug) {
+      return res.status(404).json({ error: 'Classement introuvable', data: [] });
+    }
+    res.set('Cache-Control', 'public, max-age=60');
+    res.json({ data: await getLevelsWithImages() });
+  } catch (error) {
+    res.status(500).json({ error: 'Impossible de charger les niveaux', data: [] });
+  }
+});
+
 app.get('/api/leaderboard/config', waitDB, async (req, res) => {
   try { res.json({ data: { ignoredUsers: (await db.getSettingStr('leaderboard_ignored_users', 'BotRix,botrix')) || '' } }); }
   catch(e) { res.json({ data: { ignoredUsers: 'BotRix,botrix' } }); }
@@ -2088,7 +2153,7 @@ app.get('/api/tts/quota', async (req, res) => {
 });
 
 app.get('/overlay', (req,res) => res.sendFile(path.join(__dirname,'public','overlay.html')));
-app.get('/classement', (req,res) => res.sendFile(path.join(__dirname,'public','classement.html')));
+app.get('/classement', (req,res) => res.redirect('/'));
 
 
 

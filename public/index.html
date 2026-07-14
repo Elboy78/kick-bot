@@ -583,7 +583,7 @@ hr.div{border:none;border-top:1px solid var(--brd);margin:12px 0}
 
   <!-- ══ CLASSEMENT ══ -->
   <div class="page" id="page-classement">
-    <div class="header"><div><h1>Classement</h1><p>Top viewers et niveaux</p></div><button class="btn" onclick="refreshLeaderboard()">↻ Actualiser</button></div>
+    <div class="header"><div><h1>Classement</h1><p>Top viewers et niveaux</p></div><div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn" onclick="copyPublicLeaderboardLink()">🔗 Copier le lien public</button><button class="btn" onclick="refreshLeaderboard()">↻ Actualiser</button></div></div>
     <div class="panel" style="margin-bottom:14px">
       <h3>🏆 Classement complet
         <span style="display:flex;gap:6px">
@@ -2069,6 +2069,18 @@ async function loadLeaderboard() {
     lbData = await get('/api/leaderboard?limit='+limit) || [];
     renderLB(lbData);
   } catch(e){}
+}
+
+async function copyPublicLeaderboardLink(){
+  const slug = String(CURRENT_STREAMER_SLUG || activeKickChannel || '').trim().toLowerCase();
+  if(!slug){ toast('Chaîne introuvable'); return; }
+  const url = `${location.origin}/classement/${encodeURIComponent(slug)}`;
+  try {
+    await navigator.clipboard.writeText(url);
+    toast('Lien public du classement copié ✓');
+  } catch(e) {
+    window.prompt('Copie le lien public du classement :', url);
+  }
 }
 
 async function refreshLeaderboard() {

@@ -44,7 +44,7 @@ function getDefaultStreamerSeed() {
 
 function readRequestedSlug(req) {
   const directPath = `${req?.originalUrl || ''} ${req?.path || ''} ${req?.url || ''}`;
-  const pathSlug = String(directPath).match(/\/s\/([^\/?#\s]+)/)?.[1];
+  const pathSlug = String(directPath).match(/(?:\/s|\/classement|\/api\/public\/(?:leaderboard|levels|streamer))\/([^\/?#\s]+)/)?.[1];
   let refererSlug = '';
   try {
     const ref = String(req?.headers?.referer || req?.headers?.referrer || '');
@@ -64,14 +64,15 @@ function readRequestedSlug(req) {
   );
 }
 
-async function ensureRequestedStreamer(db, slug) {
+async function ensureRequestedStreamer(db, slug, options = {}) {
   const cleanSlug = normalizeSlug(slug || DEFAULT_STREAMER_SLUG);
+  const createIfMissing = options.createIfMissing !== false;
   let streamer = await db.getStreamerBySlug(cleanSlug).catch(() => null);
 
   // V2 réelle : un slug demandé par /s/:streamer ou ?streamer= doit avoir
   // son propre tenant. Avant, un slug inconnu retombait sur le streamer par
   // défaut, donc tous les widgets affichaient la même file Song Request.
-  if (!streamer) {
+  if (!streamer && createIfMissing) {
     if (cleanSlug === DEFAULT_STREAMER_SLUG) {
       streamer = await db.ensureDefaultStreamer(getDefaultStreamerSeed());
     } else if (typeof db.upsertStreamer === 'function') {
@@ -85,29 +86,31 @@ async function ensureRequestedStreamer(db, slug) {
     }
   }
 
-  return streamer || await db.ensureDefaultStreamer(getDefaultStreamerSeed());
+  if (streamer) return streamer;
+  if (!createIfMissing) return null;
+  return await db.ensureDefaultStreamer(getDefaultStreamerSeed());
 }
+
 
 async function attachTenant(db, req, res, next) {
   try {
-    let streamer = null;
-    if (req.authSession?.streamerId && typeof db.getStreamerById === 'function') {
-      streamer = await db.getStreamerById(req.authSession.streamerId).catch(() => null);
-    }
-    if (!streamer) {
-      const slug = readRequestedSlug(req);
-      streamer = await ensureRequestedStreamer(db, slug);
-    }
-    req.streamer = streamer;
-    req.streamerSlug = streamer.slug;
+    const slug = readRequestedSlug(req);
+    const streamer = await ensureRequestedStreamer(db, slug, { createIfMissing: !req.publicTenantLookupOnly });
+    req.streamer = streamer || null;
+    req.streamerSlug = streamer?.slug || normalizeSlug(slug);
   } catch (e) {
-    try {
-      const fallback = await db.ensureDefaultStreamer(getDefaultStreamerSeed());
-      req.streamer = fallback;
-      req.streamerSlug = fallback.slug;
-    } catch (_) {
+    if (req.publicTenantLookupOnly) {
       req.streamer = null;
-      req.streamerSlug = DEFAULT_STREAMER_SLUG;
+      req.streamerSlug = normalizeSlug(slug);
+    } else {
+      try {
+        const fallback = await db.ensureDefaultStreamer(getDefaultStreamerSeed());
+        req.streamer = fallback;
+        req.streamerSlug = fallback.slug;
+      } catch (_) {
+        req.streamer = null;
+        req.streamerSlug = DEFAULT_STREAMER_SLUG;
+      }
     }
   }
   const context = {
