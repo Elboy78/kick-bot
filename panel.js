@@ -2285,13 +2285,17 @@ app.get('/auth/callback', async (req, res) => {
       await db.saveOAuthToken('kick', token.accessToken, token.refreshToken, token.expiresAt);
     }
 
-    setSessionCookie(res, {
-      streamerId: streamer.id,
-      streamerSlug: streamer.slug,
-      kickUserId: kickUser.id || streamer.kick_user_id || '',
-      username,
-    });
-    setStreamerSessionCookie(res, slug); // compatibilité temporaire avec les pages publiques V2
+    // Nouvelle connexion : on annule aussi un éventuel panel ouvert en mode super-admin.
+clearAdminTargetCookie(req, res);
+
+// La session est obligatoirement liée au streamer réellement retourné par Kick.
+setSessionCookie(req, res, {
+  id: streamer.id,
+  slug: streamer.slug
+});
+
+// Ancien cookie conservé temporairement pour les parties V2 encore compatibles.
+setStreamerSessionCookie(res, streamer.slug); // compatibilité temporaire avec les pages publiques V2
     console.log(`[OAUTH CALLBACK V2] ✅ Streamer connecté: ${slug} (#${streamer.id})`);
     res.redirect(`/s/${slug}/dashboard`);
   } catch (e) {
@@ -2302,7 +2306,8 @@ app.get('/auth/callback', async (req, res) => {
 
 
 app.get('/auth/logout', (req, res) => {
-  clearSessionCookie(res);
+  clearSessionCookie(req, res);
+  clearAdminTargetCookie(req, res);
   clearStreamerCookie(res);
   res.redirect('/login');
 });
