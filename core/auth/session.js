@@ -1,86 +1,90 @@
 const crypto = require('crypto');
 
 const COOKIE_NAME = 'elbot_session';
-const MAX_AGE_MS = 1000 * 60 * 60 * 24 * 7;
+const MAX_AGE_SECONDS = 60 * 60 * 24 * 30;
 
 function getSecret() {
   const secret = String(process.env.SESSION_SECRET || '').trim();
-  if (!secret) throw new Error('SESSION_SECRET manquant');
+  if (secret.length < 32) {
+    throw new Error('SESSION_SECRET doit contenir au moins 32 caractères.');
+  }
   return secret;
 }
 
 function encode(value) {
-  return Buffer.from(value).toString('base64url');
+  return Buffer.from(value, 'utf8').toString('base64url');
 }
 
 function decode(value) {
   return Buffer.from(value, 'base64url').toString('utf8');
 }
 
-function sign(value) {
-  return crypto.createHmac('sha256', getSecret()).update(value).digest('base64url');
+function sign(encodedPayload) {
+  return crypto.createHmac('sha256', getSecret()).update(encodedPayload).digest('base64url');
 }
 
-function timingSafeEqual(a, b) {
-  const left = Buffer.from(String(a));
-  const right = Buffer.from(String(b));
-  return left.length === right.length && crypto.timingSafeEqual(left, right);
+function safeEqual(left, right) {
+  const a = Buffer.from(String(left || ''));
+  const b = Buffer.from(String(right || ''));
+  return a.length === b.length && crypto.timingSafeEqual(a, b);
 }
 
-function createSession(streamer) {
-  if (!streamer?.id || !streamer?.slug) throw new Error('Streamer invalide pour la session');
-  const now = Date.now();
-  const payload = encode(JSON.stringify({
-    streamerId: Number(streamer.id),
-    slug: String(streamer.slug),
+function createSession(payload) {
+  const now = Math.floor(Date.now() / 1000);
+  const body = {
+    version: 1,
+    streamerId: Number(payload.streamerId),
+    streamerSlug: String(payload.streamerSlug || ''),
+    kickUserId: String(payload.kickUserId || ''),
+    username: String(payload.username || payload.streamerSlug || ''),
     issuedAt: now,
-    expiresAt: now + MAX_AGE_MS
-  }));
-  return `${payload}.${sign(payload)}`;
+    expiresAt: now + MAX_AGE_SECONDS,
+  };
+
+  if (!Number.isInteger(body.streamerId) || body.streamerId <= 0 || !body.streamerSlug) {
+    throw new Error('Session invalide: streamer manquant.');
+  }
+
+  const encoded = encode(JSON.stringify(body));
+  return `${encoded}.${sign(encoded)}`;
 }
 
-function readSession(value) {
-  if (!value || typeof value !== 'string') return null;
-  const [payload, signature, extra] = value.split('.');
-  if (!payload || !signature || extra) return null;
-  let expected;
-  try { expected = sign(payload); } catch { return null; }
-  if (!timingSafeEqual(signature, expected)) return null;
+function verifySession(token) {
   try {
-    const data = JSON.parse(decode(payload));
-    if (!data.streamerId || !data.slug || !data.expiresAt || Date.now() >= Number(data.expiresAt)) return null;
-    return data;
+    const [encoded, signature] = String(token || '').split('.');
+    if (!encoded || !signature || !safeEqual(signature, sign(encoded))) return null;
+    const payload = JSON.parse(decode(encoded));
+    const now = Math.floor(Date.now() / 1000);
+    if (payload.version !== 1 || !payload.streamerId || !payload.streamerSlug || payload.expiresAt <= now) return null;
+    return payload;
   } catch {
     return null;
   }
 }
 
-function cookieOptions(req) {
-  const forwardedProto = String(req?.headers?.['x-forwarded-proto'] || '').split(',')[0].trim();
-  const secure = forwardedProto === 'https' || req?.secure || process.env.NODE_ENV === 'production';
+function cookieOptions() {
+  const secure = process.env.NODE_ENV === 'production' || Boolean(process.env.RENDER_EXTERNAL_URL);
   return {
     httpOnly: true,
     secure,
     sameSite: 'lax',
     path: '/',
-    maxAge: MAX_AGE_MS
+    maxAge: MAX_AGE_SECONDS * 1000,
   };
 }
 
-function setSessionCookie(req, res, streamer) {
-  res.cookie(COOKIE_NAME, createSession(streamer), cookieOptions(req));
+function setSessionCookie(res, payload) {
+  res.cookie(COOKIE_NAME, createSession(payload), cookieOptions());
 }
 
-function clearSessionCookie(req, res) {
-  const options = cookieOptions(req);
-  delete options.maxAge;
-  res.clearCookie(COOKIE_NAME, options);
+function clearSessionCookie(res) {
+  res.clearCookie(COOKIE_NAME, cookieOptions());
 }
 
 module.exports = {
   COOKIE_NAME,
   createSession,
-  readSession,
+  verifySession,
   setSessionCookie,
-  clearSessionCookie
+  clearSessionCookie,
 };

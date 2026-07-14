@@ -90,7 +90,14 @@ async function ensureRequestedStreamer(db, slug) {
 
 async function attachTenant(db, req, res, next) {
   try {
-    const streamer = req.authStreamer || await ensureRequestedStreamer(db, readRequestedSlug(req));
+    let streamer = null;
+    if (req.authSession?.streamerId && typeof db.getStreamerById === 'function') {
+      streamer = await db.getStreamerById(req.authSession.streamerId).catch(() => null);
+    }
+    if (!streamer) {
+      const slug = readRequestedSlug(req);
+      streamer = await ensureRequestedStreamer(db, slug);
+    }
     req.streamer = streamer;
     req.streamerSlug = streamer.slug;
   } catch (e) {
