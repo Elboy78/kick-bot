@@ -2065,18 +2065,32 @@ app.get('/classement', (req,res) => res.sendFile(path.join(__dirname,'public','c
 
 
 
-function setStreamerSessionCookie(res, slug) {
-  const clean = tenant.normalizeSlug(slug);
-  const secure = process.env.NODE_ENV === 'production' || process.env.RENDER || process.env.RENDER_EXTERNAL_URL;
-  res.setHeader('Set-Cookie', [
-    `kb_streamer=${encodeURIComponent(clean)}; Path=/; Max-Age=${60*60*24*365}; SameSite=Lax${secure ? '; Secure' : ''}`
-  ]);
-}
-function clearStreamerCookie(res) {
-  const secure = process.env.NODE_ENV === 'production' || process.env.RENDER || process.env.RENDER_EXTERNAL_URL;
-  res.setHeader('Set-Cookie', `kb_streamer=; Path=/; Max-Age=0; SameSite=Lax${secure ? '; Secure' : ''}`);
+function getLegacyStreamerCookieOptions() {
+  const secure =
+    process.env.NODE_ENV === 'production' ||
+    Boolean(process.env.RENDER) ||
+    Boolean(process.env.RENDER_EXTERNAL_URL);
+
+  return {
+    path: '/',
+    sameSite: 'lax',
+    secure,
+    httpOnly: true,
+  };
 }
 
+function setStreamerSessionCookie(res, slug) {
+  const clean = tenant.normalizeSlug(slug);
+
+  res.cookie('kb_streamer', clean, {
+    ...getLegacyStreamerCookieOptions(),
+    maxAge: 60 * 60 * 24 * 365 * 1000,
+  });
+}
+
+function clearStreamerCookie(res) {
+  res.clearCookie('kb_streamer', getLegacyStreamerCookieOptions());
+}
 
 // Connexion du compte BOT unique (ex: BOT7UP). Ce compte est utilisé uniquement
 // pour écrire dans les chats, jamais pour identifier le panel streamer.
