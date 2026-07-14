@@ -25,7 +25,7 @@ const io     = new Server(server, { cors: { origin: '*' } });
 app.use(cors());
 app.use(express.json({ limit: '8mb' }));
 app.use(express.static(path.join(__dirname, 'public'), { index: false }));
-app.use(loadSession);
+app.use(loadSession(db));
 // Les pages/API publiques de classement doivent uniquement consulter un tenant
 // existant. Un slug inventé ne doit jamais créer automatiquement un streamer.
 app.use((req, res, next) => {
