@@ -2315,11 +2315,47 @@ app.get('/auth/logout', (req, res) => {
 });
 
 app.get('/api/oauth/status', async (req, res) => {
+  res.setHeader('Cache-Control', 'no-store');
+
+  const configured = kickOAuth.isConfigured();
+
   try {
-    const tm = createTenantManager({ db, io, req });
-    const connected = await kickOAuth.isConnected(tm.streamerId);
-    res.json({ configured: kickOAuth.isConfigured(), connected, streamer: tm.info() });
-  } catch (e) { res.json({ configured: kickOAuth.isConfigured(), connected: false }); }
+    // Aucun compte ne doit être déduit depuis fack7up, l’URL
+    // ou l’ancien cookie lorsqu’il n’existe pas de session Kick valide.
+    if (!req.authSession?.streamerId || !req.streamer) {
+      return res.json({
+        configured,
+        authenticated: false,
+        connected: false,
+        streamer: null,
+      });
+    }
+
+    const connected = await kickOAuth.isConnected(req.streamer.id);
+
+    return res.json({
+      configured,
+      authenticated: true,
+      connected: Boolean(connected),
+      streamer: {
+        id: req.streamer.id,
+        slug: req.streamer.slug,
+        displayName:
+          req.streamer.display_name ||
+          req.streamer.displayName ||
+          req.streamer.slug,
+      },
+    });
+  } catch (error) {
+    console.error('[OAUTH STATUS] Erreur :', error);
+
+    return res.json({
+      configured,
+      authenticated: false,
+      connected: false,
+      streamer: null,
+    });
+  }
 });
 
 app.post('/api/admin/oauth/disconnect', requireAuth, requireTenant, async (req, res) => {

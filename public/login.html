@@ -40,18 +40,33 @@
           showError('Ajoute KICK_CLIENT_ID, KICK_CLIENT_SECRET et KICK_REDIRECT_URI dans les variables Render.');
           return;
         }
-        if(j.connected && st.slug){
-          $('status').textContent = 'Connecté en tant que ' + (st.displayName || st.slug) + '.';
-          $('dashBtn').style.display = 'flex';
-          $('dashBtn').href = '/s/' + encodeURIComponent(st.slug) + '/dashboard';
-          // Redirection douce, mais laisse le bouton visible si tu veux cliquer toi-même.
-          setTimeout(() => { if(!location.hash.includes('stay')) location.href = $('dashBtn').href; }, 900);
-        } else {
-          $('status').textContent = 'Prêt à connecter ton compte Kick.';
-        }
+      if (j.authenticated && j.connected && st.slug) {
+  $('status').textContent =
+    'Connecté en tant que ' + (st.displayName || st.slug) + '.';
+
+  $('dashBtn').style.display = 'flex';
+  $('dashBtn').href =
+    '/s/' + encodeURIComponent(st.slug) + '/dashboard';
+} else {
+  $('status').textContent = 'Prêt à connecter ton compte Kick.';
+}
       }catch(e){ $('status').textContent='Impossible de vérifier la session.'; }
     }
-    $('loginBtn').addEventListener('click', () => { $('card').classList.add('loading'); $('status').textContent='Redirection vers Kick...'; });
+   $('loginBtn').addEventListener('click', (event) => {
+  const button = event.currentTarget;
+
+  if (button.dataset.loading === 'true') {
+    event.preventDefault();
+    return;
+  }
+
+  button.dataset.loading = 'true';
+  button.style.pointerEvents = 'none';
+  button.setAttribute('aria-disabled', 'true');
+
+  $('card').classList.add('loading');
+  $('status').textContent = 'Redirection vers Kick...';
+});
     boot();
   </script>
 </body>
