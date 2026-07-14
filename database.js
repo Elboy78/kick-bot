@@ -617,28 +617,12 @@ async function clearAllPoints() {
 // ─── Commandes ────────────────────────────────────────────────────────────────
 
 
-async function getCustomCommand(trigger) {
+async function getCustomCommands() {
   const sid = scopedStreamerId();
-  const raw = String(trigger || '').trim().toLowerCase();
-  const storageTrigger = `${sid}:${raw}`;
-
-  return get(
-    `SELECT *
-     FROM custom_commands
-     WHERE COALESCE(streamer_id, 1) = ?
-       AND enabled = 1
-       AND (
-         trigger = ?
-         OR trigger = ?
-         OR display_trigger = ?
-       )
-     ORDER BY
-       CASE WHEN trigger = ? THEN 0 ELSE 1 END,
-       id DESC
-     LIMIT 1`,
-    [sid, raw, storageTrigger, raw, storageTrigger]
-  );
+  const rows = await all(`SELECT * FROM custom_commands WHERE COALESCE(streamer_id, 1) = ? ORDER BY trigger ASC`, [sid]);
+  return rows.map(r => ({ ...r, trigger: r.display_trigger || String(r.trigger || '').replace(new RegExp(`^${sid}:`), '') }));
 }
+
 async function getCustomCommand(trigger) {
   const sid = scopedStreamerId();
   const raw = String(trigger || '').toLowerCase();
@@ -647,78 +631,11 @@ async function getCustomCommand(trigger) {
 
 async function setCustomCommand(trigger, response, mentionUser = 0) {
   const sid = scopedStreamerId();
-  const displayTrigger = String(trigger || '').trim().toLowerCase();
+  const displayTrigger = String(trigger || '').toLowerCase();
   const storageTrigger = `${sid}:${displayTrigger}`;
-
-  if (!displayTrigger) {
-    throw new Error('Commande vide');
-  }
-
-  // Recherche aussi bien les anciennes commandes (!topw)
-  // que le nouveau format multi-streamer (1:!topw).
-  const existing = await get(
-    `SELECT id
-     FROM custom_commands
-     WHERE COALESCE(streamer_id, 1) = ?
-       AND (
-         trigger = ?
-         OR trigger = ?
-         OR display_trigger = ?
-       )
-     ORDER BY
-       CASE WHEN display_trigger = ? THEN 0 ELSE 1 END,
-       id ASC
-     LIMIT 1`,
-    [sid, displayTrigger, storageTrigger, displayTrigger, displayTrigger]
-  );
-
-  if (existing?.id) {
-    await run(
-      `UPDATE custom_commands
-       SET trigger = ?,
-           display_trigger = ?,
-           response = ?,
-           mention_user = ?,
-           streamer_id = ?
-       WHERE id = ?`,
-      [
-        storageTrigger,
-        displayTrigger,
-        response,
-        mentionUser ? 1 : 0,
-        sid,
-        existing.id,
-      ]
-    );
-
-    // Supprime d’éventuels doublons historiques pour cette commande.
-    await run(
-      `DELETE FROM custom_commands
-       WHERE COALESCE(streamer_id, 1) = ?
-         AND id <> ?
-         AND (
-           trigger = ?
-           OR trigger = ?
-           OR display_trigger = ?
-         )`,
-      [sid, existing.id, displayTrigger, storageTrigger, displayTrigger]
-    );
-
-    return;
-  }
-
-  await run(
-    `INSERT INTO custom_commands
-      (trigger, display_trigger, response, mention_user, streamer_id)
-     VALUES (?, ?, ?, ?, ?)`,
-    [
-      storageTrigger,
-      displayTrigger,
-      response,
-      mentionUser ? 1 : 0,
-      sid,
-    ]
-  );
+  await run(`INSERT INTO custom_commands (trigger, display_trigger, response, mention_user, streamer_id) VALUES (?, ?, ?, ?, ?)
+             ON CONFLICT(trigger) DO UPDATE SET response = ?, mention_user = ?, display_trigger = ?, streamer_id = ?`,
+    [storageTrigger, displayTrigger, response, mentionUser ? 1 : 0, sid, response, mentionUser ? 1 : 0, displayTrigger, sid]);
 }
 
 async function deleteCustomCommand(trigger) {
