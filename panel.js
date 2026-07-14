@@ -11,6 +11,10 @@ const shared = require('./shared');
 const tenant = require('./tenant');
 const { createTenantManager } = require('./tenant-manager');
 const widgetEngine = require('./widget-engine');
+const createLoadSession = require('./middlewares/loadSession');
+const requireAuth = require('./middlewares/requireAuth');
+const requireTenant = require('./middlewares/requireTenant');
+const { setSessionCookie, clearSessionCookie } = require('./core/auth/session');
 
 const app    = express();
 const PORT   = parseInt(process.env.PANEL_PORT || '3000');
@@ -20,9 +24,8 @@ const io     = new Server(server, { cors: { origin: '*' } });
 app.use(cors());
 app.use(express.json({ limit: '8mb' }));
 app.use(express.static(path.join(__dirname, 'public'), { index: false }));
+app.use(createLoadSession(db));
 app.use((req, res, next) => tenant.attachTenant(db, req, res, next));
-
-function requireAuth(req, res, next) { next(); }
 
 // Init DB avant de démarrer
 let dbReady = false;
@@ -39,12 +42,8 @@ db.ensureInit().then(async () => {
   }
   dbReady = true;
   console.log('[PANEL] DB prête ✓');
-  // Servir les fichiers statiques seulement après init
-  app.use(express.static(path.join(__dirname, 'public'), { index: false }));
 }).catch(err => {
   console.error('[PANEL] Erreur init DB:', err);
-  // Démarrer quand même sans DB
-  app.use(express.static(path.join(__dirname, 'public'), { index: false }));
 });
 
 // Middleware : attendre que la DB soit prête
@@ -60,7 +59,10 @@ app.get('/login.html', (req, res) => res.sendFile(path.join(__dirname, 'public',
 
 
 // ── V2 Multi-streamer : socle sans casser la V1 ──────────────────────────────
-app.get('/api/v2/streamers/current', waitDB, async (req, res) => {
+app.use('/api/admin', requireAuth);
+app.use('/api/v2/admin', requireAuth);
+
+app.get('/api/v2/streamers/current', requireAuth, waitDB, async (req, res) => {
   try {
     const streamer = req.streamer || await db.ensureDefaultStreamer(tenant.getDefaultStreamerSeed());
     const connected = await kickOAuth.isConnected(streamer.id).catch(() => false);
@@ -68,7 +70,7 @@ app.get('/api/v2/streamers/current', waitDB, async (req, res) => {
   } catch(e) { res.status(500).json({ error: e.message }); }
 });
 
-app.get('/api/v2/streamers', waitDB, async (req, res) => {
+app.get('/api/v2/streamers', requireAuth, waitDB, async (req, res) => {
   try { res.json({ data: await db.listStreamers() }); }
   catch(e) { res.status(500).json({ error: e.message }); }
 });
@@ -88,7 +90,7 @@ app.post('/api/v2/admin/streamers', requireAuth, waitDB, async (req, res) => {
 });
 
 
-app.get('/api/v2/widgets', waitDB, async (req, res) => {
+app.get('/api/v2/widgets', requireAuth, waitDB, async (req, res) => {
   try {
     const protocol = req.headers['x-forwarded-proto'] || req.protocol || 'https';
     const host = req.get('host');
@@ -119,7 +121,7 @@ app.get('/api/v2/widgets', waitDB, async (req, res) => {
   }
 });
 
-app.get('/api/v2/obs-links', waitDB, async (req, res) => {
+app.get('/api/v2/obs-links', requireAuth, waitDB, async (req, res) => {
   try {
     const protocol = req.headers['x-forwarded-proto'] || req.protocol || 'https';
     const host = req.get('host');
@@ -211,8 +213,6 @@ function installTenantScopedSettings() {
 }
 installTenantScopedSettings();
 
-app.use((req, res, next) => tenant.attachTenant(db, req, res, next));
-
 // V2 overlays privés : quand un widget OBS est ouvert via /o/<token>/<widget>.html,
 // le navigateur n'a pas forcément un cookie fiable dans OBS. Les APIs du widget
 // peuvent donc envoyer ?overlayToken=<token>. On résout alors le vrai streamer ici,
@@ -270,23 +270,23 @@ app.get('/o/:token/:file', waitDB, async (req, res) => {
   }
 });
 app.get('/s/:streamer/classement', setStreamerCookieMiddleware, (req, res) => res.sendFile(path.join(__dirname, 'public', 'classement.html')));
-app.get('/s/:streamer/dashboard', setStreamerCookieMiddleware, (req, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));
-app.get('/s/:streamer/dashboard.html', setStreamerCookieMiddleware, (req, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));
-app.get('/s/:streamer/panel', setStreamerCookieMiddleware, (req, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));
-app.get('/s/:streamer/panel.html', setStreamerCookieMiddleware, (req, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));
-app.get('/s/:streamer/overlays', setStreamerCookieMiddleware, (req, res) => res.sendFile(path.join(__dirname, 'public', 'overlays.html')));
-app.get('/s/:streamer/overlays.html', setStreamerCookieMiddleware, (req, res) => res.sendFile(path.join(__dirname, 'public', 'overlays.html')));
-app.get('/s/:streamer/account', setStreamerCookieMiddleware, (req, res) => res.sendFile(path.join(__dirname, 'public', 'account.html')));
-app.get('/s/:streamer/account.html', setStreamerCookieMiddleware, (req, res) => res.sendFile(path.join(__dirname, 'public', 'account.html')));
+app.get('/s/:streamer/dashboard', requireAuth, requireTenant, (req, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));
+app.get('/s/:streamer/dashboard.html', requireAuth, requireTenant, (req, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));
+app.get('/s/:streamer/panel', requireAuth, requireTenant, (req, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));
+app.get('/s/:streamer/panel.html', requireAuth, requireTenant, (req, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));
+app.get('/s/:streamer/overlays', requireAuth, requireTenant, (req, res) => res.sendFile(path.join(__dirname, 'public', 'overlays.html')));
+app.get('/s/:streamer/overlays.html', requireAuth, requireTenant, (req, res) => res.sendFile(path.join(__dirname, 'public', 'overlays.html')));
+app.get('/s/:streamer/account', requireAuth, requireTenant, (req, res) => res.sendFile(path.join(__dirname, 'public', 'account.html')));
+app.get('/s/:streamer/account.html', requireAuth, requireTenant, (req, res) => res.sendFile(path.join(__dirname, 'public', 'account.html')));
 
 
-app.get('/api/v2/tenant/debug', async (req, res) => {
+app.get('/api/v2/tenant/debug', requireAuth, async (req, res) => {
   try {
     const tm = createTenantManager({ db, io, req });
     res.json({ data: { ...tm.info(), overlayLinks: tm.overlayLinks(), sampleScopedKey: tm.scopedKey('songrequest_queue'), sampleSongRequestQueue: await tm.getJson('songrequest_queue', []) } });
   } catch(e) { res.status(500).json({ error: e.message }); }
 });
-app.get('/api/v2/tenant/current', async (req, res) => {
+app.get('/api/v2/tenant/current', requireAuth, async (req, res) => {
   try { const tm = createTenantManager({ db, io, req }); res.json({ data: tm.info() }); }
   catch(e) { res.status(500).json({ error: e.message }); }
 });
@@ -294,7 +294,7 @@ app.get('/api/v2/tenant/current', async (req, res) => {
 // Reçoit les métadonnées de chaîne résolues par le navigateur du streamer.
 // Render peut recevoir 403 sur kick.com/api/v2/channels/:slug, alors que le navigateur du streamer y a accès.
 // Une fois chatroom_id enregistré, BotManager peut écouter la chaîne sans refaire de scraping.
-app.post('/api/v2/streamer/chatroom', waitDB, async (req, res) => {
+app.post('/api/v2/streamer/chatroom', requireAuth, waitDB, async (req, res) => {
   try {
     const tm = createTenantManager({ db, io, req });
     const streamer = await db.getStreamerById(tm.streamerId);
@@ -2141,17 +2141,27 @@ app.get('/auth/callback', async (req, res) => {
       await db.saveOAuthToken('kick', token.accessToken, token.refreshToken, token.expiresAt);
     }
 
+    setSessionCookie(req, res, streamer);
     setStreamerSessionCookie(res, slug);
-    res.cookie('kb_streamer', slug, { path: '/', sameSite: 'Lax', maxAge: 1000 * 60 * 60 * 24 * 365 });
     console.log(`[OAUTH CALLBACK V2] ✅ Streamer connecté: ${slug} (#${streamer.id})`);
-    res.redirect(`/s/${slug}/dashboard?streamer=${encodeURIComponent(slug)}`);
+    const requestedReturnTo = String(token.meta?.returnTo || '');
+    const safeReturnTo = requestedReturnTo.startsWith('/') && !requestedReturnTo.startsWith('//')
+      ? requestedReturnTo
+      : `/s/${slug}/dashboard`;
+    res.redirect(safeReturnTo);
   } catch (e) {
     console.error('[OAUTH CALLBACK V2] ❌ Exception:', e.response?.data || e.message, e.stack);
     res.status(500).send(`<pre style="color:#ff5c7a;background:#111;padding:20px;font-family:monospace;white-space:pre-wrap">Erreur OAuth V2: ${e.message}\n\n${e.stack || ''}</pre>`);
   }
 });
 
-app.get('/api/oauth/status', async (req, res) => {
+app.get('/auth/logout', (req, res) => {
+  clearSessionCookie(req, res);
+  clearStreamerCookie(res);
+  res.redirect('/login');
+});
+
+app.get('/api/oauth/status', requireAuth, async (req, res) => {
   try {
     const tm = createTenantManager({ db, io, req });
     const connected = await kickOAuth.isConnected(tm.streamerId);
@@ -2159,16 +2169,17 @@ app.get('/api/oauth/status', async (req, res) => {
   } catch (e) { res.json({ configured: kickOAuth.isConfigured(), connected: false }); }
 });
 
-app.post('/api/admin/oauth/disconnect', async (req, res) => {
+app.post('/api/admin/oauth/disconnect', requireAuth, async (req, res) => {
   try {
     const tm = createTenantManager({ db, io, req });
     await kickOAuth.disconnect(tm.streamerId);
+    clearSessionCookie(req, res);
     clearStreamerCookie(res);
     res.json({ success: true });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-app.get('/api/v2/dashboard-summary', async (req, res) => {
+app.get('/api/v2/dashboard-summary', requireAuth, async (req, res) => {
   try {
     const tm = createTenantManager({ db, io, req });
     const sr = await getSongRequestState();
@@ -2186,7 +2197,7 @@ app.get('/api/v2/dashboard-summary', async (req, res) => {
   } catch(e) { res.status(500).json({ error: e.message }); }
 });
 
-app.get('/api/v2/account', async (req, res) => {
+app.get('/api/v2/account', requireAuth, async (req, res) => {
   try {
     const tm = createTenantManager({ db, io, req });
     const st = req.streamer || {};
