@@ -2325,27 +2325,48 @@ app.get('/auth/logout', (req, res) => {
 
 app.get('/api/oauth/status', async (req, res) => {
   res.setHeader('Cache-Control', 'no-store');
+
   const configured = kickOAuth.isConfigured();
 
   try {
     if (!req.authSession?.streamerId || !req.authStreamer) {
-      return res.json({ configured, authenticated: false, connected: false, streamer: null });
+      return res.json({
+        configured,
+        authenticated: false,
+        connected: false,
+        streamer: null
+      });
     }
 
-    const connected = await kickOAuth.isConnected(req.authStreamer.id);
+    const streamer = req.authStreamer;
+
+    const connected = await kickOAuth
+      .isConnected(streamer.id)
+      .catch(() => false);
+
     return res.json({
       configured,
       authenticated: true,
       connected: Boolean(connected),
       streamer: {
-        id: req.authStreamer.id,
-        slug: req.authStreamer.slug,
-        displayName: req.authStreamer.display_name || req.authStreamer.displayName || req.authStreamer.slug
+        id: streamer.id,
+        slug: streamer.slug,
+        displayName:
+          streamer.display_name ||
+          streamer.displayName ||
+          streamer.kick_username ||
+          streamer.slug
       }
     });
   } catch (error) {
-    console.error('[OAUTH STATUS] Erreur :', error.message);
-    return res.json({ configured, authenticated: false, connected: false, streamer: null });
+    console.error('[OAUTH STATUS]', error);
+
+    return res.json({
+      configured,
+      authenticated: false,
+      connected: false,
+      streamer: null
+    });
   }
 });
 
