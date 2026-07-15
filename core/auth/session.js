@@ -1,6 +1,11 @@
 const crypto = require('crypto');
 
-const COOKIE_NAME = 'elbot_session';
+const COOKIE_NAME = 'elbot_session_final';
+const OLD_COOKIE_NAMES = [
+  'elbot_session',
+  'elbot_session_v2',
+  'elbot_session_v3'
+];
 const ADMIN_TARGET_COOKIE_NAME = 'elbot_admin_target';
 const DEFAULT_SESSION_DAYS = 30;
 const MIN_SESSION_DAYS = 1;
@@ -98,8 +103,17 @@ function readAdminTarget(value) {
 }
 
 function cookieOptions(req, maxAge = sessionMaxAgeMs()) {
-  const forwardedProto = String(req?.headers?.['x-forwarded-proto'] || '').split(',')[0].trim();
-  const secure = forwardedProto === 'https' || req?.secure || process.env.NODE_ENV === 'production';
+  const forwardedProto = String(
+    req?.headers?.['x-forwarded-proto'] || ''
+  )
+    .split(',')[0]
+    .trim();
+
+  const secure =
+    forwardedProto === 'https' ||
+    req?.secure ||
+    process.env.NODE_ENV === 'production';
+
   return {
     httpOnly: true,
     secure,
@@ -109,15 +123,76 @@ function cookieOptions(req, maxAge = sessionMaxAgeMs()) {
   };
 }
 
+function clearCookieVariants(req, res, name) {
+  const host = String(
+    req.hostname || req.headers.host || ''
+  )
+    .split(':')[0]
+    .trim()
+    .toLowerCase();
+
+  const variants = [
+    {
+      path: '/',
+      httpOnly: true,
+      secure: true,
+      sameSite: 'lax'
+    },
+    {
+      path: '/',
+      httpOnly: true,
+      secure: false,
+      sameSite: 'lax'
+    }
+  ];
+
+  if (host) {
+    variants.push({
+      path: '/',
+      domain: host,
+      httpOnly: true,
+      secure: true,
+      sameSite: 'lax'
+    });
+  }
+
+  if (host === 'test.elbot.fr' || host === 'panel.elbot.fr') {
+    variants.push({
+      path: '/',
+      domain: '.elbot.fr',
+      httpOnly: true,
+      secure: true,
+      sameSite: 'lax'
+    });
+  }
+
+  for (const options of variants) {
+    res.clearCookie(name, options);
+  }
+}
+
 function setSessionCookie(req, res, streamer) {
-  res.cookie(COOKIE_NAME, createSession(streamer), cookieOptions(req));
+  for (const oldName of OLD_COOKIE_NAMES) {
+    clearCookieVariants(req, res, oldName);
+  }
+
+  res.cookie(
+    COOKIE_NAME,
+    createSession(streamer),
+    cookieOptions(req)
+  );
 }
 
 function clearSessionCookie(req, res) {
-  const options = cookieOptions(req);
-  delete options.maxAge;
-  res.clearCookie(COOKIE_NAME, options);
-  res.clearCookie(ADMIN_TARGET_COOKIE_NAME, options);
+  clearCookieVariants(req, res, COOKIE_NAME);
+
+  for (const oldName of OLD_COOKIE_NAMES) {
+    clearCookieVariants(req, res, oldName);
+  }
+
+  clearCookieVariants(req, res, ADMIN_TARGET_COOKIE_NAME);
+  clearCookieVariants(req, res, 'kb_streamer');
+}
 }
 
 function setAdminTargetCookie(req, res, target) {
