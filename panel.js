@@ -1561,103 +1561,34 @@ app.post('/api/admin/widgets/songrequest/delete', requireAuth, async (req, res) 
   try {
     const tm = getSongRequestTM(req);
     const state = await getSongRequestState(tm);
-    const id = String(req.body.id || '');
-    const wasCurrent = String(state.queue[0]?.id || '') === id;
-    const queue = state.queue.filter(item => String(item.id) !== id);
-
-    await saveSongRequestQueue(queue, tm);
-
-    if (wasCurrent) {
-      setSongRequestDesiredStatus(tm, queue[0] ? 'playing' : 'stopped');
-      await saveSongRequestPlayerState({
-        itemId: queue[0]?.id || '',
-        status: queue[0] ? 'playing' : 'stopped',
-        currentTime: 0,
-        duration: queue[0]?.duration || 0
-      }, true, tm);
-      await issueSongRequestControl('load-current', {}, tm);
-    }
-
-    return res.json({ success:true, ...(await getSongRequestState(tm)) });
-  } catch(e) {
-    return res.status(500).json({ error:e.message });
-  }
+    const id = req.body.id;
+    const wasCurrent = state.queue[0]?.id === id;
+    await saveSongRequestQueue(state.queue.filter(x => x.id !== id), tm);
+    if (wasCurrent) await issueSongRequestControl('load-current', {}, tm);
+    res.json({ success:true, ...(await getSongRequestState(tm)) });
+  } catch(e) { res.status(500).json({ error:e.message }); }
 });
 
-
-app.post('/api/admin/widgets/songrequest/reorder', requireAuth, async (req, res) => {
-  try {
-    const tm = getSongRequestTM(req);
-    const state = await getSongRequestState(tm);
-    const orderedIds = Array.isArray(req.body.orderedIds) ? req.body.orderedIds.map(String) : [];
-    if (!orderedIds.length || orderedIds.length !== state.queue.length) {
-      return res.status(400).json({ error:'Ordre de file invalide' });
-    }
-
-    const byId = new Map(state.queue.map(item => [String(item.id), item]));
-    const reordered = orderedIds.map(id => byId.get(id)).filter(Boolean);
-    if (reordered.length !== state.queue.length) {
-      return res.status(400).json({ error:'Une musique de la file est introuvable' });
-    }
-
-    const previousCurrentId = state.queue[0]?.id || '';
-    await saveSongRequestQueue(reordered, tm);
-
-    if ((reordered[0]?.id || '') !== previousCurrentId) {
-      setSongRequestDesiredStatus(tm, reordered[0] ? 'playing' : 'stopped');
-      await saveSongRequestPlayerState({
-        itemId: reordered[0]?.id || '',
-        status: reordered[0] ? 'playing' : 'stopped',
-        currentTime: 0,
-        duration: reordered[0]?.duration || 0
-      }, true, tm);
-      await issueSongRequestControl('load-current', {}, tm);
-    }
-
-    return res.json({ success:true, ...(await getSongRequestState(tm)) });
-  } catch(e) {
-    return res.status(500).json({ error:e.message });
-  }
-});
 
 app.post('/api/admin/widgets/songrequest/move', requireAuth, async (req, res) => {
   try {
     const tm = getSongRequestTM(req);
     const state = await getSongRequestState(tm);
     const id = String(req.body.id || '');
-    const from = state.queue.findIndex(item => String(item.id) === id);
-    if (from < 0) return res.status(404).json({ error:'Musique introuvable' });
+    const direction = String(req.body.direction || '').toLowerCase();
+    const index = state.queue.findIndex(item => String(item.id) === id);
 
-    let to = Number.parseInt(req.body.toIndex, 10);
-    if (!Number.isFinite(to)) {
-      const direction = String(req.body.direction || '');
-      to = direction === 'up' ? from - 1 : direction === 'down' ? from + 1 : from;
-    }
-    to = Math.max(0, Math.min(state.queue.length - 1, to));
-    if (from === to) return res.json({ success:true, ...state });
+    if (index < 1) return res.status(400).json({ error:'Musique en attente introuvable' });
 
-    const queue = [...state.queue];
-    const [item] = queue.splice(from, 1);
-    queue.splice(to, 0, item);
-
-    const previousCurrentId = state.queue[0]?.id || '';
-    await saveSongRequestQueue(queue, tm);
-
-    if ((queue[0]?.id || '') !== previousCurrentId) {
-      setSongRequestDesiredStatus(tm, queue[0] ? 'playing' : 'stopped');
-      await saveSongRequestPlayerState({
-        itemId: queue[0]?.id || '',
-        status: queue[0] ? 'playing' : 'stopped',
-        currentTime: 0,
-        duration: queue[0]?.duration || 0
-      }, true, tm);
-      await issueSongRequestControl('load-current', {}, tm);
+    const target = direction === 'up' ? index - 1 : direction === 'down' ? index + 1 : -1;
+    if (target < 1 || target >= state.queue.length) {
+      return res.json({ success:true, ...(await getSongRequestState(tm)) });
     }
 
+    [state.queue[index], state.queue[target]] = [state.queue[target], state.queue[index]];
+    await saveSongRequestQueue(state.queue, tm);
     return res.json({ success:true, ...(await getSongRequestState(tm)) });
-  } catch(e) {
-    return res.status(500).json({ error:e.message });
-  }
+  } catch(e) { res.status(500).json({ error:e.message }); }
 });
 
 app.post('/api/admin/widgets/songrequest/play-item', requireAuth, async (req, res) => {
@@ -1668,28 +1599,26 @@ app.post('/api/admin/widgets/songrequest/play-item', requireAuth, async (req, re
     const index = state.queue.findIndex(item => String(item.id) === id);
     if (index < 0) return res.status(404).json({ error:'Musique introuvable' });
 
-    const queue = [...state.queue];
-    const [item] = queue.splice(index, 1);
-    queue.unshift(item);
+    if (index > 0) {
+      const [selected] = state.queue.splice(index, 1);
+      state.queue.unshift(selected);
+      await saveSongRequestQueue(state.queue, tm);
+    }
 
-    await saveSongRequestQueue(queue, tm);
-    setSongRequestDesiredStatus(tm, 'playing');
+    const current = state.queue[0] || null;
+    setSongRequestDesiredStatus(tm, current ? 'playing' : 'stopped');
     await saveSongRequestPlayerState({
-      itemId: item.id,
-      status: 'playing',
+      itemId: current?.id || '',
+      status: current ? 'playing' : 'stopped',
       currentTime: 0,
-      duration: item.duration || 0
+      duration: current?.duration || 0
     }, true, tm);
-    await issueSongRequestControl('load-current', {}, tm);
-    await issueSongRequestControl('play', {}, tm);
-
+    await issueSongRequestControl('load-current', { autoplay:true }, tm);
     return res.json({ success:true, ...(await getSongRequestState(tm)) });
-  } catch(e) {
-    return res.status(500).json({ error:e.message });
-  }
+  } catch(e) { res.status(500).json({ error:e.message }); }
 });
 
-app.post('/api/admin/widgets/songrequest/edit', requireAuth, async (req, res) => {
+app.post('/api/admin/widgets/songrequest/update-item', requireAuth, async (req, res) => {
   try {
     const tm = getSongRequestTM(req);
     const state = await getSongRequestState(tm);
@@ -1697,20 +1626,12 @@ app.post('/api/admin/widgets/songrequest/edit', requireAuth, async (req, res) =>
     const item = state.queue.find(entry => String(entry.id) === id);
     if (!item) return res.status(404).json({ error:'Musique introuvable' });
 
-    if (typeof req.body.title === 'string') {
-      const title = req.body.title.trim().slice(0, 160);
-      if (title) item.title = title;
-    }
-    if (typeof req.body.username === 'string') {
-      const username = req.body.username.trim().slice(0, 60);
-      if (username) item.username = username;
-    }
+    if (typeof req.body.title === 'string') item.title = req.body.title.trim().slice(0, 160) || item.title;
+    if (typeof req.body.username === 'string') item.username = req.body.username.trim().slice(0, 60) || 'Anonyme';
 
     await saveSongRequestQueue(state.queue, tm);
     return res.json({ success:true, ...(await getSongRequestState(tm)) });
-  } catch(e) {
-    return res.status(500).json({ error:e.message });
-  }
+  } catch(e) { res.status(500).json({ error:e.message }); }
 });
 
 app.post('/api/widgets/songrequest/next', async (req, res) => {

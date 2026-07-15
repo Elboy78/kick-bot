@@ -1078,7 +1078,7 @@ Option 3" rows="4"></textarea><div style="display:flex;gap:6px;margin-top:10px">
             <div class="sr-song-title" id="sr-now-title">Aucune musique en cours</div>
             <div class="sr-song-meta" id="sr-now-meta">Le chat peut demander une musique avec !sr</div>
             <div class="sr-progress-row">
-              <input id="sr-seek" class="sr-smooth-range" type="range" min="0" max="0" value="0" step="0.1" oninput="previewSongRequestSeek(this.value)" onchange="seekSongRequest(this.value)">
+              <input id="sr-seek" class="sr-smooth-range" type="range" min="0" max="0" value="0" step="0.01" disabled oninput="previewSongRequestSeek(this.value)" onchange="seekSongRequest(this.value)">
               <div class="sr-times"><span id="sr-current-time">0:00</span><span id="sr-duration-time">0:00</span></div>
             </div>
           </div>
@@ -1086,7 +1086,7 @@ Option 3" rows="4"></textarea><div style="display:flex;gap:6px;margin-top:10px">
         <div class="sr-controls">
           <button class="sr-round-btn primary" id="sr-toggle-btn" onclick="toggleSongRequest()" title="Lecture / Pause">▶</button>
           <button class="sr-round-btn" onclick="nextSongRequest()" title="Suivant">⏭</button>
-          <div class="sr-volume-box"><span>🔊</span><input id="sr-volume" class="sr-smooth-range" type="range" min="0" max="100" value="100" step="1" oninput="previewSongRequestVolume(this.value)" onchange="setSongRequestVolume(this.value)"><span id="sr-volume-label">100%</span></div>
+          <div class="sr-volume-box"><span>🔊</span><input id="sr-volume" class="sr-smooth-range" type="range" min="0" max="100" value="100" step="1" oninput="setSongRequestVolumeLive(this.value)" onchange="flushSongRequestVolume(true)"><span id="sr-volume-label">100%</span></div>
         </div>
       </div>
     </div>
@@ -4086,6 +4086,14 @@ try {
     // Comme ça, quand tu arrives dans Widget > Sub Goal, les chiffres sont déjà corrects.
     try { renderSubCounter(data); } catch(e) { console.warn('[SUBCOUNTER] render socket error', e); }
   });
+  chestSocket.on('songrequest-update', (data) => {
+    if (Array.isArray(data?.queue)) srLastQueue = data.queue;
+    if (!srLastQueue.length) srPlayer = Object.assign(srPlayer, { status:'stopped', currentTime:0, duration:0, itemId:'' });
+    if (isSongRequestVisible()) {
+      renderSongRequestQueue(srLastQueue);
+      renderSongRequestPlayer(srLastQueue, srPlayer);
+    }
+  });
 } catch(e) { console.warn('[CHESTS] socket indisponible', e); }
 
 async function newChestSeason() {
@@ -4588,124 +4596,101 @@ function copyDetectedToken() {
 }
 
 
-// ── Song Request V3 ──────────────────────────────────────────────────────────
+// ── Song Request ─────────────────────────────────────────────────────────────
 let srLastQueue = [];
 let srPlayer = { status:'stopped', currentTime:0, duration:0, volume:100, itemId:'' };
+let srProgressTimer = null;
+let srPollTimer = null;
 let srClockBaseTime = 0;
 let srClockBaseAt = performance.now();
 let srRafTimer = null;
-let srSocketBound = false;
-let srBusy = false;
+let srLastRenderedSecond = -1;
+let srLastRenderedProgress = -1;
+let srVolumeDebounce = null;
+let srPendingVolume = null;
+let srVolumeInFlight = false;
+function srSetVal(id, val) { const el = document.getElementById(id); if (el && document.activeElement !== el) el.value = val; }
+function srSetChecked(id, val) { const el = document.getElementById(id); if (el) el.checked = !!val; }
+function isSongRequestOpen() { const el = document.getElementById('widget-songrequest-settings'); return !!el && el.style.display !== 'none'; }
 
-function srSetVal(id, val) {
-  const el = document.getElementById(id);
-  if (el && document.activeElement !== el) el.value = val;
-}
-function srSetChecked(id, val) {
-  const el = document.getElementById(id);
-  if (el) el.checked = !!val;
-}
-function isSongRequestOpen() {
-  const el = document.getElementById('widget-songrequest-settings');
-  return !!el && el.style.display !== 'none';
-}
 function fmtSongTime(seconds) {
   seconds = Math.max(0, Math.floor(Number(seconds || 0)));
   const h = Math.floor(seconds / 3600);
   const m = Math.floor((seconds % 3600) / 60);
   const s = seconds % 60;
-  return h
-    ? `${h}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`
-    : `${m}:${String(s).padStart(2,'0')}`;
+  return h ? `${h}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}` : `${m}:${String(s).padStart(2,'0')}`;
 }
+
 function srSyncClockFromPlayer(player = srPlayer) {
   srClockBaseTime = Math.max(0, Number(player.currentTime || 0));
   srClockBaseAt = performance.now();
 }
 function srComputedTime() {
-  const duration = Math.max(
-    Number(srPlayer.duration || 0),
-    Number(srLastQueue[0]?.duration || 0),
-    0
-  );
-  let current = Number(srClockBaseTime || 0);
+  const duration = Math.max(Number(srPlayer.duration || 0), Number(srLastQueue[0]?.duration || 0), 0);
+  let t = Number(srClockBaseTime || 0);
   if (String(srPlayer.status || '').toLowerCase() === 'playing') {
-    current += (performance.now() - srClockBaseAt) / 1000;
+    t += (performance.now() - srClockBaseAt) / 1000;
   }
-  return duration
-    ? Math.min(Math.max(0, current), duration)
-    : Math.max(0, current);
+  return duration ? Math.min(Math.max(0, t), duration) : Math.max(0, t);
 }
 function srPaintRange(el, value, max) {
   if (!el) return;
-  const pct = max > 0
-    ? Math.max(0, Math.min(100, (Number(value || 0) / max) * 100))
-    : 0;
-  el.style.background =
-    `linear-gradient(90deg,#7dd3fc 0%,#a78bfa ${pct}%,rgba(255,255,255,.18) ${pct}%,rgba(255,255,255,.18) 100%)`;
+  const pct = max > 0 ? Math.max(0, Math.min(100, (Number(value || 0) / max) * 100)) : 0;
+  el.style.background = `linear-gradient(90deg,#7dd3fc 0%,#a78bfa ${pct}%,rgba(255,255,255,.18) ${pct}%,rgba(255,255,255,.18) 100%)`;
 }
-function srApplyState(data, options = {}) {
-  if (!data) return;
-
-  if (typeof data.enabled === 'boolean') srSetChecked('sr-enabled', data.enabled);
-  if (data.command !== undefined) srSetVal('sr-command', data.command || '!sr');
-  if (data.confirmMessage !== undefined) srSetVal('sr-confirm', data.confirmMessage || '');
-  if (data.chatConfirmEnabled !== undefined) srSetChecked('sr-chat-confirm', data.chatConfirmEnabled === true);
-  if (data.maxQueue !== undefined) srSetVal('sr-max', data.maxQueue || 30);
-
-  const previousItemId = String(srPlayer.itemId || '');
-  const previousStatus = String(srPlayer.status || '');
-  const localTime = srComputedTime();
-
-  if (Array.isArray(data.queue)) srLastQueue = data.queue;
-  if (data.player) srPlayer = { ...srPlayer, ...data.player };
-
-  if (!srLastQueue.length) {
-    srPlayer = { ...srPlayer, status:'stopped', currentTime:0, duration:0, itemId:'' };
-  } else if (!srPlayer.itemId || srPlayer.itemId !== srLastQueue[0].id) {
-    srPlayer = {
-      ...srPlayer,
-      itemId: srLastQueue[0].id,
-      currentTime: Number(srPlayer.itemId === srLastQueue[0].id ? srPlayer.currentTime : 0),
-      duration: Number(srLastQueue[0].duration || srPlayer.duration || 0)
-    };
+function srUpdateProgressOnly(force = false) {
+  const seek = document.getElementById('sr-seek');
+  const curTimeEl = document.getElementById('sr-current-time');
+  const durTimeEl = document.getElementById('sr-duration-time');
+  const duration = Math.max(Number(srPlayer.duration || 0), Number(srLastQueue[0]?.duration || 0), 0);
+  const current = srComputedTime();
+  const currentSecond = Math.floor(current);
+  const roundedProgress = Math.round(current * 20) / 20;
+  if (seek && (force || Math.abs(roundedProgress - srLastRenderedProgress) >= 0.05)) {
+    seek.max = duration || 0;
+    seek.value = duration ? Math.min(current, duration) : 0;
+    srPaintRange(seek, seek.value, seek.max);
+    srLastRenderedProgress = roundedProgress;
   }
-
-  const incomingTime = Number(data.player?.currentTime ?? srPlayer.currentTime ?? 0);
-  if (
-    options.forceClock ||
-    previousItemId !== String(srPlayer.itemId || '') ||
-    previousStatus !== String(srPlayer.status || '') ||
-    Math.abs(incomingTime - localTime) > 1.5
-  ) {
-    srSyncClockFromPlayer(srPlayer);
+  if (curTimeEl && (force || currentSecond !== srLastRenderedSecond)) {
+    curTimeEl.textContent = fmtSongTime(current);
+    srLastRenderedSecond = currentSecond;
   }
-
-  renderSongRequestPlayer();
-  renderSongRequestQueue(srLastQueue);
-  hydrateAllObsLinks();
+  if (durTimeEl && force) durTimeEl.textContent = duration ? fmtSongTime(duration) : '0:00';
 }
-async function srRequest(path, options = {}) {
-  const response = await fetch(API + path, options);
-  const data = await response.json().catch(() => ({}));
-  if (!response.ok) throw new Error(data.error || 'Erreur Song Request');
-  srApplyState(data, { forceClock:true });
-  return data;
+function srStartSmoothUiLoop(){
+  if (srRafTimer) cancelAnimationFrame(srRafTimer);
+  const loop = () => {
+    if (isSongRequestOpen()) srUpdateProgressOnly(false);
+    srRafTimer = requestAnimationFrame(loop);
+  };
+  srRafTimer = requestAnimationFrame(loop);
 }
 async function loadSongRequest(silent = false) {
   try {
-    const response = await fetch(
-      API + '/api/widgets/songrequest?ts=' + Date.now(),
-      { cache:'no-store' }
-    );
-    const data = await response.json();
-    srApplyState(data, { forceClock:true });
-  } catch (error) {
-    if (!silent) console.error('[SONGREQUEST]', error);
-  }
+    const r = await fetch(API + '/api/widgets/songrequest?ts=' + Date.now(), { cache: 'no-store' });
+    const d = await r.json();
+    srSetChecked('sr-enabled', !!d.enabled);
+    srSetVal('sr-command', d.command || '!sr');
+    srSetVal('sr-confirm', d.confirmMessage || '🎵 @{username}, ta musique a été ajoutée à la file !');
+    srSetChecked('sr-chat-confirm', d.chatConfirmEnabled === true);
+    srSetVal('sr-max', d.maxQueue || 30);
+    const vol = document.getElementById('sr-volume');
+    if (vol && d.player?.volume !== undefined) vol.value = d.player.volume;
+    hydrateAllObsLinks();
+    srLastQueue = Array.isArray(d.queue) ? d.queue : [];
+    const prevItemId = srPlayer.itemId || '';
+    const prevStatus = srPlayer.status || '';
+    srPlayer = Object.assign(srPlayer, d.player || {});
+    if (!srLastQueue.length) srPlayer = Object.assign(srPlayer, { status:'stopped', currentTime:0, duration:0, itemId:'' });
+    else if (srPlayer.itemId && srPlayer.itemId !== srLastQueue[0].id) srPlayer = Object.assign(srPlayer, { itemId: srLastQueue[0].id, currentTime:0, duration:srLastQueue[0].duration || 0 });
+    if (prevItemId !== srPlayer.itemId || prevStatus !== srPlayer.status || Math.abs(Number(d.player?.currentTime || 0) - srComputedTime()) > 1.25) srSyncClockFromPlayer(srPlayer);
+    renderSongRequestPlayer(srLastQueue, srPlayer);
+    renderSongRequestQueue(srLastQueue);
+  } catch(e) { if (!silent) console.error(e); }
 }
-function renderSongRequestPlayer() {
-  const cur = srLastQueue[0] || null;
+function renderSongRequestPlayer(queue = srLastQueue, player = srPlayer) {
+  const cur = queue[0] || null;
   const thumb = document.getElementById('sr-now-thumb');
   const title = document.getElementById('sr-now-title');
   const meta = document.getElementById('sr-now-meta');
@@ -4716,298 +4701,213 @@ function renderSongRequestPlayer() {
   const durTimeEl = document.getElementById('sr-duration-time');
   const vol = document.getElementById('sr-volume');
   const volLabel = document.getElementById('sr-volume-label');
-
-  const duration = Math.max(
-    Number(srPlayer.duration || 0),
-    Number(cur?.duration || 0),
-    0
-  );
+  if (!cur) player = Object.assign({}, player, { status:'stopped', currentTime:0, duration:0, itemId:'' });
+  const duration = Math.max(Number(player.duration || 0), Number(cur?.duration || 0), 0);
   const current = srComputedTime();
-  const state = cur ? String(srPlayer.status || 'stopped').toLowerCase() : 'stopped';
-
-  if (thumb) {
-    thumb.innerHTML = cur?.thumbnail
-      ? `<img src="${escapeAttr(cur.thumbnail)}" onerror="this.parentNode.textContent='🎵'">`
-      : '🎵';
-  }
+  const st = String(player.status || (cur ? 'playing' : 'stopped')).toLowerCase();
+  if (thumb) thumb.innerHTML = cur?.thumbnail ? `<img src="${escapeAttr(cur.thumbnail)}" onerror="this.parentNode.textContent='🎵'">` : '🎵';
   if (title) title.textContent = cur ? (cur.title || cur.song || 'Musique en cours') : 'Aucune musique en cours';
-  if (meta) {
-    meta.textContent = cur
-      ? `Demandé par ${cur.username || 'Anonyme'}${cur.author ? ' · ' + cur.author : ''}`
-      : 'Le chat peut demander une musique avec !sr';
-  }
-  if (seek) {
-    seek.disabled = !cur || duration <= 0;
-    seek.max = duration || 0;
-    if (document.activeElement !== seek) seek.value = Math.min(current, duration || current);
-    srPaintRange(seek, seek.value, seek.max);
-  }
+  if (meta) meta.textContent = cur ? `Demandé par ${cur.username || 'Anonyme'}${cur.author ? ' · ' + cur.author : ''}` : 'Le chat peut demander une musique avec !sr';
+  if (seek) { seek.max = duration || 0; seek.value = Math.min(current, duration || current); seek.disabled = !cur || duration <= 0; srPaintRange(seek, seek.value, seek.max); }
   if (curTimeEl) curTimeEl.textContent = fmtSongTime(current);
   if (durTimeEl) durTimeEl.textContent = duration ? fmtSongTime(duration) : '0:00';
+  srLastRenderedSecond = Math.floor(current);
+  srLastRenderedProgress = Math.round(current * 20) / 20;
   if (status) {
-    status.classList.toggle('playing', state === 'playing');
-    status.textContent = !cur
-      ? 'En attente'
-      : state === 'paused'
-        ? 'En pause'
-        : state === 'playing'
-          ? 'En lecture'
-          : 'Arrêt';
+    status.classList.toggle('playing', st === 'playing');
+    status.textContent = !cur ? 'En attente' : (st === 'paused' ? 'En pause' : st === 'playing' ? 'En lecture' : 'Prêt');
   }
-  if (toggleBtn) {
-    toggleBtn.textContent = state === 'playing' ? '⏸' : '▶';
-    toggleBtn.disabled = srBusy || !cur;
-  }
-  if (vol && document.activeElement !== vol) vol.value = Number(srPlayer.volume ?? 100);
-  if (vol) srPaintRange(vol, vol.value, 100);
-  if (volLabel) volLabel.textContent = `${Math.round(Number(vol?.value ?? srPlayer.volume ?? 100))}%`;
+  if (toggleBtn) toggleBtn.textContent = st === 'playing' ? '⏸' : '▶';
+  if (vol && player.volume !== undefined && document.activeElement !== vol) vol.value = player.volume;
+  if (vol) srPaintRange(vol, vol.value || player.volume || 100, 100);
+  if (volLabel) volLabel.textContent = `${Math.round(Number(vol?.value ?? player.volume ?? 100))}%`;
 }
-function srStartSmoothUiLoop() {
-  if (srRafTimer) cancelAnimationFrame(srRafTimer);
-  const loop = () => {
-    if (isSongRequestOpen()) renderSongRequestPlayer();
-    srRafTimer = requestAnimationFrame(loop);
-  };
-  srRafTimer = requestAnimationFrame(loop);
+function startSongRequestProgressTimer(){ srStartSmoothUiLoop(); }
+startSongRequestProgressTimer();
+function startSongRequestPolling(){
+  if (srPollTimer) clearInterval(srPollTimer);
+  srPollTimer = setInterval(() => { if (isSongRequestOpen()) loadSongRequest(true); }, 8000);
+  window.addEventListener('focus', () => { if (isSongRequestOpen()) loadSongRequest(true); });
+  document.addEventListener('visibilitychange', () => { if (!document.hidden && isSongRequestOpen()) loadSongRequest(true); });
 }
-srStartSmoothUiLoop();
+startSongRequestPolling();
 
 function renderSongRequestQueue(queue) {
   const box = document.getElementById('songrequest-queue');
   if (!box) return;
-
   if (!queue.length) {
     box.innerHTML = '<div class="empty"><div class="ei">🎵</div><p>Aucune musique demandée</p></div>';
     return;
   }
-
-  box.innerHTML = queue.map((song, index) => {
-    const title = song.title || song.song || '';
-    const subtitle = song.author
-      ? `${escapeHtml(song.author)} · demandé par ${escapeHtml(song.username || 'Anonyme')}`
-      : `Demandé par ${escapeHtml(song.username || 'Anonyme')}`;
-
+  box.innerHTML = queue.map((s, i) => {
+    const title = s.title || s.song || '';
+    const sub = s.author ? `${escapeHtml(s.author)} · demandé par ${escapeHtml(s.username || 'Anonyme')}` : `Demandé par ${escapeHtml(s.username || 'Anonyme')}`;
     return `
-      <div data-sr-id="${escapeAttr(song.id)}" style="display:flex;align-items:center;gap:10px;padding:10px;border-bottom:1px solid var(--brd)">
-        <div style="width:74px;height:42px;border-radius:8px;overflow:hidden;background:var(--card2);border:1px solid var(--brd);display:flex;align-items:center;justify-content:center;flex-shrink:0">
-          ${song.thumbnail ? `<img src="${escapeAttr(song.thumbnail)}" style="width:100%;height:100%;object-fit:cover" loading="lazy" onerror="this.parentNode.textContent='🎵'">` : '🎵'}
-        </div>
-        <div style="min-width:0;flex:1">
-          <div style="font-size:9px;color:${index === 0 ? '#93c5fd' : 'var(--muted)'};font-weight:900;text-transform:uppercase">
-            ${index === 0 ? 'En cours' : `En attente #${index + 1}`}
-          </div>
-          <div style="font-size:13px;font-weight:900;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${escapeHtml(title)}</div>
-          <div style="font-size:10px;color:var(--muted);margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">
-            ${subtitle}${song.durationText ? ' · ' + escapeHtml(song.durationText) : ''}
-          </div>
-        </div>
-        <div style="display:flex;gap:5px;flex-wrap:wrap;justify-content:flex-end;max-width:220px">
-          ${index > 0 ? `<button class="btnx btn-outline btn-xs" onclick="playSongRequestItem('${escapeAttr(song.id)}')" title="Lire maintenant">▶</button>` : ''}
-          ${index > 0 ? `<button class="btnx btn-ghost btn-xs" onclick="moveSongRequest('${escapeAttr(song.id)}','up')" title="Monter">↑</button>` : ''}
-          ${index < queue.length - 1 ? `<button class="btnx btn-ghost btn-xs" onclick="moveSongRequest('${escapeAttr(song.id)}','down')" title="Descendre">↓</button>` : ''}
-          <button class="btnx btn-ghost btn-xs" onclick="editSongRequest('${escapeAttr(song.id)}')" title="Modifier">✎</button>
-          ${song.url ? `<button class="btnx btn-ghost btn-xs" onclick="window.open('${escapeAttr(song.url)}','_blank')" title="Ouvrir">↗</button>` : ''}
-          <button class="btnx btn-red btn-xs" onclick="deleteSongRequest('${escapeAttr(song.id)}')" title="Supprimer">✕</button>
-        </div>
-      </div>`;
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px;border-bottom:1px solid var(--brd)">
+      <div style="width:74px;height:42px;border-radius:8px;overflow:hidden;background:var(--card2);border:1px solid var(--brd);display:flex;align-items:center;justify-content:center;flex-shrink:0">
+        ${s.thumbnail ? `<img src="${escapeAttr(s.thumbnail)}" style="width:100%;height:100%;object-fit:cover" loading="lazy" onerror="this.parentNode.textContent='🎵'">` : '🎵'}
+      </div>
+      <div style="min-width:0;flex:1">
+        <div style="font-size:9px;color:${i===0?'#93c5fd':'var(--muted)'};font-weight:900;text-transform:uppercase">${i===0?'En cours':'En attente #' + (i+1)}</div>
+        <div style="font-size:13px;font-weight:900;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${escapeHtml(title)}</div>
+        <div style="font-size:10px;color:var(--muted);margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${sub}${s.durationText ? ' · ' + escapeHtml(s.durationText) : ''}</div>
+      </div>
+      <div style="display:flex;gap:5px;flex-shrink:0;flex-wrap:wrap;justify-content:flex-end;max-width:330px">
+        ${i > 0 ? `<button class="btnx btn-outline btn-xs" onclick="playSongRequestItem('${escapeAttr(s.id)}')">▶ Lire</button>` : ''}
+        ${i > 1 ? `<button class="btnx btn-ghost btn-xs" onclick="moveSongRequest('${escapeAttr(s.id)}','up')" title="Monter">↑</button>` : ''}
+        ${i > 0 && i < queue.length - 1 ? `<button class="btnx btn-ghost btn-xs" onclick="moveSongRequest('${escapeAttr(s.id)}','down')" title="Descendre">↓</button>` : ''}
+        <button class="btnx btn-ghost btn-xs" onclick="editSongRequestItem('${escapeAttr(s.id)}')">✎ Modifier</button>
+        ${s.url ? `<button class="btnx btn-ghost btn-xs" onclick="window.open('${escapeAttr(s.url)}','_blank')">Ouvrir</button>` : ''}
+        <button class="btnx btn-red btn-xs" onclick="deleteSongRequest('${escapeAttr(s.id)}')">✕</button>
+      </div>
+    </div>`;
   }).join('');
 }
 
 async function saveSongRequestSettings() {
-  try {
-    const body = {
-      enabled: document.getElementById('sr-enabled')?.checked === true,
-      command: (document.getElementById('sr-command')?.value || '!sr').trim(),
-      confirmMessage: (document.getElementById('sr-confirm')?.value || '').trim(),
-      chatConfirmEnabled: document.getElementById('sr-chat-confirm')?.checked === true,
-      maxQueue: parseInt(document.getElementById('sr-max')?.value || '30', 10) || 30
-    };
-    await srRequest('/api/admin/widgets/songrequest/settings', {
-      method:'POST',
-      headers:{'Content-Type':'application/json'},
-      body:JSON.stringify(body)
-    });
-    toast('Song Request enregistré ✓');
-  } catch(error) {
-    toast(error.message || 'Erreur Song Request');
-  }
+  const body = {
+    enabled: document.getElementById('sr-enabled')?.checked === true,
+    command: (document.getElementById('sr-command')?.value || '!sr').trim(),
+    confirmMessage: (document.getElementById('sr-confirm')?.value || '').trim(),
+    chatConfirmEnabled: document.getElementById('sr-chat-confirm')?.checked === true,
+    maxQueue: parseInt(document.getElementById('sr-max')?.value || '30') || 30
+  };
+  const r = await fetch(API + '/api/admin/widgets/songrequest/settings', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body) });
+  const d = await r.json().catch(()=>null);
+  toast('Song Request enregistré ✓');
+  if (d) { srLastQueue = Array.isArray(d.queue) ? d.queue : srLastQueue; srPlayer = Object.assign(srPlayer, d.player || {}); renderSongRequestQueue(srLastQueue); renderSongRequestPlayer(srLastQueue, srPlayer); }
+  loadSongRequest(true);
 }
+
 async function addSongRequestManual() {
   const username = (document.getElementById('sr-manual-user')?.value || 'Streamer').trim();
   const song = (document.getElementById('sr-manual-song')?.value || '').trim();
   if (!song) return toast('Ajoute un titre ou un lien');
-
-  try {
-    await srRequest('/api/admin/widgets/songrequest/add', {
-      method:'POST',
-      headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({ username, song })
-    });
-    srSetVal('sr-manual-song', '');
-    toast('Musique ajoutée ✓');
-  } catch(error) {
-    toast(error.message || 'Impossible d’ajouter la musique');
-  }
+  const r = await fetch(API + '/api/admin/widgets/songrequest/add', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ username, song }) });
+  const d = await r.json().catch(()=>({}));
+  if (!r.ok) return toast(d.error || 'Impossible d’ajouter la musique');
+  srSetVal('sr-manual-song', '');
+  toast('Musique ajoutée ✓');
+  loadSongRequest();
 }
+
 async function deleteSongRequest(id) {
-  try {
-    await srRequest('/api/admin/widgets/songrequest/delete', {
-      method:'POST',
-      headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({ id })
-    });
-  } catch(error) {
-    toast(error.message || 'Suppression impossible');
-  }
+  await fetch(API + '/api/admin/widgets/songrequest/delete', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ id }) });
+  loadSongRequest();
 }
-async function moveSongRequest(id, direction) {
-  try {
-    await srRequest('/api/admin/widgets/songrequest/move', {
-      method:'POST',
-      headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({ id, direction })
-    });
-  } catch(error) {
-    toast(error.message || 'Déplacement impossible');
-  }
-}
-async function playSongRequestItem(id) {
-  try {
-    await srRequest('/api/admin/widgets/songrequest/play-item', {
-      method:'POST',
-      headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({ id })
-    });
-  } catch(error) {
-    toast(error.message || 'Lecture impossible');
-  }
-}
-async function editSongRequest(id) {
-  const item = srLastQueue.find(song => String(song.id) === String(id));
-  if (!item) return;
 
+async function moveSongRequest(id, direction) {
+  const r = await fetch(API + '/api/admin/widgets/songrequest/move', {
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({ id, direction })
+  });
+  const d = await r.json().catch(()=>({}));
+  if (!r.ok) return toast(d.error || 'Impossible de déplacer la musique');
+  srLastQueue = Array.isArray(d.queue) ? d.queue : srLastQueue;
+  srPlayer = Object.assign(srPlayer, d.player || {});
+  renderSongRequestQueue(srLastQueue);
+  renderSongRequestPlayer(srLastQueue, srPlayer);
+}
+
+async function playSongRequestItem(id) {
+  const r = await fetch(API + '/api/admin/widgets/songrequest/play-item', {
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({ id })
+  });
+  const d = await r.json().catch(()=>({}));
+  if (!r.ok) return toast(d.error || 'Impossible de lancer cette musique');
+  srLastQueue = Array.isArray(d.queue) ? d.queue : srLastQueue;
+  srPlayer = Object.assign(srPlayer, d.player || {});
+  srSyncClockFromPlayer(srPlayer);
+  renderSongRequestQueue(srLastQueue);
+  renderSongRequestPlayer(srLastQueue, srPlayer);
+}
+
+async function editSongRequestItem(id) {
+  const item = srLastQueue.find(entry => String(entry.id) === String(id));
+  if (!item) return;
   const title = prompt('Titre affiché', item.title || item.song || '');
   if (title === null) return;
   const username = prompt('Demandé par', item.username || 'Anonyme');
   if (username === null) return;
-
-  try {
-    await srRequest('/api/admin/widgets/songrequest/edit', {
-      method:'POST',
-      headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({ id, title, username })
-    });
-    toast('Musique modifiée ✓');
-  } catch(error) {
-    toast(error.message || 'Modification impossible');
-  }
+  const r = await fetch(API + '/api/admin/widgets/songrequest/update-item', {
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({ id, title, username })
+  });
+  const d = await r.json().catch(()=>({}));
+  if (!r.ok) return toast(d.error || 'Impossible de modifier la musique');
+  srLastQueue = Array.isArray(d.queue) ? d.queue : srLastQueue;
+  renderSongRequestQueue(srLastQueue);
+  renderSongRequestPlayer(srLastQueue, Object.assign(srPlayer, d.player || {}));
+  toast('Musique modifiée ✓');
 }
-async function playSongRequest() {
-  return srRequest('/api/admin/widgets/songrequest/play', { method:'POST' });
-}
-async function pauseSongRequest() {
-  return srRequest('/api/admin/widgets/songrequest/pause', { method:'POST' });
-}
+async function playSongRequest() { await fetch(API + '/api/admin/widgets/songrequest/play', { method:'POST' }); loadSongRequest(true); }
+async function pauseSongRequest() { await fetch(API + '/api/admin/widgets/songrequest/pause', { method:'POST' }); loadSongRequest(true); }
 async function toggleSongRequest() {
-  if (srBusy || !srLastQueue.length) return;
-  srBusy = true;
-  renderSongRequestPlayer();
-  try {
-    if (String(srPlayer.status || '').toLowerCase() === 'playing') {
-      await pauseSongRequest();
-    } else {
-      await playSongRequest();
-    }
-  } catch(error) {
-    toast(error.message || 'Commande impossible');
-  } finally {
-    srBusy = false;
-    renderSongRequestPlayer();
-  }
+  const isPlaying = String(srPlayer.status || '').toLowerCase() === 'playing';
+  if (isPlaying) { srPlayer.currentTime = srComputedTime(); srPlayer.status = 'paused'; srSyncClockFromPlayer(srPlayer); renderSongRequestPlayer(srLastQueue, srPlayer); await pauseSongRequest(); }
+  else { srPlayer.status = srLastQueue.length ? 'playing' : 'stopped'; srSyncClockFromPlayer(srPlayer); renderSongRequestPlayer(srLastQueue, srPlayer); await playSongRequest(); }
 }
-function previewSongRequestSeek(value) {
-  const seek = document.getElementById('sr-seek');
-  const current = document.getElementById('sr-current-time');
-  if (seek) srPaintRange(seek, value, seek.max);
-  if (current) current.textContent = fmtSongTime(value);
+function previewSongRequestSeek(v) {
+  srPlayer.currentTime = Number(v || 0);
+  renderSongRequestPlayer(srLastQueue, srPlayer);
 }
-async function seekSongRequest(value) {
-  const seconds = Math.max(0, Number(value || 0));
-  try {
-    await srRequest('/api/admin/widgets/songrequest/seek', {
-      method:'POST',
-      headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({ seconds })
-    });
-  } catch(error) {
-    toast(error.message || 'Seek impossible');
-  }
+async function seekSongRequest(v) {
+  const seconds = Math.max(0, Number(v || 0));
+  const r = await fetch(API + '/api/admin/widgets/songrequest/seek', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ seconds }) });
+  const d = await r.json().catch(()=>({}));
+  if (!r.ok) return toast(d.error || 'Impossible de déplacer la lecture');
+  srPlayer = Object.assign(srPlayer, d.player || {}, { currentTime: seconds });
+  srSyncClockFromPlayer(srPlayer);
+  renderSongRequestPlayer(srLastQueue, srPlayer);
 }
-function previewSongRequestVolume(value) {
-  const volume = Math.max(0, Math.min(100, Number(value ?? 100)));
+function previewSongRequestVolume(v) {
+  const volume = Math.max(0, Math.min(100, Number(v ?? 100)));
   const label = document.getElementById('sr-volume-label');
   const input = document.getElementById('sr-volume');
   if (label) label.textContent = `${Math.round(volume)}%`;
   if (input) srPaintRange(input, volume, 100);
 }
-async function setSongRequestVolume(value) {
-  const volume = Math.max(0, Math.min(100, Number(value ?? 100)));
+async function sendSongRequestVolume(volume) {
+  if (srVolumeInFlight) { srPendingVolume = volume; return; }
+  srVolumeInFlight = true;
   try {
-    await srRequest('/api/admin/widgets/songrequest/volume', {
-      method:'POST',
-      headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({ volume })
-    });
-  } catch(error) {
-    toast(error.message || 'Volume impossible');
-  }
+    await fetch(API + '/api/admin/widgets/songrequest/volume', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ volume }) });
+  } catch(e) {}
+  srVolumeInFlight = false;
+  if (srPendingVolume !== null && srPendingVolume !== volume) {
+    const next = srPendingVolume; srPendingVolume = null;
+    sendSongRequestVolume(next);
+  } else srPendingVolume = null;
 }
+function setSongRequestVolumeLive(v) {
+  const volume = Math.max(0, Math.min(100, Number(v ?? 100)));
+  srPlayer.volume = volume;
+  previewSongRequestVolume(volume);
+  clearTimeout(srVolumeDebounce);
+  srVolumeDebounce = setTimeout(() => sendSongRequestVolume(volume), 60);
+}
+function flushSongRequestVolume(force = false) {
+  const input = document.getElementById('sr-volume');
+  const volume = Math.max(0, Math.min(100, Number(input?.value ?? srPlayer.volume ?? 100)));
+  clearTimeout(srVolumeDebounce);
+  sendSongRequestVolume(volume);
+}
+async function setSongRequestVolume(v) { setSongRequestVolumeLive(v); flushSongRequestVolume(true); }
 async function nextSongRequest() {
-  try {
-    await srRequest('/api/admin/widgets/songrequest/next', { method:'POST' });
-  } catch(error) {
-    toast(error.message || 'Passage impossible');
-  }
+  await fetch(API + '/api/admin/widgets/songrequest/next', { method:'POST' });
+  loadSongRequest();
 }
 async function clearSongRequests() {
   if (!confirm('Vider toute la file Song Request ?')) return;
-  try {
-    await srRequest('/api/admin/widgets/songrequest/clear', { method:'POST' });
-    toast('File vidée ✓');
-  } catch(error) {
-    toast(error.message || 'Impossible de vider la file');
-  }
+  await fetch(API + '/api/admin/widgets/songrequest/clear', { method:'POST' });
+  toast('File vidée ✓');
+  loadSongRequest();
 }
 
-function bindSongRequestSocket() {
-  if (srSocketBound) return;
-  const socket = window.chestSocket || (typeof io === 'function' ? io() : null);
-  if (!socket) return;
-  srSocketBound = true;
-
-  socket.on('connect', () => {
-    if (isSongRequestOpen()) loadSongRequest(true);
-  });
-  socket.on('songrequest-update', data => {
-    if (Array.isArray(data?.queue)) srApplyState({ queue:data.queue });
-  });
-  socket.on('songrequest-player-state', player => {
-    if (
-      srLastQueue[0]?.id &&
-      player?.itemId &&
-      String(player.itemId) !== String(srLastQueue[0].id)
-    ) return;
-    srApplyState({ player });
-  });
-  socket.on('songrequest-settings-update', data => srApplyState(data));
-}
-bindSongRequestSocket();
-window.addEventListener('focus', () => {
-  if (isSongRequestOpen()) loadSongRequest(true);
-});
-document.addEventListener('visibilitychange', () => {
-  if (!document.hidden && isSongRequestOpen()) loadSongRequest(true);
-});
 
 
 let WIDGET_ENGINE_CACHE = null;
