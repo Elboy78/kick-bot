@@ -229,11 +229,11 @@ function handleControl(c){
   if(c.streamer){ adoptStreamer(c.streamer); if(STREAMER_SLUG&&String(c.streamer).toLowerCase()!==String(STREAMER_SLUG).toLowerCase())return; }
   const seq=Number(c.seq||0); if(seq && seq<=lastSeq)return; if(seq) lastSeq=seq;
   const a=String(c.action||'');
-  if(a==='pause'){pauseLocal(true);} 
-  else if(a==='play'){desiredStatus='playing'; applyPlayback('play'); playLocal(true);} 
-  else if(a==='stop'){stopLocal(true);} 
+  if(a==='pause'){pauseLocal(false);} 
+  else if(a==='play'){desiredStatus='playing'; applyPlayback('play'); playLocal(false);} 
+  else if(a==='stop'){stopLocal(false);} 
   else if(a==='next'||a==='load-current'){load(false);} 
-  else if(a==='seek'){const sec=Math.max(0,Number(c.seconds||0)); syncClockFrom(sec); try{player&&player.seekTo&&player.seekTo(sec,true);}catch(e){} render(); postState(desiredStatus,true);} 
+  else if(a==='seek'){const sec=Math.max(0,Number(c.seconds||0)); syncClockFrom(sec); try{player&&player.seekTo&&player.seekTo(sec,true);}catch(e){} render();} 
   else if(a==='volume'){setVolumeLocal(c.volume,false);} 
 }
 async function pollControl(){
@@ -244,13 +244,14 @@ async function pollControl(){
 
 window.onYouTubeIframeAPIReady=function(){ytReady=true; ensurePlayer(); applyPlayback('yt-ready');};
 load(true);
-setInterval(()=>{updateTimeUI(); pollControl(); postState(desiredStatus,false);},250);
-setInterval(()=>load(false),30000);
+setInterval(()=>updateTimeUI(),250);
+setInterval(()=>postState(desiredStatus,false),2000);
+setInterval(()=>load(false),15000);
 try{
   srSocket=io({transports:['websocket','polling']});
   srSocket.on('connect',()=>joinStreamerRoom(STREAMER_SLUG));
   srSocket.on('songrequest-control',handleControl);
-  srSocket.on('songrequest-update',d=>{ if(d?.streamer){adoptStreamer(d.streamer); if(STREAMER_SLUG&&String(d.streamer).toLowerCase()!==String(STREAMER_SLUG).toLowerCase())return;} const old=queue[0]?.id||''; queue=Array.isArray(d.queue)?d.queue:[]; if((queue[0]?.id||'')!==old){currentItemId=''; currentVideoId=''; syncClockFrom(0); desiredStatus=queue[0]?'playing':'stopped';} if(!queue[0])stopLocal(false); else applyPlayback('queue'); render();});
+  srSocket.on('songrequest-update',d=>{ if(d?.streamer){adoptStreamer(d.streamer); if(STREAMER_SLUG&&String(d.streamer).toLowerCase()!==String(STREAMER_SLUG).toLowerCase())return;} load(false); });
   srSocket.on('songrequest-player-state',st=>{ if(overlayInvalid)return; if(st?.streamer){adoptStreamer(st.streamer); if(STREAMER_SLUG&&String(st.streamer).toLowerCase()!==String(STREAMER_SLUG).toLowerCase())return;} if(st&&Number.isFinite(Number(st.volume))) setVolumeLocal(st.volume,false); });
   srSocket.on('overlay-token-regenerated',d=>{ if(String(d?.widget||'').toLowerCase()==='songrequest' && OVERLAY_TOKEN) invalidateOverlay(); });
 }catch(e){}

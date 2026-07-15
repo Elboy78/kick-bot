@@ -59,9 +59,16 @@ function requirePlatformAdmin(req, res, next) {
 }
 
 // V2 : page d'entrée = login Kick. Le panel complet vit dans /s/:streamer/dashboard.
-app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'public', 'login.html')));
-app.get('/login', (req, res) => res.sendFile(path.join(__dirname, 'public', 'login.html')));
-app.get('/login.html', (req, res) => res.sendFile(path.join(__dirname, 'public', 'login.html')));
+function serveLoginOrDashboard(req, res) {
+  if (req.authStreamer?.slug) {
+    return res.redirect(`/s/${encodeURIComponent(req.authStreamer.slug)}/dashboard`);
+  }
+  return res.sendFile(path.join(__dirname, 'public', 'login.html'));
+}
+
+app.get('/', serveLoginOrDashboard);
+app.get('/login', serveLoginOrDashboard);
+app.get('/login.html', serveLoginOrDashboard);
 
 
 // ── Administration plateforme : accès support sécurisé ───────────────────────
@@ -1562,6 +1569,71 @@ app.post('/api/admin/widgets/songrequest/delete', requireAuth, async (req, res) 
   } catch(e) { res.status(500).json({ error:e.message }); }
 });
 
+
+app.post('/api/admin/widgets/songrequest/move', requireAuth, async (req, res) => {
+  try {
+    const tm = getSongRequestTM(req);
+    const state = await getSongRequestState(tm);
+    const id = String(req.body.id || '');
+    const direction = String(req.body.direction || '').toLowerCase();
+    const index = state.queue.findIndex(item => String(item.id) === id);
+
+    if (index < 1) return res.status(400).json({ error:'Musique en attente introuvable' });
+
+    const target = direction === 'up' ? index - 1 : direction === 'down' ? index + 1 : -1;
+    if (target < 1 || target >= state.queue.length) {
+      return res.json({ success:true, ...(await getSongRequestState(tm)) });
+    }
+
+    [state.queue[index], state.queue[target]] = [state.queue[target], state.queue[index]];
+    await saveSongRequestQueue(state.queue, tm);
+    return res.json({ success:true, ...(await getSongRequestState(tm)) });
+  } catch(e) { res.status(500).json({ error:e.message }); }
+});
+
+app.post('/api/admin/widgets/songrequest/play-item', requireAuth, async (req, res) => {
+  try {
+    const tm = getSongRequestTM(req);
+    const state = await getSongRequestState(tm);
+    const id = String(req.body.id || '');
+    const index = state.queue.findIndex(item => String(item.id) === id);
+    if (index < 0) return res.status(404).json({ error:'Musique introuvable' });
+
+    if (index > 0) {
+      const [selected] = state.queue.splice(index, 1);
+      state.queue.unshift(selected);
+      await saveSongRequestQueue(state.queue, tm);
+    }
+
+    const current = state.queue[0] || null;
+    setSongRequestDesiredStatus(tm, current ? 'playing' : 'stopped');
+    await saveSongRequestPlayerState({
+      itemId: current?.id || '',
+      status: current ? 'playing' : 'stopped',
+      currentTime: 0,
+      duration: current?.duration || 0
+    }, true, tm);
+    await issueSongRequestControl('load-current', { autoplay:true }, tm);
+    return res.json({ success:true, ...(await getSongRequestState(tm)) });
+  } catch(e) { res.status(500).json({ error:e.message }); }
+});
+
+app.post('/api/admin/widgets/songrequest/update-item', requireAuth, async (req, res) => {
+  try {
+    const tm = getSongRequestTM(req);
+    const state = await getSongRequestState(tm);
+    const id = String(req.body.id || '');
+    const item = state.queue.find(entry => String(entry.id) === id);
+    if (!item) return res.status(404).json({ error:'Musique introuvable' });
+
+    if (typeof req.body.title === 'string') item.title = req.body.title.trim().slice(0, 160) || item.title;
+    if (typeof req.body.username === 'string') item.username = req.body.username.trim().slice(0, 60) || 'Anonyme';
+
+    await saveSongRequestQueue(state.queue, tm);
+    return res.json({ success:true, ...(await getSongRequestState(tm)) });
+  } catch(e) { res.status(500).json({ error:e.message }); }
+});
+
 app.post('/api/widgets/songrequest/next', async (req, res) => {
   if (rejectInvalidSongRequestOverlay(req, res)) return;
   try {
@@ -2235,15 +2307,17 @@ app.get('/auth/bot/login', (req, res) => {
 // ════════════════════════════════════════════════════════════════════
 
 app.get('/auth/login', (req, res) => {
-  if (!kickOAuth.isConfigured()) {
-    return res.status(400).send('KICK_CLIENT_ID, KICK_CLIENT_SECRET ou KICK_REDIRECT_URI manquant dans les variables Render.');
+  // Une session encore valide ouvre directement le panel : aucune nouvelle
+  // autorisation Kick n'est demandée tant que l'utilisateur ne se déconnecte pas.
+  if (req.authStreamer?.slug) {
+    return res.redirect(`/s/${encodeURIComponent(req.authStreamer.slug)}/dashboard`);
   }
-  const url = kickOAuth.getAuthorizationUrl(null, {
-  mode: 'streamer_login',
-  returnTo: ''
-});
+  if (!kickOAuth.isConfigured()) {
+    return res.status(400).send('KICK_CLIENT_ID, KICK_CLIENT_SECRET ou KICK_REDIRECT_URI manquant dans le fichier .env.');
+  }
+  const url = kickOAuth.getAuthorizationUrl(null, { mode: 'streamer_login', returnTo: '' });
   console.log('[OAUTH LOGIN V2] Connexion streamer Kick lancée');
-  res.redirect(url);
+  return res.redirect(url);
 });
 
 app.get('/auth/callback', async (req, res) => {
@@ -2320,40 +2394,43 @@ app.get('/api/oauth/status', async (req, res) => {
   const configured = kickOAuth.isConfigured();
 
   try {
-    // Aucun compte ne doit être déduit depuis fack7up, l’URL
-    // ou l’ancien cookie lorsqu’il n’existe pas de session Kick valide.
-    if (!req.authSession?.streamerId || !req.streamer) {
+    if (!req.authSession?.streamerId || !req.authStreamer) {
       return res.json({
         configured,
         authenticated: false,
         connected: false,
-        streamer: null,
+        streamer: null
       });
     }
 
-    const connected = await kickOAuth.isConnected(req.streamer.id);
+    const streamer = req.authStreamer;
+
+    const connected = await kickOAuth
+      .isConnected(streamer.id)
+      .catch(() => false);
 
     return res.json({
       configured,
       authenticated: true,
       connected: Boolean(connected),
       streamer: {
-        id: req.streamer.id,
-        slug: req.streamer.slug,
+        id: streamer.id,
+        slug: streamer.slug,
         displayName:
-          req.streamer.display_name ||
-          req.streamer.displayName ||
-          req.streamer.slug,
-      },
+          streamer.display_name ||
+          streamer.displayName ||
+          streamer.kick_username ||
+          streamer.slug
+      }
     });
   } catch (error) {
-    console.error('[OAUTH STATUS] Erreur :', error);
+    console.error('[OAUTH STATUS]', error);
 
     return res.json({
       configured,
       authenticated: false,
       connected: false,
-      streamer: null,
+      streamer: null
     });
   }
 });
@@ -2802,7 +2879,6 @@ io.on('connection', (socket) => {
   });
 });
 
-app.get('/login', (req,res) => res.sendFile(path.join(__dirname,'public','login.html')));
 app.get('*', (req,res) => res.sendFile(path.join(__dirname,'public','index.html')));
 
 server.listen(PORT, () => {

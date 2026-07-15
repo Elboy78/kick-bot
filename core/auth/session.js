@@ -2,8 +2,18 @@ const crypto = require('crypto');
 
 const COOKIE_NAME = 'elbot_session';
 const ADMIN_TARGET_COOKIE_NAME = 'elbot_admin_target';
-const MAX_AGE_MS = 1000 * 60 * 60 * 24 * 7;
+const DEFAULT_SESSION_DAYS = 30;
+const MIN_SESSION_DAYS = 1;
+const MAX_SESSION_DAYS = 90;
 const ADMIN_TARGET_MAX_AGE_MS = 1000 * 60 * 60 * 8;
+
+function sessionMaxAgeMs() {
+  const configured = Number.parseInt(process.env.SESSION_MAX_AGE_DAYS || '', 10);
+  const days = Number.isFinite(configured)
+    ? Math.min(MAX_SESSION_DAYS, Math.max(MIN_SESSION_DAYS, configured))
+    : DEFAULT_SESSION_DAYS;
+  return days * 24 * 60 * 60 * 1000;
+}
 
 function getSecret() {
   const secret = String(process.env.SESSION_SECRET || '').trim();
@@ -29,19 +39,19 @@ function timingSafeEqual(a, b) {
   return left.length === right.length && crypto.timingSafeEqual(left, right);
 }
 
-function createSession(streamer) {
+function createSession(streamer, now = Date.now()) {
   if (!streamer?.id || !streamer?.slug) throw new Error('Streamer invalide pour la session');
-  const now = Date.now();
+  const maxAge = sessionMaxAgeMs();
   const payload = encode(JSON.stringify({
     streamerId: Number(streamer.id),
     slug: String(streamer.slug),
     issuedAt: now,
-    expiresAt: now + MAX_AGE_MS
+    expiresAt: now + maxAge
   }));
   return `${payload}.${sign(payload)}`;
 }
 
-function readSession(value) {
+function readSignedPayload(value) {
   if (!value || typeof value !== 'string') return null;
   const [payload, signature, extra] = value.split('.');
   if (!payload || !signature || extra) return null;
@@ -57,6 +67,19 @@ function readSession(value) {
   }
 }
 
+function readSession(value) {
+  return readSignedPayload(value);
+}
+
+function shouldRefreshSession(session, now = Date.now()) {
+  if (!session?.issuedAt || !session?.expiresAt) return true;
+  const maxAge = sessionMaxAgeMs();
+  const age = now - Number(session.issuedAt);
+  const remaining = Number(session.expiresAt) - now;
+  // Session glissante : renouvellement après 24 h d'utilisation ou lorsqu'il
+  // reste moins d'un tiers de sa durée de vie.
+  return age >= Math.min(24 * 60 * 60 * 1000, maxAge / 3) || remaining <= maxAge / 3;
+}
 
 function createAdminTarget(target) {
   if (!target?.streamerId || !target?.slug) throw new Error('Tenant admin invalide');
@@ -71,10 +94,10 @@ function createAdminTarget(target) {
 }
 
 function readAdminTarget(value) {
-  return readSession(value);
+  return readSignedPayload(value);
 }
 
-function cookieOptions(req) {
+function cookieOptions(req, maxAge = sessionMaxAgeMs()) {
   const forwardedProto = String(req?.headers?.['x-forwarded-proto'] || '').split(',')[0].trim();
   const secure = forwardedProto === 'https' || req?.secure || process.env.NODE_ENV === 'production';
   return {
@@ -82,7 +105,7 @@ function cookieOptions(req) {
     secure,
     sameSite: 'lax',
     path: '/',
-    maxAge: MAX_AGE_MS
+    maxAge
   };
 }
 
@@ -98,10 +121,7 @@ function clearSessionCookie(req, res) {
 }
 
 function setAdminTargetCookie(req, res, target) {
-  res.cookie(ADMIN_TARGET_COOKIE_NAME, createAdminTarget(target), {
-    ...cookieOptions(req),
-    maxAge: ADMIN_TARGET_MAX_AGE_MS
-  });
+  res.cookie(ADMIN_TARGET_COOKIE_NAME, createAdminTarget(target), cookieOptions(req, ADMIN_TARGET_MAX_AGE_MS));
 }
 
 function clearAdminTargetCookie(req, res) {
@@ -115,10 +135,12 @@ module.exports = {
   ADMIN_TARGET_COOKIE_NAME,
   createSession,
   readSession,
+  shouldRefreshSession,
   createAdminTarget,
   readAdminTarget,
   setSessionCookie,
   clearSessionCookie,
   setAdminTargetCookie,
-  clearAdminTargetCookie
+  clearAdminTargetCookie,
+  sessionMaxAgeMs
 };
