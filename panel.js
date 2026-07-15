@@ -59,9 +59,16 @@ function requirePlatformAdmin(req, res, next) {
 }
 
 // V2 : page d'entrée = login Kick. Le panel complet vit dans /s/:streamer/dashboard.
-app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'public', 'login.html')));
-app.get('/login', (req, res) => res.sendFile(path.join(__dirname, 'public', 'login.html')));
-app.get('/login.html', (req, res) => res.sendFile(path.join(__dirname, 'public', 'login.html')));
+function serveLoginOrDashboard(req, res) {
+  if (req.authStreamer?.slug) {
+    return res.redirect(`/s/${encodeURIComponent(req.authStreamer.slug)}/dashboard`);
+  }
+  return res.sendFile(path.join(__dirname, 'public', 'login.html'));
+}
+
+app.get('/', serveLoginOrDashboard);
+app.get('/login', serveLoginOrDashboard);
+app.get('/login.html', serveLoginOrDashboard);
 
 
 // ── Administration plateforme : accès support sécurisé ───────────────────────
@@ -2235,13 +2242,17 @@ app.get('/auth/bot/login', (req, res) => {
 // ════════════════════════════════════════════════════════════════════
 
 app.get('/auth/login', (req, res) => {
-  if (!kickOAuth.isConfigured()) {
-    return res.status(400).send('KICK_CLIENT_ID, KICK_CLIENT_SECRET ou KICK_REDIRECT_URI manquant dans les variables Render.');
+  // Une session encore valide ouvre directement le panel : aucune nouvelle
+  // autorisation Kick n'est demandée tant que l'utilisateur ne se déconnecte pas.
+  if (req.authStreamer?.slug) {
+    return res.redirect(`/s/${encodeURIComponent(req.authStreamer.slug)}/dashboard`);
   }
-  const returnTo = String(req.query.returnTo || req.query.redirect || '').slice(0, 300);
-  const url = kickOAuth.getAuthorizationUrl(null, { mode: 'streamer_login', returnTo });
+  if (!kickOAuth.isConfigured()) {
+    return res.status(400).send('KICK_CLIENT_ID, KICK_CLIENT_SECRET ou KICK_REDIRECT_URI manquant dans le fichier .env.');
+  }
+  const url = kickOAuth.getAuthorizationUrl(null, { mode: 'streamer_login', returnTo: '' });
   console.log('[OAUTH LOGIN V2] Connexion streamer Kick lancée');
-  res.redirect(url);
+  return res.redirect(url);
 });
 
 app.get('/auth/callback', async (req, res) => {
@@ -2313,11 +2324,29 @@ app.get('/auth/logout', (req, res) => {
 });
 
 app.get('/api/oauth/status', async (req, res) => {
+  res.setHeader('Cache-Control', 'no-store');
+  const configured = kickOAuth.isConfigured();
+
   try {
-    const tm = createTenantManager({ db, io, req });
-    const connected = await kickOAuth.isConnected(tm.streamerId);
-    res.json({ configured: kickOAuth.isConfigured(), connected, streamer: tm.info() });
-  } catch (e) { res.json({ configured: kickOAuth.isConfigured(), connected: false }); }
+    if (!req.authSession?.streamerId || !req.authStreamer) {
+      return res.json({ configured, authenticated: false, connected: false, streamer: null });
+    }
+
+    const connected = await kickOAuth.isConnected(req.authStreamer.id);
+    return res.json({
+      configured,
+      authenticated: true,
+      connected: Boolean(connected),
+      streamer: {
+        id: req.authStreamer.id,
+        slug: req.authStreamer.slug,
+        displayName: req.authStreamer.display_name || req.authStreamer.displayName || req.authStreamer.slug
+      }
+    });
+  } catch (error) {
+    console.error('[OAUTH STATUS] Erreur :', error.message);
+    return res.json({ configured, authenticated: false, connected: false, streamer: null });
+  }
 });
 
 app.post('/api/admin/oauth/disconnect', requireAuth, requireTenant, async (req, res) => {
@@ -2764,7 +2793,6 @@ io.on('connection', (socket) => {
   });
 });
 
-app.get('/login', (req,res) => res.sendFile(path.join(__dirname,'public','login.html')));
 app.get('*', (req,res) => res.sendFile(path.join(__dirname,'public','index.html')));
 
 server.listen(PORT, () => {

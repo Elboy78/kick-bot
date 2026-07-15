@@ -1,5 +1,12 @@
 const tenant = require('../tenant');
-const { COOKIE_NAME, ADMIN_TARGET_COOKIE_NAME, readSession, readAdminTarget } = require('../core/auth/session');
+const {
+  COOKIE_NAME,
+  ADMIN_TARGET_COOKIE_NAME,
+  readSession,
+  readAdminTarget,
+  shouldRefreshSession,
+  setSessionCookie
+} = require('../core/auth/session');
 const { isPlatformAdmin } = require('../core/auth/platform-admin');
 
 module.exports = function createLoadSession(db) {
@@ -37,6 +44,13 @@ module.exports = function createLoadSession(db) {
         role: streamer.role || 'streamer',
         platformAdmin
       };
+
+      // Prolonge la session lors d'une utilisation réelle, sans rappeler OAuth.
+      if (shouldRefreshSession(session)) {
+        setSessionCookie(req, res, { id: streamer.id, slug: streamer.slug });
+        req.authSessionRefreshed = true;
+      }
+
       next();
     } catch (error) {
       console.error('[AUTH] Erreur chargement session:', error.message);
