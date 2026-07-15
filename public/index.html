@@ -1078,7 +1078,19 @@ Option 3" rows="4"></textarea><div style="display:flex;gap:6px;margin-top:10px">
             <div class="sr-song-title" id="sr-now-title">Aucune musique en cours</div>
             <div class="sr-song-meta" id="sr-now-meta">Le chat peut demander une musique avec !sr</div>
             <div class="sr-progress-row">
-              <input id="sr-seek" class="sr-smooth-range" type="range" min="0" max="0" value="0" step="0.01" disabled oninput="previewSongRequestSeek(this.value)" onchange="seekSongRequest(this.value)">
+              <input
+  id="sr-seek"
+  class="sr-smooth-range"
+  type="range"
+  min="0"
+  max="0"
+  value="0"
+  step="0.1"
+  onpointerdown="beginSongRequestSeek()"
+  onkeydown="beginSongRequestSeek()"
+  oninput="previewSongRequestSeek(this.value)"
+  onchange="commitSongRequestSeek(this.value)"
+> oninput="previewSongRequestSeek(this.value)" onchange="seekSongRequest(this.value)">
               <div class="sr-times"><span id="sr-current-time">0:00</span><span id="sr-duration-time">0:00</span></div>
             </div>
           </div>
@@ -4609,6 +4621,8 @@ let srLastRenderedProgress = -1;
 let srVolumeDebounce = null;
 let srPendingVolume = null;
 let srVolumeInFlight = false;
+let srSeeking = false;
+let srSeekInFlight = false;
 function srSetVal(id, val) { const el = document.getElementById(id); if (el && document.activeElement !== el) el.value = val; }
 function srSetChecked(id, val) { const el = document.getElementById(id); if (el) el.checked = !!val; }
 function isSongRequestOpen() { const el = document.getElementById('widget-songrequest-settings'); return !!el && el.style.display !== 'none'; }
@@ -4646,12 +4660,16 @@ function srUpdateProgressOnly(force = false) {
   const current = srComputedTime();
   const currentSecond = Math.floor(current);
   const roundedProgress = Math.round(current * 20) / 20;
-  if (seek && (force || Math.abs(roundedProgress - srLastRenderedProgress) >= 0.05)) {
-    seek.max = duration || 0;
-    seek.value = duration ? Math.min(current, duration) : 0;
-    srPaintRange(seek, seek.value, seek.max);
-    srLastRenderedProgress = roundedProgress;
-  }
+  if (
+  seek &&
+  !srSeeking &&
+  (force || Math.abs(roundedProgress - srLastRenderedProgress) >= 0.05)
+) {
+  seek.max = duration || 0;
+  seek.value = duration ? Math.min(current, duration) : 0;
+  srPaintRange(seek, seek.value, seek.max);
+  srLastRenderedProgress = roundedProgress;
+}
   if (curTimeEl && (force || currentSecond !== srLastRenderedSecond)) {
     curTimeEl.textContent = fmtSongTime(current);
     srLastRenderedSecond = currentSecond;
@@ -4708,7 +4726,18 @@ function renderSongRequestPlayer(queue = srLastQueue, player = srPlayer) {
   if (thumb) thumb.innerHTML = cur?.thumbnail ? `<img src="${escapeAttr(cur.thumbnail)}" onerror="this.parentNode.textContent='🎵'">` : '🎵';
   if (title) title.textContent = cur ? (cur.title || cur.song || 'Musique en cours') : 'Aucune musique en cours';
   if (meta) meta.textContent = cur ? `Demandé par ${cur.username || 'Anonyme'}${cur.author ? ' · ' + cur.author : ''}` : 'Le chat peut demander une musique avec !sr';
-  if (seek) { seek.max = duration || 0; seek.value = Math.min(current, duration || current); seek.disabled = !cur || duration <= 0; srPaintRange(seek, seek.value, seek.max); }
+  if (seek) {
+  seek.max = duration || 0;
+  seek.disabled = !cur || duration <= 0;
+
+  if (!srSeeking) {
+    seek.value = duration
+      ? Math.min(current, duration)
+      : 0;
+
+    srPaintRange(seek, seek.value, seek.max);
+  }
+}
   if (curTimeEl) curTimeEl.textContent = fmtSongTime(current);
   if (durTimeEl) durTimeEl.textContent = duration ? fmtSongTime(duration) : '0:00';
   srLastRenderedSecond = Math.floor(current);
@@ -4851,18 +4880,95 @@ async function toggleSongRequest() {
   if (isPlaying) { srPlayer.currentTime = srComputedTime(); srPlayer.status = 'paused'; srSyncClockFromPlayer(srPlayer); renderSongRequestPlayer(srLastQueue, srPlayer); await pauseSongRequest(); }
   else { srPlayer.status = srLastQueue.length ? 'playing' : 'stopped'; srSyncClockFromPlayer(srPlayer); renderSongRequestPlayer(srLastQueue, srPlayer); await playSongRequest(); }
 }
-function previewSongRequestSeek(v) {
-  srPlayer.currentTime = Number(v || 0);
-  renderSongRequestPlayer(srLastQueue, srPlayer);
+function beginSongRequestSeek() {
+  srSeeking = true;
 }
-async function seekSongRequest(v) {
-  const seconds = Math.max(0, Number(v || 0));
-  const r = await fetch(API + '/api/admin/widgets/songrequest/seek', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ seconds }) });
-  const d = await r.json().catch(()=>({}));
-  if (!r.ok) return toast(d.error || 'Impossible de déplacer la lecture');
-  srPlayer = Object.assign(srPlayer, d.player || {}, { currentTime: seconds });
-  srSyncClockFromPlayer(srPlayer);
-  renderSongRequestPlayer(srLastQueue, srPlayer);
+
+function previewSongRequestSeek(value) {
+  srSeeking = true;
+
+  const seconds = Math.max(0, Number(value || 0));
+
+  const duration = Math.max(
+    Number(srPlayer.duration || 0),
+    Number(srLastQueue[0]?.duration || 0),
+    0
+  );
+
+  const safeSeconds = duration
+    ? Math.min(seconds, duration)
+    : seconds;
+
+  const seek = document.getElementById('sr-seek');
+  const currentTime = document.getElementById('sr-current-time');
+
+  if (seek) {
+    seek.value = safeSeconds;
+    srPaintRange(seek, safeSeconds, duration);
+  }
+
+  if (currentTime) {
+    currentTime.textContent = fmtSongTime(safeSeconds);
+  }
+}
+
+async function commitSongRequestSeek(value) {
+  if (srSeekInFlight) return;
+
+  srSeekInFlight = true;
+
+  const duration = Math.max(
+    Number(srPlayer.duration || 0),
+    Number(srLastQueue[0]?.duration || 0),
+    0
+  );
+
+  const requestedSeconds = Math.max(0, Number(value || 0));
+
+  const seconds = duration
+    ? Math.min(requestedSeconds, duration)
+    : requestedSeconds;
+
+  try {
+    const response = await fetch(
+      API + '/api/admin/widgets/songrequest/seek',
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ seconds })
+      }
+    );
+
+    const result = await response.json().catch(() => ({}));
+
+    if (!response.ok) {
+      throw new Error(
+        result.error || 'Impossible de déplacer la lecture'
+      );
+    }
+
+    srPlayer = Object.assign(
+      srPlayer,
+      result.player || {},
+      { currentTime: seconds }
+    );
+
+    srSyncClockFromPlayer(srPlayer);
+
+    srLastRenderedProgress = -1;
+    srLastRenderedSecond = -1;
+
+    previewSongRequestSeek(seconds);
+  } catch (error) {
+    console.error('[SONG REQUEST SEEK]', error);
+    toast(error.message || 'Erreur pendant le déplacement');
+  } finally {
+    srSeeking = false;
+    srSeekInFlight = false;
+    srUpdateProgressOnly(true);
+  }
 }
 function previewSongRequestVolume(v) {
   const volume = Math.max(0, Math.min(100, Number(v ?? 100)));
