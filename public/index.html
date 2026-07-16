@@ -1162,54 +1162,170 @@ Option 3" rows="4"></textarea><div style="display:flex;gap:6px;margin-top:10px">
 
   <!-- ══ CHAT OVERLAY WIDGET SETTINGS ══ -->
   <div id="widget-chat-settings" style="display:none">
-    <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:14px">
+    <div class="co-page-head">
       <button class="dark-btn" onclick="backToWidgetsHome()">← Retour aux widgets</button>
-      <div style="font-size:10px;color:var(--muted);font-weight:800;text-transform:uppercase;letter-spacing:.7px">Widget actif : Chat Overlay</div>
+      <div class="co-active-chip">Widget actif · Chat Overlay</div>
     </div>
-    <div class="header"><div><h1>Chat Overlay</h1><p>Affiche le chat Kick en source navigateur OBS</p></div></div>
+    <div class="header co-title-head"><div><h1>Chat Overlay Premium</h1><p>Configure le rendu du chat Kick et prévisualise chaque changement avant OBS.</p></div></div>
     <style>
-      #widget-chat-settings .co-toggle-line{display:flex;align-items:center;gap:10px;margin:8px 0 12px;font-size:13px;color:var(--text);cursor:pointer;user-select:none}
-      #widget-chat-settings .co-switch{position:relative;width:46px;height:24px;display:inline-block;flex:0 0 46px}
+      #widget-chat-settings{--co-accent:#53fc18}
+      #widget-chat-settings .co-page-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px}
+      #widget-chat-settings .co-active-chip{font-size:9px;color:#bbf7d0;font-weight:900;text-transform:uppercase;letter-spacing:.8px;padding:7px 10px;border-radius:999px;background:rgba(34,197,94,.10);border:1px solid rgba(34,197,94,.24)}
+      #widget-chat-settings .co-title-head{margin-bottom:16px}
+      #widget-chat-settings .co-layout{display:grid;grid-template-columns:minmax(0,1fr) 460px;gap:16px;align-items:start}
+      #widget-chat-settings .co-settings-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
+      #widget-chat-settings .co-section{background:var(--card);border:1px solid var(--brd);border-radius:16px;padding:16px}
+      #widget-chat-settings .co-section.wide{grid-column:1/-1}
+      #widget-chat-settings .co-section-title{display:flex;align-items:center;gap:8px;margin-bottom:12px;font-size:12px;font-weight:900}
+      #widget-chat-settings .co-section-sub{font-size:9px;color:var(--muted);margin-top:-7px;margin-bottom:10px;line-height:1.45}
+      #widget-chat-settings .co-toggle-line{display:flex;align-items:center;gap:10px;margin:7px 0;padding:7px 8px;border-radius:10px;font-size:11px;color:var(--text);cursor:pointer;user-select:none;transition:.15s}
+      #widget-chat-settings .co-toggle-line:hover{background:var(--card2)}
+      #widget-chat-settings .co-toggle-line b{font-weight:750}
+      #widget-chat-settings .co-switch{position:relative;width:42px;height:22px;display:inline-block;flex:0 0 42px}
       #widget-chat-settings .co-switch input{opacity:0;width:0;height:0;position:absolute}
       #widget-chat-settings .co-switch span{position:absolute;inset:0;background:#161827;border:1px solid var(--brd);border-radius:999px;transition:.18s}
-      #widget-chat-settings .co-switch span:before{content:'';position:absolute;width:18px;height:18px;left:3px;top:2px;border-radius:50%;background:#6b7280;transition:.18s}
-      #widget-chat-settings .co-switch input:checked + span{background:rgba(34,197,94,.35);border-color:#22c55e}
-      #widget-chat-settings .co-switch input:checked + span:before{transform:translateX(21px);background:#86efac}
+      #widget-chat-settings .co-switch span:before{content:'';position:absolute;width:16px;height:16px;left:3px;top:2px;border-radius:50%;background:#6b7280;transition:.18s}
+      #widget-chat-settings .co-switch input:checked + span{background:rgba(34,197,94,.30);border-color:#22c55e}
+      #widget-chat-settings .co-switch input:checked + span:before{transform:translateX(19px);background:#86efac}
+      #widget-chat-settings .co-fields{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+      #widget-chat-settings .co-theme-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+      #widget-chat-settings .co-theme-card{border:1px solid var(--brd);background:var(--card2);border-radius:12px;padding:10px;cursor:pointer;text-align:left;color:var(--text);font-family:inherit;transition:.18s}
+      #widget-chat-settings .co-theme-card:hover,#widget-chat-settings .co-theme-card.active{border-color:rgba(83,252,24,.55);box-shadow:0 0 0 3px rgba(83,252,24,.08)}
+      #widget-chat-settings .co-theme-card b{display:block;font-size:10px;margin-top:7px}
+      #widget-chat-settings .co-theme-demo{height:42px;border-radius:9px;display:flex;align-items:flex-end;padding:6px}
+      #widget-chat-settings .co-theme-demo span{height:10px;border-radius:5px;width:75%}
+      #widget-chat-settings .co-theme-premium{background:linear-gradient(135deg,#08101e,#151c33)}#widget-chat-settings .co-theme-premium span{background:#53fc18}
+      #widget-chat-settings .co-theme-glass{background:linear-gradient(135deg,rgba(30,41,59,.9),rgba(15,23,42,.55))}#widget-chat-settings .co-theme-glass span{background:#93c5fd}
+      #widget-chat-settings .co-theme-minimal{background:transparent;border:1px dashed #475569}#widget-chat-settings .co-theme-minimal span{background:#fff}
+      #widget-chat-settings .co-theme-neon{background:#020705;box-shadow:inset 0 0 14px rgba(83,252,24,.18)}#widget-chat-settings .co-theme-neon span{background:#53fc18;box-shadow:0 0 9px #53fc18}
+      #widget-chat-settings .co-theme-kick{background:linear-gradient(135deg,#050805,#102710)}#widget-chat-settings .co-theme-kick span{background:#53fc18}
+      #widget-chat-settings .co-theme-ocean{background:linear-gradient(135deg,#06263a,#0b4f6c)}#widget-chat-settings .co-theme-ocean span{background:#38bdf8}
+      #widget-chat-settings .co-theme-sunset{background:linear-gradient(135deg,#431407,#9a3412 55%,#7c2d12)}#widget-chat-settings .co-theme-sunset span{background:#fb923c}
+      #widget-chat-settings .co-theme-candy{background:linear-gradient(135deg,#4a044e,#831843 55%,#312e81)}#widget-chat-settings .co-theme-candy span{background:#f9a8d4}
+      #widget-chat-settings .co-theme-mono{background:linear-gradient(135deg,#111,#2b2b2b)}#widget-chat-settings .co-theme-mono span{background:#f5f5f5}
+      #widget-chat-settings .co-theme-cyber{background:linear-gradient(135deg,#050014,#1b0638)}#widget-chat-settings .co-theme-cyber span{background:#22d3ee;box-shadow:0 0 9px #22d3ee}
+      #widget-chat-settings .co-theme-royal{background:linear-gradient(135deg,#190b3d,#4c1d95)}#widget-chat-settings .co-theme-royal span{background:#c4b5fd}
+      #widget-chat-settings .co-theme-transparent{background:linear-gradient(135deg,rgba(15,23,42,.18),rgba(15,23,42,.04));border:1px dashed rgba(255,255,255,.3)}#widget-chat-settings .co-theme-transparent span{background:rgba(255,255,255,.85)}
+      #widget-chat-settings .co-theme-aurora{background:linear-gradient(135deg,#052e2b,#164e63 48%,#312e81)}#widget-chat-settings .co-theme-aurora span{background:linear-gradient(90deg,#2dd4bf,#818cf8)}
+      #widget-chat-settings .co-theme-fire{background:linear-gradient(135deg,#2b0904,#7c2d12 55%,#b91c1c)}#widget-chat-settings .co-theme-fire span{background:linear-gradient(90deg,#facc15,#f97316,#ef4444)}
+      #widget-chat-settings .co-theme-ice{background:linear-gradient(135deg,#082f49,#0e7490 55%,#bae6fd)}#widget-chat-settings .co-theme-ice span{background:#e0f2fe}
+      #widget-chat-settings .co-theme-sakura{background:linear-gradient(135deg,#4a1736,#9d174d 55%,#f9a8d4)}#widget-chat-settings .co-theme-sakura span{background:#fce7f3}
+      #widget-chat-settings .co-theme-gold{background:linear-gradient(135deg,#1c1403,#713f12 55%,#ca8a04)}#widget-chat-settings .co-theme-gold span{background:#fde68a}
+      #widget-chat-settings .co-theme-terminal{background:#020b05;border:1px solid #22c55e}#widget-chat-settings .co-theme-terminal span{background:#22c55e;box-shadow:0 0 9px #22c55e}
+
+      #widget-chat-settings .co-preview-panel{position:sticky;top:16px;background:var(--card);border:1px solid var(--brd);border-radius:16px;padding:16px}
+      #widget-chat-settings .co-preview-stage{height:520px;border-radius:15px;border:1px solid var(--brd);background:radial-gradient(circle at top right,rgba(83,252,24,.10),transparent 35%),linear-gradient(180deg,#121827,#050711);padding:18px;display:flex;align-items:flex-end;overflow:hidden}
+      #widget-chat-settings #co-preview{width:100%;display:flex;flex-direction:column;gap:9px}
+      #widget-chat-settings .co-preview-actions{display:grid;grid-template-columns:1fr auto;gap:8px;margin-top:12px}
+      #widget-chat-settings .co-test-status{min-height:18px;margin-top:8px;font-size:10px;color:var(--muted)}
+      #widget-chat-settings .co-test-status.ok{color:#86efac}#widget-chat-settings .co-test-status.err{color:#ff6b7a}
+      #widget-chat-settings .co-save-bar{display:flex;gap:10px;align-items:center;justify-content:flex-end;margin-top:12px}
+      @media(max-width:1250px){#widget-chat-settings .co-layout{grid-template-columns:1fr}#widget-chat-settings .co-preview-panel{position:static}#widget-chat-settings .co-preview-stage{height:420px}}
+      @media(max-width:850px){#widget-chat-settings .co-settings-grid{grid-template-columns:1fr}#widget-chat-settings .co-section.wide{grid-column:auto}#widget-chat-settings .co-theme-grid{grid-template-columns:repeat(2,1fr)}}
+      .co-preview-pop{animation:coPreviewPop .35s cubic-bezier(.2,.85,.25,1.12)}
+      .co-preview-slide{animation:coPreviewSlide .38s ease-out}.co-preview-slide-right{animation:coPreviewSlideRight .38s ease-out}
+      .co-preview-rise{animation:coPreviewRise .4s ease-out}.co-preview-zoom{animation:coPreviewZoom .35s ease-out}
+      .co-preview-bounce{animation:coPreviewBounce .55s cubic-bezier(.3,1.5,.4,1)}.co-preview-flip{animation:coPreviewFlip .5s ease-out}
+      .co-preview-glitch{animation:coPreviewGlitch .36s steps(2,end)}.co-preview-fade{animation:coPreviewFade .4s ease-out}
+      @keyframes coPreviewPop{from{opacity:.2;transform:translateY(12px) scale(.94)}to{opacity:1;transform:none}}
+      @keyframes coPreviewSlide{from{opacity:.2;transform:translateX(-45px)}to{opacity:1;transform:none}}
+      @keyframes coPreviewSlideRight{from{opacity:.2;transform:translateX(45px)}to{opacity:1;transform:none}}
+      @keyframes coPreviewRise{from{opacity:.1;transform:translateY(32px)}to{opacity:1;transform:none}}
+      @keyframes coPreviewZoom{from{opacity:.15;transform:scale(.72)}to{opacity:1;transform:none}}
+      @keyframes coPreviewBounce{0%{opacity:.2;transform:translateY(25px) scale(.9)}65%{opacity:1;transform:translateY(-7px) scale(1.03)}100%{transform:none}}
+      @keyframes coPreviewFlip{from{opacity:.1;transform:perspective(500px) rotateX(-70deg)}to{opacity:1;transform:none}}
+      @keyframes coPreviewGlitch{0%{opacity:.2;transform:translate(8px,-2px);filter:hue-rotate(90deg)}40%{transform:translate(-6px,2px)}100%{opacity:1;transform:none;filter:none}}
+      @keyframes coPreviewFade{from{opacity:0}to{opacity:1}}
     </style>
-    <div class="g2">
-      <div class="panel">
-        <h3>⚙️ Paramètres</h3>
-        <label class="co-toggle-line"><span class="co-switch"><input type="checkbox" id="co-enabled"><span></span></span><b>Activer l’overlay chat</b></label>
-        <label class="co-toggle-line"><span class="co-switch"><input type="checkbox" id="co-hide-bots"><span></span></span><b>Masquer les bots</b></label>
-        <label class="co-toggle-line"><span class="co-switch"><input type="checkbox" id="co-hide-commands"><span></span></span><b>Masquer les commandes qui commencent par !</b></label>
-        <label class="co-toggle-line"><span class="co-switch"><input type="checkbox" id="co-show-platform"><span></span></span><b>Afficher l’icône Kick</b></label>
-        <label class="co-toggle-line"><span class="co-switch"><input type="checkbox" id="co-show-time"><span></span></span><b>Afficher l’heure du message</b></label>
-        <label class="lbl">Utilisateurs ignorés</label>
-        <input class="inp" id="co-ignored" placeholder="BotRix, autrebot" style="margin-bottom:10px">
-        <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px">
-          <div><label class="lbl">Taille police</label><input type="number" class="inp" id="co-font-size" min="10" max="42"></div>
-          <div><label class="lbl">Durée message</label><input type="number" class="inp" id="co-duration" min="0" max="60"></div>
-          <div><label class="lbl">Messages affichés</label><input type="number" class="inp" id="co-max" min="1" max="30"></div>
-          <div><label class="lbl">Animation</label><select class="inp" id="co-animation"><option value="pop">Pop In</option><option value="slide">Slide</option><option value="fade">Fade</option><option value="none">Aucune</option></select></div>
-          <div style="grid-column:1/-1"><label class="lbl">Design</label><select class="inp" id="co-design"><option value="glass">Glass propre</option><option value="minimal">Minimal</option><option value="neon">Neon</option></select></div>
-        </div>
-        <button class="dark-btn" onclick="saveChatOverlaySettings()" style="width:100%;justify-content:center;margin-top:12px">ENREGISTRER</button>
-        <div class="obs-link-box">
-          <div class="obs-link-head"><b>🔗 Lien overlay OBS Chat</b><span><button class="obs-copy-btn" onclick="copyObsUrl('chat-obs-url')">Copier</button><button class="obs-regenerate-btn" onclick="regenerateObsToken('chat')">Régénérer</button></span></div>
-          <div class="obs-link-row"><code class="obs-link-code" id="chat-obs-url">/widgets/chat.html</code></div>
-          <span style="margin-top:6px;display:block">À mettre dans OBS en Source navigateur. Le lien est flouté pour éviter qu’il soit visible en live.</span>
-        </div>
-      </div>
-      <div class="panel">
-        <h3>👀 Aperçu</h3>
-        <div style="height:360px;border-radius:12px;border:1px solid var(--brd);background:radial-gradient(circle at top,#1e293b,#060814);padding:16px;display:flex;align-items:flex-end;overflow:hidden">
-          <div style="width:100%">
-            <div style="font-size:18px;font-weight:950;margin:8px 0;color:#fff"><span style="color:#22c55e">⬢ Elboy78</span> : GG le chat overlay est propre 🔥</div>
-            <div style="font-size:18px;font-weight:950;margin:8px 0;color:#fff"><span style="color:#a78bfa">⬢ Viewer</span> : test depuis Kick</div>
+    <div class="co-layout">
+      <div class="co-settings-grid">
+        <section class="co-section">
+          <div class="co-section-title">⚙️ Général</div>
+          <div class="co-section-sub">Activation et filtrage des messages envoyés vers OBS.</div>
+          <label class="co-toggle-line"><span class="co-switch"><input type="checkbox" id="co-enabled"><span></span></span><b>Activer l’overlay chat</b></label>
+          <label class="co-toggle-line"><span class="co-switch"><input type="checkbox" id="co-hide-bots"><span></span></span><b>Masquer les bots</b></label>
+          <label class="co-toggle-line"><span class="co-switch"><input type="checkbox" id="co-hide-commands"><span></span></span><b>Masquer les commandes en !</b></label>
+          <label class="lbl">Utilisateurs ignorés</label>
+          <input class="inp" id="co-ignored" placeholder="BotRix, autrebot">
+        </section>
+        <section class="co-section">
+          <div class="co-section-title">👤 Identité</div>
+          <div class="co-section-sub">Choisis les informations visibles autour du message.</div>
+          <label class="co-toggle-line"><span class="co-switch"><input type="checkbox" id="co-show-platform"><span></span></span><b>Afficher l’icône Kick</b></label>
+          <label class="co-toggle-line"><span class="co-switch"><input type="checkbox" id="co-show-time"><span></span></span><b>Afficher l’heure</b></label>
+          <label class="co-toggle-line"><span class="co-switch"><input type="checkbox" id="co-show-avatars"><span></span></span><b>Afficher les avatars</b></label>
+          <label class="co-toggle-line"><span class="co-switch"><input type="checkbox" id="co-show-badges"><span></span></span><b>Afficher les badges</b></label>
+          <label class="co-toggle-line"><span class="co-switch"><input type="checkbox" id="co-highlight-roles"><span></span></span><b>Mettre en valeur streamer et modos</b></label>
+        </section>
+        <section class="co-section">
+          <div class="co-section-title">💬 Messages</div>
+          <div class="co-section-sub">Durée de vie, fusion et capacité de l’overlay.</div>
+          <label class="co-toggle-line"><span class="co-switch"><input type="checkbox" id="co-group-messages"><span></span></span><b>Regrouper les messages successifs</b></label>
+          <div class="co-fields">
+            <div><label class="lbl">Durée d’affichage</label><input type="number" class="inp" id="co-duration" min="0" max="60"></div>
+            <div><label class="lbl">Messages maximum</label><input type="number" class="inp" id="co-max" min="1" max="30"></div>
+            <div><label class="lbl">Délai de regroupement</label><input type="number" class="inp" id="co-group-window" min="2" max="60"></div>
+            <div><label class="lbl">Taille de police</label><input type="number" class="inp" id="co-font-size" min="10" max="42"></div>
           </div>
-        </div>
-        <button class="dark-btn" onclick="testChatOverlay()" style="width:100%;justify-content:center;margin-top:12px">ENVOYER UN TEST SUR OBS</button>
+        </section>
+        <section class="co-section">
+          <div class="co-section-title">✨ Animation</div>
+          <div class="co-section-sub">Choisis la manière dont les messages apparaissent à l’écran.</div>
+          <label class="lbl">Animation d’entrée</label>
+          <select class="inp" id="co-animation">
+            <option value="pop">Pop In</option>
+            <option value="slide">Slide gauche</option>
+            <option value="slide-right">Slide droite</option>
+            <option value="rise">Montée douce</option>
+            <option value="zoom">Zoom</option>
+            <option value="bounce">Rebond</option>
+            <option value="flip">Flip 3D</option>
+            <option value="glitch">Glitch</option>
+            <option value="fade">Fondu</option>
+            <option value="none">Aucune</option>
+          </select>
+        </section>
+        <section class="co-section wide">
+          <div class="co-section-title">🎨 Thème</div>
+          <div class="co-section-sub">Clique sur un thème pour mettre à jour l’aperçu instantanément.</div>
+          <input type="hidden" id="co-design" value="premium">
+          <div class="co-theme-grid">
+            <button type="button" class="co-theme-card" aria-pressed="false" data-theme="premium" onclick="selectChatOverlayTheme('premium')"><div class="co-theme-demo co-theme-premium"><span></span></div><b>Premium</b></button>
+            <button type="button" class="co-theme-card" aria-pressed="false" data-theme="glass" onclick="selectChatOverlayTheme('glass')"><div class="co-theme-demo co-theme-glass"><span></span></div><b>Glass</b></button>
+            <button type="button" class="co-theme-card" aria-pressed="false" data-theme="minimal" onclick="selectChatOverlayTheme('minimal')"><div class="co-theme-demo co-theme-minimal"><span></span></div><b>Minimal</b></button>
+            <button type="button" class="co-theme-card" aria-pressed="false" data-theme="neon" onclick="selectChatOverlayTheme('neon')"><div class="co-theme-demo co-theme-neon"><span></span></div><b>Neon</b></button>
+            <button type="button" class="co-theme-card" aria-pressed="false" data-theme="kick" onclick="selectChatOverlayTheme('kick')"><div class="co-theme-demo co-theme-kick"><span></span></div><b>Kick</b></button>
+            <button type="button" class="co-theme-card" aria-pressed="false" data-theme="ocean" onclick="selectChatOverlayTheme('ocean')"><div class="co-theme-demo co-theme-ocean"><span></span></div><b>Ocean</b></button>
+            <button type="button" class="co-theme-card" aria-pressed="false" data-theme="sunset" onclick="selectChatOverlayTheme('sunset')"><div class="co-theme-demo co-theme-sunset"><span></span></div><b>Sunset</b></button>
+            <button type="button" class="co-theme-card" aria-pressed="false" data-theme="candy" onclick="selectChatOverlayTheme('candy')"><div class="co-theme-demo co-theme-candy"><span></span></div><b>Candy</b></button>
+            <button type="button" class="co-theme-card" aria-pressed="false" data-theme="mono" onclick="selectChatOverlayTheme('mono')"><div class="co-theme-demo co-theme-mono"><span></span></div><b>Mono</b></button>
+            <button type="button" class="co-theme-card" aria-pressed="false" data-theme="cyber" onclick="selectChatOverlayTheme('cyber')"><div class="co-theme-demo co-theme-cyber"><span></span></div><b>Cyber</b></button>
+            <button type="button" class="co-theme-card" aria-pressed="false" data-theme="royal" onclick="selectChatOverlayTheme('royal')"><div class="co-theme-demo co-theme-royal"><span></span></div><b>Royal</b></button>
+            <button type="button" class="co-theme-card" aria-pressed="false" data-theme="transparent" onclick="selectChatOverlayTheme('transparent')"><div class="co-theme-demo co-theme-transparent"><span></span></div><b>Transparent</b></button>
+            <button type="button" class="co-theme-card" aria-pressed="false" data-theme="aurora"><div class="co-theme-demo co-theme-aurora"><span></span></div><b>Aurora</b></button>
+            <button type="button" class="co-theme-card" aria-pressed="false" data-theme="fire"><div class="co-theme-demo co-theme-fire"><span></span></div><b>Fire</b></button>
+            <button type="button" class="co-theme-card" aria-pressed="false" data-theme="ice"><div class="co-theme-demo co-theme-ice"><span></span></div><b>Ice</b></button>
+            <button type="button" class="co-theme-card" aria-pressed="false" data-theme="sakura"><div class="co-theme-demo co-theme-sakura"><span></span></div><b>Sakura</b></button>
+            <button type="button" class="co-theme-card" aria-pressed="false" data-theme="gold"><div class="co-theme-demo co-theme-gold"><span></span></div><b>Gold</b></button>
+            <button type="button" class="co-theme-card" aria-pressed="false" data-theme="terminal"><div class="co-theme-demo co-theme-terminal"><span></span></div><b>Terminal</b></button>
+          </div>
+          <div class="co-save-bar"><button class="dark-btn" onclick="saveChatOverlaySettings()">ENREGISTRER LES RÉGLAGES</button></div>
+          <div class="obs-link-box">
+            <div class="obs-link-head"><b>🔗 Lien overlay OBS Chat</b><span><button class="obs-copy-btn" onclick="copyObsUrl('chat-obs-url')">Copier</button><button class="obs-regenerate-btn" onclick="regenerateObsToken('chat')">Régénérer</button></span></div>
+            <div class="obs-link-row"><code class="obs-link-code" id="chat-obs-url">/widgets/chat.html</code></div>
+            <span style="margin-top:6px;display:block">À mettre dans OBS en Source navigateur. Le lien est flouté pour éviter qu’il soit visible en live.</span>
+          </div>
+        </section>
       </div>
+      <aside class="co-preview-panel">
+        <h3 style="margin-bottom:12px">👀 Aperçu en direct</h3>
+        <div class="co-preview-stage"><div id="co-preview"></div></div>
+        <div class="co-preview-actions">
+          <button class="dark-btn" onclick="testChatOverlay()" style="justify-content:center">ENVOYER UN TEST SUR OBS</button>
+          <button class="btnx btn-ghost" onclick="renderChatOverlayPreview()">↻</button>
+        </div>
+        <div id="co-test-status" class="co-test-status">Le test apparaîtra dans la source navigateur OBS ouverte avec le lien ci-dessus.</div>
+      </aside>
     </div>
   </div>
 
@@ -5504,59 +5620,650 @@ try {
 } catch(e) {}
 
 
-// ── Chat Overlay ──────────────────────────────────────────────────────────────
-const CHAT_OVERLAY_LOCAL_KEY = 'bot7up_chat_overlay_settings_backup';
-function applyChatOverlaySettings(d) {
-  setCheck('co-enabled', !!d.enabled);
-  setCheck('co-hide-bots', !!d.hideBots);
-  setCheck('co-hide-commands', !!d.hideCommands);
-  setCheck('co-show-platform', !!d.showPlatformIcon);
-  setCheck('co-show-time', !!d.showTime);
-  setVal('co-ignored', d.ignoredUsers || 'BotRix,botrix');
-  setVal('co-font-size', d.fontSize || 21);
-  setVal('co-duration', d.messageDuration ?? 10);
-  setVal('co-max', d.maxMessages || 8);
-  setVal('co-animation', d.animation || 'pop');
-  setVal('co-design', d.design || 'glass');
-  hydrateAllObsLinks();
-  hydrateAllObsLinks();
+// ── Chat Overlay V3 autonome ─────────────────────────────────────────────────
+const ChatOverlayUI = (() => {
+  const LOCAL_KEY = 'elbot_chat_overlay_v3';
+  const DEFAULTS = Object.freeze({
+    enabled: true,
+    hideBots: true,
+    hideCommands: true,
+    showPlatformIcon: true,
+    showTime: false,
+    showAvatars: true,
+    showBadges: true,
+    groupMessages: true,
+    groupWindow: 12,
+    highlightRoles: true,
+    ignoredUsers: 'BotRix,botrix',
+    fontSize: 21,
+    messageDuration: 10,
+    maxMessages: 8,
+    animation: 'pop',
+    design: 'premium'
+  });
+
+  const ALLOWED_THEMES = new Set([
+    'premium', 'glass', 'minimal', 'neon',
+    'kick', 'ocean', 'sunset', 'candy',
+    'mono', 'cyber', 'royal', 'transparent',
+    'aurora', 'fire', 'ice', 'sakura',
+    'gold', 'terminal'
+  ]);
+
+  let saveTimer = null;
+  let savePromise = null;
+  let pendingSave = false;
+  let controlsBound = false;
+  let applying = false;
+
+  const byId = id => document.getElementById(id);
+
+  function streamerSlug() {
+    const match = location.pathname.match(/^\/s\/([^/]+)/i);
+    return String(
+      match?.[1] ||
+      window.CURRENT_STREAMER_SLUG ||
+      'default'
+    ).trim().toLowerCase();
+  }
+
+  function storageKey() {
+    return `${LOCAL_KEY}:${streamerSlug()}`;
+  }
+
+  function setChecked(id, value) {
+    const element = byId(id);
+    if (element) element.checked = Boolean(value);
+  }
+
+  function setValue(id, value) {
+    const element = byId(id);
+    if (element) element.value = value ?? '';
+  }
+
+  function checked(id, fallback = false) {
+    const element = byId(id);
+    return element ? Boolean(element.checked) : fallback;
+  }
+
+  function value(id, fallback = '') {
+    const element = byId(id);
+    return element ? element.value : fallback;
+  }
+
+  function numberValue(id, fallback) {
+    const parsed = Number(value(id, fallback));
+    return Number.isFinite(parsed) ? parsed : fallback;
+  }
+
+  function normalize(input = {}) {
+    const source =
+      input && typeof input === 'object' ? input : {};
+
+    const design = ALLOWED_THEMES.has(
+      String(source.design || '').toLowerCase()
+    )
+      ? String(source.design).toLowerCase()
+      : DEFAULTS.design;
+
+    return {
+      enabled:
+        typeof source.enabled === 'boolean'
+          ? source.enabled
+          : DEFAULTS.enabled,
+      hideBots:
+        typeof source.hideBots === 'boolean'
+          ? source.hideBots
+          : DEFAULTS.hideBots,
+      hideCommands:
+        typeof source.hideCommands === 'boolean'
+          ? source.hideCommands
+          : DEFAULTS.hideCommands,
+      showPlatformIcon:
+        typeof source.showPlatformIcon === 'boolean'
+          ? source.showPlatformIcon
+          : DEFAULTS.showPlatformIcon,
+      showTime:
+        typeof source.showTime === 'boolean'
+          ? source.showTime
+          : DEFAULTS.showTime,
+      showAvatars:
+        typeof source.showAvatars === 'boolean'
+          ? source.showAvatars
+          : DEFAULTS.showAvatars,
+      showBadges:
+        typeof source.showBadges === 'boolean'
+          ? source.showBadges
+          : DEFAULTS.showBadges,
+      groupMessages:
+        typeof source.groupMessages === 'boolean'
+          ? source.groupMessages
+          : DEFAULTS.groupMessages,
+      groupWindow: Math.min(
+        60,
+        Math.max(
+          2,
+          Number.parseInt(
+            source.groupWindow ?? DEFAULTS.groupWindow,
+            10
+          ) || DEFAULTS.groupWindow
+        )
+      ),
+      highlightRoles:
+        typeof source.highlightRoles === 'boolean'
+          ? source.highlightRoles
+          : DEFAULTS.highlightRoles,
+      ignoredUsers:
+        typeof source.ignoredUsers === 'string'
+          ? source.ignoredUsers.slice(0, 500)
+          : DEFAULTS.ignoredUsers,
+      fontSize: Math.min(
+        42,
+        Math.max(
+          10,
+          Number.parseInt(
+            source.fontSize ?? DEFAULTS.fontSize,
+            10
+          ) || DEFAULTS.fontSize
+        )
+      ),
+      messageDuration: Math.min(
+        60,
+        Math.max(
+          0,
+          Number.parseInt(
+            source.messageDuration ??
+              DEFAULTS.messageDuration,
+            10
+          )
+        )
+      ),
+      maxMessages: Math.min(
+        30,
+        Math.max(
+          1,
+          Number.parseInt(
+            source.maxMessages ?? DEFAULTS.maxMessages,
+            10
+          ) || DEFAULTS.maxMessages
+        )
+      ),
+      animation:
+        typeof source.animation === 'string'
+          ? source.animation.slice(0, 30)
+          : DEFAULTS.animation,
+      design
+    };
+  }
+
+  function readForm() {
+    return normalize({
+      enabled: checked('co-enabled', DEFAULTS.enabled),
+      hideBots: checked('co-hide-bots', DEFAULTS.hideBots),
+      hideCommands: checked(
+        'co-hide-commands',
+        DEFAULTS.hideCommands
+      ),
+      showPlatformIcon: checked(
+        'co-show-platform',
+        DEFAULTS.showPlatformIcon
+      ),
+      showTime: checked('co-show-time', DEFAULTS.showTime),
+      showAvatars: checked(
+        'co-show-avatars',
+        DEFAULTS.showAvatars
+      ),
+      showBadges: checked(
+        'co-show-badges',
+        DEFAULTS.showBadges
+      ),
+      groupMessages: checked(
+        'co-group-messages',
+        DEFAULTS.groupMessages
+      ),
+      groupWindow: numberValue(
+        'co-group-window',
+        DEFAULTS.groupWindow
+      ),
+      highlightRoles: checked(
+        'co-highlight-roles',
+        DEFAULTS.highlightRoles
+      ),
+      ignoredUsers: value(
+        'co-ignored',
+        DEFAULTS.ignoredUsers
+      ),
+      fontSize: numberValue(
+        'co-font-size',
+        DEFAULTS.fontSize
+      ),
+      messageDuration: numberValue(
+        'co-duration',
+        DEFAULTS.messageDuration
+      ),
+      maxMessages: numberValue(
+        'co-max',
+        DEFAULTS.maxMessages
+      ),
+      animation: value(
+        'co-animation',
+        DEFAULTS.animation
+      ),
+      design: value('co-design', DEFAULTS.design)
+    });
+  }
+
+  function updateThemeCards(design) {
+    document
+      .querySelectorAll(
+        '#widget-chat-settings .co-theme-card[data-theme]'
+      )
+      .forEach(card => {
+        const active =
+          String(card.dataset.theme) === String(design);
+
+        card.classList.toggle('active', active);
+        card.setAttribute(
+          'aria-pressed',
+          active ? 'true' : 'false'
+        );
+      });
+  }
+
+  function apply(input, options = {}) {
+    const settings = normalize(input);
+    applying = true;
+
+    setChecked('co-enabled', settings.enabled);
+    setChecked('co-hide-bots', settings.hideBots);
+    setChecked(
+      'co-hide-commands',
+      settings.hideCommands
+    );
+    setChecked(
+      'co-show-platform',
+      settings.showPlatformIcon
+    );
+    setChecked('co-show-time', settings.showTime);
+    setChecked('co-show-avatars', settings.showAvatars);
+    setChecked('co-show-badges', settings.showBadges);
+    setChecked(
+      'co-group-messages',
+      settings.groupMessages
+    );
+    setChecked(
+      'co-highlight-roles',
+      settings.highlightRoles
+    );
+
+    setValue('co-group-window', settings.groupWindow);
+    setValue('co-ignored', settings.ignoredUsers);
+    setValue('co-font-size', settings.fontSize);
+    setValue('co-duration', settings.messageDuration);
+    setValue('co-max', settings.maxMessages);
+    setValue('co-animation', settings.animation);
+    setValue('co-design', settings.design);
+
+    updateThemeCards(settings.design);
+    applying = false;
+
+    try {
+      localStorage.setItem(
+        storageKey(),
+        JSON.stringify(settings)
+      );
+    } catch (error) {}
+
+    if (typeof hydrateAllObsLinks === 'function') {
+      hydrateAllObsLinks();
+    }
+
+    renderChatOverlayPreview();
+
+    if (!options.skipBind) bind();
+
+    return settings;
+  }
+
+  function readBackup() {
+    try {
+      const parsed = JSON.parse(
+        localStorage.getItem(storageKey()) || 'null'
+      );
+      return parsed ? normalize(parsed) : null;
+    } catch (error) {
+      return null;
+    }
+  }
+
+  async function load() {
+    const backup = readBackup();
+
+    try {
+      const response = await fetch(
+        API + '/api/widgets/chat-overlay?ts=' + Date.now(),
+        {
+          cache: 'no-store',
+          credentials: 'same-origin',
+          headers: {
+            'Cache-Control': 'no-cache'
+          }
+        }
+      );
+
+      const data = await response.json().catch(() => ({}));
+
+      if (!response.ok || data.error) {
+        throw new Error(
+          data.error ||
+          'Impossible de charger les réglages'
+        );
+      }
+
+      return apply(data);
+    } catch (error) {
+      console.error('[CHAT OVERLAY LOAD]', error);
+      return apply(backup || DEFAULTS);
+    }
+  }
+
+  async function save(options = {}) {
+    const silent = Boolean(options.silent);
+
+    if (savePromise) {
+      pendingSave = true;
+      return savePromise;
+    }
+
+    const settings = readForm();
+
+    try {
+      localStorage.setItem(
+        storageKey(),
+        JSON.stringify(settings)
+      );
+    } catch (error) {}
+
+    savePromise = (async () => {
+      const response = await fetch(
+        API + '/api/admin/widgets/chat-overlay/settings',
+        {
+          method: 'POST',
+          credentials: 'same-origin',
+          cache: 'no-store',
+          headers: {
+            'Content-Type': 'application/json',
+            'Cache-Control': 'no-cache'
+          },
+          body: JSON.stringify(settings)
+        }
+      );
+
+      const result = await response
+        .json()
+        .catch(() => ({}));
+
+      if (!response.ok || result.success !== true) {
+        throw new Error(
+          result.error ||
+          'Enregistrement impossible'
+        );
+      }
+
+      if (
+        !result.settings ||
+        typeof result.settings !== 'object'
+      ) {
+        throw new Error(
+          'Le serveur n’a pas confirmé les réglages'
+        );
+      }
+
+      const saved = apply(result.settings);
+
+      if (!silent) {
+        toast('Chat Overlay enregistré ✓');
+      }
+
+      return saved;
+    })();
+
+    try {
+      return await savePromise;
+    } catch (error) {
+      console.error('[CHAT OVERLAY SAVE]', error);
+
+      if (!silent) {
+        toast(
+          error.message ||
+          'Erreur d’enregistrement'
+        );
+      }
+
+      throw error;
+    } finally {
+      savePromise = null;
+
+      if (pendingSave) {
+        pendingSave = false;
+        scheduleSave(150);
+      }
+    }
+  }
+
+  function scheduleSave(delay = 550) {
+    if (applying) return;
+
+    clearTimeout(saveTimer);
+    saveTimer = setTimeout(() => {
+      save({ silent: true }).catch(() => {});
+    }, delay);
+  }
+
+  function selectTheme(theme) {
+    const selected = ALLOWED_THEMES.has(
+      String(theme || '').toLowerCase()
+    )
+      ? String(theme).toLowerCase()
+      : DEFAULTS.design;
+
+    setValue('co-design', selected);
+    updateThemeCards(selected);
+    renderChatOverlayPreview();
+    scheduleSave(100);
+  }
+
+  function previewAnimation() {
+    const box = byId('co-preview');
+    if (!box) return;
+
+    const animation =
+      value('co-animation', DEFAULTS.animation);
+
+    box.classList.remove(
+      'co-preview-pop',
+      'co-preview-slide',
+      'co-preview-slide-right',
+      'co-preview-rise',
+      'co-preview-zoom',
+      'co-preview-bounce',
+      'co-preview-flip',
+      'co-preview-glitch',
+      'co-preview-fade'
+    );
+
+    void box.offsetWidth;
+
+    if (animation !== 'none') {
+      box.classList.add(`co-preview-${animation}`);
+    }
+
+    scheduleSave(100);
+  }
+
+  function bind() {
+    const root = byId('widget-chat-settings');
+
+    if (!root || controlsBound) return;
+
+    controlsBound = true;
+
+    root.addEventListener('click', event => {
+      const card = event.target.closest(
+        '.co-theme-card[data-theme]'
+      );
+
+      if (!card) return;
+
+      event.preventDefault();
+      event.stopPropagation();
+      selectTheme(card.dataset.theme);
+    });
+
+    root.addEventListener('change', event => {
+      if (!event.target.matches(
+        'input, select, textarea'
+      )) {
+        return;
+      }
+
+      if (event.target.id === 'co-animation') {
+        previewAnimation();
+      } else {
+        renderChatOverlayPreview();
+        scheduleSave(250);
+      }
+    });
+
+    root.addEventListener('input', event => {
+      if (!event.target.matches(
+        'input[type="number"], input[type="text"], textarea'
+      )) {
+        return;
+      }
+
+      renderChatOverlayPreview();
+      scheduleSave(650);
+    });
+  }
+
+  return {
+    bind,
+    load,
+    save,
+    apply,
+    readForm,
+    selectTheme,
+    previewAnimation,
+    scheduleSave,
+    defaults: DEFAULTS
+  };
+})();
+
+function chatOverlayStorageKey() {
+  const match = location.pathname.match(/^\/s\/([^/]+)/i);
+  const slug = String(
+    match?.[1] ||
+    window.CURRENT_STREAMER_SLUG ||
+    'default'
+  ).trim().toLowerCase();
+
+  return `elbot_chat_overlay_v3:${slug}`;
 }
-async function loadChatOverlaySettings() {
-  let backup = null;
-  try { backup = JSON.parse(localStorage.getItem(CHAT_OVERLAY_LOCAL_KEY) || 'null'); } catch(e) {}
-  if (backup) applyChatOverlaySettings(backup);
+
+function currentChatOverlaySettingsFromForm() {
+  return ChatOverlayUI.readForm();
+}
+
+function applyChatOverlaySettings(settings) {
+  return ChatOverlayUI.apply(settings);
+}
+
+function loadChatOverlaySettings() {
+  return ChatOverlayUI.load();
+}
+
+function saveChatOverlaySettings(options = {}) {
+  return ChatOverlayUI.save(options);
+}
+
+function scheduleChatOverlaySave(delay = 550) {
+  ChatOverlayUI.scheduleSave?.(delay);
+}
+
+window.selectChatOverlayTheme = theme =>
+  ChatOverlayUI.selectTheme(theme);
+
+function renderChatOverlayPreview() {
+  const box = document.getElementById('co-preview');
+  if (!box) return;
+  const cfg = currentChatOverlaySettingsFromForm();
+  const design = cfg.design || 'premium';
+  const previewThemes = {
+    premium: 'background:linear-gradient(135deg,rgba(8,12,21,.92),rgba(18,24,42,.72));border:1px solid rgba(255,255,255,.15);box-shadow:0 14px 34px rgba(0,0,0,.32);padding:11px 13px;border-radius:16px',
+    glass: 'background:rgba(15,23,42,.52);border:1px solid rgba(255,255,255,.18);backdrop-filter:blur(14px);padding:11px 13px;border-radius:15px',
+    minimal: 'background:transparent;border:0;padding:5px 0;text-shadow:0 2px 4px #000',
+    neon: 'background:rgba(2,7,5,.78);border:1px solid rgba(83,252,24,.55);box-shadow:0 0 24px rgba(83,252,24,.18);padding:11px 13px;border-radius:15px',
+    kick: 'background:linear-gradient(135deg,rgba(5,8,5,.94),rgba(16,39,16,.84));border:1px solid rgba(83,252,24,.34);padding:11px 13px;border-radius:15px',
+    ocean: 'background:linear-gradient(135deg,rgba(6,38,58,.94),rgba(11,79,108,.78));border:1px solid rgba(56,189,248,.45);box-shadow:0 14px 34px rgba(14,165,233,.14);padding:11px 13px;border-radius:16px',
+    sunset: 'background:linear-gradient(135deg,rgba(67,20,7,.95),rgba(154,52,18,.82));border:1px solid rgba(251,146,60,.42);padding:11px 13px;border-radius:16px',
+    candy: 'background:linear-gradient(135deg,rgba(74,4,78,.94),rgba(131,24,67,.82),rgba(49,46,129,.78));border:1px solid rgba(249,168,212,.38);padding:11px 13px;border-radius:18px',
+    mono: 'background:linear-gradient(135deg,rgba(17,17,17,.95),rgba(43,43,43,.88));border:1px solid rgba(255,255,255,.22);padding:11px 13px;border-radius:12px;filter:grayscale(1)',
+    cyber: 'background:linear-gradient(135deg,rgba(5,0,20,.95),rgba(27,6,56,.88));border:1px solid rgba(34,211,238,.52);box-shadow:0 0 25px rgba(34,211,238,.15);padding:11px 13px;border-radius:8px',
+    royal: 'background:linear-gradient(135deg,rgba(25,11,61,.96),rgba(76,29,149,.84));border:1px solid rgba(196,181,253,.42);box-shadow:0 14px 38px rgba(124,58,237,.16);padding:11px 13px;border-radius:18px',
+    transparent: 'background:rgba(15,23,42,.10);border:1px solid rgba(255,255,255,.16);backdrop-filter:blur(6px);padding:10px 12px;border-radius:14px;text-shadow:0 2px 5px rgba(0,0,0,.9)',
+    aurora: 'background:linear-gradient(135deg,rgba(5,46,43,.95),rgba(22,78,99,.85),rgba(49,46,129,.82));border:1px solid rgba(45,212,191,.42);padding:11px 13px;border-radius:18px',
+    fire: 'background:linear-gradient(135deg,rgba(43,9,4,.96),rgba(124,45,18,.86),rgba(185,28,28,.82));border:1px solid rgba(249,115,22,.5);padding:11px 13px;border-radius:14px',
+    ice: 'background:linear-gradient(135deg,rgba(8,47,73,.96),rgba(14,116,144,.84),rgba(186,230,253,.28));border:1px solid rgba(186,230,253,.55);padding:11px 13px;border-radius:17px',
+    sakura: 'background:linear-gradient(135deg,rgba(74,23,54,.96),rgba(157,23,77,.85),rgba(249,168,212,.32));border:1px solid rgba(249,168,212,.52);padding:11px 13px;border-radius:20px',
+    gold: 'background:linear-gradient(135deg,rgba(28,20,3,.97),rgba(113,63,18,.88),rgba(202,138,4,.42));border:1px solid rgba(253,230,138,.55);padding:11px 13px;border-radius:14px',
+    terminal: 'background:rgba(2,11,5,.97);border:1px solid rgba(34,197,94,.72);box-shadow:0 0 24px rgba(34,197,94,.14);padding:11px 13px;border-radius:6px;font-family:monospace'
+  };
+  const base = previewThemes[design] || previewThemes.premium;
+  const avatar = cfg.showAvatars ? '<div style="width:40px;height:40px;flex:0 0 40px;border-radius:12px;background:linear-gradient(135deg,#22c55e,#15803d);display:grid;place-items:center;font-weight:950;color:#061208">E</div>' : '';
+  const badges = cfg.showBadges ? '<span style="font-size:8px;padding:2px 5px;border-radius:6px;background:#60a5fa;color:#06101e;font-weight:950">MOD</span>' : '';
+  const kick = cfg.showPlatformIcon ? '<span style="width:17px;height:17px;border-radius:5px;background:#53fc18;color:#071106;display:inline-grid;place-items:center;font-size:8px;font-weight:950">K</span>' : '';
+  const clock = cfg.showTime ? '<small style="color:#94a3b8;margin-left:auto">15:42</small>' : '';
+  box.innerHTML = `
+    <div style="display:flex;gap:10px;align-items:flex-start;${base}">${avatar}<div style="min-width:0;flex:1"><div style="display:flex;align-items:center;gap:5px">${kick}${badges}<b style="color:#53fc18">Elboy78</b>${clock}</div><div style="font-size:${Math.max(14,Math.min(24,cfg.fontSize))}px;font-weight:760;margin-top:4px;color:#fff">GG le nouvel overlay est propre 🔥</div>${cfg.groupMessages?'<div style="font-size:14px;font-weight:680;margin-top:4px;color:#e2e8f0">Deuxième message regroupé automatiquement</div>':''}</div></div>
+    <div style="display:flex;gap:10px;align-items:flex-start;${base}">${cfg.showAvatars?'<div style="width:40px;height:40px;flex:0 0 40px;border-radius:12px;background:linear-gradient(135deg,#a78bfa,#7c3aed);display:grid;place-items:center;font-weight:950">V</div>':''}<div><b style="color:#a78bfa">Viewer</b><div style="font-size:${Math.max(14,Math.min(24,cfg.fontSize))}px;font-weight:750;margin-top:4px">test depuis Kick</div></div></div>`;
+}
+
+
+
+function previewChatOverlayAnimation() {
+  ChatOverlayUI.previewAnimation();
+}
+
+async function testChatOverlay() {
+  const status = document.getElementById('co-test-status');
+  if (status) { status.className = 'co-test-status'; status.textContent = 'Envoi du message test…'; }
   try {
-    const r = await fetch(API + '/api/widgets/chat-overlay?ts=' + Date.now(), { cache:'no-store' });
-    const d = await r.json();
-    applyChatOverlaySettings(d);
-    try { localStorage.setItem(CHAT_OVERLAY_LOCAL_KEY, JSON.stringify(d)); } catch(e) {}
-  } catch(e) {
-    if (!backup) applyChatOverlaySettings({ enabled:true, hideBots:true, hideCommands:true, showPlatformIcon:true, showTime:false, ignoredUsers:'BotRix,botrix', fontSize:21, messageDuration:10, maxMessages:8, animation:'pop', design:'glass' });
+    const response = await fetch(API + '/api/admin/widgets/chat-overlay/test', {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ username:'Elboy78', message:'Message test Overlay Chat ✨' })
+    });
+    const result = await response.json().catch(() => ({}));
+    if (!response.ok || !result.delivered) throw new Error(result.error || 'Le test n’a pas été diffusé');
+    if (status) { status.className = 'co-test-status ok'; status.textContent = `Test envoyé à l’overlay ${result.streamer || ''} ✓`; }
+    toast('Message test envoyé dans OBS ✓');
+  } catch (error) {
+    if (status) { status.className = 'co-test-status err'; status.textContent = error.message || 'Erreur pendant le test OBS'; }
+    toast(error.message || 'Erreur test Overlay Chat');
   }
 }
-async function saveChatOverlaySettings() {
-  const body = {
-    enabled: !!document.getElementById('co-enabled')?.checked,
-    hideBots: !!document.getElementById('co-hide-bots')?.checked,
-    hideCommands: !!document.getElementById('co-hide-commands')?.checked,
-    showPlatformIcon: !!document.getElementById('co-show-platform')?.checked,
-    showTime: !!document.getElementById('co-show-time')?.checked,
-    ignoredUsers: document.getElementById('co-ignored')?.value || '',
-    fontSize: Number(document.getElementById('co-font-size')?.value || 21),
-    messageDuration: Number(document.getElementById('co-duration')?.value || 10),
-    maxMessages: Number(document.getElementById('co-max')?.value || 8),
-    animation: document.getElementById('co-animation')?.value || 'pop',
-    design: document.getElementById('co-design')?.value || 'glass'
-  };
-  try { localStorage.setItem(CHAT_OVERLAY_LOCAL_KEY, JSON.stringify(body)); } catch(e) {}
-  await fetch(API + '/api/admin/widgets/chat-overlay/settings', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body) });
-  toast('Chat Overlay enregistré ✓');
-  loadChatOverlaySettings();
+
+if (document.readyState === 'loading') {
+  document.addEventListener(
+    'DOMContentLoaded',
+    () => ChatOverlayUI.bind(),
+    { once: true }
+  );
+} else {
+  ChatOverlayUI.bind();
 }
-async function testChatOverlay() {
-  await fetch(API + '/api/admin/widgets/chat-overlay/test', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ message:'Message test overlay chat ✨' }) });
-  toast('Message test envoyé ✓');
-}
+
 
 // ── TTS ───────────────────────────────────────────────────────────────────────
 
