@@ -1041,6 +1041,58 @@ Option 3" rows="4"></textarea><div style="display:flex;gap:6px;margin-top:10px">
       #widget-songrequest-settings .sr-queue-row[draggable=true]:active{cursor:grabbing}
       #widget-songrequest-settings .sr-queue-row.dragging{opacity:.38;transform:scale(.985)}
       #widget-songrequest-settings .sr-queue-row.drag-over{border-color:rgba(96,165,250,.7);background:rgba(96,165,250,.10);transform:translateY(2px)}
+      #widget-songrequest-settings .sr-queue-row.sr-drop-before,
+      #widget-songrequest-settings .sr-queue-row.sr-drop-after{position:relative}
+      #widget-songrequest-settings .sr-queue-row.sr-drop-before::before,
+      #widget-songrequest-settings .sr-queue-row.sr-drop-after::after{
+        content:'';
+        position:absolute;
+        left:10px;
+        right:10px;
+        height:3px;
+        z-index:20;
+        border-radius:999px;
+        background:#60a5fa;
+        box-shadow:0 0 13px rgba(96,165,250,.85)
+      }
+      #widget-songrequest-settings .sr-queue-row.sr-drop-before::before{top:-6px}
+      #widget-songrequest-settings .sr-queue-row.sr-drop-after::after{bottom:-6px}
+      #widget-songrequest-settings .sr-queue-row img{-webkit-user-drag:none;user-select:none}
+      #widget-songrequest-settings .sr-row-actions{display:flex;align-items:center;justify-content:flex-end;flex-shrink:0}
+      #widget-songrequest-settings .sr-more-actions{min-width:34px;justify-content:center;font-size:16px;letter-spacing:1px;line-height:1}
+      #sr-actions-menu{
+        position:fixed;
+        z-index:20050;
+        display:none;
+        min-width:210px;
+        padding:7px;
+        border-radius:13px;
+        background:rgba(10,14,30,.98);
+        border:1px solid rgba(148,163,184,.24);
+        box-shadow:0 22px 60px rgba(0,0,0,.55);
+        backdrop-filter:blur(18px);
+        -webkit-backdrop-filter:blur(18px)
+      }
+      #sr-actions-menu.open{display:block}
+      #sr-actions-menu button{
+        width:100%;
+        display:flex;
+        align-items:center;
+        gap:9px;
+        padding:9px 10px;
+        border:0;
+        border-radius:9px;
+        background:transparent;
+        color:var(--text);
+        font:inherit;
+        font-size:11px;
+        font-weight:750;
+        text-align:left;
+        cursor:pointer
+      }
+      #sr-actions-menu button:hover{background:rgba(96,165,250,.12)}
+      #sr-actions-menu button.danger{color:#ff6b7a}
+      #sr-actions-menu button.danger:hover{background:rgba(255,59,95,.12)}
       #widget-songrequest-settings .sr-drag-handle{width:28px;height:38px;border-radius:9px;display:grid;place-items:center;color:#94a3b8;font-size:18px;flex:0 0 28px;user-select:none}
       #widget-songrequest-settings .sr-eta{font-size:9px;color:#93c5fd;font-weight:900;margin-top:3px}
       @media(max-width:720px){#widget-songrequest-settings .sr-player-main{align-items:flex-start}#widget-songrequest-settings .sr-cover{width:88px;height:58px}#widget-songrequest-settings .sr-song-title{font-size:17px}#widget-songrequest-settings .sr-volume-box{width:100%;justify-content:center;margin-left:0}}
@@ -4811,11 +4863,15 @@ function renderSongRequestQueue(queue) {
         <div style="font-size:10px;color:var(--muted);margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${sub}${s.durationText ? ' · ' + escapeHtml(s.durationText) : ''}</div>
         <div class="sr-eta">${eta}</div>
       </div>
-      <div style="display:flex;gap:5px;flex-shrink:0;flex-wrap:wrap;justify-content:flex-end;max-width:300px">
-        ${i > 0 ? `<button class="btnx btn-outline btn-xs" onclick="playSongRequestItem('${escapeAttr(s.id)}')">▶ Lire</button>` : ''}
-        <button class="btnx btn-ghost btn-xs" onclick="editSongRequestItem('${escapeAttr(s.id)}')">✎ Modifier</button>
-        ${s.url ? `<button class="btnx btn-ghost btn-xs" onclick="window.open('${escapeAttr(s.url)}','_blank')">Ouvrir</button>` : ''}
-        <button class="btnx btn-red btn-xs" onclick="deleteSongRequest('${escapeAttr(s.id)}')">✕</button>
+      <div class="sr-row-actions">
+        <button
+          class="btnx btn-ghost btn-xs sr-more-actions"
+          type="button"
+          aria-haspopup="menu"
+          aria-expanded="false"
+          onclick="event.stopPropagation(); openSongRequestActions(event, '${escapeAttr(s.id)}')"
+          title="Plus d’actions"
+        >•••</button>
       </div>
     </div>`;
   }).join('');
@@ -4823,43 +4879,148 @@ function renderSongRequestQueue(queue) {
 }
 
 let srDraggedQueueId = '';
+let srDropTargetId = '';
+let srDropAfter = false;
+
+const srTransparentDragImage = (() => {
+  const canvas = document.createElement('canvas');
+  canvas.width = 1;
+  canvas.height = 1;
+  return canvas;
+})();
+
+function clearSongRequestDropMarkers() {
+  document
+    .querySelectorAll('#songrequest-queue .sr-drop-before, #songrequest-queue .sr-drop-after')
+    .forEach(row => row.classList.remove('sr-drop-before', 'sr-drop-after', 'drag-over'));
+}
+
 function bindSongRequestDragAndDrop() {
   document.querySelectorAll('#songrequest-queue .sr-queue-row[draggable="true"]').forEach(row => {
+    row.querySelectorAll('img, a, button').forEach(element => {
+      element.setAttribute('draggable', 'false');
+    });
+
     row.addEventListener('dragstart', event => {
       srDraggedQueueId = row.dataset.srId || '';
+      srDropTargetId = '';
+      srDropAfter = false;
+
+      if (!srDraggedQueueId) {
+        event.preventDefault();
+        return;
+      }
+
       row.classList.add('dragging');
       event.dataTransfer.effectAllowed = 'move';
       event.dataTransfer.setData('text/plain', srDraggedQueueId);
+
+      // Empêche Chrome d'afficher une grosse copie de la carte à droite.
+      try {
+        event.dataTransfer.setDragImage(srTransparentDragImage, 0, 0);
+      } catch (error) {}
     });
+
     row.addEventListener('dragend', () => {
       row.classList.remove('dragging');
-      document.querySelectorAll('#songrequest-queue .drag-over').forEach(el => el.classList.remove('drag-over'));
+      clearSongRequestDropMarkers();
       srDraggedQueueId = '';
+      srDropTargetId = '';
+      srDropAfter = false;
     });
+
     row.addEventListener('dragover', event => {
       event.preventDefault();
-      if (!srDraggedQueueId || srDraggedQueueId === row.dataset.srId) return;
-      row.classList.add('drag-over');
+
+      const targetId = row.dataset.srId || '';
+      if (
+        !srDraggedQueueId ||
+        !targetId ||
+        String(srDraggedQueueId) === String(targetId)
+      ) {
+        return;
+      }
+
+      clearSongRequestDropMarkers();
+
+      const rect = row.getBoundingClientRect();
+      srDropAfter = event.clientY > rect.top + rect.height / 2;
+      srDropTargetId = targetId;
+
+      row.classList.add(
+        srDropAfter ? 'sr-drop-after' : 'sr-drop-before'
+      );
+
       event.dataTransfer.dropEffect = 'move';
     });
-    row.addEventListener('dragleave', () => row.classList.remove('drag-over'));
+
+    row.addEventListener('dragleave', event => {
+      if (row.contains(event.relatedTarget)) return;
+      row.classList.remove('sr-drop-before', 'sr-drop-after', 'drag-over');
+    });
+
     row.addEventListener('drop', async event => {
+      // Le dépôt ne se fait qu'ici, donc uniquement au relâchement du clic.
       event.preventDefault();
-      row.classList.remove('drag-over');
-      const sourceId = event.dataTransfer.getData('text/plain') || srDraggedQueueId;
-      const targetId = row.dataset.srId || '';
-      if (!sourceId || !targetId || sourceId === targetId) return;
+
+      const sourceId =
+        event.dataTransfer.getData('text/plain') ||
+        srDraggedQueueId;
+
+      const targetId = row.dataset.srId || srDropTargetId;
+      const dropAfter = srDropAfter;
+
+      clearSongRequestDropMarkers();
+
+      if (
+        !sourceId ||
+        !targetId ||
+        String(sourceId) === String(targetId)
+      ) {
+        return;
+      }
+
       const waiting = srLastQueue.slice(1);
-      const from = waiting.findIndex(item => String(item.id) === String(sourceId));
-      const to = waiting.findIndex(item => String(item.id) === String(targetId));
-      if (from < 0 || to < 0) return;
-      const [moved] = waiting.splice(from, 1);
-      waiting.splice(to, 0, moved);
       const previous = srLastQueue.slice();
+
+      const from = waiting.findIndex(
+        item => String(item.id) === String(sourceId)
+      );
+
+      if (from < 0) return;
+
+      const [moved] = waiting.splice(from, 1);
+
+      const targetIndex = waiting.findIndex(
+        item => String(item.id) === String(targetId)
+      );
+
+      if (targetIndex < 0) return;
+
+      let insertionIndex = targetIndex + (dropAfter ? 1 : 0);
+      insertionIndex = Math.max(
+        0,
+        Math.min(waiting.length, insertionIndex)
+      );
+
+      waiting.splice(insertionIndex, 0, moved);
+
       srLastQueue = [srLastQueue[0], ...waiting];
       renderSongRequestQueue(srLastQueue);
-      try { await saveSongRequestOrder(waiting.map(item => item.id)); }
-      catch (error) { srLastQueue = previous; renderSongRequestQueue(srLastQueue); toast(error.message || 'Impossible de déplacer la musique'); }
+
+      try {
+        await saveSongRequestOrder(
+          waiting.map(item => item.id)
+        );
+        toast('Nouvel ordre enregistré ✓');
+      } catch (error) {
+        srLastQueue = previous;
+        renderSongRequestQueue(srLastQueue);
+        toast(
+          error.message ||
+          'Impossible de déplacer la musique'
+        );
+      }
     });
   });
 }
@@ -6334,5 +6495,130 @@ setInterval(syncOwnKickChatroomForBot, 5 * 60 * 1000);
 
 
 </script>
+
+<div id="sr-actions-menu" role="menu" aria-hidden="true"></div>
+<script id="sr-actions-menu-script">
+let srActionsMenuItemId = '';
+
+function closeSongRequestActions() {
+  const menu = document.getElementById('sr-actions-menu');
+  if (!menu) return;
+
+  menu.classList.remove('open');
+  menu.setAttribute('aria-hidden', 'true');
+  menu.innerHTML = '';
+  srActionsMenuItemId = '';
+
+  document
+    .querySelectorAll('.sr-more-actions[aria-expanded="true"]')
+    .forEach(button => button.setAttribute('aria-expanded', 'false'));
+}
+
+function songRequestMenuItemById(id) {
+  return srLastQueue.find(
+    item => String(item.id) === String(id)
+  ) || null;
+}
+
+function runSongRequestMenuAction(action) {
+  const id = srActionsMenuItemId;
+  const item = songRequestMenuItemById(id);
+
+  closeSongRequestActions();
+
+  if (!id || !item) return;
+
+  if (action === 'play') {
+    playSongRequestItem(id);
+  } else if (action === 'edit') {
+    editSongRequestItem(id);
+  } else if (action === 'open' && item.url) {
+    window.open(item.url, '_blank', 'noopener,noreferrer');
+  } else if (action === 'copy' && item.url) {
+    navigator.clipboard
+      ?.writeText(item.url)
+      .then(() => toast('Lien copié ✓'))
+      .catch(() => toast('Impossible de copier le lien'));
+  } else if (action === 'delete') {
+    deleteSongRequest(id);
+  }
+}
+
+function openSongRequestActions(event, id) {
+  const menu = document.getElementById('sr-actions-menu');
+  const button = event.currentTarget;
+  const item = songRequestMenuItemById(id);
+
+  if (!menu || !item) return;
+
+  const alreadyOpen =
+    menu.classList.contains('open') &&
+    String(srActionsMenuItemId) === String(id);
+
+  closeSongRequestActions();
+
+  if (alreadyOpen) return;
+
+  srActionsMenuItemId = String(id);
+
+  menu.innerHTML = `
+    ${String(srLastQueue[0]?.id) !== String(id)
+      ? `<button type="button" role="menuitem" onclick="runSongRequestMenuAction('play')">▶ Lire maintenant</button>`
+      : ''}
+    <button type="button" role="menuitem" onclick="runSongRequestMenuAction('edit')">✎ Modifier</button>
+    ${item.url
+      ? `<button type="button" role="menuitem" onclick="runSongRequestMenuAction('open')">↗ Ouvrir sur YouTube</button>
+         <button type="button" role="menuitem" onclick="runSongRequestMenuAction('copy')">⧉ Copier le lien</button>`
+      : ''}
+    <button type="button" role="menuitem" class="danger" onclick="runSongRequestMenuAction('delete')">✕ Supprimer</button>
+  `;
+
+  menu.classList.add('open');
+  menu.setAttribute('aria-hidden', 'false');
+  button.setAttribute('aria-expanded', 'true');
+
+  const buttonRect = button.getBoundingClientRect();
+  const margin = 8;
+
+  menu.style.left = '0px';
+  menu.style.top = '0px';
+
+  const menuRect = menu.getBoundingClientRect();
+
+  let left = buttonRect.right - menuRect.width;
+  let top = buttonRect.bottom + margin;
+
+  if (left < margin) left = margin;
+  if (left + menuRect.width > window.innerWidth - margin) {
+    left = window.innerWidth - menuRect.width - margin;
+  }
+
+  if (top + menuRect.height > window.innerHeight - margin) {
+    top = buttonRect.top - menuRect.height - margin;
+  }
+
+  menu.style.left = `${Math.max(margin, left)}px`;
+  menu.style.top = `${Math.max(margin, top)}px`;
+}
+
+document.addEventListener('pointerdown', event => {
+  const menu = document.getElementById('sr-actions-menu');
+
+  if (
+    menu?.classList.contains('open') &&
+    !menu.contains(event.target) &&
+    !event.target.closest('.sr-more-actions')
+  ) {
+    closeSongRequestActions();
+  }
+});
+
+document.addEventListener('keydown', event => {
+  if (event.key === 'Escape') {
+    closeSongRequestActions();
+  }
+});
+</script>
+
 </body>
 </html>
