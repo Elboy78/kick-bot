@@ -5648,7 +5648,7 @@ function scheduleChatOverlaySave(delay = 650) {
   persistChatOverlayDraft();
   clearTimeout(chatOverlaySaveTimer);
   chatOverlaySaveTimer = setTimeout(() => {
-    saveChatOverlaySettings({ silent: true });
+    saveChatOverlaySettings({ silent: true }).catch(() => {});
   }, delay);
 }
 
@@ -5813,53 +5813,74 @@ if (designInput) {
 }
 async function loadChatOverlaySettings() {
   let backup = null;
+
   try {
     backup = JSON.parse(
       localStorage.getItem(chatOverlayStorageKey()) || 'null'
     );
   } catch (error) {}
 
-  if (backup) applyChatOverlaySettings(backup);
-
   try {
+    // SQLite est la source de vérité. On attend sa réponse avant
+    // d'afficher les réglages afin d'éviter qu'un ancien cache écrase le serveur.
     const response = await fetch(
       API + '/api/widgets/chat-overlay?ts=' + Date.now(),
-      { cache: 'no-store' }
+      {
+        cache: 'no-store',
+        headers: {
+          'Cache-Control': 'no-cache'
+        }
+      }
     );
+
     const data = await response.json().catch(() => ({}));
 
     if (!response.ok || data.error) {
-      throw new Error(data.error || 'Impossible de charger les réglages');
+      throw new Error(
+        data.error || 'Impossible de charger les réglages'
+      );
     }
 
     applyChatOverlaySettings(data);
+
     try {
       localStorage.setItem(
         chatOverlayStorageKey(),
         JSON.stringify(data)
       );
     } catch (error) {}
+
+    return data;
   } catch (error) {
-    if (!backup) {
-      applyChatOverlaySettings({
-        enabled: true,
-        hideBots: true,
-        hideCommands: true,
-        showPlatformIcon: true,
-        showTime: false,
-        ignoredUsers: 'BotRix,botrix',
-        fontSize: 21,
-        messageDuration: 10,
-        maxMessages: 8,
-        animation: 'pop',
-        design: 'premium',
-        showAvatars: true,
-        showBadges: true,
-        groupMessages: true,
-        groupWindow: 12,
-        highlightRoles: true
-      });
+    console.error('[CHAT OVERLAY LOAD]', error);
+
+    // Le cache local ne sert qu'en secours si le serveur est inaccessible.
+    if (backup) {
+      applyChatOverlaySettings(backup);
+      return backup;
     }
+
+    const defaults = {
+      enabled: true,
+      hideBots: true,
+      hideCommands: true,
+      showPlatformIcon: true,
+      showTime: false,
+      ignoredUsers: 'BotRix,botrix',
+      fontSize: 21,
+      messageDuration: 10,
+      maxMessages: 8,
+      animation: 'pop',
+      design: 'premium',
+      showAvatars: true,
+      showBadges: true,
+      groupMessages: true,
+      groupWindow: 12,
+      highlightRoles: true
+    };
+
+    applyChatOverlaySettings(defaults);
+    return defaults;
   }
 }
 
@@ -5874,6 +5895,7 @@ async function saveChatOverlaySettings(options = {}) {
   chatOverlaySaveInFlight = true;
   const body = currentChatOverlaySettingsFromForm();
 
+  // Cache de secours immédiatement mis à jour, séparé par streamer.
   try {
     localStorage.setItem(
       chatOverlayStorageKey(),
@@ -5886,17 +5908,32 @@ async function saveChatOverlaySettings(options = {}) {
       API + '/api/admin/widgets/chat-overlay/settings',
       {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        credentials: 'same-origin',
+        cache: 'no-store',
+        headers: {
+          'Content-Type': 'application/json',
+          'Cache-Control': 'no-cache'
+        },
         body: JSON.stringify(body)
       }
     );
+
     const result = await response.json().catch(() => ({}));
 
-    if (!response.ok || !result.success) {
-      throw new Error(result.error || 'Enregistrement impossible');
+    if (!response.ok || result.success !== true) {
+      throw new Error(
+        result.error || 'Enregistrement impossible'
+      );
     }
 
-    const saved = result.settings || body;
+    const saved = result.settings;
+
+    if (!saved || typeof saved !== 'object') {
+      throw new Error(
+        'Le serveur n’a pas confirmé les réglages enregistrés'
+      );
+    }
+
     applyChatOverlaySettings(saved);
 
     try {
@@ -5906,16 +5943,27 @@ async function saveChatOverlaySettings(options = {}) {
       );
     } catch (error) {}
 
-    if (!silent) toast('Chat Overlay enregistré ✓');
+    if (!silent) {
+      toast('Chat Overlay enregistré ✓');
+    }
+
+    return saved;
   } catch (error) {
-    if (!silent) toast(error.message || 'Erreur d’enregistrement');
     console.error('[CHAT OVERLAY SAVE]', error);
+
+    if (!silent) {
+      toast(
+        error.message || 'Erreur d’enregistrement'
+      );
+    }
+
+    throw error;
   } finally {
     chatOverlaySaveInFlight = false;
 
     if (chatOverlayPendingSave) {
       chatOverlayPendingSave = false;
-      scheduleChatOverlaySave(100);
+      scheduleChatOverlaySave(120);
     }
   }
 }
