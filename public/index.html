@@ -4620,6 +4620,8 @@ let srLastRenderedProgress = -1;
 let srVolumeDebounce = null;
 let srPendingVolume = null;
 let srVolumeInFlight = false;
+let srSeeking = false;
+let srSeekInFlight = false;
 function srSetVal(id, val) { const el = document.getElementById(id); if (el && document.activeElement !== el) el.value = val; }
 function srSetChecked(id, val) { const el = document.getElementById(id); if (el) el.checked = !!val; }
 function isSongRequestOpen() { const el = document.getElementById('widget-songrequest-settings'); return !!el && el.style.display !== 'none'; }
@@ -4657,7 +4659,11 @@ function srUpdateProgressOnly(force = false) {
   const current = srComputedTime();
   const currentSecond = Math.floor(current);
   const roundedProgress = Math.round(current * 20) / 20;
-  if (seek && (force || Math.abs(roundedProgress - srLastRenderedProgress) >= 0.05)) {
+  if (
+  seek &&
+  !srSeeking &&
+  (force || Math.abs(roundedProgress - srLastRenderedProgress) >= 0.05)
+) {
     seek.max = duration || 0;
     seek.value = duration ? Math.min(current, duration) : 0;
     srPaintRange(seek, seek.value, seek.max);
@@ -4719,7 +4725,18 @@ function renderSongRequestPlayer(queue = srLastQueue, player = srPlayer) {
   if (thumb) thumb.innerHTML = cur?.thumbnail ? `<img src="${escapeAttr(cur.thumbnail)}" onerror="this.parentNode.textContent='🎵'">` : '🎵';
   if (title) title.textContent = cur ? (cur.title || cur.song || 'Musique en cours') : 'Aucune musique en cours';
   if (meta) meta.textContent = cur ? `Demandé par ${cur.username || 'Anonyme'}${cur.author ? ' · ' + cur.author : ''}` : 'Le chat peut demander une musique avec !sr';
-  if (seek) { seek.max = duration || 0; seek.value = Math.min(current, duration || current); seek.disabled = !cur || duration <= 0; srPaintRange(seek, seek.value, seek.max); }
+  if (seek) {
+  seek.max = duration || 0;
+  seek.disabled = !cur || duration <= 0;
+
+  if (!srSeeking) {
+    seek.value = duration
+      ? Math.min(current, duration)
+      : 0;
+
+    srPaintRange(seek, seek.value, seek.max);
+  }
+}
   if (curTimeEl) curTimeEl.textContent = fmtSongTime(current);
   if (durTimeEl) durTimeEl.textContent = duration ? fmtSongTime(duration) : '0:00';
   srLastRenderedSecond = Math.floor(current);
@@ -4945,14 +4962,91 @@ function previewSongRequestSeek(v) {
   srPlayer.currentTime = Number(v || 0);
   renderSongRequestPlayer(srLastQueue, srPlayer);
 }
-async function seekSongRequest(v) {
-  const seconds = Math.max(0, Number(v || 0));
-  const r = await fetch(API + '/api/admin/widgets/songrequest/seek', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ seconds }) });
-  const d = await r.json().catch(()=>({}));
-  if (!r.ok) return toast(d.error || 'Impossible de déplacer la lecture');
-  srPlayer = Object.assign(srPlayer, d.player || {}, { currentTime: seconds });
-  srSyncClockFromPlayer(srPlayer);
-  renderSongRequestPlayer(srLastQueue, srPlayer);
+function beginSongRequestSeek() {
+  srSeeking = true;
+}
+
+function previewSongRequestSeek(value) {
+  srSeeking = true;
+
+  const duration = Math.max(
+    Number(srPlayer.duration || 0),
+    Number(srLastQueue[0]?.duration || 0),
+    0
+  );
+
+  const requested = Math.max(0, Number(value || 0));
+  const seconds = duration
+    ? Math.min(requested, duration)
+    : requested;
+
+  const seek = document.getElementById('sr-seek');
+  const time = document.getElementById('sr-current-time');
+
+  if (seek) {
+    seek.value = seconds;
+    srPaintRange(seek, seconds, duration);
+  }
+
+  if (time) {
+    time.textContent = fmtSongTime(seconds);
+  }
+}
+
+async function commitSongRequestSeek(value) {
+  if (srSeekInFlight) return;
+
+  srSeekInFlight = true;
+
+  const duration = Math.max(
+    Number(srPlayer.duration || 0),
+    Number(srLastQueue[0]?.duration || 0),
+    0
+  );
+
+  const requested = Math.max(0, Number(value || 0));
+  const seconds = duration
+    ? Math.min(requested, duration)
+    : requested;
+
+  try {
+    const response = await fetch(
+      API + '/api/admin/widgets/songrequest/seek',
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ seconds })
+      }
+    );
+
+    const result = await response.json().catch(() => ({}));
+
+    if (!response.ok) {
+      throw new Error(
+        result.error || 'Impossible de déplacer la lecture'
+      );
+    }
+
+    srPlayer = Object.assign(
+      srPlayer,
+      result.player || {},
+      { currentTime: seconds }
+    );
+
+    srSyncClockFromPlayer(srPlayer);
+
+    srLastRenderedProgress = -1;
+    srLastRenderedSecond = -1;
+  } catch (error) {
+    console.error('[SONG REQUEST SEEK]', error);
+    toast(error.message || 'Erreur pendant le déplacement');
+  } finally {
+    srSeeking = false;
+    srSeekInFlight = false;
+    srUpdateProgressOnly(true);
+  }
 }
 function previewSongRequestVolume(v) {
   const volume = Math.max(0, Math.min(100, Number(v ?? 100)));
