@@ -4951,12 +4951,86 @@ async function editSongRequestItem(id) {
   renderSongRequestPlayer(srLastQueue, Object.assign(srPlayer, d.player || {}));
   toast('Musique modifiée ✓');
 }
-async function playSongRequest() { await fetch(API + '/api/admin/widgets/songrequest/play', { method:'POST' }); loadSongRequest(true); }
-async function pauseSongRequest() { await fetch(API + '/api/admin/widgets/songrequest/pause', { method:'POST' }); loadSongRequest(true); }
-async function toggleSongRequest() {
-  const isPlaying = String(srPlayer.status || '').toLowerCase() === 'playing';
-  if (isPlaying) { srPlayer.currentTime = srComputedTime(); srPlayer.status = 'paused'; srSyncClockFromPlayer(srPlayer); renderSongRequestPlayer(srLastQueue, srPlayer); await pauseSongRequest(); }
-  else { srPlayer.status = srLastQueue.length ? 'playing' : 'stopped'; srSyncClockFromPlayer(srPlayer); renderSongRequestPlayer(srLastQueue, srPlayer); await playSongRequest(); }
+let srPlaybackInFlight = false;
+
+async function setSongRequestPlayback(status) {
+  if (srPlaybackInFlight) return;
+  if (!srLastQueue.length) return;
+
+  srPlaybackInFlight = true;
+
+  const previousPlayer = { ...srPlayer };
+  const currentTime = srComputedTime();
+
+  // Mise à jour immédiate du panel.
+  srPlayer = {
+    ...srPlayer,
+    status,
+    currentTime
+  };
+
+  srSyncClockFromPlayer(srPlayer);
+  renderSongRequestPlayer(srLastQueue, srPlayer);
+
+  const endpoint =
+    status === 'playing'
+      ? '/api/admin/widgets/songrequest/play'
+      : '/api/admin/widgets/songrequest/pause';
+
+  try {
+    const response = await fetch(API + endpoint, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      }
+    });
+
+    const result = await response.json().catch(() => ({}));
+
+    if (!response.ok) {
+      throw new Error(
+        result.error || 'Impossible de modifier la lecture'
+      );
+    }
+
+    // On accepte l’état officiel sans recharger toute la file.
+    if (result.player) {
+      srPlayer = {
+        ...srPlayer,
+        ...result.player
+      };
+
+      srSyncClockFromPlayer(srPlayer);
+      renderSongRequestPlayer(srLastQueue, srPlayer);
+    }
+  } catch (error) {
+    // Retour arrière uniquement si le serveur refuse.
+    srPlayer = previousPlayer;
+    srSyncClockFromPlayer(srPlayer);
+    renderSongRequestPlayer(srLastQueue, srPlayer);
+
+    console.error('[SONG REQUEST PLAYBACK]', error);
+    toast(error.message || 'Erreur de lecture');
+  } finally {
+    srPlaybackInFlight = false;
+  }
+}
+
+function playSongRequest() {
+  return setSongRequestPlayback('playing');
+}
+
+function pauseSongRequest() {
+  return setSongRequestPlayback('paused');
+}
+
+function toggleSongRequest() {
+  const isPlaying =
+    String(srPlayer.status || '').toLowerCase() === 'playing';
+
+  return setSongRequestPlayback(
+    isPlaying ? 'paused' : 'playing'
+  );
 }
 function previewSongRequestSeek(v) {
   srPlayer.currentTime = Number(v || 0);
