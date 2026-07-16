@@ -245,19 +245,31 @@ window.onYouTubeIframeAPIReady=function(){
 };
 
 load(true);
-setInterval(()=>updateTimeUI(),250);
-// État de lecture remonté moins souvent, uniquement pour la progression.
-// Il ne pilote jamais PLAY / PAUSE côté serveur.
-setInterval(()=>postState(desiredStatus,false),5000);
+
+// Affichage local fluide.
+setInterval(() => updateTimeUI(), 250);
+
+// Remontée de la progression du lecteur OBS.
+setInterval(() => postState(desiredStatus, false), 2000);
+
+// File et métadonnées : resynchronisation légère.
+setInterval(() => load(false), 15000);
+
+// Play / Pause / Seek / Volume : secours temps réel.
+// La fonction existait, mais elle n’était jamais appelée.
+setInterval(() => pollControl(), 800);
 
 try{
   srSocket=io({transports:['websocket','polling']});
 
-  srSocket.on('connect',()=>{
-    joinStreamerRoom(STREAMER_SLUG);
-    // Une resynchronisation uniquement après reconnexion Socket.IO.
-    load(false);
-  });
+ srSocket.on('connect', () => {
+  // Une nouvelle connexion Socket.IO doit rejoindre à nouveau la room.
+  srJoinedRoom = '';
+  joinStreamerRoom(STREAMER_SLUG);
+
+  // Récupère immédiatement une commande éventuellement ratée.
+  pollControl();
+});
 
   srSocket.on('songrequest-control',handleControl);
 
