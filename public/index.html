@@ -1198,6 +1198,14 @@ Option 3" rows="4"></textarea><div style="display:flex;gap:6px;margin-top:10px">
       #widget-chat-settings .co-theme-glass{background:linear-gradient(135deg,rgba(30,41,59,.9),rgba(15,23,42,.55))}#widget-chat-settings .co-theme-glass span{background:#93c5fd}
       #widget-chat-settings .co-theme-minimal{background:transparent;border:1px dashed #475569}#widget-chat-settings .co-theme-minimal span{background:#fff}
       #widget-chat-settings .co-theme-neon{background:#020705;box-shadow:inset 0 0 14px rgba(83,252,24,.18)}#widget-chat-settings .co-theme-neon span{background:#53fc18;box-shadow:0 0 9px #53fc18}
+      #widget-chat-settings .co-theme-kick{background:linear-gradient(135deg,#050805,#102710)}#widget-chat-settings .co-theme-kick span{background:#53fc18}
+      #widget-chat-settings .co-theme-ocean{background:linear-gradient(135deg,#06263a,#0b4f6c)}#widget-chat-settings .co-theme-ocean span{background:#38bdf8}
+      #widget-chat-settings .co-theme-sunset{background:linear-gradient(135deg,#431407,#9a3412 55%,#7c2d12)}#widget-chat-settings .co-theme-sunset span{background:#fb923c}
+      #widget-chat-settings .co-theme-candy{background:linear-gradient(135deg,#4a044e,#831843 55%,#312e81)}#widget-chat-settings .co-theme-candy span{background:#f9a8d4}
+      #widget-chat-settings .co-theme-mono{background:linear-gradient(135deg,#111,#2b2b2b)}#widget-chat-settings .co-theme-mono span{background:#f5f5f5}
+      #widget-chat-settings .co-theme-cyber{background:linear-gradient(135deg,#050014,#1b0638)}#widget-chat-settings .co-theme-cyber span{background:#22d3ee;box-shadow:0 0 9px #22d3ee}
+      #widget-chat-settings .co-theme-royal{background:linear-gradient(135deg,#190b3d,#4c1d95)}#widget-chat-settings .co-theme-royal span{background:#c4b5fd}
+      #widget-chat-settings .co-theme-transparent{background:linear-gradient(135deg,rgba(15,23,42,.18),rgba(15,23,42,.04));border:1px dashed rgba(255,255,255,.3)}#widget-chat-settings .co-theme-transparent span{background:rgba(255,255,255,.85)}
       #widget-chat-settings .co-preview-panel{position:sticky;top:16px;background:var(--card);border:1px solid var(--brd);border-radius:16px;padding:16px}
       #widget-chat-settings .co-preview-stage{height:520px;border-radius:15px;border:1px solid var(--brd);background:radial-gradient(circle at top right,rgba(83,252,24,.10),transparent 35%),linear-gradient(180deg,#121827,#050711);padding:18px;display:flex;align-items:flex-end;overflow:hidden}
       #widget-chat-settings #co-preview{width:100%;display:flex;flex-direction:column;gap:9px}
@@ -1254,6 +1262,14 @@ Option 3" rows="4"></textarea><div style="display:flex;gap:6px;margin-top:10px">
             <button type="button" class="co-theme-card" data-theme="glass" onclick="selectChatOverlayTheme('glass')"><div class="co-theme-demo co-theme-glass"><span></span></div><b>Glass</b></button>
             <button type="button" class="co-theme-card" data-theme="minimal" onclick="selectChatOverlayTheme('minimal')"><div class="co-theme-demo co-theme-minimal"><span></span></div><b>Minimal</b></button>
             <button type="button" class="co-theme-card" data-theme="neon" onclick="selectChatOverlayTheme('neon')"><div class="co-theme-demo co-theme-neon"><span></span></div><b>Neon</b></button>
+            <button type="button" class="co-theme-card" data-theme="kick" onclick="selectChatOverlayTheme('kick')"><div class="co-theme-demo co-theme-kick"><span></span></div><b>Kick</b></button>
+            <button type="button" class="co-theme-card" data-theme="ocean" onclick="selectChatOverlayTheme('ocean')"><div class="co-theme-demo co-theme-ocean"><span></span></div><b>Ocean</b></button>
+            <button type="button" class="co-theme-card" data-theme="sunset" onclick="selectChatOverlayTheme('sunset')"><div class="co-theme-demo co-theme-sunset"><span></span></div><b>Sunset</b></button>
+            <button type="button" class="co-theme-card" data-theme="candy" onclick="selectChatOverlayTheme('candy')"><div class="co-theme-demo co-theme-candy"><span></span></div><b>Candy</b></button>
+            <button type="button" class="co-theme-card" data-theme="mono" onclick="selectChatOverlayTheme('mono')"><div class="co-theme-demo co-theme-mono"><span></span></div><b>Mono</b></button>
+            <button type="button" class="co-theme-card" data-theme="cyber" onclick="selectChatOverlayTheme('cyber')"><div class="co-theme-demo co-theme-cyber"><span></span></div><b>Cyber</b></button>
+            <button type="button" class="co-theme-card" data-theme="royal" onclick="selectChatOverlayTheme('royal')"><div class="co-theme-demo co-theme-royal"><span></span></div><b>Royal</b></button>
+            <button type="button" class="co-theme-card" data-theme="transparent" onclick="selectChatOverlayTheme('transparent')"><div class="co-theme-demo co-theme-transparent"><span></span></div><b>Transparent</b></button>
           </div>
           <div class="co-save-bar"><button class="dark-btn" onclick="saveChatOverlaySettings()">ENREGISTRER LES RÉGLAGES</button></div>
           <div class="obs-link-box">
@@ -5598,13 +5614,21 @@ function renderChatOverlayPreview() {
   if (!box) return;
   const cfg = currentChatOverlaySettingsFromForm();
   const design = cfg.design || 'premium';
-  const base = design === 'minimal'
-    ? 'background:transparent;border:0;padding:5px 0;text-shadow:0 2px 4px #000'
-    : design === 'neon'
-      ? 'background:rgba(2,7,5,.78);border:1px solid rgba(83,252,24,.55);box-shadow:0 0 24px rgba(83,252,24,.18);padding:11px 13px;border-radius:15px'
-      : design === 'glass'
-        ? 'background:rgba(15,23,42,.52);border:1px solid rgba(255,255,255,.18);backdrop-filter:blur(14px);padding:11px 13px;border-radius:15px'
-        : 'background:linear-gradient(135deg,rgba(8,12,21,.92),rgba(18,24,42,.72));border:1px solid rgba(255,255,255,.15);box-shadow:0 14px 34px rgba(0,0,0,.32);padding:11px 13px;border-radius:16px';
+  const previewThemes = {
+    premium: 'background:linear-gradient(135deg,rgba(8,12,21,.92),rgba(18,24,42,.72));border:1px solid rgba(255,255,255,.15);box-shadow:0 14px 34px rgba(0,0,0,.32);padding:11px 13px;border-radius:16px',
+    glass: 'background:rgba(15,23,42,.52);border:1px solid rgba(255,255,255,.18);backdrop-filter:blur(14px);padding:11px 13px;border-radius:15px',
+    minimal: 'background:transparent;border:0;padding:5px 0;text-shadow:0 2px 4px #000',
+    neon: 'background:rgba(2,7,5,.78);border:1px solid rgba(83,252,24,.55);box-shadow:0 0 24px rgba(83,252,24,.18);padding:11px 13px;border-radius:15px',
+    kick: 'background:linear-gradient(135deg,rgba(5,8,5,.94),rgba(16,39,16,.84));border:1px solid rgba(83,252,24,.34);padding:11px 13px;border-radius:15px',
+    ocean: 'background:linear-gradient(135deg,rgba(6,38,58,.94),rgba(11,79,108,.78));border:1px solid rgba(56,189,248,.45);box-shadow:0 14px 34px rgba(14,165,233,.14);padding:11px 13px;border-radius:16px',
+    sunset: 'background:linear-gradient(135deg,rgba(67,20,7,.95),rgba(154,52,18,.82));border:1px solid rgba(251,146,60,.42);padding:11px 13px;border-radius:16px',
+    candy: 'background:linear-gradient(135deg,rgba(74,4,78,.94),rgba(131,24,67,.82),rgba(49,46,129,.78));border:1px solid rgba(249,168,212,.38);padding:11px 13px;border-radius:18px',
+    mono: 'background:linear-gradient(135deg,rgba(17,17,17,.95),rgba(43,43,43,.88));border:1px solid rgba(255,255,255,.22);padding:11px 13px;border-radius:12px;filter:grayscale(1)',
+    cyber: 'background:linear-gradient(135deg,rgba(5,0,20,.95),rgba(27,6,56,.88));border:1px solid rgba(34,211,238,.52);box-shadow:0 0 25px rgba(34,211,238,.15);padding:11px 13px;border-radius:8px',
+    royal: 'background:linear-gradient(135deg,rgba(25,11,61,.96),rgba(76,29,149,.84));border:1px solid rgba(196,181,253,.42);box-shadow:0 14px 38px rgba(124,58,237,.16);padding:11px 13px;border-radius:18px',
+    transparent: 'background:rgba(15,23,42,.10);border:1px solid rgba(255,255,255,.16);backdrop-filter:blur(6px);padding:10px 12px;border-radius:14px;text-shadow:0 2px 5px rgba(0,0,0,.9)'
+  };
+  const base = previewThemes[design] || previewThemes.premium;
   const avatar = cfg.showAvatars ? '<div style="width:40px;height:40px;flex:0 0 40px;border-radius:12px;background:linear-gradient(135deg,#22c55e,#15803d);display:grid;place-items:center;font-weight:950;color:#061208">E</div>' : '';
   const badges = cfg.showBadges ? '<span style="font-size:8px;padding:2px 5px;border-radius:6px;background:#60a5fa;color:#06101e;font-weight:950">MOD</span>' : '';
   const kick = cfg.showPlatformIcon ? '<span style="width:17px;height:17px;border-radius:5px;background:#53fc18;color:#071106;display:inline-grid;place-items:center;font-size:8px;font-weight:950">K</span>' : '';
