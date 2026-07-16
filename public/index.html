@@ -1162,62 +1162,116 @@ Option 3" rows="4"></textarea><div style="display:flex;gap:6px;margin-top:10px">
 
   <!-- ══ CHAT OVERLAY WIDGET SETTINGS ══ -->
   <div id="widget-chat-settings" style="display:none">
-    <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:14px">
+    <div class="co-page-head">
       <button class="dark-btn" onclick="backToWidgetsHome()">← Retour aux widgets</button>
-      <div style="font-size:10px;color:var(--muted);font-weight:800;text-transform:uppercase;letter-spacing:.7px">Widget actif : Chat Overlay</div>
+      <div class="co-active-chip">Widget actif · Chat Overlay</div>
     </div>
-    <div class="header"><div><h1>Chat Overlay</h1><p>Affiche le chat Kick en source navigateur OBS</p></div></div>
+    <div class="header co-title-head"><div><h1>Chat Overlay Premium</h1><p>Configure le rendu du chat Kick et prévisualise chaque changement avant OBS.</p></div></div>
     <style>
-      #widget-chat-settings .co-toggle-line{display:flex;align-items:center;gap:10px;margin:8px 0 12px;font-size:13px;color:var(--text);cursor:pointer;user-select:none}
-      #widget-chat-settings .co-switch{position:relative;width:46px;height:24px;display:inline-block;flex:0 0 46px}
+      #widget-chat-settings{--co-accent:#53fc18}
+      #widget-chat-settings .co-page-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px}
+      #widget-chat-settings .co-active-chip{font-size:9px;color:#bbf7d0;font-weight:900;text-transform:uppercase;letter-spacing:.8px;padding:7px 10px;border-radius:999px;background:rgba(34,197,94,.10);border:1px solid rgba(34,197,94,.24)}
+      #widget-chat-settings .co-title-head{margin-bottom:16px}
+      #widget-chat-settings .co-layout{display:grid;grid-template-columns:minmax(0,1fr) 460px;gap:16px;align-items:start}
+      #widget-chat-settings .co-settings-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
+      #widget-chat-settings .co-section{background:var(--card);border:1px solid var(--brd);border-radius:16px;padding:16px}
+      #widget-chat-settings .co-section.wide{grid-column:1/-1}
+      #widget-chat-settings .co-section-title{display:flex;align-items:center;gap:8px;margin-bottom:12px;font-size:12px;font-weight:900}
+      #widget-chat-settings .co-section-sub{font-size:9px;color:var(--muted);margin-top:-7px;margin-bottom:10px;line-height:1.45}
+      #widget-chat-settings .co-toggle-line{display:flex;align-items:center;gap:10px;margin:7px 0;padding:7px 8px;border-radius:10px;font-size:11px;color:var(--text);cursor:pointer;user-select:none;transition:.15s}
+      #widget-chat-settings .co-toggle-line:hover{background:var(--card2)}
+      #widget-chat-settings .co-toggle-line b{font-weight:750}
+      #widget-chat-settings .co-switch{position:relative;width:42px;height:22px;display:inline-block;flex:0 0 42px}
       #widget-chat-settings .co-switch input{opacity:0;width:0;height:0;position:absolute}
       #widget-chat-settings .co-switch span{position:absolute;inset:0;background:#161827;border:1px solid var(--brd);border-radius:999px;transition:.18s}
-      #widget-chat-settings .co-switch span:before{content:'';position:absolute;width:18px;height:18px;left:3px;top:2px;border-radius:50%;background:#6b7280;transition:.18s}
-      #widget-chat-settings .co-switch input:checked + span{background:rgba(34,197,94,.35);border-color:#22c55e}
-      #widget-chat-settings .co-switch input:checked + span:before{transform:translateX(21px);background:#86efac}
+      #widget-chat-settings .co-switch span:before{content:'';position:absolute;width:16px;height:16px;left:3px;top:2px;border-radius:50%;background:#6b7280;transition:.18s}
+      #widget-chat-settings .co-switch input:checked + span{background:rgba(34,197,94,.30);border-color:#22c55e}
+      #widget-chat-settings .co-switch input:checked + span:before{transform:translateX(19px);background:#86efac}
+      #widget-chat-settings .co-fields{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+      #widget-chat-settings .co-theme-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+      #widget-chat-settings .co-theme-card{border:1px solid var(--brd);background:var(--card2);border-radius:12px;padding:10px;cursor:pointer;text-align:left;color:var(--text);font-family:inherit;transition:.18s}
+      #widget-chat-settings .co-theme-card:hover,#widget-chat-settings .co-theme-card.active{border-color:rgba(83,252,24,.55);box-shadow:0 0 0 3px rgba(83,252,24,.08)}
+      #widget-chat-settings .co-theme-card b{display:block;font-size:10px;margin-top:7px}
+      #widget-chat-settings .co-theme-demo{height:42px;border-radius:9px;display:flex;align-items:flex-end;padding:6px}
+      #widget-chat-settings .co-theme-demo span{height:10px;border-radius:5px;width:75%}
+      #widget-chat-settings .co-theme-premium{background:linear-gradient(135deg,#08101e,#151c33)}#widget-chat-settings .co-theme-premium span{background:#53fc18}
+      #widget-chat-settings .co-theme-glass{background:linear-gradient(135deg,rgba(30,41,59,.9),rgba(15,23,42,.55))}#widget-chat-settings .co-theme-glass span{background:#93c5fd}
+      #widget-chat-settings .co-theme-minimal{background:transparent;border:1px dashed #475569}#widget-chat-settings .co-theme-minimal span{background:#fff}
+      #widget-chat-settings .co-theme-neon{background:#020705;box-shadow:inset 0 0 14px rgba(83,252,24,.18)}#widget-chat-settings .co-theme-neon span{background:#53fc18;box-shadow:0 0 9px #53fc18}
+      #widget-chat-settings .co-preview-panel{position:sticky;top:16px;background:var(--card);border:1px solid var(--brd);border-radius:16px;padding:16px}
+      #widget-chat-settings .co-preview-stage{height:520px;border-radius:15px;border:1px solid var(--brd);background:radial-gradient(circle at top right,rgba(83,252,24,.10),transparent 35%),linear-gradient(180deg,#121827,#050711);padding:18px;display:flex;align-items:flex-end;overflow:hidden}
+      #widget-chat-settings #co-preview{width:100%;display:flex;flex-direction:column;gap:9px}
+      #widget-chat-settings .co-preview-actions{display:grid;grid-template-columns:1fr auto;gap:8px;margin-top:12px}
+      #widget-chat-settings .co-test-status{min-height:18px;margin-top:8px;font-size:10px;color:var(--muted)}
+      #widget-chat-settings .co-test-status.ok{color:#86efac}#widget-chat-settings .co-test-status.err{color:#ff6b7a}
+      #widget-chat-settings .co-save-bar{display:flex;gap:10px;align-items:center;justify-content:flex-end;margin-top:12px}
+      @media(max-width:1250px){#widget-chat-settings .co-layout{grid-template-columns:1fr}#widget-chat-settings .co-preview-panel{position:static}#widget-chat-settings .co-preview-stage{height:420px}}
+      @media(max-width:850px){#widget-chat-settings .co-settings-grid{grid-template-columns:1fr}#widget-chat-settings .co-section.wide{grid-column:auto}#widget-chat-settings .co-theme-grid{grid-template-columns:repeat(2,1fr)}}
     </style>
-    <div class="g2">
-      <div class="panel">
-        <h3>⚙️ Paramètres</h3>
-        <label class="co-toggle-line"><span class="co-switch"><input type="checkbox" id="co-enabled"><span></span></span><b>Activer l’overlay chat</b></label>
-        <label class="co-toggle-line"><span class="co-switch"><input type="checkbox" id="co-hide-bots"><span></span></span><b>Masquer les bots</b></label>
-        <label class="co-toggle-line"><span class="co-switch"><input type="checkbox" id="co-hide-commands"><span></span></span><b>Masquer les commandes qui commencent par !</b></label>
-        <label class="co-toggle-line"><span class="co-switch"><input type="checkbox" id="co-show-platform"><span></span></span><b>Afficher l’icône Kick</b></label>
-        <label class="co-toggle-line"><span class="co-switch"><input type="checkbox" id="co-show-time"><span></span></span><b>Afficher l’heure du message</b></label>
-        <label class="co-toggle-line"><span class="co-switch"><input type="checkbox" id="co-show-avatars"><span></span></span><b>Afficher les avatars</b></label>
-        <label class="co-toggle-line"><span class="co-switch"><input type="checkbox" id="co-show-badges"><span></span></span><b>Afficher les badges</b></label>
-        <label class="co-toggle-line"><span class="co-switch"><input type="checkbox" id="co-group-messages"><span></span></span><b>Regrouper les messages successifs</b></label>
-        <label class="co-toggle-line"><span class="co-switch"><input type="checkbox" id="co-highlight-roles"><span></span></span><b>Mettre en valeur streamer et modérateurs</b></label>
-        <label class="lbl">Utilisateurs ignorés</label>
-        <input class="inp" id="co-ignored" placeholder="BotRix, autrebot" style="margin-bottom:10px">
-        <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px">
-          <div><label class="lbl">Taille police</label><input type="number" class="inp" id="co-font-size" min="10" max="42"></div>
-          <div><label class="lbl">Durée message</label><input type="number" class="inp" id="co-duration" min="0" max="60"></div>
-          <div><label class="lbl">Messages affichés</label><input type="number" class="inp" id="co-max" min="1" max="30"></div>
-          <div><label class="lbl">Délai de regroupement</label><input type="number" class="inp" id="co-group-window" min="2" max="60"></div>
-          <div><label class="lbl">Animation</label><select class="inp" id="co-animation"><option value="pop">Pop In</option><option value="slide">Slide</option><option value="fade">Fade</option><option value="none">Aucune</option></select></div>
-          <div style="grid-column:1/-1"><label class="lbl">Design</label><select class="inp" id="co-design"><option value="premium">Premium</option><option value="glass">Glass</option><option value="minimal">Minimal</option><option value="neon">Neon</option></select></div>
-        </div>
-        <button class="dark-btn" onclick="saveChatOverlaySettings()" style="width:100%;justify-content:center;margin-top:12px">ENREGISTRER</button>
-        <div class="obs-link-box">
-          <div class="obs-link-head"><b>🔗 Lien overlay OBS Chat</b><span><button class="obs-copy-btn" onclick="copyObsUrl('chat-obs-url')">Copier</button><button class="obs-regenerate-btn" onclick="regenerateObsToken('chat')">Régénérer</button></span></div>
-          <div class="obs-link-row"><code class="obs-link-code" id="chat-obs-url">/widgets/chat.html</code></div>
-          <span style="margin-top:6px;display:block">À mettre dans OBS en Source navigateur. Le lien est flouté pour éviter qu’il soit visible en live.</span>
-        </div>
-      </div>
-      <div class="panel">
-        <h3>👀 Aperçu</h3>
-        <div style="height:360px;border-radius:12px;border:1px solid var(--brd);background:radial-gradient(circle at top,#1e293b,#060814);padding:16px;display:flex;align-items:flex-end;overflow:hidden">
-          <div id="co-preview" style="width:100%;display:flex;flex-direction:column;gap:9px">
-            <div style="display:flex;gap:10px;align-items:flex-start;padding:11px 13px;border-radius:16px;border:1px solid rgba(255,255,255,.15);background:linear-gradient(135deg,rgba(8,12,21,.86),rgba(18,24,42,.62));box-shadow:0 14px 34px rgba(0,0,0,.32)">
-              <div style="width:38px;height:38px;border-radius:12px;background:linear-gradient(135deg,#22c55e,#15803d);display:grid;place-items:center;font-weight:950;color:#061208">E</div>
-              <div style="min-width:0;flex:1"><div style="display:flex;align-items:center;gap:6px"><span style="font-size:9px;padding:2px 6px;border-radius:999px;background:#22c55e;color:#071106;font-weight:950">LIVE</span><b style="color:#53fc18">Elboy78</b><small style="color:#94a3b8">15:42</small></div><div style="font-size:17px;font-weight:750;margin-top:4px;color:#fff">GG le nouvel overlay est propre 🔥</div></div>
-            </div>
-            <div style="display:flex;gap:10px;align-items:flex-start;padding:11px 13px;border-radius:16px;border:1px solid rgba(255,255,255,.12);background:rgba(10,14,27,.72)"><div style="width:38px;height:38px;border-radius:12px;background:linear-gradient(135deg,#a78bfa,#7c3aed);display:grid;place-items:center;font-weight:950">V</div><div><b style="color:#a78bfa">Viewer</b><div style="font-size:17px;font-weight:750;margin-top:4px">test depuis Kick</div></div></div>
+    <div class="co-layout">
+      <div class="co-settings-grid">
+        <section class="co-section">
+          <div class="co-section-title">⚙️ Général</div>
+          <div class="co-section-sub">Activation et filtrage des messages envoyés vers OBS.</div>
+          <label class="co-toggle-line"><span class="co-switch"><input type="checkbox" id="co-enabled"><span></span></span><b>Activer l’overlay chat</b></label>
+          <label class="co-toggle-line"><span class="co-switch"><input type="checkbox" id="co-hide-bots"><span></span></span><b>Masquer les bots</b></label>
+          <label class="co-toggle-line"><span class="co-switch"><input type="checkbox" id="co-hide-commands"><span></span></span><b>Masquer les commandes en !</b></label>
+          <label class="lbl">Utilisateurs ignorés</label>
+          <input class="inp" id="co-ignored" placeholder="BotRix, autrebot">
+        </section>
+        <section class="co-section">
+          <div class="co-section-title">👤 Identité</div>
+          <div class="co-section-sub">Choisis les informations visibles autour du message.</div>
+          <label class="co-toggle-line"><span class="co-switch"><input type="checkbox" id="co-show-platform"><span></span></span><b>Afficher l’icône Kick</b></label>
+          <label class="co-toggle-line"><span class="co-switch"><input type="checkbox" id="co-show-time"><span></span></span><b>Afficher l’heure</b></label>
+          <label class="co-toggle-line"><span class="co-switch"><input type="checkbox" id="co-show-avatars"><span></span></span><b>Afficher les avatars</b></label>
+          <label class="co-toggle-line"><span class="co-switch"><input type="checkbox" id="co-show-badges"><span></span></span><b>Afficher les badges</b></label>
+          <label class="co-toggle-line"><span class="co-switch"><input type="checkbox" id="co-highlight-roles"><span></span></span><b>Mettre en valeur streamer et modos</b></label>
+        </section>
+        <section class="co-section">
+          <div class="co-section-title">💬 Messages</div>
+          <div class="co-section-sub">Durée de vie, fusion et capacité de l’overlay.</div>
+          <label class="co-toggle-line"><span class="co-switch"><input type="checkbox" id="co-group-messages"><span></span></span><b>Regrouper les messages successifs</b></label>
+          <div class="co-fields">
+            <div><label class="lbl">Durée d’affichage</label><input type="number" class="inp" id="co-duration" min="0" max="60"></div>
+            <div><label class="lbl">Messages maximum</label><input type="number" class="inp" id="co-max" min="1" max="30"></div>
+            <div><label class="lbl">Délai de regroupement</label><input type="number" class="inp" id="co-group-window" min="2" max="60"></div>
+            <div><label class="lbl">Taille de police</label><input type="number" class="inp" id="co-font-size" min="10" max="42"></div>
           </div>
-        </div>
-        <button class="dark-btn" onclick="testChatOverlay()" style="width:100%;justify-content:center;margin-top:12px">ENVOYER UN TEST SUR OBS</button>
+        </section>
+        <section class="co-section">
+          <div class="co-section-title">✨ Animation</div>
+          <div class="co-section-sub">Choisis la manière dont les messages apparaissent à l’écran.</div>
+          <label class="lbl">Animation d’entrée</label>
+          <select class="inp" id="co-animation"><option value="pop">Pop In</option><option value="slide">Slide</option><option value="fade">Fade</option><option value="none">Aucune</option></select>
+        </section>
+        <section class="co-section wide">
+          <div class="co-section-title">🎨 Thème</div>
+          <div class="co-section-sub">Clique sur un thème pour mettre à jour l’aperçu instantanément.</div>
+          <input type="hidden" id="co-design" value="premium">
+          <div class="co-theme-grid">
+            <button type="button" class="co-theme-card" data-theme="premium" onclick="selectChatOverlayTheme('premium')"><div class="co-theme-demo co-theme-premium"><span></span></div><b>Premium</b></button>
+            <button type="button" class="co-theme-card" data-theme="glass" onclick="selectChatOverlayTheme('glass')"><div class="co-theme-demo co-theme-glass"><span></span></div><b>Glass</b></button>
+            <button type="button" class="co-theme-card" data-theme="minimal" onclick="selectChatOverlayTheme('minimal')"><div class="co-theme-demo co-theme-minimal"><span></span></div><b>Minimal</b></button>
+            <button type="button" class="co-theme-card" data-theme="neon" onclick="selectChatOverlayTheme('neon')"><div class="co-theme-demo co-theme-neon"><span></span></div><b>Neon</b></button>
+          </div>
+          <div class="co-save-bar"><button class="dark-btn" onclick="saveChatOverlaySettings()">ENREGISTRER LES RÉGLAGES</button></div>
+          <div class="obs-link-box">
+            <div class="obs-link-head"><b>🔗 Lien overlay OBS Chat</b><span><button class="obs-copy-btn" onclick="copyObsUrl('chat-obs-url')">Copier</button><button class="obs-regenerate-btn" onclick="regenerateObsToken('chat')">Régénérer</button></span></div>
+            <div class="obs-link-row"><code class="obs-link-code" id="chat-obs-url">/widgets/chat.html</code></div>
+            <span style="margin-top:6px;display:block">À mettre dans OBS en Source navigateur. Le lien est flouté pour éviter qu’il soit visible en live.</span>
+          </div>
+        </section>
       </div>
+      <aside class="co-preview-panel">
+        <h3 style="margin-bottom:12px">👀 Aperçu en direct</h3>
+        <div class="co-preview-stage"><div id="co-preview"></div></div>
+        <div class="co-preview-actions">
+          <button class="dark-btn" onclick="testChatOverlay()" style="justify-content:center">ENVOYER UN TEST SUR OBS</button>
+          <button class="btnx btn-ghost" onclick="renderChatOverlayPreview()">↻</button>
+        </div>
+        <div id="co-test-status" class="co-test-status">Le test apparaîtra dans la source navigateur OBS ouverte avec le lien ci-dessus.</div>
+      </aside>
     </div>
   </div>
 
@@ -5514,6 +5568,52 @@ try {
 
 // ── Chat Overlay ──────────────────────────────────────────────────────────────
 const CHAT_OVERLAY_LOCAL_KEY = 'bot7up_chat_overlay_settings_backup';
+function currentChatOverlaySettingsFromForm() {
+  return {
+    enabled: !!document.getElementById('co-enabled')?.checked,
+    hideBots: !!document.getElementById('co-hide-bots')?.checked,
+    hideCommands: !!document.getElementById('co-hide-commands')?.checked,
+    showPlatformIcon: !!document.getElementById('co-show-platform')?.checked,
+    showTime: !!document.getElementById('co-show-time')?.checked,
+    showAvatars: !!document.getElementById('co-show-avatars')?.checked,
+    showBadges: !!document.getElementById('co-show-badges')?.checked,
+    groupMessages: !!document.getElementById('co-group-messages')?.checked,
+    groupWindow: Number(document.getElementById('co-group-window')?.value || 12),
+    highlightRoles: !!document.getElementById('co-highlight-roles')?.checked,
+    ignoredUsers: document.getElementById('co-ignored')?.value || '',
+    fontSize: Number(document.getElementById('co-font-size')?.value || 21),
+    messageDuration: Number(document.getElementById('co-duration')?.value || 10),
+    maxMessages: Number(document.getElementById('co-max')?.value || 8),
+    animation: document.getElementById('co-animation')?.value || 'pop',
+    design: document.getElementById('co-design')?.value || 'premium'
+  };
+}
+function selectChatOverlayTheme(theme) {
+  setVal('co-design', theme);
+  document.querySelectorAll('#widget-chat-settings .co-theme-card').forEach(card => card.classList.toggle('active', card.dataset.theme === theme));
+  renderChatOverlayPreview();
+}
+function renderChatOverlayPreview() {
+  const box = document.getElementById('co-preview');
+  if (!box) return;
+  const cfg = currentChatOverlaySettingsFromForm();
+  const design = cfg.design || 'premium';
+  const base = design === 'minimal'
+    ? 'background:transparent;border:0;padding:5px 0;text-shadow:0 2px 4px #000'
+    : design === 'neon'
+      ? 'background:rgba(2,7,5,.78);border:1px solid rgba(83,252,24,.55);box-shadow:0 0 24px rgba(83,252,24,.18);padding:11px 13px;border-radius:15px'
+      : design === 'glass'
+        ? 'background:rgba(15,23,42,.52);border:1px solid rgba(255,255,255,.18);backdrop-filter:blur(14px);padding:11px 13px;border-radius:15px'
+        : 'background:linear-gradient(135deg,rgba(8,12,21,.92),rgba(18,24,42,.72));border:1px solid rgba(255,255,255,.15);box-shadow:0 14px 34px rgba(0,0,0,.32);padding:11px 13px;border-radius:16px';
+  const avatar = cfg.showAvatars ? '<div style="width:40px;height:40px;flex:0 0 40px;border-radius:12px;background:linear-gradient(135deg,#22c55e,#15803d);display:grid;place-items:center;font-weight:950;color:#061208">E</div>' : '';
+  const badges = cfg.showBadges ? '<span style="font-size:8px;padding:2px 5px;border-radius:6px;background:#60a5fa;color:#06101e;font-weight:950">MOD</span>' : '';
+  const kick = cfg.showPlatformIcon ? '<span style="width:17px;height:17px;border-radius:5px;background:#53fc18;color:#071106;display:inline-grid;place-items:center;font-size:8px;font-weight:950">K</span>' : '';
+  const clock = cfg.showTime ? '<small style="color:#94a3b8;margin-left:auto">15:42</small>' : '';
+  box.innerHTML = `
+    <div style="display:flex;gap:10px;align-items:flex-start;${base}">${avatar}<div style="min-width:0;flex:1"><div style="display:flex;align-items:center;gap:5px">${kick}${badges}<b style="color:#53fc18">Elboy78</b>${clock}</div><div style="font-size:${Math.max(14,Math.min(24,cfg.fontSize))}px;font-weight:760;margin-top:4px;color:#fff">GG le nouvel overlay est propre 🔥</div>${cfg.groupMessages?'<div style="font-size:14px;font-weight:680;margin-top:4px;color:#e2e8f0">Deuxième message regroupé automatiquement</div>':''}</div></div>
+    <div style="display:flex;gap:10px;align-items:flex-start;${base}">${cfg.showAvatars?'<div style="width:40px;height:40px;flex:0 0 40px;border-radius:12px;background:linear-gradient(135deg,#a78bfa,#7c3aed);display:grid;place-items:center;font-weight:950">V</div>':''}<div><b style="color:#a78bfa">Viewer</b><div style="font-size:${Math.max(14,Math.min(24,cfg.fontSize))}px;font-weight:750;margin-top:4px">test depuis Kick</div></div></div>`;
+}
+
 function applyChatOverlaySettings(d) {
   setCheck('co-enabled', !!d.enabled);
   setCheck('co-hide-bots', !!d.hideBots);
@@ -5532,7 +5632,8 @@ function applyChatOverlaySettings(d) {
   setVal('co-animation', d.animation || 'pop');
   setVal('co-design', d.design || 'premium');
   hydrateAllObsLinks();
-  hydrateAllObsLinks();
+  document.querySelectorAll('#widget-chat-settings .co-theme-card').forEach(card => card.classList.toggle('active', card.dataset.theme === (d.design || 'premium')));
+  renderChatOverlayPreview();
 }
 async function loadChatOverlaySettings() {
   let backup = null;
@@ -5548,33 +5649,37 @@ async function loadChatOverlaySettings() {
   }
 }
 async function saveChatOverlaySettings() {
-  const body = {
-    enabled: !!document.getElementById('co-enabled')?.checked,
-    hideBots: !!document.getElementById('co-hide-bots')?.checked,
-    hideCommands: !!document.getElementById('co-hide-commands')?.checked,
-    showPlatformIcon: !!document.getElementById('co-show-platform')?.checked,
-    showTime: !!document.getElementById('co-show-time')?.checked,
-    showAvatars: !!document.getElementById('co-show-avatars')?.checked,
-    showBadges: !!document.getElementById('co-show-badges')?.checked,
-    groupMessages: !!document.getElementById('co-group-messages')?.checked,
-    groupWindow: Number(document.getElementById('co-group-window')?.value || 12),
-    highlightRoles: !!document.getElementById('co-highlight-roles')?.checked,
-    ignoredUsers: document.getElementById('co-ignored')?.value || '',
-    fontSize: Number(document.getElementById('co-font-size')?.value || 21),
-    messageDuration: Number(document.getElementById('co-duration')?.value || 10),
-    maxMessages: Number(document.getElementById('co-max')?.value || 8),
-    animation: document.getElementById('co-animation')?.value || 'pop',
-    design: document.getElementById('co-design')?.value || 'premium'
-  };
+  const body = currentChatOverlaySettingsFromForm();
   try { localStorage.setItem(CHAT_OVERLAY_LOCAL_KEY, JSON.stringify(body)); } catch(e) {}
   await fetch(API + '/api/admin/widgets/chat-overlay/settings', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body) });
   toast('Chat Overlay enregistré ✓');
   loadChatOverlaySettings();
 }
 async function testChatOverlay() {
-  await fetch(API + '/api/admin/widgets/chat-overlay/test', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ message:'Message test overlay chat ✨' }) });
-  toast('Message test envoyé ✓');
+  const status = document.getElementById('co-test-status');
+  if (status) { status.className = 'co-test-status'; status.textContent = 'Envoi du message test…'; }
+  try {
+    const response = await fetch(API + '/api/admin/widgets/chat-overlay/test', {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ username:'Elboy78', message:'Message test Overlay Chat ✨' })
+    });
+    const result = await response.json().catch(() => ({}));
+    if (!response.ok || !result.delivered) throw new Error(result.error || 'Le test n’a pas été diffusé');
+    if (status) { status.className = 'co-test-status ok'; status.textContent = `Test envoyé à l’overlay ${result.streamer || ''} ✓`; }
+    toast('Message test envoyé dans OBS ✓');
+  } catch (error) {
+    if (status) { status.className = 'co-test-status err'; status.textContent = error.message || 'Erreur pendant le test OBS'; }
+    toast(error.message || 'Erreur test Overlay Chat');
+  }
 }
+document.addEventListener('input', event => {
+  if (event.target?.closest?.('#widget-chat-settings')) renderChatOverlayPreview();
+});
+document.addEventListener('change', event => {
+  if (event.target?.closest?.('#widget-chat-settings')) renderChatOverlayPreview();
+});
+
 
 // ── TTS ───────────────────────────────────────────────────────────────────────
 

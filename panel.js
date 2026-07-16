@@ -2918,17 +2918,29 @@ app.post('/api/admin/widgets/chat-overlay/settings', requireAuth, async (req, re
 app.post('/api/admin/widgets/chat-overlay/test', requireAuth, async (req, res) => {
   try {
     const tm = req.tenantManager || getChatOverlayTM(req);
-    await emitChatOverlayMessage({
-      username: req.body?.username || 'TestChat',
-      content: req.body?.message || 'Message test overlay chat ✨ [emote:37243:gachiGASM]',
-      badges: [{type:'moderator', text:'Modo'}],
+    const overlayToken = await getChatOverlayToken(tm);
+    const payload = {
+      id: `test_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+      streamer: tm.slug,
+      overlayToken,
+      username: String(req.body?.username || 'Elboy78').slice(0, 60),
+      content: String(req.body?.message || 'Message test Overlay Chat ✨').slice(0, 800),
+      badges: [{ type:'moderator', text:'MOD' }],
       platform: 'Kick',
       color: '#53fc18',
       avatarUrl: '',
-      at: new Date().toISOString()
-    }, tm);
-    res.json({ success: true, streamer:tm.slug });
-  } catch(e) { res.status(500).json({ error: e.message }); }
+      at: new Date().toISOString(),
+      isTest: true
+    };
+
+    // Un test OBS doit toujours être visible, même si l'overlay est désactivé
+    // ou si les filtres masquent habituellement ce type de message.
+    tm.emit('chat-overlay-message', payload);
+    res.json({ success: true, delivered: true, streamer: tm.slug, payload });
+  } catch(e) {
+    console.error('[CHAT OVERLAY TEST]', e);
+    res.status(500).json({ error: e.message });
+  }
 });
 
 io.on('connection', (socket) => {

@@ -57,6 +57,17 @@ let settings={enabled:true,showPlatformIcon:true,showTime:false,showAvatars:true
 let lastGroup={username:'',element:null,lines:null,lastAt:0,timer:null};
 function apiUrl(path){const u=new URL(path,location.origin);if(overlayToken)u.searchParams.set('overlayToken',overlayToken);else if(slug)u.searchParams.set('streamer',slug);u.searchParams.set('_',Date.now());return u.pathname+u.search}
 const socket=io({transports:['websocket','polling'],query:{...(slug?{streamer:slug}:{}),...(overlayToken?{overlayToken}: {})}});
+let joinedStreamer='';
+function joinStreamerRoom(value){
+  const next=String(value||'').trim().toLowerCase();
+  if(!next||!socket?.connected||joinedStreamer===next)return;
+  socket.emit('tenant-join',next);
+  joinedStreamer=next;
+}
+socket.on('connect',()=>{
+  joinedStreamer='';
+  joinStreamerRoom(slug||settings.streamer||'');
+});
 function esc(s){return String(s??'').replace(/[&<>'"]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[m]))}
 function emotes(content){const raw=String(content??''),re=/\[emote:(\d+):([^\]\r\n]+)\]/g;let html='',last=0,m;while((m=re.exec(raw))){html+=esc(raw.slice(last,m.index));const id=m[1],name=String(m[2]||'emote').slice(0,64);html+=`<img class="kick-emote" src="https://files.kick.com/emotes/${id}/fullsize" alt="${esc(name)}" title="${esc(name)}" loading="eager" decoding="async">`;last=re.lastIndex}return html+esc(raw.slice(last))}
 function time(iso){try{return new Date(iso||Date.now()).toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'})}catch{return''}}
@@ -69,13 +80,22 @@ function animationClass(){return settings.animation==='slide'?'enter-slide':sett
 function trim(){const max=Math.max(1,Number(settings.maxMessages||8));while(messages.children.length>max){const first=messages.firstElementChild;if(lastGroup.element===first)resetGroup();first?.remove()}}
 function apply(){document.documentElement.style.setProperty('--fs',`${Number(settings.fontSize||21)}px`);messages.classList.toggle('mode-no-avatar',!settings.showAvatars);messages.classList.toggle('mode-no-badges',!settings.showBadges);document.querySelectorAll('.msg').forEach(el=>{el.classList.remove('premium','glass','minimal','neon');el.classList.add(settings.design||'premium')});trim()}
 function invalidate(){active=false;messages.innerHTML='';resetGroup();try{socket.disconnect()}catch{}}
-function accepts(payload){if(!active||!settings.enabled)return false;if(overlayToken&&payload?.overlayToken!==overlayToken)return false;if(slug&&payload?.streamer&&String(payload.streamer).toLowerCase()!==String(slug).toLowerCase())return false;return true}
+function accepts(payload){
+  if(!active)return false;
+  if(!payload?.isTest&&!settings.enabled)return false;
+  if(overlayToken&&payload?.overlayToken!==overlayToken)return false;
+  const expected=String(slug||settings.streamer||'').toLowerCase();
+  if(expected&&payload?.streamer&&String(payload.streamer).toLowerCase()!==expected)return false;
+  return true
+}
 function resetGroup(){if(lastGroup.timer)clearTimeout(lastGroup.timer);lastGroup={username:'',element:null,lines:null,lastAt:0,timer:null}}
 function scheduleRemoval(el){const dur=Number(settings.messageDuration||0);if(el._removeTimer)clearTimeout(el._removeTimer);if(dur<=0)return;el._removeTimer=setTimeout(()=>{if(!el.isConnected)return;el.classList.add('fadeout');setTimeout(()=>{if(lastGroup.element===el)resetGroup();el.remove()},270)},dur*1000)}
 function addLine(lines,payload){const line=document.createElement('div');line.className='text group-line';line.innerHTML=emotes(payload.content);line.querySelectorAll('img.kick-emote').forEach(img=>img.addEventListener('error',()=>img.replaceWith(document.createTextNode(img.alt||'')),{once:true}));lines.appendChild(line)}
 function add(payload){if(!accepts(payload))return;const now=Date.now(),key=String(payload.username||'').toLowerCase(),windowMs=Math.max(2,Number(settings.groupWindow||12))*1000;const canGroup=settings.groupMessages&&lastGroup.element?.isConnected&&lastGroup.username===key&&(now-lastGroup.lastAt)<=windowMs;if(canGroup){addLine(lastGroup.lines,payload);lastGroup.lastAt=now;scheduleRemoval(lastGroup.element);trim();return}
 const el=document.createElement('div');el.className=`msg ${settings.design||'premium'} ${animationClass()}`;const color=/^#[0-9a-f]{3,8}$/i.test(payload.color||'')?payload.color:'#53fc18';el.style.setProperty('--name-color',color);if(settings.highlightRoles&&hasImportantRole(payload))el.classList.add('role-highlight');const platform=settings.showPlatformIcon?'<span class="platform">K</span>':'';const clock=settings.showTime?`<span class="time">${time(payload.at)}</span>`:'';const bh=badgeHtml(payload.badges);el.innerHTML=`${avatarHtml(payload)}<div class="body"><div class="header">${platform}${bh?`<span class="badges">${bh}</span>`:''}<span class="name">${esc(payload.username)}</span>${clock}</div><div class="lines"></div></div>`;const lines=el.querySelector('.lines');addLine(lines,payload);messages.appendChild(el);trim();scheduleRemoval(el);lastGroup={username:key,element:el,lines,lastAt:now,timer:null}}
-async function load(){try{const cached=JSON.parse(localStorage.getItem(storageKey)||'null');if(cached){settings={...settings,...cached};apply()}}catch{}try{const r=await fetch(apiUrl('/api/widgets/chat-overlay'),{cache:'no-store'});const data=await r.json().catch(()=>({}));if(!r.ok||data.error==='overlay_invalid'||data.tokenValid===false){invalidate();return}if(overlayToken&&data.overlayToken!==overlayToken){invalidate();return}settings={...settings,...data};localStorage.setItem(storageKey,JSON.stringify(settings));apply()}catch{}}
+async function load(){try{const cached=JSON.parse(localStorage.getItem(storageKey)||'null');if(cached){settings={...settings,...cached};apply()}}catch{}try{const r=await fetch(apiUrl('/api/widgets/chat-overlay'),{cache:'no-store'});const data=await r.json().catch(()=>({}));if(!r.ok||data.error==='overlay_invalid'||data.tokenValid===false){invalidate();return}if(overlayToken&&data.overlayToken!==overlayToken){invalidate();return}settings={...settings,...data};
+if(data.streamer)joinStreamerRoom(data.streamer);
+localStorage.setItem(storageKey,JSON.stringify(settings));apply()}catch{}}
 socket.on('chat-overlay-message',add);
 socket.on('chat-overlay-settings',cfg=>{if(!accepts(cfg))return;settings={...settings,...cfg};try{localStorage.setItem(storageKey,JSON.stringify(settings))}catch{}apply()});
 load();setInterval(load,12000);
