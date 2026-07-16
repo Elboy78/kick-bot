@@ -1206,6 +1206,13 @@ Option 3" rows="4"></textarea><div style="display:flex;gap:6px;margin-top:10px">
       #widget-chat-settings .co-theme-cyber{background:linear-gradient(135deg,#050014,#1b0638)}#widget-chat-settings .co-theme-cyber span{background:#22d3ee;box-shadow:0 0 9px #22d3ee}
       #widget-chat-settings .co-theme-royal{background:linear-gradient(135deg,#190b3d,#4c1d95)}#widget-chat-settings .co-theme-royal span{background:#c4b5fd}
       #widget-chat-settings .co-theme-transparent{background:linear-gradient(135deg,rgba(15,23,42,.18),rgba(15,23,42,.04));border:1px dashed rgba(255,255,255,.3)}#widget-chat-settings .co-theme-transparent span{background:rgba(255,255,255,.85)}
+      #widget-chat-settings .co-theme-aurora{background:linear-gradient(135deg,#052e2b,#164e63 48%,#312e81)}#widget-chat-settings .co-theme-aurora span{background:linear-gradient(90deg,#2dd4bf,#818cf8)}
+      #widget-chat-settings .co-theme-fire{background:linear-gradient(135deg,#2b0904,#7c2d12 55%,#b91c1c)}#widget-chat-settings .co-theme-fire span{background:linear-gradient(90deg,#facc15,#f97316,#ef4444)}
+      #widget-chat-settings .co-theme-ice{background:linear-gradient(135deg,#082f49,#0e7490 55%,#bae6fd)}#widget-chat-settings .co-theme-ice span{background:#e0f2fe}
+      #widget-chat-settings .co-theme-sakura{background:linear-gradient(135deg,#4a1736,#9d174d 55%,#f9a8d4)}#widget-chat-settings .co-theme-sakura span{background:#fce7f3}
+      #widget-chat-settings .co-theme-gold{background:linear-gradient(135deg,#1c1403,#713f12 55%,#ca8a04)}#widget-chat-settings .co-theme-gold span{background:#fde68a}
+      #widget-chat-settings .co-theme-terminal{background:#020b05;border:1px solid #22c55e}#widget-chat-settings .co-theme-terminal span{background:#22c55e;box-shadow:0 0 9px #22c55e}
+
       #widget-chat-settings .co-preview-panel{position:sticky;top:16px;background:var(--card);border:1px solid var(--brd);border-radius:16px;padding:16px}
       #widget-chat-settings .co-preview-stage{height:520px;border-radius:15px;border:1px solid var(--brd);background:radial-gradient(circle at top right,rgba(83,252,24,.10),transparent 35%),linear-gradient(180deg,#121827,#050711);padding:18px;display:flex;align-items:flex-end;overflow:hidden}
       #widget-chat-settings #co-preview{width:100%;display:flex;flex-direction:column;gap:9px}
@@ -1215,6 +1222,20 @@ Option 3" rows="4"></textarea><div style="display:flex;gap:6px;margin-top:10px">
       #widget-chat-settings .co-save-bar{display:flex;gap:10px;align-items:center;justify-content:flex-end;margin-top:12px}
       @media(max-width:1250px){#widget-chat-settings .co-layout{grid-template-columns:1fr}#widget-chat-settings .co-preview-panel{position:static}#widget-chat-settings .co-preview-stage{height:420px}}
       @media(max-width:850px){#widget-chat-settings .co-settings-grid{grid-template-columns:1fr}#widget-chat-settings .co-section.wide{grid-column:auto}#widget-chat-settings .co-theme-grid{grid-template-columns:repeat(2,1fr)}}
+      .co-preview-pop{animation:coPreviewPop .35s cubic-bezier(.2,.85,.25,1.12)}
+      .co-preview-slide{animation:coPreviewSlide .38s ease-out}.co-preview-slide-right{animation:coPreviewSlideRight .38s ease-out}
+      .co-preview-rise{animation:coPreviewRise .4s ease-out}.co-preview-zoom{animation:coPreviewZoom .35s ease-out}
+      .co-preview-bounce{animation:coPreviewBounce .55s cubic-bezier(.3,1.5,.4,1)}.co-preview-flip{animation:coPreviewFlip .5s ease-out}
+      .co-preview-glitch{animation:coPreviewGlitch .36s steps(2,end)}.co-preview-fade{animation:coPreviewFade .4s ease-out}
+      @keyframes coPreviewPop{from{opacity:.2;transform:translateY(12px) scale(.94)}to{opacity:1;transform:none}}
+      @keyframes coPreviewSlide{from{opacity:.2;transform:translateX(-45px)}to{opacity:1;transform:none}}
+      @keyframes coPreviewSlideRight{from{opacity:.2;transform:translateX(45px)}to{opacity:1;transform:none}}
+      @keyframes coPreviewRise{from{opacity:.1;transform:translateY(32px)}to{opacity:1;transform:none}}
+      @keyframes coPreviewZoom{from{opacity:.15;transform:scale(.72)}to{opacity:1;transform:none}}
+      @keyframes coPreviewBounce{0%{opacity:.2;transform:translateY(25px) scale(.9)}65%{opacity:1;transform:translateY(-7px) scale(1.03)}100%{transform:none}}
+      @keyframes coPreviewFlip{from{opacity:.1;transform:perspective(500px) rotateX(-70deg)}to{opacity:1;transform:none}}
+      @keyframes coPreviewGlitch{0%{opacity:.2;transform:translate(8px,-2px);filter:hue-rotate(90deg)}40%{transform:translate(-6px,2px)}100%{opacity:1;transform:none;filter:none}}
+      @keyframes coPreviewFade{from{opacity:0}to{opacity:1}}
     </style>
     <div class="co-layout">
       <div class="co-settings-grid">
@@ -1251,7 +1272,18 @@ Option 3" rows="4"></textarea><div style="display:flex;gap:6px;margin-top:10px">
           <div class="co-section-title">✨ Animation</div>
           <div class="co-section-sub">Choisis la manière dont les messages apparaissent à l’écran.</div>
           <label class="lbl">Animation d’entrée</label>
-          <select class="inp" id="co-animation"><option value="pop">Pop In</option><option value="slide">Slide</option><option value="fade">Fade</option><option value="none">Aucune</option></select>
+          <select class="inp" id="co-animation">
+            <option value="pop">Pop In</option>
+            <option value="slide">Slide gauche</option>
+            <option value="slide-right">Slide droite</option>
+            <option value="rise">Montée douce</option>
+            <option value="zoom">Zoom</option>
+            <option value="bounce">Rebond</option>
+            <option value="flip">Flip 3D</option>
+            <option value="glitch">Glitch</option>
+            <option value="fade">Fondu</option>
+            <option value="none">Aucune</option>
+          </select>
         </section>
         <section class="co-section wide">
           <div class="co-section-title">🎨 Thème</div>
@@ -1270,6 +1302,12 @@ Option 3" rows="4"></textarea><div style="display:flex;gap:6px;margin-top:10px">
             <button type="button" class="co-theme-card" aria-pressed="false" data-theme="cyber" onclick="selectChatOverlayTheme('cyber')"><div class="co-theme-demo co-theme-cyber"><span></span></div><b>Cyber</b></button>
             <button type="button" class="co-theme-card" aria-pressed="false" data-theme="royal" onclick="selectChatOverlayTheme('royal')"><div class="co-theme-demo co-theme-royal"><span></span></div><b>Royal</b></button>
             <button type="button" class="co-theme-card" aria-pressed="false" data-theme="transparent" onclick="selectChatOverlayTheme('transparent')"><div class="co-theme-demo co-theme-transparent"><span></span></div><b>Transparent</b></button>
+            <button type="button" class="co-theme-card" aria-pressed="false" data-theme="aurora"><div class="co-theme-demo co-theme-aurora"><span></span></div><b>Aurora</b></button>
+            <button type="button" class="co-theme-card" aria-pressed="false" data-theme="fire"><div class="co-theme-demo co-theme-fire"><span></span></div><b>Fire</b></button>
+            <button type="button" class="co-theme-card" aria-pressed="false" data-theme="ice"><div class="co-theme-demo co-theme-ice"><span></span></div><b>Ice</b></button>
+            <button type="button" class="co-theme-card" aria-pressed="false" data-theme="sakura"><div class="co-theme-demo co-theme-sakura"><span></span></div><b>Sakura</b></button>
+            <button type="button" class="co-theme-card" aria-pressed="false" data-theme="gold"><div class="co-theme-demo co-theme-gold"><span></span></div><b>Gold</b></button>
+            <button type="button" class="co-theme-card" aria-pressed="false" data-theme="terminal"><div class="co-theme-demo co-theme-terminal"><span></span></div><b>Terminal</b></button>
           </div>
           <div class="co-save-bar"><button class="dark-btn" onclick="saveChatOverlaySettings()">ENREGISTRER LES RÉGLAGES</button></div>
           <div class="obs-link-box">
@@ -5634,11 +5672,12 @@ function currentChatOverlaySettingsFromForm() {
     design: document.getElementById('co-design')?.value || 'premium'
   };
 }
-function selectChatOverlayTheme(theme) {
+window.selectChatOverlayTheme = function selectChatOverlayTheme(theme) {
   const allowed = new Set([
     'premium', 'glass', 'minimal', 'neon',
     'kick', 'ocean', 'sunset', 'candy',
-    'mono', 'cyber', 'royal', 'transparent'
+    'mono', 'cyber', 'royal', 'transparent',
+    'aurora', 'fire', 'ice', 'sakura', 'gold', 'terminal'
   ]);
   const selected = allowed.has(String(theme || '').toLowerCase())
     ? String(theme).toLowerCase()
@@ -5655,7 +5694,7 @@ function selectChatOverlayTheme(theme) {
 
   renderChatOverlayPreview();
   scheduleChatOverlaySave(120);
-}
+};
 function renderChatOverlayPreview() {
   const box = document.getElementById('co-preview');
   if (!box) return;
@@ -5673,7 +5712,13 @@ function renderChatOverlayPreview() {
     mono: 'background:linear-gradient(135deg,rgba(17,17,17,.95),rgba(43,43,43,.88));border:1px solid rgba(255,255,255,.22);padding:11px 13px;border-radius:12px;filter:grayscale(1)',
     cyber: 'background:linear-gradient(135deg,rgba(5,0,20,.95),rgba(27,6,56,.88));border:1px solid rgba(34,211,238,.52);box-shadow:0 0 25px rgba(34,211,238,.15);padding:11px 13px;border-radius:8px',
     royal: 'background:linear-gradient(135deg,rgba(25,11,61,.96),rgba(76,29,149,.84));border:1px solid rgba(196,181,253,.42);box-shadow:0 14px 38px rgba(124,58,237,.16);padding:11px 13px;border-radius:18px',
-    transparent: 'background:rgba(15,23,42,.10);border:1px solid rgba(255,255,255,.16);backdrop-filter:blur(6px);padding:10px 12px;border-radius:14px;text-shadow:0 2px 5px rgba(0,0,0,.9)'
+    transparent: 'background:rgba(15,23,42,.10);border:1px solid rgba(255,255,255,.16);backdrop-filter:blur(6px);padding:10px 12px;border-radius:14px;text-shadow:0 2px 5px rgba(0,0,0,.9)',
+    aurora: 'background:linear-gradient(135deg,rgba(5,46,43,.95),rgba(22,78,99,.85),rgba(49,46,129,.82));border:1px solid rgba(45,212,191,.42);padding:11px 13px;border-radius:18px',
+    fire: 'background:linear-gradient(135deg,rgba(43,9,4,.96),rgba(124,45,18,.86),rgba(185,28,28,.82));border:1px solid rgba(249,115,22,.5);padding:11px 13px;border-radius:14px',
+    ice: 'background:linear-gradient(135deg,rgba(8,47,73,.96),rgba(14,116,144,.84),rgba(186,230,253,.28));border:1px solid rgba(186,230,253,.55);padding:11px 13px;border-radius:17px',
+    sakura: 'background:linear-gradient(135deg,rgba(74,23,54,.96),rgba(157,23,77,.85),rgba(249,168,212,.32));border:1px solid rgba(249,168,212,.52);padding:11px 13px;border-radius:20px',
+    gold: 'background:linear-gradient(135deg,rgba(28,20,3,.97),rgba(113,63,18,.88),rgba(202,138,4,.42));border:1px solid rgba(253,230,138,.55);padding:11px 13px;border-radius:14px',
+    terminal: 'background:rgba(2,11,5,.97);border:1px solid rgba(34,197,94,.72);box-shadow:0 0 24px rgba(34,197,94,.14);padding:11px 13px;border-radius:6px;font-family:monospace'
   };
   const base = previewThemes[design] || previewThemes.premium;
   const avatar = cfg.showAvatars ? '<div style="width:40px;height:40px;flex:0 0 40px;border-radius:12px;background:linear-gradient(135deg,#22c55e,#15803d);display:grid;place-items:center;font-weight:950;color:#061208">E</div>' : '';
@@ -5683,6 +5728,49 @@ function renderChatOverlayPreview() {
   box.innerHTML = `
     <div style="display:flex;gap:10px;align-items:flex-start;${base}">${avatar}<div style="min-width:0;flex:1"><div style="display:flex;align-items:center;gap:5px">${kick}${badges}<b style="color:#53fc18">Elboy78</b>${clock}</div><div style="font-size:${Math.max(14,Math.min(24,cfg.fontSize))}px;font-weight:760;margin-top:4px;color:#fff">GG le nouvel overlay est propre 🔥</div>${cfg.groupMessages?'<div style="font-size:14px;font-weight:680;margin-top:4px;color:#e2e8f0">Deuxième message regroupé automatiquement</div>':''}</div></div>
     <div style="display:flex;gap:10px;align-items:flex-start;${base}">${cfg.showAvatars?'<div style="width:40px;height:40px;flex:0 0 40px;border-radius:12px;background:linear-gradient(135deg,#a78bfa,#7c3aed);display:grid;place-items:center;font-weight:950">V</div>':''}<div><b style="color:#a78bfa">Viewer</b><div style="font-size:${Math.max(14,Math.min(24,cfg.fontSize))}px;font-weight:750;margin-top:4px">test depuis Kick</div></div></div>`;
+}
+
+
+function previewChatOverlayAnimation() {
+  const box = document.getElementById('co-preview');
+  if (!box) return;
+  const animation = document.getElementById('co-animation')?.value || 'pop';
+  box.classList.remove('co-preview-pop','co-preview-slide','co-preview-slide-right','co-preview-rise','co-preview-zoom','co-preview-bounce','co-preview-flip','co-preview-glitch','co-preview-fade');
+  void box.offsetWidth;
+  if (animation !== 'none') box.classList.add(`co-preview-${animation}`);
+  scheduleChatOverlaySave(120);
+}
+
+function bindChatOverlayControls() {
+  const root = document.getElementById('widget-chat-settings');
+  if (!root || root.dataset.controlsBound === '1') return;
+  root.dataset.controlsBound = '1';
+
+  root.addEventListener('click', event => {
+    const card = event.target.closest('.co-theme-card[data-theme]');
+    if (!card) return;
+    event.preventDefault();
+    event.stopPropagation();
+    window.selectChatOverlayTheme(card.dataset.theme);
+  });
+
+  root.addEventListener('change', event => {
+    if (event.target?.id === 'co-animation') {
+      previewChatOverlayAnimation();
+      return;
+    }
+    if (event.target.matches('input,select,textarea')) {
+      renderChatOverlayPreview();
+      scheduleChatOverlaySave();
+    }
+  });
+
+  root.addEventListener('input', event => {
+    if (event.target.matches('input[type="number"],input[type="text"],textarea')) {
+      renderChatOverlayPreview();
+      scheduleChatOverlaySave();
+    }
+  });
 }
 
 function applyChatOverlaySettings(d) {
@@ -5703,7 +5791,12 @@ function applyChatOverlaySettings(d) {
   setVal('co-animation', d.animation || 'pop');
   setVal('co-design', d.design || 'premium');
   hydrateAllObsLinks();
-  document.querySelectorAll('#widget-chat-settings .co-theme-card').forEach(card => card.classList.toggle('active', card.dataset.theme === (d.design || 'premium')));
+  document.querySelectorAll('#widget-chat-settings .co-theme-card').forEach(card => {
+    const active = card.dataset.theme === (d.design || 'premium');
+    card.classList.toggle('active', active);
+    card.setAttribute('aria-pressed', active ? 'true' : 'false');
+  });
+  bindChatOverlayControls();
   renderChatOverlayPreview();
 }
 async function loadChatOverlaySettings() {
@@ -5844,6 +5937,12 @@ document.addEventListener('change', event => {
   scheduleChatOverlaySave(250);
 });
 
+
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', bindChatOverlayControls, { once: true });
+} else {
+  bindChatOverlayControls();
+}
 
 // ── TTS ───────────────────────────────────────────────────────────────────────
 
