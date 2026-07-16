@@ -1591,6 +1591,31 @@ app.post('/api/admin/widgets/songrequest/move', requireAuth, async (req, res) =>
   } catch(e) { res.status(500).json({ error:e.message }); }
 });
 
+
+app.post('/api/admin/widgets/songrequest/reorder', requireAuth, async (req, res) => {
+  try {
+    const tm = getSongRequestTM(req);
+    const state = await getSongRequestState(tm);
+    const current = state.queue[0] || null;
+    const waiting = state.queue.slice(1);
+    const requestedIds = Array.isArray(req.body.ids) ? req.body.ids.map(String) : [];
+    const waitingById = new Map(waiting.map(item => [String(item.id), item]));
+
+    if (requestedIds.length !== waiting.length || new Set(requestedIds).size !== requestedIds.length) {
+      return res.status(400).json({ error:'Ordre de file invalide' });
+    }
+
+    const reordered = requestedIds.map(id => waitingById.get(id));
+    if (reordered.some(item => !item)) {
+      return res.status(400).json({ error:'Une musique de la file est introuvable' });
+    }
+
+    const queue = current ? [current, ...reordered] : reordered;
+    await saveSongRequestQueue(queue, tm);
+    return res.json({ success:true, ...(await getSongRequestState(tm)) });
+  } catch(e) { res.status(500).json({ error:e.message }); }
+});
+
 app.post('/api/admin/widgets/songrequest/play-item', requireAuth, async (req, res) => {
   try {
     const tm = getSongRequestTM(req);

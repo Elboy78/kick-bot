@@ -5,25 +5,12 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Song Request</title>
 <style>
-  html,body{margin:0;background:transparent;font-family:Inter,Arial,sans-serif;color:#fff;overflow:hidden}
-  .wrap{width:585px;min-height:148px;padding:8px;box-sizing:border-box}
-  .card{position:relative;overflow:hidden;border-radius:22px;padding:15px 18px;background:linear-gradient(135deg,rgba(7,18,34,.96),rgba(22,14,58,.9) 55%,rgba(3,32,34,.92));border:1px solid rgba(147,197,253,.34);box-shadow:0 20px 50px rgba(0,0,0,.48),inset 0 1px 0 rgba(255,255,255,.08)}
-  .card:before{content:"";position:absolute;inset:-80px;background:radial-gradient(circle at 92% 10%,rgba(139,92,246,.28),transparent 34%),radial-gradient(circle at 70% 115%,rgba(45,212,191,.22),transparent 42%);pointer-events:none}
-  .statusDot{position:absolute;right:17px;top:15px;width:8px;height:8px;border-radius:50%;background:#22c55e;box-shadow:0 0 16px rgba(34,197,94,.9);opacity:.95}
-  .statusDot.paused{background:#f59e0b;box-shadow:0 0 16px rgba(245,158,11,.9)}
-  .row{position:relative;z-index:2;display:flex;gap:14px;align-items:center}
-  .thumb{width:88px;height:56px;border-radius:10px;object-fit:cover;border:1px solid rgba(255,255,255,.18);background:rgba(255,255,255,.05);box-shadow:0 10px 22px rgba(0,0,0,.35)}
-  .meta{min-width:0;flex:1}.topline{display:flex;align-items:center;gap:8px;margin-bottom:6px}.pill{font-size:9px;font-weight:950;letter-spacing:1px;text-transform:uppercase;padding:4px 9px;border-radius:999px;background:rgba(147,197,253,.13);border:1px solid rgba(147,197,253,.24);color:#bfdbfe}.state{font-size:10px;font-weight:900;text-transform:uppercase;color:rgba(255,255,255,.68)}
-  .song{font-size:19px;line-height:1.08;font-weight:950;letter-spacing:-.35px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-shadow:0 2px 12px rgba(0,0,0,.45)}
-  .by{margin-top:5px;font-size:11px;color:rgba(226,232,240,.72);font-weight:750;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-  .barWrap{position:relative;z-index:2;margin-top:12px}.bar{height:9px;border-radius:999px;background:rgba(255,255,255,.2);box-shadow:inset 0 1px 4px rgba(0,0,0,.5);overflow:hidden}.fill{width:0%;height:100%;border-radius:999px;background:linear-gradient(90deg,#60a5fa,#8b5cf6,#2dd4bf);transition:width .25s linear}.times{display:flex;justify-content:space-between;margin-top:5px;font-size:11px;color:rgba(226,232,240,.75);font-weight:850}
-  .next{position:relative;z-index:2;margin-top:11px;border:1px solid rgba(147,197,253,.15);background:rgba(15,23,42,.46);border-radius:14px;padding:9px 12px;font-size:11px;color:rgba(226,232,240,.7);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.empty .song{color:rgba(226,232,240,.78)}.empty .fill{width:0!important}
-  #yt-holder{position:absolute;left:-9999px;top:-9999px;width:1px;height:1px;opacity:0;pointer-events:none}
+html,body{margin:0;background:transparent;font-family:Inter,Arial,sans-serif;color:#fff;overflow:hidden}.wrap{width:680px;padding:10px;box-sizing:border-box}.card{--accent:#8b5cf6;position:relative;overflow:hidden;border-radius:28px;padding:18px;background:linear-gradient(135deg,rgba(7,12,24,.94),rgba(20,13,45,.91) 52%,rgba(3,26,31,.92));border:1px solid rgba(255,255,255,.16);box-shadow:0 28px 80px rgba(0,0,0,.52),inset 0 1px 0 rgba(255,255,255,.10);backdrop-filter:blur(24px);transition:opacity .35s,transform .35s}.bg{position:absolute;inset:-35px;background-position:center;background-size:cover;filter:blur(34px) saturate(1.35);opacity:.28;transform:scale(1.16);transition:background-image .5s}.shade{position:absolute;inset:0;background:linear-gradient(90deg,rgba(3,7,18,.92),rgba(5,8,20,.65) 58%,rgba(11,8,30,.72));}.content{position:relative;z-index:2}.top{display:grid;grid-template-columns:132px minmax(0,1fr);gap:18px;align-items:center}.art{width:132px;height:132px;border-radius:22px;object-fit:cover;border:1px solid rgba(255,255,255,.20);background:rgba(255,255,255,.05);box-shadow:0 20px 40px rgba(0,0,0,.45);transition:transform .35s,opacity .35s}.eyebrow{display:flex;align-items:center;gap:9px;margin-bottom:9px}.pulse{width:8px;height:8px;border-radius:50%;background:#34d399;box-shadow:0 0 18px #34d399}.paused .pulse{background:#f59e0b;box-shadow:0 0 18px #f59e0b}.label{font-size:10px;font-weight:950;letter-spacing:1.5px;text-transform:uppercase;color:#c4b5fd}.song{font-size:27px;line-height:1.05;font-weight:950;letter-spacing:-.7px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-shadow:0 3px 18px rgba(0,0,0,.45)}.author{margin-top:7px;font-size:13px;color:#dbeafe;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.requester{margin-top:10px;font-size:11px;color:rgba(226,232,240,.68);font-weight:750}.barWrap{margin-top:17px}.bar{height:10px;border-radius:999px;background:rgba(255,255,255,.16);overflow:hidden;box-shadow:inset 0 2px 6px rgba(0,0,0,.38)}.fill{height:100%;width:0;border-radius:inherit;background:linear-gradient(90deg,#60a5fa,#a78bfa,#2dd4bf);box-shadow:0 0 18px rgba(139,92,246,.62)}.times{display:flex;justify-content:space-between;margin-top:6px;font-size:11px;color:#dbeafe;font-weight:900}.bottom{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:12px;align-items:center;margin-top:14px}.next{min-width:0;border:1px solid rgba(255,255,255,.12);background:rgba(15,23,42,.42);border-radius:15px;padding:10px 12px}.nextLabel{font-size:8px;color:#93c5fd;font-weight:950;letter-spacing:1.2px;text-transform:uppercase}.nextTitle{font-size:11px;font-weight:850;color:#eef2ff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:3px}.queueCount{font-size:10px;font-weight:900;color:#c4b5fd;padding:8px 11px;border-radius:999px;background:rgba(139,92,246,.14);border:1px solid rgba(167,139,250,.20);white-space:nowrap}.upcoming{position:absolute;inset:0;z-index:4;display:grid;place-items:center;background:rgba(5,8,18,.82);backdrop-filter:blur(14px);opacity:0;pointer-events:none;transition:opacity .3s}.upcoming.show{opacity:1}.upcomingBox{text-align:center}.upcomingLabel{font-size:11px;font-weight:950;letter-spacing:1.6px;color:#93c5fd;text-transform:uppercase}.upcomingTitle{margin-top:8px;font-size:23px;font-weight:950;max-width:560px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.empty .art{opacity:.35}.empty .fill{width:0!important}.mode-minimal .top{grid-template-columns:1fr}.mode-minimal .art,.mode-minimal .author,.mode-minimal .requester,.mode-minimal .bottom,.mode-minimal .label{display:none}.mode-minimal .song{font-size:24px}.mode-compact .art{width:88px;height:88px}.mode-compact .top{grid-template-columns:88px minmax(0,1fr)}#yt-holder{position:absolute;left:-9999px;top:-9999px;width:1px;height:1px;opacity:0;pointer-events:none}@media(max-width:720px){.wrap{width:100vw}.card{border-radius:20px}.top{grid-template-columns:92px minmax(0,1fr)}.art{width:92px;height:92px}.song{font-size:20px}}
 </style>
 </head>
 <body>
 <div id="yt-holder"><div id="yt-player"></div></div>
-<div class="wrap"><div class="card empty" id="card"><div class="statusDot" id="dot"></div><div class="row"><img class="thumb" id="thumb" alt=""/><div class="meta"><div class="topline"><span class="pill">Song Request</span><span class="state" id="stateTxt">En attente</span></div><div class="song" id="song">Aucune musique en cours</div><div class="by" id="by">Utilise !sr + lien/titre dans le chat</div></div></div><div class="barWrap"><div class="bar"><div class="fill" id="fill"></div></div><div class="times"><span id="curTime">0:00</span><span id="durTime">0:00</span></div></div><div class="next" id="next" style="display:none"></div></div></div>
+<div class="wrap"><div class="card empty" id="card"><div class="bg" id="bg"></div><div class="shade"></div><div class="content"><div class="top"><img class="art" id="thumb" alt=""/><div class="meta"><div class="eyebrow"><span class="pulse"></span><span class="label" id="stateTxt">Now playing</span></div><div class="song" id="song">Aucune musique en cours</div><div class="author" id="author">Song Request ElBot</div><div class="requester" id="by">Utilise !sr + lien/titre dans le chat</div></div></div><div class="barWrap"><div class="bar"><div class="fill" id="fill"></div></div><div class="times"><span id="curTime">0:00</span><span id="durTime">0:00</span></div></div><div class="bottom"><div class="next" id="next" style="display:none"><div class="nextLabel">À suivre</div><div class="nextTitle" id="nextTitle"></div></div><div class="queueCount" id="queueCount">0 en attente</div></div></div><div class="upcoming" id="upcoming"><div class="upcomingBox"><div class="upcomingLabel" id="upcomingLabel">Dans 10 secondes</div><div class="upcomingTitle" id="upcomingTitle"></div></div></div></div></div>
 <script src="/socket.io/socket.io.js"></script>
 <script src="https://www.youtube.com/iframe_api"></script>
 <script>
@@ -47,7 +34,7 @@ function apiUrl(path){
 function joinStreamerRoom(slug){ slug=String(slug||'').toLowerCase(); if(!slug||!srSocket||srJoinedRoom===slug)return; try{srSocket.emit('tenant-join', slug); srJoinedRoom=slug;}catch(e){} }
 function adoptStreamer(slug){ slug=String(slug||'').toLowerCase(); if(!slug)return; if(!STREAMER_SLUG) STREAMER_SLUG=slug; joinStreamerRoom(STREAMER_SLUG); }
 
-const el={card:document.getElementById('card'),dot:document.getElementById('dot'),thumb:document.getElementById('thumb'),song:document.getElementById('song'),by:document.getElementById('by'),next:document.getElementById('next'),fill:document.getElementById('fill'),cur:document.getElementById('curTime'),dur:document.getElementById('durTime'),state:document.getElementById('stateTxt')};
+const el={card:document.getElementById('card'),bg:document.getElementById('bg'),thumb:document.getElementById('thumb'),song:document.getElementById('song'),author:document.getElementById('author'),by:document.getElementById('by'),next:document.getElementById('next'),nextTitle:document.getElementById('nextTitle'),queueCount:document.getElementById('queueCount'),upcoming:document.getElementById('upcoming'),upcomingLabel:document.getElementById('upcomingLabel'),upcomingTitle:document.getElementById('upcomingTitle'),fill:document.getElementById('fill'),cur:document.getElementById('curTime'),dur:document.getElementById('durTime'),state:document.getElementById('stateTxt')};
 let player=null, ytReady=false, lastSeq=0;
 let queue=[], enabled=false, currentItemId='', currentVideoId='';
 let desiredStatus='stopped';
@@ -55,6 +42,7 @@ let volume=100;
 let displayTime=0, duration=0, lastClock=Date.now();
 let loadingUntil=0, lastStatePost=0, lastControlPoll=0, suppressStateUntil=0;
 let overlayInvalid=false;
+const overlayMode=(new URLSearchParams(location.search).get('theme')||'premium').toLowerCase(); document.getElementById('card').classList.add('mode-'+(['minimal','compact','premium'].includes(overlayMode)?overlayMode:'premium'));
 
 function esc(v){return String(v||'').replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));}
 function fmt(s){s=Math.max(0,Math.floor(Number(s)||0));return Math.floor(s/60)+':'+String(s%60).padStart(2,'0');}
@@ -69,7 +57,7 @@ function invalidateOverlay(){
   queue=[]; enabled=false; desiredStatus='stopped';
   try{ if(player){ player.pauseVideo&&player.pauseVideo(); player.stopVideo&&player.stopVideo(); } }catch(e){}
   currentItemId=''; currentVideoId=''; duration=0; syncClockFrom(0);
-  el.card.classList.add('empty'); el.dot.classList.add('paused');
+  el.card.classList.add('empty');
   el.state.textContent='Lien expiré';
   el.song.textContent='Lien OBS régénéré';
   el.by.textContent='Copie le nouveau lien Song Request depuis le panel.';
@@ -95,12 +83,16 @@ function getSmoothTime(){
 function render(){
   const cur=queue[0], nxt=queue[1];
   el.card.classList.toggle('empty',!cur);
-  el.dot.classList.toggle('paused', desiredStatus==='paused');
-  el.state.textContent=!cur?'En attente':desiredStatus==='paused'?'Pause':desiredStatus==='playing'?'En lecture':'Arrêt';
-  el.thumb.src=cur?.thumbnail||''; el.thumb.style.visibility=cur?.thumbnail?'visible':'hidden';
-  el.song.innerHTML=esc(cur?.title||cur?.song||'Aucune musique en cours');
-  el.by.innerHTML=cur?'Demandé par '+esc(cur.username||'Anonyme')+(cur.author?' · '+esc(cur.author):''):'Utilise !sr + lien/titre dans le chat';
-  if(nxt){el.next.style.display='block';el.next.innerHTML='À suivre : '+esc(nxt.title||nxt.song)+' — '+esc(nxt.username||'Anonyme')}else el.next.style.display='none';
+  el.card.classList.toggle('paused',desiredStatus==='paused');
+  el.state.textContent=!cur?'En attente':desiredStatus==='paused'?'En pause':'Now playing';
+  const image=cur?.thumbnail||'';
+  el.thumb.src=image; el.thumb.style.visibility=image?'visible':'hidden';
+  el.bg.style.backgroundImage=image?`url("${String(image).replace(/"/g,'')}")`:'none';
+  el.song.textContent=cur?.title||cur?.song||'Aucune musique en cours';
+  el.author.textContent=cur?.author||'Song Request ElBot';
+  el.by.textContent=cur?'Demandé par '+(cur.username||'Anonyme'):'Utilise !sr + lien/titre dans le chat';
+  if(nxt){el.next.style.display='block';el.nextTitle.textContent=(nxt.title||nxt.song)+' · '+(nxt.username||'Anonyme')}else el.next.style.display='none';
+  el.queueCount.textContent=`${Math.max(0,queue.length-1)} en attente`;
   updateTimeUI();
 }
 function updateTimeUI(){
@@ -109,6 +101,11 @@ function updateTimeUI(){
   el.cur.textContent=fmt(cur); el.dur.textContent=fmt(d);
   el.fill.style.transition = desiredStatus==='playing' ? 'width .22s linear' : 'none';
   el.fill.style.width=d?Math.min(100,Math.max(0,(cur/d)*100))+'%':'0%';
+  const remaining=d?Math.max(0,d-cur):999;
+  const nxt=queue[1];
+  const showUpcoming=!!nxt && remaining<=10 && remaining>0 && desiredStatus==='playing';
+  el.upcoming.classList.toggle('show',showUpcoming);
+  if(showUpcoming){el.upcomingLabel.textContent=`Dans ${Math.ceil(remaining)} seconde${remaining>1?'s':''}`;el.upcomingTitle.textContent=nxt.title||nxt.song||'';}
 }
 
 function ensurePlayer(){

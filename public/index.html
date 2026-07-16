@@ -1032,6 +1032,17 @@ Option 3" rows="4"></textarea><div style="display:flex;gap:6px;margin-top:10px">
       #widget-songrequest-settings .sr-volume-box{display:flex;align-items:center;gap:8px;margin-left:12px;color:#cbd5e1;font-size:10px;font-weight:900;text-transform:uppercase}
       #widget-songrequest-settings #sr-volume{width:150px;accent-color:#93c5fd}
       #widget-songrequest-settings .sr-empty-hint{position:relative;text-align:center;padding:28px 10px;color:#94a3b8}
+
+      #widget-songrequest-settings .sr-queue-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px;flex-wrap:wrap}
+      #widget-songrequest-settings .sr-queue-stats{display:flex;gap:8px;flex-wrap:wrap}
+      #widget-songrequest-settings .sr-stat-chip{padding:6px 10px;border-radius:999px;background:rgba(96,165,250,.10);border:1px solid rgba(147,197,253,.20);color:#bfdbfe;font-size:10px;font-weight:900}
+      #widget-songrequest-settings .sr-queue-row{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:11px;border:1px solid transparent;border-bottom-color:var(--brd);border-radius:12px;transition:transform .16s,background .16s,border-color .16s,opacity .16s}
+      #widget-songrequest-settings .sr-queue-row[draggable=true]{cursor:grab}
+      #widget-songrequest-settings .sr-queue-row[draggable=true]:active{cursor:grabbing}
+      #widget-songrequest-settings .sr-queue-row.dragging{opacity:.38;transform:scale(.985)}
+      #widget-songrequest-settings .sr-queue-row.drag-over{border-color:rgba(96,165,250,.7);background:rgba(96,165,250,.10);transform:translateY(2px)}
+      #widget-songrequest-settings .sr-drag-handle{width:28px;height:38px;border-radius:9px;display:grid;place-items:center;color:#94a3b8;font-size:18px;flex:0 0 28px;user-select:none}
+      #widget-songrequest-settings .sr-eta{font-size:9px;color:#93c5fd;font-weight:900;margin-top:3px}
       @media(max-width:720px){#widget-songrequest-settings .sr-player-main{align-items:flex-start}#widget-songrequest-settings .sr-cover{width:88px;height:58px}#widget-songrequest-settings .sr-song-title{font-size:17px}#widget-songrequest-settings .sr-volume-box{width:100%;justify-content:center;margin-left:0}}
     </style>
 
@@ -1078,19 +1089,7 @@ Option 3" rows="4"></textarea><div style="display:flex;gap:6px;margin-top:10px">
             <div class="sr-song-title" id="sr-now-title">Aucune musique en cours</div>
             <div class="sr-song-meta" id="sr-now-meta">Le chat peut demander une musique avec !sr</div>
             <div class="sr-progress-row">
-              <input
-  id="sr-seek"
-  class="sr-smooth-range"
-  type="range"
-  min="0"
-  max="0"
-  value="0"
-  step="0.1"
-  onpointerdown="beginSongRequestSeek()"
-  onkeydown="beginSongRequestSeek()"
-  oninput="previewSongRequestSeek(this.value)"
-  onchange="commitSongRequestSeek(this.value)"
-> oninput="previewSongRequestSeek(this.value)" onchange="seekSongRequest(this.value)">
+              <input id="sr-seek" class="sr-smooth-range" type="range" min="0" max="0" value="0" step="0.01" disabled oninput="previewSongRequestSeek(this.value)" onchange="seekSongRequest(this.value)">
               <div class="sr-times"><span id="sr-current-time">0:00</span><span id="sr-duration-time">0:00</span></div>
             </div>
           </div>
@@ -1103,7 +1102,7 @@ Option 3" rows="4"></textarea><div style="display:flex;gap:6px;margin-top:10px">
       </div>
     </div>
     <div class="panel" style="margin-top:14px">
-      <h3>🎶 File d’attente</h3>
+      <div class="sr-queue-head"><h3 style="margin:0">🎶 File d’attente</h3><div class="sr-queue-stats"><span class="sr-stat-chip" id="sr-queue-count">0 morceau</span><span class="sr-stat-chip" id="sr-queue-duration">0 min</span></div></div>
       <div id="songrequest-queue"><div class="empty"><div class="ei">🎵</div><p>Aucune musique demandée</p></div></div>
     </div>
   </div>
@@ -4621,8 +4620,6 @@ let srLastRenderedProgress = -1;
 let srVolumeDebounce = null;
 let srPendingVolume = null;
 let srVolumeInFlight = false;
-let srSeeking = false;
-let srSeekInFlight = false;
 function srSetVal(id, val) { const el = document.getElementById(id); if (el && document.activeElement !== el) el.value = val; }
 function srSetChecked(id, val) { const el = document.getElementById(id); if (el) el.checked = !!val; }
 function isSongRequestOpen() { const el = document.getElementById('widget-songrequest-settings'); return !!el && el.style.display !== 'none'; }
@@ -4660,16 +4657,12 @@ function srUpdateProgressOnly(force = false) {
   const current = srComputedTime();
   const currentSecond = Math.floor(current);
   const roundedProgress = Math.round(current * 20) / 20;
-  if (
-  seek &&
-  !srSeeking &&
-  (force || Math.abs(roundedProgress - srLastRenderedProgress) >= 0.05)
-) {
-  seek.max = duration || 0;
-  seek.value = duration ? Math.min(current, duration) : 0;
-  srPaintRange(seek, seek.value, seek.max);
-  srLastRenderedProgress = roundedProgress;
-}
+  if (seek && (force || Math.abs(roundedProgress - srLastRenderedProgress) >= 0.05)) {
+    seek.max = duration || 0;
+    seek.value = duration ? Math.min(current, duration) : 0;
+    srPaintRange(seek, seek.value, seek.max);
+    srLastRenderedProgress = roundedProgress;
+  }
   if (curTimeEl && (force || currentSecond !== srLastRenderedSecond)) {
     curTimeEl.textContent = fmtSongTime(current);
     srLastRenderedSecond = currentSecond;
@@ -4726,18 +4719,7 @@ function renderSongRequestPlayer(queue = srLastQueue, player = srPlayer) {
   if (thumb) thumb.innerHTML = cur?.thumbnail ? `<img src="${escapeAttr(cur.thumbnail)}" onerror="this.parentNode.textContent='🎵'">` : '🎵';
   if (title) title.textContent = cur ? (cur.title || cur.song || 'Musique en cours') : 'Aucune musique en cours';
   if (meta) meta.textContent = cur ? `Demandé par ${cur.username || 'Anonyme'}${cur.author ? ' · ' + cur.author : ''}` : 'Le chat peut demander une musique avec !sr';
-  if (seek) {
-  seek.max = duration || 0;
-  seek.disabled = !cur || duration <= 0;
-
-  if (!srSeeking) {
-    seek.value = duration
-      ? Math.min(current, duration)
-      : 0;
-
-    srPaintRange(seek, seek.value, seek.max);
-  }
-}
+  if (seek) { seek.max = duration || 0; seek.value = Math.min(current, duration || current); seek.disabled = !cur || duration <= 0; srPaintRange(seek, seek.value, seek.max); }
   if (curTimeEl) curTimeEl.textContent = fmtSongTime(current);
   if (durTimeEl) durTimeEl.textContent = duration ? fmtSongTime(duration) : '0:00';
   srLastRenderedSecond = Math.floor(current);
@@ -4761,9 +4743,33 @@ function startSongRequestPolling(){
 }
 startSongRequestPolling();
 
+function songRequestEtaSeconds(queue, index) {
+  if (index <= 0) return 0;
+  const currentRemaining = Math.max(0, Number(srPlayer.duration || queue[0]?.duration || 0) - srComputedTime());
+  return currentRemaining + queue.slice(1, index).reduce((sum, item) => sum + (Number(item.duration || 0) || 180), 0);
+}
+function formatSongRequestEta(seconds) {
+  seconds = Math.max(0, Math.round(Number(seconds || 0)));
+  if (seconds < 60) return `Dans ${seconds}s`;
+  const minutes = Math.floor(seconds / 60);
+  const remain = seconds % 60;
+  return `Dans ${minutes} min${remain ? ` ${remain}s` : ''}`;
+}
+function updateSongRequestQueueStats(queue) {
+  const count = document.getElementById('sr-queue-count');
+  const total = document.getElementById('sr-queue-duration');
+  const waiting = Math.max(0, queue.length - 1);
+  const totalSeconds = queue.reduce((sum, item, index) => {
+    if (index === 0) return sum + Math.max(0, Number(srPlayer.duration || item.duration || 0) - srComputedTime());
+    return sum + (Number(item.duration || 0) || 180);
+  }, 0);
+  if (count) count.textContent = `${waiting} en attente`;
+  if (total) total.textContent = totalSeconds < 60 ? `${Math.round(totalSeconds)} s` : `${Math.ceil(totalSeconds / 60)} min restantes`;
+}
 function renderSongRequestQueue(queue) {
   const box = document.getElementById('songrequest-queue');
   if (!box) return;
+  updateSongRequestQueueStats(queue);
   if (!queue.length) {
     box.innerHTML = '<div class="empty"><div class="ei">🎵</div><p>Aucune musique demandée</p></div>';
     return;
@@ -4771,26 +4777,81 @@ function renderSongRequestQueue(queue) {
   box.innerHTML = queue.map((s, i) => {
     const title = s.title || s.song || '';
     const sub = s.author ? `${escapeHtml(s.author)} · demandé par ${escapeHtml(s.username || 'Anonyme')}` : `Demandé par ${escapeHtml(s.username || 'Anonyme')}`;
+    const eta = i > 0 ? formatSongRequestEta(songRequestEtaSeconds(queue, i)) : 'Lecture actuelle';
     return `
-    <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px;border-bottom:1px solid var(--brd)">
+    <div class="sr-queue-row" data-sr-id="${escapeAttr(s.id)}" ${i > 0 ? 'draggable="true"' : ''}>
+      <div class="sr-drag-handle" title="${i > 0 ? 'Glisser pour déplacer' : 'Musique actuelle'}">${i > 0 ? '☰' : '▶'}</div>
       <div style="width:74px;height:42px;border-radius:8px;overflow:hidden;background:var(--card2);border:1px solid var(--brd);display:flex;align-items:center;justify-content:center;flex-shrink:0">
         ${s.thumbnail ? `<img src="${escapeAttr(s.thumbnail)}" style="width:100%;height:100%;object-fit:cover" loading="lazy" onerror="this.parentNode.textContent='🎵'">` : '🎵'}
       </div>
       <div style="min-width:0;flex:1">
-        <div style="font-size:9px;color:${i===0?'#93c5fd':'var(--muted)'};font-weight:900;text-transform:uppercase">${i===0?'En cours':'En attente #' + (i+1)}</div>
+        <div style="font-size:9px;color:${i===0?'#93c5fd':'var(--muted)'};font-weight:900;text-transform:uppercase">${i===0?'En cours':'En attente #' + i}</div>
         <div style="font-size:13px;font-weight:900;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${escapeHtml(title)}</div>
         <div style="font-size:10px;color:var(--muted);margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${sub}${s.durationText ? ' · ' + escapeHtml(s.durationText) : ''}</div>
+        <div class="sr-eta">${eta}</div>
       </div>
-      <div style="display:flex;gap:5px;flex-shrink:0;flex-wrap:wrap;justify-content:flex-end;max-width:330px">
+      <div style="display:flex;gap:5px;flex-shrink:0;flex-wrap:wrap;justify-content:flex-end;max-width:300px">
         ${i > 0 ? `<button class="btnx btn-outline btn-xs" onclick="playSongRequestItem('${escapeAttr(s.id)}')">▶ Lire</button>` : ''}
-        ${i > 1 ? `<button class="btnx btn-ghost btn-xs" onclick="moveSongRequest('${escapeAttr(s.id)}','up')" title="Monter">↑</button>` : ''}
-        ${i > 0 && i < queue.length - 1 ? `<button class="btnx btn-ghost btn-xs" onclick="moveSongRequest('${escapeAttr(s.id)}','down')" title="Descendre">↓</button>` : ''}
         <button class="btnx btn-ghost btn-xs" onclick="editSongRequestItem('${escapeAttr(s.id)}')">✎ Modifier</button>
         ${s.url ? `<button class="btnx btn-ghost btn-xs" onclick="window.open('${escapeAttr(s.url)}','_blank')">Ouvrir</button>` : ''}
         <button class="btnx btn-red btn-xs" onclick="deleteSongRequest('${escapeAttr(s.id)}')">✕</button>
       </div>
     </div>`;
   }).join('');
+  bindSongRequestDragAndDrop();
+}
+
+let srDraggedQueueId = '';
+function bindSongRequestDragAndDrop() {
+  document.querySelectorAll('#songrequest-queue .sr-queue-row[draggable="true"]').forEach(row => {
+    row.addEventListener('dragstart', event => {
+      srDraggedQueueId = row.dataset.srId || '';
+      row.classList.add('dragging');
+      event.dataTransfer.effectAllowed = 'move';
+      event.dataTransfer.setData('text/plain', srDraggedQueueId);
+    });
+    row.addEventListener('dragend', () => {
+      row.classList.remove('dragging');
+      document.querySelectorAll('#songrequest-queue .drag-over').forEach(el => el.classList.remove('drag-over'));
+      srDraggedQueueId = '';
+    });
+    row.addEventListener('dragover', event => {
+      event.preventDefault();
+      if (!srDraggedQueueId || srDraggedQueueId === row.dataset.srId) return;
+      row.classList.add('drag-over');
+      event.dataTransfer.dropEffect = 'move';
+    });
+    row.addEventListener('dragleave', () => row.classList.remove('drag-over'));
+    row.addEventListener('drop', async event => {
+      event.preventDefault();
+      row.classList.remove('drag-over');
+      const sourceId = event.dataTransfer.getData('text/plain') || srDraggedQueueId;
+      const targetId = row.dataset.srId || '';
+      if (!sourceId || !targetId || sourceId === targetId) return;
+      const waiting = srLastQueue.slice(1);
+      const from = waiting.findIndex(item => String(item.id) === String(sourceId));
+      const to = waiting.findIndex(item => String(item.id) === String(targetId));
+      if (from < 0 || to < 0) return;
+      const [moved] = waiting.splice(from, 1);
+      waiting.splice(to, 0, moved);
+      const previous = srLastQueue.slice();
+      srLastQueue = [srLastQueue[0], ...waiting];
+      renderSongRequestQueue(srLastQueue);
+      try { await saveSongRequestOrder(waiting.map(item => item.id)); }
+      catch (error) { srLastQueue = previous; renderSongRequestQueue(srLastQueue); toast(error.message || 'Impossible de déplacer la musique'); }
+    });
+  });
+}
+async function saveSongRequestOrder(ids) {
+  const response = await fetch(API + '/api/admin/widgets/songrequest/reorder', {
+    method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ ids })
+  });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(data.error || 'Ordre invalide');
+  srLastQueue = Array.isArray(data.queue) ? data.queue : srLastQueue;
+  srPlayer = Object.assign(srPlayer, data.player || {});
+  renderSongRequestQueue(srLastQueue);
+  renderSongRequestPlayer(srLastQueue, srPlayer);
 }
 
 async function saveSongRequestSettings() {
@@ -4880,95 +4941,18 @@ async function toggleSongRequest() {
   if (isPlaying) { srPlayer.currentTime = srComputedTime(); srPlayer.status = 'paused'; srSyncClockFromPlayer(srPlayer); renderSongRequestPlayer(srLastQueue, srPlayer); await pauseSongRequest(); }
   else { srPlayer.status = srLastQueue.length ? 'playing' : 'stopped'; srSyncClockFromPlayer(srPlayer); renderSongRequestPlayer(srLastQueue, srPlayer); await playSongRequest(); }
 }
-function beginSongRequestSeek() {
-  srSeeking = true;
+function previewSongRequestSeek(v) {
+  srPlayer.currentTime = Number(v || 0);
+  renderSongRequestPlayer(srLastQueue, srPlayer);
 }
-
-function previewSongRequestSeek(value) {
-  srSeeking = true;
-
-  const seconds = Math.max(0, Number(value || 0));
-
-  const duration = Math.max(
-    Number(srPlayer.duration || 0),
-    Number(srLastQueue[0]?.duration || 0),
-    0
-  );
-
-  const safeSeconds = duration
-    ? Math.min(seconds, duration)
-    : seconds;
-
-  const seek = document.getElementById('sr-seek');
-  const currentTime = document.getElementById('sr-current-time');
-
-  if (seek) {
-    seek.value = safeSeconds;
-    srPaintRange(seek, safeSeconds, duration);
-  }
-
-  if (currentTime) {
-    currentTime.textContent = fmtSongTime(safeSeconds);
-  }
-}
-
-async function commitSongRequestSeek(value) {
-  if (srSeekInFlight) return;
-
-  srSeekInFlight = true;
-
-  const duration = Math.max(
-    Number(srPlayer.duration || 0),
-    Number(srLastQueue[0]?.duration || 0),
-    0
-  );
-
-  const requestedSeconds = Math.max(0, Number(value || 0));
-
-  const seconds = duration
-    ? Math.min(requestedSeconds, duration)
-    : requestedSeconds;
-
-  try {
-    const response = await fetch(
-      API + '/api/admin/widgets/songrequest/seek',
-      {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ seconds })
-      }
-    );
-
-    const result = await response.json().catch(() => ({}));
-
-    if (!response.ok) {
-      throw new Error(
-        result.error || 'Impossible de déplacer la lecture'
-      );
-    }
-
-    srPlayer = Object.assign(
-      srPlayer,
-      result.player || {},
-      { currentTime: seconds }
-    );
-
-    srSyncClockFromPlayer(srPlayer);
-
-    srLastRenderedProgress = -1;
-    srLastRenderedSecond = -1;
-
-    previewSongRequestSeek(seconds);
-  } catch (error) {
-    console.error('[SONG REQUEST SEEK]', error);
-    toast(error.message || 'Erreur pendant le déplacement');
-  } finally {
-    srSeeking = false;
-    srSeekInFlight = false;
-    srUpdateProgressOnly(true);
-  }
+async function seekSongRequest(v) {
+  const seconds = Math.max(0, Number(v || 0));
+  const r = await fetch(API + '/api/admin/widgets/songrequest/seek', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ seconds }) });
+  const d = await r.json().catch(()=>({}));
+  if (!r.ok) return toast(d.error || 'Impossible de déplacer la lecture');
+  srPlayer = Object.assign(srPlayer, d.player || {}, { currentTime: seconds });
+  srSyncClockFromPlayer(srPlayer);
+  renderSongRequestPlayer(srLastQueue, srPlayer);
 }
 function previewSongRequestVolume(v) {
   const volume = Math.max(0, Math.min(100, Number(v ?? 100)));
@@ -6022,7 +6006,8 @@ async function checkPanelAuth() {
     window.CURRENT_STREAMER = st.slug || st.kickUsername || '';
     return true;
   } catch(e) {
-    window.location.href = '/auth/login';
+    const returnTo = encodeURIComponent(window.location.pathname + window.location.search);
+    window.location.href = '/auth/login?returnTo=' + returnTo;
     return false;
   }
 }
