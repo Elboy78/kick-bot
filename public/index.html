@@ -1089,7 +1089,7 @@ Option 3" rows="4"></textarea><div style="display:flex;gap:6px;margin-top:10px">
             <div class="sr-song-title" id="sr-now-title">Aucune musique en cours</div>
             <div class="sr-song-meta" id="sr-now-meta">Le chat peut demander une musique avec !sr</div>
             <div class="sr-progress-row">
-              <input id="sr-seek" class="sr-smooth-range" type="range" min="0" max="0" value="0" step="0.01" disabled oninput="previewSongRequestSeek(this.value)" onchange="seekSongRequest(this.value)">
+              <input id="sr-seek" class="sr-smooth-range" type="range" min="0" max="0" value="0" step="0.1" onpointerdown="beginSongRequestSeek()" onkeydown="beginSongRequestSeek()" oninput="previewSongRequestSeek(this.value)" onchange="commitSongRequestSeek(this.value)">
               <div class="sr-times"><span id="sr-current-time">0:00</span><span id="sr-duration-time">0:00</span></div>
             </div>
           </div>
@@ -4752,13 +4752,17 @@ function renderSongRequestPlayer(queue = srLastQueue, player = srPlayer) {
 }
 function startSongRequestProgressTimer(){ srStartSmoothUiLoop(); }
 startSongRequestProgressTimer();
-function startSongRequestPolling(){
-  if (srPollTimer) clearInterval(srPollTimer);
-  srPollTimer = setInterval(() => { if (isSongRequestOpen()) loadSongRequest(true); }, 8000);
-  window.addEventListener('focus', () => { if (isSongRequestOpen()) loadSongRequest(true); });
-  document.addEventListener('visibilitychange', () => { if (!document.hidden && isSongRequestOpen()) loadSongRequest(true); });
+function startSongRequestRecoverySync(){
+  // Aucun polling permanent : Socket.IO pilote l'interface.
+  // Une lecture complète est faite uniquement au retour sur l'onglet.
+  window.addEventListener('focus', () => {
+    if (isSongRequestOpen()) loadSongRequest(true);
+  });
+  document.addEventListener('visibilitychange', () => {
+    if (!document.hidden && isSongRequestOpen()) loadSongRequest(true);
+  });
 }
-startSongRequestPolling();
+startSongRequestRecoverySync();
 
 function songRequestEtaSeconds(queue, index) {
   if (index <= 0) return 0;
@@ -5032,10 +5036,6 @@ function toggleSongRequest() {
     isPlaying ? 'paused' : 'playing'
   );
 }
-function previewSongRequestSeek(v) {
-  srPlayer.currentTime = Number(v || 0);
-  renderSongRequestPlayer(srLastQueue, srPlayer);
-}
 function beginSongRequestSeek() {
   srSeeking = true;
 }
@@ -5156,14 +5156,26 @@ function flushSongRequestVolume(force = false) {
 }
 async function setSongRequestVolume(v) { setSongRequestVolumeLive(v); flushSongRequestVolume(true); }
 async function nextSongRequest() {
-  await fetch(API + '/api/admin/widgets/songrequest/next', { method:'POST' });
-  loadSongRequest();
+  const response = await fetch(API + '/api/admin/widgets/songrequest/next', { method:'POST' });
+  const result = await response.json().catch(() => ({}));
+  if (!response.ok) return toast(result.error || 'Impossible de passer au morceau suivant');
+  if (Array.isArray(result.queue)) srLastQueue = result.queue;
+  if (result.player) srPlayer = { ...srPlayer, ...result.player };
+  srSyncClockFromPlayer(srPlayer);
+  renderSongRequestQueue(srLastQueue);
+  renderSongRequestPlayer(srLastQueue, srPlayer);
 }
 async function clearSongRequests() {
   if (!confirm('Vider toute la file Song Request ?')) return;
-  await fetch(API + '/api/admin/widgets/songrequest/clear', { method:'POST' });
+  const response = await fetch(API + '/api/admin/widgets/songrequest/clear', { method:'POST' });
+  const result = await response.json().catch(() => ({}));
+  if (!response.ok) return toast(result.error || 'Impossible de vider la file');
+  srLastQueue = [];
+  srPlayer = { ...srPlayer, status:'stopped', itemId:'', currentTime:0, duration:0 };
+  srSyncClockFromPlayer(srPlayer);
+  renderSongRequestQueue(srLastQueue);
+  renderSongRequestPlayer(srLastQueue, srPlayer);
   toast('File vidée ✓');
-  loadSongRequest();
 }
 
 

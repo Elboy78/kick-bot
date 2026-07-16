@@ -127,14 +127,17 @@ function loadVideoForCurrent(){
 }
 function applyPlayback(reason){
   if(!enabled||!queue[0]){stopLocal(false);return;}
-  ensurePlayer(); if(!player)return;
-  const alreadyLoaded=loadVideoForCurrent();
+  ensurePlayer();
+  if(!player)return;
+
+  loadVideoForCurrent();
   try{player.setVolume(volume)}catch(e){}
+
+  // Exécution directe : aucun délai artificiel.
   if(desiredStatus==='paused') pauseLocal(false);
-  else if(desiredStatus==='playing') {
-    if(alreadyLoaded || Date.now()>loadingUntil-1700) playLocal(false);
-    else setTimeout(()=>{ if(desiredStatus==='playing') playLocal(false); },650);
-  }
+  else if(desiredStatus==='playing') playLocal(false);
+  else stopLocal(false);
+
   render();
 }
 function playLocal(report=true){
@@ -201,7 +204,9 @@ async function postState(status,force){
   const cur=queue[0]; if(!cur)return;
   const d=duration||pdur()||Number(cur.duration||0)||0;
   // Le widget ne remonte plus le volume : seul le panel/Companion décide du volume.
-  fetch(apiUrl('/api/widgets/songrequest/player-state'),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({itemId:cur.id,status,currentTime:getSmoothTime(),duration:d})}).catch(()=>{});
+  const body={itemId:cur.id,currentTime:getSmoothTime(),duration:d};
+  if(status==='ended') body.status='ended';
+  fetch(apiUrl('/api/widgets/songrequest/player-state'),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}).catch(()=>{});
 }
 async function nextPublic(){if(overlayInvalid)return;try{const r=await fetch(apiUrl('/api/widgets/songrequest/next'),{method:'POST'}); if(r.status===410) invalidateOverlay();}catch(e){}}
 function applyServerState(st,initial=false){
@@ -233,24 +238,69 @@ function handleControl(c){
   else if(a==='seek'){const sec=Math.max(0,Number(c.seconds||0)); syncClockFrom(sec); try{player&&player.seekTo&&player.seekTo(sec,true);}catch(e){} render();} 
   else if(a==='volume'){setVolumeLocal(c.volume,false);} 
 }
-async function pollControl(){
-  if(overlayInvalid)return;
-  const now=Date.now(); if(now-lastControlPoll<650)return; lastControlPoll=now;
-  try{const r=await fetch(apiUrl('/api/widgets/songrequest?controlOnly=1&ts='+Date.now()),{cache:'no-store'}); if(r.status===410){invalidateOverlay();return;} const st=await r.json(); if(st?.invalidOverlay){invalidateOverlay();return;} if(st?.streamer) adoptStreamer(st.streamer); if(st?.control) handleControl(st.control); if(st?.player&&Number.isFinite(Number(st.player.volume))) setVolumeLocal(st.player.volume,false);}catch(e){}
-}
+window.onYouTubeIframeAPIReady=function(){
+  ytReady=true;
+  ensurePlayer();
+  applyPlayback('yt-ready');
+};
 
-window.onYouTubeIframeAPIReady=function(){ytReady=true; ensurePlayer(); applyPlayback('yt-ready');};
 load(true);
 setInterval(()=>updateTimeUI(),250);
-setInterval(()=>postState(desiredStatus,false),2000);
-setInterval(()=>load(false),15000);
+// État de lecture remonté moins souvent, uniquement pour la progression.
+// Il ne pilote jamais PLAY / PAUSE côté serveur.
+setInterval(()=>postState(desiredStatus,false),5000);
+
 try{
   srSocket=io({transports:['websocket','polling']});
-  srSocket.on('connect',()=>joinStreamerRoom(STREAMER_SLUG));
+
+  srSocket.on('connect',()=>{
+    joinStreamerRoom(STREAMER_SLUG);
+    // Une resynchronisation uniquement après reconnexion Socket.IO.
+    load(false);
+  });
+
   srSocket.on('songrequest-control',handleControl);
-  srSocket.on('songrequest-update',d=>{ if(d?.streamer){adoptStreamer(d.streamer); if(STREAMER_SLUG&&String(d.streamer).toLowerCase()!==String(STREAMER_SLUG).toLowerCase())return;} load(false); });
-  srSocket.on('songrequest-player-state',st=>{ if(overlayInvalid)return; if(st?.streamer){adoptStreamer(st.streamer); if(STREAMER_SLUG&&String(st.streamer).toLowerCase()!==String(STREAMER_SLUG).toLowerCase())return;} if(st&&Number.isFinite(Number(st.volume))) setVolumeLocal(st.volume,false); });
-  srSocket.on('overlay-token-regenerated',d=>{ if(String(d?.widget||'').toLowerCase()==='songrequest' && OVERLAY_TOKEN) invalidateOverlay(); });
+
+  srSocket.on('songrequest-update',d=>{
+    if(d?.streamer){
+      adoptStreamer(d.streamer);
+      if(STREAMER_SLUG&&String(d.streamer).toLowerCase()!==String(STREAMER_SLUG).toLowerCase())return;
+    }
+
+    if(Array.isArray(d?.queue)){
+      const oldId=queue[0]?.id||'';
+      queue=d.queue;
+      const newId=queue[0]?.id||'';
+
+      if(newId!==oldId){
+        currentItemId='';
+        currentVideoId='';
+        duration=Number(queue[0]?.duration||0)||0;
+        syncClockFrom(0);
+      }
+
+      if(!queue[0]) stopLocal(false);
+      else applyPlayback('queue-socket');
+
+      render();
+      return;
+    }
+
+    load(false);
+  });
+
+  srSocket.on('songrequest-player-state',st=>{
+    if(overlayInvalid)return;
+    if(st?.streamer){
+      adoptStreamer(st.streamer);
+      if(STREAMER_SLUG&&String(st.streamer).toLowerCase()!==String(STREAMER_SLUG).toLowerCase())return;
+    }
+    if(st&&Number.isFinite(Number(st.volume))) setVolumeLocal(st.volume,false);
+  });
+
+  srSocket.on('overlay-token-regenerated',d=>{
+    if(String(d?.widget||'').toLowerCase()==='songrequest' && OVERLAY_TOKEN) invalidateOverlay();
+  });
 }catch(e){}
 </script>
 </body>

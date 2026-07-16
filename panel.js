@@ -1703,28 +1703,53 @@ app.post('/api/admin/widgets/songrequest/play', requireAuth, async (req, res) =>
     const tm = getSongRequestTM(req);
     const state = await getSongRequestState(tm);
     const cur = state.queue[0];
-    setSongRequestDesiredStatus(tm, cur ? 'playing' : 'stopped');
-    const next = await saveSongRequestPlayerState({ itemId: cur?.id || '', status: cur ? 'playing' : 'stopped' }, true, tm);
-    await issueSongRequestControl('play', {}, tm);
-    res.json({ success:true, player: next });
+    const patch = { itemId: cur?.id || '', status: cur ? 'playing' : 'stopped' };
+
+    setSongRequestDesiredStatus(tm, patch.status);
+
+    // Temps réel d'abord : OBS reçoit PLAY immédiatement.
+    const control = emitSongRequestControlNow('play', {}, tm);
+
+    // Persistance ensuite, sans bloquer la réponse ni la commande OBS.
+    tm.setJson('songrequest_control', control).catch(() => {});
+    saveSongRequestPlayerState(patch, true, tm).catch(error => {
+      console.warn(`[SONGREQUEST:${songRequestSlug(tm)}] Sauvegarde play impossible:`, error.message);
+    });
+
+    res.json({ success:true, player: { ...(state.player || {}), ...patch } });
   } catch(e) { res.status(500).json({ error:e.message }); }
 });
 app.post('/api/admin/widgets/songrequest/pause', requireAuth, async (req, res) => {
   try {
     const tm = getSongRequestTM(req);
+    const state = await getSongRequestPlayerState(tm);
+    const patch = { status:'paused' };
+
     setSongRequestDesiredStatus(tm, 'paused');
-    const next = await saveSongRequestPlayerState({ status:'paused' }, true, tm);
-    await issueSongRequestControl('pause', {}, tm);
-    res.json({ success:true, player: next });
+
+    const control = emitSongRequestControlNow('pause', {}, tm);
+    tm.setJson('songrequest_control', control).catch(() => {});
+    saveSongRequestPlayerState(patch, true, tm).catch(error => {
+      console.warn(`[SONGREQUEST:${songRequestSlug(tm)}] Sauvegarde pause impossible:`, error.message);
+    });
+
+    res.json({ success:true, player: { ...state, ...patch } });
   } catch(e) { res.status(500).json({ error:e.message }); }
 });
 app.post('/api/admin/widgets/songrequest/seek', requireAuth, async (req, res) => {
   try {
     const tm = getSongRequestTM(req);
+    const state = await getSongRequestPlayerState(tm);
     const seconds = Math.max(0, parseFloat(req.body.seconds || 0) || 0);
-    const next = await saveSongRequestPlayerState({ currentTime: seconds }, true, tm);
-    await issueSongRequestControl('seek', { seconds }, tm);
-    res.json({ success:true, player: next });
+    const patch = { currentTime: seconds };
+
+    const control = emitSongRequestControlNow('seek', { seconds }, tm);
+    tm.setJson('songrequest_control', control).catch(() => {});
+    saveSongRequestPlayerState(patch, true, tm).catch(error => {
+      console.warn(`[SONGREQUEST:${songRequestSlug(tm)}] Sauvegarde seek impossible:`, error.message);
+    });
+
+    res.json({ success:true, player: { ...state, ...patch } });
   } catch(e) { res.status(500).json({ error:e.message }); }
 });
 app.post('/api/admin/widgets/songrequest/volume', requireAuth, async (req, res) => {
@@ -1735,13 +1760,18 @@ app.post('/api/admin/widgets/songrequest/volume', requireAuth, async (req, res) 
     const state = await getSongRequestPlayerState(tm);
     const next = { ...state, streamer: songRequestSlug(tm), volume, updatedAt: new Date().toISOString() };
 
-    // Sauvegarde AVANT d'émettre, sinon un refresh/poll pouvait relire l'ancien 100%.
-    await tm.setJson('songrequest_player_state', next);
+    const control = emitSongRequestControlNow('volume', { volume }, tm);
+
+    tm.setJson('songrequest_control', control).catch(() => {});
+    tm.setJson('songrequest_player_state', next).catch(error => {
+      console.warn(`[SONGREQUEST:${songRequestSlug(tm)}] Sauvegarde volume impossible:`, error.message);
+    });
     tm.emit('songrequest-player-state', next);
-    await issueSongRequestControl('volume', { volume }, tm);
+
     res.json({ success:true, player: next });
   } catch(e) { res.status(500).json({ error:e.message }); }
 });
+
 app.post('/api/widgets/songrequest/player-state', async (req, res) => {
   if (rejectInvalidSongRequestOverlay(req, res)) return;
   try {
@@ -1759,12 +1789,11 @@ app.post('/api/widgets/songrequest/player-state', async (req, res) => {
     const patch = { itemId: currentItem.id };
     if (typeof req.body.status === 'string') {
       const status = String(req.body.status).toLowerCase();
+      // Seule la fin réelle de YouTube peut modifier la commande officielle.
+      // PLAY / PAUSE viennent uniquement du panel ou du Companion.
       if (status === 'ended') {
         patch.status = 'stopped';
         setSongRequestDesiredStatus(tm, 'stopped');
-      } else if (['playing','paused','stopped'].includes(status)) {
-        patch.status = status;
-        setSongRequestDesiredStatus(tm, status);
       }
     }
     if (req.body.currentTime !== undefined) patch.currentTime = Math.max(0, parseFloat(req.body.currentTime) || 0);
