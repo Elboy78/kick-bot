@@ -5620,88 +5620,580 @@ try {
 } catch(e) {}
 
 
-// ── Chat Overlay ──────────────────────────────────────────────────────────────
-const CHAT_OVERLAY_LOCAL_KEY = 'bot7up_chat_overlay_settings_backup';
-let chatOverlaySaveTimer = null;
-let chatOverlaySaveInFlight = false;
-let chatOverlayPendingSave = false;
+// ── Chat Overlay V3 autonome ─────────────────────────────────────────────────
+const ChatOverlayUI = (() => {
+  const LOCAL_KEY = 'elbot_chat_overlay_v3';
+  const DEFAULTS = Object.freeze({
+    enabled: true,
+    hideBots: true,
+    hideCommands: true,
+    showPlatformIcon: true,
+    showTime: false,
+    showAvatars: true,
+    showBadges: true,
+    groupMessages: true,
+    groupWindow: 12,
+    highlightRoles: true,
+    ignoredUsers: 'BotRix,botrix',
+    fontSize: 21,
+    messageDuration: 10,
+    maxMessages: 8,
+    animation: 'pop',
+    design: 'premium'
+  });
 
-function chatOverlayStreamerSlug() {
-  const match = location.pathname.match(/^\/s\/([^/]+)/i);
-  return String(match?.[1] || '').trim().toLowerCase() || 'default';
-}
-
-function chatOverlayStorageKey() {
-  return `${CHAT_OVERLAY_LOCAL_KEY}:${chatOverlayStreamerSlug()}`;
-}
-
-function persistChatOverlayDraft() {
-  try {
-    localStorage.setItem(
-      chatOverlayStorageKey(),
-      JSON.stringify(currentChatOverlaySettingsFromForm())
-    );
-  } catch (error) {}
-}
-
-function scheduleChatOverlaySave(delay = 650) {
-  persistChatOverlayDraft();
-  clearTimeout(chatOverlaySaveTimer);
-  chatOverlaySaveTimer = setTimeout(() => {
-    saveChatOverlaySettings({ silent: true }).catch(() => {});
-  }, delay);
-}
-
-function currentChatOverlaySettingsFromForm() {
-  return {
-    enabled: !!document.getElementById('co-enabled')?.checked,
-    hideBots: !!document.getElementById('co-hide-bots')?.checked,
-    hideCommands: !!document.getElementById('co-hide-commands')?.checked,
-    showPlatformIcon: !!document.getElementById('co-show-platform')?.checked,
-    showTime: !!document.getElementById('co-show-time')?.checked,
-    showAvatars: !!document.getElementById('co-show-avatars')?.checked,
-    showBadges: !!document.getElementById('co-show-badges')?.checked,
-    groupMessages: !!document.getElementById('co-group-messages')?.checked,
-    groupWindow: Number(document.getElementById('co-group-window')?.value || 12),
-    highlightRoles: !!document.getElementById('co-highlight-roles')?.checked,
-    ignoredUsers: document.getElementById('co-ignored')?.value || '',
-    fontSize: Number(document.getElementById('co-font-size')?.value || 21),
-    messageDuration: Number(document.getElementById('co-duration')?.value || 10),
-    maxMessages: Number(document.getElementById('co-max')?.value || 8),
-    animation: document.getElementById('co-animation')?.value || 'pop',
-    design: document.getElementById('co-design')?.value || 'premium'
-  };
-}
-window.selectChatOverlayTheme = function selectChatOverlayTheme(theme) {
-  const allowed = new Set([
+  const ALLOWED_THEMES = new Set([
     'premium', 'glass', 'minimal', 'neon',
     'kick', 'ocean', 'sunset', 'candy',
     'mono', 'cyber', 'royal', 'transparent',
-    'aurora', 'fire', 'ice', 'sakura', 'gold', 'terminal'
+    'aurora', 'fire', 'ice', 'sakura',
+    'gold', 'terminal'
   ]);
-  const selected = allowed.has(String(theme || '').toLowerCase())
-    ? String(theme).toLowerCase()
-    : 'premium';
 
-  const designInput = document.getElementById('co-design');
+  let saveTimer = null;
+  let savePromise = null;
+  let pendingSave = false;
+  let controlsBound = false;
+  let applying = false;
 
-if (designInput) {
-  designInput.value = selected;
-  designInput.dispatchEvent(
-    new Event('change', { bubbles: true })
-  );
-}
-  document
-    .querySelectorAll('#widget-chat-settings .co-theme-card')
-    .forEach(card => {
-      const active = card.dataset.theme === selected;
-      card.classList.toggle('active', active);
-      card.setAttribute('aria-pressed', active ? 'true' : 'false');
+  const byId = id => document.getElementById(id);
+
+  function streamerSlug() {
+    const match = location.pathname.match(/^\/s\/([^/]+)/i);
+    return String(
+      match?.[1] ||
+      window.CURRENT_STREAMER_SLUG ||
+      'default'
+    ).trim().toLowerCase();
+  }
+
+  function storageKey() {
+    return `${LOCAL_KEY}:${streamerSlug()}`;
+  }
+
+  function setChecked(id, value) {
+    const element = byId(id);
+    if (element) element.checked = Boolean(value);
+  }
+
+  function setValue(id, value) {
+    const element = byId(id);
+    if (element) element.value = value ?? '';
+  }
+
+  function checked(id, fallback = false) {
+    const element = byId(id);
+    return element ? Boolean(element.checked) : fallback;
+  }
+
+  function value(id, fallback = '') {
+    const element = byId(id);
+    return element ? element.value : fallback;
+  }
+
+  function numberValue(id, fallback) {
+    const parsed = Number(value(id, fallback));
+    return Number.isFinite(parsed) ? parsed : fallback;
+  }
+
+  function normalize(input = {}) {
+    const source =
+      input && typeof input === 'object' ? input : {};
+
+    const design = ALLOWED_THEMES.has(
+      String(source.design || '').toLowerCase()
+    )
+      ? String(source.design).toLowerCase()
+      : DEFAULTS.design;
+
+    return {
+      enabled:
+        typeof source.enabled === 'boolean'
+          ? source.enabled
+          : DEFAULTS.enabled,
+      hideBots:
+        typeof source.hideBots === 'boolean'
+          ? source.hideBots
+          : DEFAULTS.hideBots,
+      hideCommands:
+        typeof source.hideCommands === 'boolean'
+          ? source.hideCommands
+          : DEFAULTS.hideCommands,
+      showPlatformIcon:
+        typeof source.showPlatformIcon === 'boolean'
+          ? source.showPlatformIcon
+          : DEFAULTS.showPlatformIcon,
+      showTime:
+        typeof source.showTime === 'boolean'
+          ? source.showTime
+          : DEFAULTS.showTime,
+      showAvatars:
+        typeof source.showAvatars === 'boolean'
+          ? source.showAvatars
+          : DEFAULTS.showAvatars,
+      showBadges:
+        typeof source.showBadges === 'boolean'
+          ? source.showBadges
+          : DEFAULTS.showBadges,
+      groupMessages:
+        typeof source.groupMessages === 'boolean'
+          ? source.groupMessages
+          : DEFAULTS.groupMessages,
+      groupWindow: Math.min(
+        60,
+        Math.max(
+          2,
+          Number.parseInt(
+            source.groupWindow ?? DEFAULTS.groupWindow,
+            10
+          ) || DEFAULTS.groupWindow
+        )
+      ),
+      highlightRoles:
+        typeof source.highlightRoles === 'boolean'
+          ? source.highlightRoles
+          : DEFAULTS.highlightRoles,
+      ignoredUsers:
+        typeof source.ignoredUsers === 'string'
+          ? source.ignoredUsers.slice(0, 500)
+          : DEFAULTS.ignoredUsers,
+      fontSize: Math.min(
+        42,
+        Math.max(
+          10,
+          Number.parseInt(
+            source.fontSize ?? DEFAULTS.fontSize,
+            10
+          ) || DEFAULTS.fontSize
+        )
+      ),
+      messageDuration: Math.min(
+        60,
+        Math.max(
+          0,
+          Number.parseInt(
+            source.messageDuration ??
+              DEFAULTS.messageDuration,
+            10
+          )
+        )
+      ),
+      maxMessages: Math.min(
+        30,
+        Math.max(
+          1,
+          Number.parseInt(
+            source.maxMessages ?? DEFAULTS.maxMessages,
+            10
+          ) || DEFAULTS.maxMessages
+        )
+      ),
+      animation:
+        typeof source.animation === 'string'
+          ? source.animation.slice(0, 30)
+          : DEFAULTS.animation,
+      design
+    };
+  }
+
+  function readForm() {
+    return normalize({
+      enabled: checked('co-enabled', DEFAULTS.enabled),
+      hideBots: checked('co-hide-bots', DEFAULTS.hideBots),
+      hideCommands: checked(
+        'co-hide-commands',
+        DEFAULTS.hideCommands
+      ),
+      showPlatformIcon: checked(
+        'co-show-platform',
+        DEFAULTS.showPlatformIcon
+      ),
+      showTime: checked('co-show-time', DEFAULTS.showTime),
+      showAvatars: checked(
+        'co-show-avatars',
+        DEFAULTS.showAvatars
+      ),
+      showBadges: checked(
+        'co-show-badges',
+        DEFAULTS.showBadges
+      ),
+      groupMessages: checked(
+        'co-group-messages',
+        DEFAULTS.groupMessages
+      ),
+      groupWindow: numberValue(
+        'co-group-window',
+        DEFAULTS.groupWindow
+      ),
+      highlightRoles: checked(
+        'co-highlight-roles',
+        DEFAULTS.highlightRoles
+      ),
+      ignoredUsers: value(
+        'co-ignored',
+        DEFAULTS.ignoredUsers
+      ),
+      fontSize: numberValue(
+        'co-font-size',
+        DEFAULTS.fontSize
+      ),
+      messageDuration: numberValue(
+        'co-duration',
+        DEFAULTS.messageDuration
+      ),
+      maxMessages: numberValue(
+        'co-max',
+        DEFAULTS.maxMessages
+      ),
+      animation: value(
+        'co-animation',
+        DEFAULTS.animation
+      ),
+      design: value('co-design', DEFAULTS.design)
+    });
+  }
+
+  function updateThemeCards(design) {
+    document
+      .querySelectorAll(
+        '#widget-chat-settings .co-theme-card[data-theme]'
+      )
+      .forEach(card => {
+        const active =
+          String(card.dataset.theme) === String(design);
+
+        card.classList.toggle('active', active);
+        card.setAttribute(
+          'aria-pressed',
+          active ? 'true' : 'false'
+        );
+      });
+  }
+
+  function apply(input, options = {}) {
+    const settings = normalize(input);
+    applying = true;
+
+    setChecked('co-enabled', settings.enabled);
+    setChecked('co-hide-bots', settings.hideBots);
+    setChecked(
+      'co-hide-commands',
+      settings.hideCommands
+    );
+    setChecked(
+      'co-show-platform',
+      settings.showPlatformIcon
+    );
+    setChecked('co-show-time', settings.showTime);
+    setChecked('co-show-avatars', settings.showAvatars);
+    setChecked('co-show-badges', settings.showBadges);
+    setChecked(
+      'co-group-messages',
+      settings.groupMessages
+    );
+    setChecked(
+      'co-highlight-roles',
+      settings.highlightRoles
+    );
+
+    setValue('co-group-window', settings.groupWindow);
+    setValue('co-ignored', settings.ignoredUsers);
+    setValue('co-font-size', settings.fontSize);
+    setValue('co-duration', settings.messageDuration);
+    setValue('co-max', settings.maxMessages);
+    setValue('co-animation', settings.animation);
+    setValue('co-design', settings.design);
+
+    updateThemeCards(settings.design);
+    applying = false;
+
+    try {
+      localStorage.setItem(
+        storageKey(),
+        JSON.stringify(settings)
+      );
+    } catch (error) {}
+
+    if (typeof hydrateAllObsLinks === 'function') {
+      hydrateAllObsLinks();
+    }
+
+    renderChatOverlayPreview();
+
+    if (!options.skipBind) bind();
+
+    return settings;
+  }
+
+  function readBackup() {
+    try {
+      const parsed = JSON.parse(
+        localStorage.getItem(storageKey()) || 'null'
+      );
+      return parsed ? normalize(parsed) : null;
+    } catch (error) {
+      return null;
+    }
+  }
+
+  async function load() {
+    const backup = readBackup();
+
+    try {
+      const response = await fetch(
+        API + '/api/widgets/chat-overlay?ts=' + Date.now(),
+        {
+          cache: 'no-store',
+          credentials: 'same-origin',
+          headers: {
+            'Cache-Control': 'no-cache'
+          }
+        }
+      );
+
+      const data = await response.json().catch(() => ({}));
+
+      if (!response.ok || data.error) {
+        throw new Error(
+          data.error ||
+          'Impossible de charger les réglages'
+        );
+      }
+
+      return apply(data);
+    } catch (error) {
+      console.error('[CHAT OVERLAY LOAD]', error);
+      return apply(backup || DEFAULTS);
+    }
+  }
+
+  async function save(options = {}) {
+    const silent = Boolean(options.silent);
+
+    if (savePromise) {
+      pendingSave = true;
+      return savePromise;
+    }
+
+    const settings = readForm();
+
+    try {
+      localStorage.setItem(
+        storageKey(),
+        JSON.stringify(settings)
+      );
+    } catch (error) {}
+
+    savePromise = (async () => {
+      const response = await fetch(
+        API + '/api/admin/widgets/chat-overlay/settings',
+        {
+          method: 'POST',
+          credentials: 'same-origin',
+          cache: 'no-store',
+          headers: {
+            'Content-Type': 'application/json',
+            'Cache-Control': 'no-cache'
+          },
+          body: JSON.stringify(settings)
+        }
+      );
+
+      const result = await response
+        .json()
+        .catch(() => ({}));
+
+      if (!response.ok || result.success !== true) {
+        throw new Error(
+          result.error ||
+          'Enregistrement impossible'
+        );
+      }
+
+      if (
+        !result.settings ||
+        typeof result.settings !== 'object'
+      ) {
+        throw new Error(
+          'Le serveur n’a pas confirmé les réglages'
+        );
+      }
+
+      const saved = apply(result.settings);
+
+      if (!silent) {
+        toast('Chat Overlay enregistré ✓');
+      }
+
+      return saved;
+    })();
+
+    try {
+      return await savePromise;
+    } catch (error) {
+      console.error('[CHAT OVERLAY SAVE]', error);
+
+      if (!silent) {
+        toast(
+          error.message ||
+          'Erreur d’enregistrement'
+        );
+      }
+
+      throw error;
+    } finally {
+      savePromise = null;
+
+      if (pendingSave) {
+        pendingSave = false;
+        scheduleSave(150);
+      }
+    }
+  }
+
+  function scheduleSave(delay = 550) {
+    if (applying) return;
+
+    clearTimeout(saveTimer);
+    saveTimer = setTimeout(() => {
+      save({ silent: true }).catch(() => {});
+    }, delay);
+  }
+
+  function selectTheme(theme) {
+    const selected = ALLOWED_THEMES.has(
+      String(theme || '').toLowerCase()
+    )
+      ? String(theme).toLowerCase()
+      : DEFAULTS.design;
+
+    setValue('co-design', selected);
+    updateThemeCards(selected);
+    renderChatOverlayPreview();
+    scheduleSave(100);
+  }
+
+  function previewAnimation() {
+    const box = byId('co-preview');
+    if (!box) return;
+
+    const animation =
+      value('co-animation', DEFAULTS.animation);
+
+    box.classList.remove(
+      'co-preview-pop',
+      'co-preview-slide',
+      'co-preview-slide-right',
+      'co-preview-rise',
+      'co-preview-zoom',
+      'co-preview-bounce',
+      'co-preview-flip',
+      'co-preview-glitch',
+      'co-preview-fade'
+    );
+
+    void box.offsetWidth;
+
+    if (animation !== 'none') {
+      box.classList.add(`co-preview-${animation}`);
+    }
+
+    scheduleSave(100);
+  }
+
+  function bind() {
+    const root = byId('widget-chat-settings');
+
+    if (!root || controlsBound) return;
+
+    controlsBound = true;
+
+    root.addEventListener('click', event => {
+      const card = event.target.closest(
+        '.co-theme-card[data-theme]'
+      );
+
+      if (!card) return;
+
+      event.preventDefault();
+      event.stopPropagation();
+      selectTheme(card.dataset.theme);
     });
 
-  renderChatOverlayPreview();
-  scheduleChatOverlaySave(120);
-};
+    root.addEventListener('change', event => {
+      if (!event.target.matches(
+        'input, select, textarea'
+      )) {
+        return;
+      }
+
+      if (event.target.id === 'co-animation') {
+        previewAnimation();
+      } else {
+        renderChatOverlayPreview();
+        scheduleSave(250);
+      }
+    });
+
+    root.addEventListener('input', event => {
+      if (!event.target.matches(
+        'input[type="number"], input[type="text"], textarea'
+      )) {
+        return;
+      }
+
+      renderChatOverlayPreview();
+      scheduleSave(650);
+    });
+  }
+
+  return {
+    bind,
+    load,
+    save,
+    apply,
+    readForm,
+    selectTheme,
+    previewAnimation,
+    scheduleSave,
+    defaults: DEFAULTS
+  };
+})();
+
+function chatOverlayStorageKey() {
+  const match = location.pathname.match(/^\/s\/([^/]+)/i);
+  const slug = String(
+    match?.[1] ||
+    window.CURRENT_STREAMER_SLUG ||
+    'default'
+  ).trim().toLowerCase();
+
+  return `elbot_chat_overlay_v3:${slug}`;
+}
+
+function currentChatOverlaySettingsFromForm() {
+  return ChatOverlayUI.readForm();
+}
+
+function applyChatOverlaySettings(settings) {
+  return ChatOverlayUI.apply(settings);
+}
+
+function loadChatOverlaySettings() {
+  return ChatOverlayUI.load();
+}
+
+function saveChatOverlaySettings(options = {}) {
+  return ChatOverlayUI.save(options);
+}
+
+function scheduleChatOverlaySave(delay = 550) {
+  ChatOverlayUI.scheduleSave?.(delay);
+}
+
+window.selectChatOverlayTheme = theme =>
+  ChatOverlayUI.selectTheme(theme);
+
 function renderChatOverlayPreview() {
   const box = document.getElementById('co-preview');
   if (!box) return;
@@ -5738,235 +6230,11 @@ function renderChatOverlayPreview() {
 }
 
 
+
 function previewChatOverlayAnimation() {
-  const box = document.getElementById('co-preview');
-  if (!box) return;
-  const animation = document.getElementById('co-animation')?.value || 'pop';
-  box.classList.remove('co-preview-pop','co-preview-slide','co-preview-slide-right','co-preview-rise','co-preview-zoom','co-preview-bounce','co-preview-flip','co-preview-glitch','co-preview-fade');
-  void box.offsetWidth;
-  if (animation !== 'none') box.classList.add(`co-preview-${animation}`);
-  scheduleChatOverlaySave(120);
+  ChatOverlayUI.previewAnimation();
 }
 
-function bindChatOverlayControls() {
-  const root = document.getElementById('widget-chat-settings');
-  if (!root || root.dataset.controlsBound === '1') return;
-  root.dataset.controlsBound = '1';
-
-  root.addEventListener('click', event => {
-    const card = event.target.closest('.co-theme-card[data-theme]');
-    if (!card) return;
-    event.preventDefault();
-    event.stopPropagation();
-    window.selectChatOverlayTheme(card.dataset.theme);
-  });
-
-  root.addEventListener('change', event => {
-    if (event.target?.id === 'co-animation') {
-      previewChatOverlayAnimation();
-      return;
-    }
-    if (event.target.matches('input,select,textarea')) {
-      renderChatOverlayPreview();
-      scheduleChatOverlaySave();
-    }
-  });
-
-  root.addEventListener('input', event => {
-    if (event.target.matches('input[type="number"],input[type="text"],textarea')) {
-      renderChatOverlayPreview();
-      scheduleChatOverlaySave();
-    }
-  });
-}
-
-function applyChatOverlaySettings(d) {
-  setCheck('co-enabled', !!d.enabled);
-  setCheck('co-hide-bots', !!d.hideBots);
-  setCheck('co-hide-commands', !!d.hideCommands);
-  setCheck('co-show-platform', !!d.showPlatformIcon);
-  setCheck('co-show-time', !!d.showTime);
-  setCheck('co-show-avatars', d.showAvatars !== false);
-  setCheck('co-show-badges', d.showBadges !== false);
-  setCheck('co-group-messages', d.groupMessages !== false);
-  setCheck('co-highlight-roles', d.highlightRoles !== false);
-  setVal('co-group-window', d.groupWindow || 12);
-  setVal('co-ignored', d.ignoredUsers || 'BotRix,botrix');
-  setVal('co-font-size', d.fontSize || 21);
-  setVal('co-duration', d.messageDuration ?? 10);
-  setVal('co-max', d.maxMessages || 8);
-  setVal('co-animation', d.animation || 'pop');
-  const designInput =
-  document.getElementById('co-design');
-
-if (designInput) {
-  designInput.value = d.design || 'premium';
-}
-  hydrateAllObsLinks();
-  document.querySelectorAll('#widget-chat-settings .co-theme-card').forEach(card => {
-    const active = card.dataset.theme === (d.design || 'premium');
-    card.classList.toggle('active', active);
-    card.setAttribute('aria-pressed', active ? 'true' : 'false');
-  });
-  bindChatOverlayControls();
-  renderChatOverlayPreview();
-}
-async function loadChatOverlaySettings() {
-  let backup = null;
-
-  try {
-    backup = JSON.parse(
-      localStorage.getItem(chatOverlayStorageKey()) || 'null'
-    );
-  } catch (error) {}
-
-  try {
-    // SQLite est la source de vérité. On attend sa réponse avant
-    // d'afficher les réglages afin d'éviter qu'un ancien cache écrase le serveur.
-    const response = await fetch(
-      API + '/api/widgets/chat-overlay?ts=' + Date.now(),
-      {
-        cache: 'no-store',
-        headers: {
-          'Cache-Control': 'no-cache'
-        }
-      }
-    );
-
-    const data = await response.json().catch(() => ({}));
-
-    if (!response.ok || data.error) {
-      throw new Error(
-        data.error || 'Impossible de charger les réglages'
-      );
-    }
-
-    applyChatOverlaySettings(data);
-
-    try {
-      localStorage.setItem(
-        chatOverlayStorageKey(),
-        JSON.stringify(data)
-      );
-    } catch (error) {}
-
-    return data;
-  } catch (error) {
-    console.error('[CHAT OVERLAY LOAD]', error);
-
-    // Le cache local ne sert qu'en secours si le serveur est inaccessible.
-    if (backup) {
-      applyChatOverlaySettings(backup);
-      return backup;
-    }
-
-    const defaults = {
-      enabled: true,
-      hideBots: true,
-      hideCommands: true,
-      showPlatformIcon: true,
-      showTime: false,
-      ignoredUsers: 'BotRix,botrix',
-      fontSize: 21,
-      messageDuration: 10,
-      maxMessages: 8,
-      animation: 'pop',
-      design: 'premium',
-      showAvatars: true,
-      showBadges: true,
-      groupMessages: true,
-      groupWindow: 12,
-      highlightRoles: true
-    };
-
-    applyChatOverlaySettings(defaults);
-    return defaults;
-  }
-}
-
-async function saveChatOverlaySettings(options = {}) {
-  const silent = Boolean(options.silent);
-
-  if (chatOverlaySaveInFlight) {
-    chatOverlayPendingSave = true;
-    return;
-  }
-
-  chatOverlaySaveInFlight = true;
-  const body = currentChatOverlaySettingsFromForm();
-
-  // Cache de secours immédiatement mis à jour, séparé par streamer.
-  try {
-    localStorage.setItem(
-      chatOverlayStorageKey(),
-      JSON.stringify(body)
-    );
-  } catch (error) {}
-
-  try {
-    const response = await fetch(
-      API + '/api/admin/widgets/chat-overlay/settings',
-      {
-        method: 'POST',
-        credentials: 'same-origin',
-        cache: 'no-store',
-        headers: {
-          'Content-Type': 'application/json',
-          'Cache-Control': 'no-cache'
-        },
-        body: JSON.stringify(body)
-      }
-    );
-
-    const result = await response.json().catch(() => ({}));
-
-    if (!response.ok || result.success !== true) {
-      throw new Error(
-        result.error || 'Enregistrement impossible'
-      );
-    }
-
-    const saved = result.settings;
-
-    if (!saved || typeof saved !== 'object') {
-      throw new Error(
-        'Le serveur n’a pas confirmé les réglages enregistrés'
-      );
-    }
-
-    applyChatOverlaySettings(saved);
-
-    try {
-      localStorage.setItem(
-        chatOverlayStorageKey(),
-        JSON.stringify(saved)
-      );
-    } catch (error) {}
-
-    if (!silent) {
-      toast('Chat Overlay enregistré ✓');
-    }
-
-    return saved;
-  } catch (error) {
-    console.error('[CHAT OVERLAY SAVE]', error);
-
-    if (!silent) {
-      toast(
-        error.message || 'Erreur d’enregistrement'
-      );
-    }
-
-    throw error;
-  } finally {
-    chatOverlaySaveInFlight = false;
-
-    if (chatOverlayPendingSave) {
-      chatOverlayPendingSave = false;
-      scheduleChatOverlaySave(120);
-    }
-  }
-}
 async function testChatOverlay() {
   const status = document.getElementById('co-test-status');
   if (status) { status.className = 'co-test-status'; status.textContent = 'Envoi du message test…'; }
@@ -5985,24 +6253,17 @@ async function testChatOverlay() {
     toast(error.message || 'Erreur test Overlay Chat');
   }
 }
-document.addEventListener('input', event => {
-  if (!event.target?.closest?.('#widget-chat-settings')) return;
-  renderChatOverlayPreview();
-  scheduleChatOverlaySave(700);
-});
-
-document.addEventListener('change', event => {
-  if (!event.target?.closest?.('#widget-chat-settings')) return;
-  renderChatOverlayPreview();
-  scheduleChatOverlaySave(250);
-});
-
 
 if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', bindChatOverlayControls, { once: true });
+  document.addEventListener(
+    'DOMContentLoaded',
+    () => ChatOverlayUI.bind(),
+    { once: true }
+  );
 } else {
-  bindChatOverlayControls();
+  ChatOverlayUI.bind();
 }
+
 
 // ── TTS ───────────────────────────────────────────────────────────────────────
 

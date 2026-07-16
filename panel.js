@@ -2801,19 +2801,20 @@ async function getChatOverlayToken(tm) {
 const CHAT_OVERLAY_CONFIG_KEY = 'chat_overlay_config_v3';
 
 function normalizeChatOverlayConfig(input = {}, streamer = '') {
-  const value = input && typeof input === 'object' ? input : {};
+  const source = input && typeof input === 'object' ? input : {};
+
   const bool = (key, fallback) =>
-    typeof value[key] === 'boolean' ? value[key] : fallback;
-  const number = (key, fallback, min, max) => {
-    const parsed = Number.parseInt(value[key], 10);
-    const safe = Number.isFinite(parsed) ? parsed : fallback;
-    return Math.min(max, Math.max(min, safe));
+    typeof source[key] === 'boolean' ? source[key] : fallback;
+
+  const integer = (key, fallback, min, max) => {
+    const parsed = Number.parseInt(source[key], 10);
+    const value = Number.isFinite(parsed) ? parsed : fallback;
+    return Math.min(max, Math.max(min, value));
   };
-  const text = (key, fallback, maxLength = 500) => {
-    const raw = value[key];
-    return typeof raw === 'string'
-      ? raw.slice(0, maxLength)
-      : fallback;
+
+  const text = (key, fallback, maxLength) => {
+    if (typeof source[key] !== 'string') return fallback;
+    return source[key].slice(0, maxLength);
   };
 
   return {
@@ -2845,7 +2846,7 @@ function normalizeChatOverlayConfig(input = {}, streamer = '') {
       'groupMessages',
       CHAT_OVERLAY_DEFAULTS.groupMessages
     ),
-    groupWindow: number(
+    groupWindow: integer(
       'groupWindow',
       CHAT_OVERLAY_DEFAULTS.groupWindow,
       2,
@@ -2855,13 +2856,13 @@ function normalizeChatOverlayConfig(input = {}, streamer = '') {
       'highlightRoles',
       CHAT_OVERLAY_DEFAULTS.highlightRoles
     ),
-    fontSize: number(
+    fontSize: integer(
       'fontSize',
       CHAT_OVERLAY_DEFAULTS.fontSize,
       10,
       42
     ),
-    messageDuration: number(
+    messageDuration: integer(
       'messageDuration',
       CHAT_OVERLAY_DEFAULTS.messageDuration,
       0,
@@ -2877,18 +2878,19 @@ function normalizeChatOverlayConfig(input = {}, streamer = '') {
       CHAT_OVERLAY_DEFAULTS.design,
       30
     ),
-    maxMessages: number(
+    maxMessages: integer(
       'maxMessages',
       CHAT_OVERLAY_DEFAULTS.maxMessages,
       1,
       30
     ),
-    streamer: String(streamer || value.streamer || '')
+    streamer: String(streamer || source.streamer || '')
   };
 }
 
 async function getLegacyChatOverlaySettings(tm) {
   const get = (key, fallback) => tm.getSetting(key, fallback);
+
   return {
     enabled: (await get('chat_overlay_enabled', '1')) === '1',
     hideBots: (await get('chat_overlay_hide_bots', '1')) === '1',
@@ -2951,8 +2953,8 @@ async function getLegacyChatOverlaySettings(tm) {
 
 async function getChatOverlaySettings(source = null) {
   const tm = getChatOverlayTM(source);
-
   let stored = null;
+
   try {
     stored = await tm.getJson(CHAT_OVERLAY_CONFIG_KEY, null);
   } catch (error) {
@@ -2963,15 +2965,16 @@ async function getChatOverlaySettings(source = null) {
   }
 
   if (!stored || typeof stored !== 'object') {
-    const legacy = await getLegacyChatOverlaySettings(tm);
-    stored = normalizeChatOverlayConfig(legacy, tm.slug);
+    stored = normalizeChatOverlayConfig(
+      await getLegacyChatOverlaySettings(tm),
+      tm.slug
+    );
 
-    // Migration automatique et atomique des anciens réglages vers V3.
     try {
       await tm.setJson(CHAT_OVERLAY_CONFIG_KEY, stored);
     } catch (error) {
       console.warn(
-        `[CHAT OVERLAY:${tm.slug}] Migration config V3 impossible:`,
+        `[CHAT OVERLAY:${tm.slug}] Migration V3 impossible:`,
         error.message
       );
     }
@@ -3051,10 +3054,10 @@ app.post('/api/admin/widgets/chat-overlay/settings', requireAuth, async (req, re
     const tm = req.tenantManager || getChatOverlayTM(req);
     const cfg = normalizeChatOverlayConfig(req.body || {}, tm.slug);
 
-    // Une seule écriture atomique : aucun paramètre ne peut être oublié.
+    // Une seule écriture atomique contient tous les paramètres.
     await tm.setJson(CHAT_OVERLAY_CONFIG_KEY, cfg);
 
-    // Compatibilité temporaire avec les anciennes parties du projet.
+    // Anciennes clés conservées temporairement pour compatibilité.
     await Promise.all([
       tm.setSetting('chat_overlay_enabled', cfg.enabled ? '1' : '0'),
       tm.setSetting('chat_overlay_hide_bots', cfg.hideBots ? '1' : '0'),
@@ -3066,7 +3069,10 @@ app.post('/api/admin/widgets/chat-overlay/settings', requireAuth, async (req, re
         'chat_overlay_show_platform_icon',
         cfg.showPlatformIcon ? '1' : '0'
       ),
-      tm.setSetting('chat_overlay_show_time', cfg.showTime ? '1' : '0'),
+      tm.setSetting(
+        'chat_overlay_show_time',
+        cfg.showTime ? '1' : '0'
+      ),
       tm.setSetting(
         'chat_overlay_show_avatars',
         cfg.showAvatars ? '1' : '0'
@@ -3103,11 +3109,18 @@ app.post('/api/admin/widgets/chat-overlay/settings', requireAuth, async (req, re
         'chat_overlay_max_messages',
         String(cfg.maxMessages)
       ),
-      tm.setSetting('chat_overlay_animation', cfg.animation),
-      tm.setSetting('chat_overlay_design', cfg.design)
+      tm.setSetting(
+        'chat_overlay_animation',
+        cfg.animation
+      ),
+      tm.setSetting(
+        'chat_overlay_design',
+        cfg.design
+      )
     ]);
 
     const overlayToken = await getChatOverlayToken(tm);
+
     tm.emit('chat-overlay-settings', {
       ...cfg,
       overlayToken
