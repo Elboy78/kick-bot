@@ -1258,18 +1258,18 @@ Option 3" rows="4"></textarea><div style="display:flex;gap:6px;margin-top:10px">
           <div class="co-section-sub">Clique sur un thème pour mettre à jour l’aperçu instantanément.</div>
           <input type="hidden" id="co-design" value="premium">
           <div class="co-theme-grid">
-            <button type="button" class="co-theme-card" data-theme="premium" onclick="selectChatOverlayTheme('premium')"><div class="co-theme-demo co-theme-premium"><span></span></div><b>Premium</b></button>
-            <button type="button" class="co-theme-card" data-theme="glass" onclick="selectChatOverlayTheme('glass')"><div class="co-theme-demo co-theme-glass"><span></span></div><b>Glass</b></button>
-            <button type="button" class="co-theme-card" data-theme="minimal" onclick="selectChatOverlayTheme('minimal')"><div class="co-theme-demo co-theme-minimal"><span></span></div><b>Minimal</b></button>
-            <button type="button" class="co-theme-card" data-theme="neon" onclick="selectChatOverlayTheme('neon')"><div class="co-theme-demo co-theme-neon"><span></span></div><b>Neon</b></button>
-            <button type="button" class="co-theme-card" data-theme="kick" onclick="selectChatOverlayTheme('kick')"><div class="co-theme-demo co-theme-kick"><span></span></div><b>Kick</b></button>
-            <button type="button" class="co-theme-card" data-theme="ocean" onclick="selectChatOverlayTheme('ocean')"><div class="co-theme-demo co-theme-ocean"><span></span></div><b>Ocean</b></button>
-            <button type="button" class="co-theme-card" data-theme="sunset" onclick="selectChatOverlayTheme('sunset')"><div class="co-theme-demo co-theme-sunset"><span></span></div><b>Sunset</b></button>
-            <button type="button" class="co-theme-card" data-theme="candy" onclick="selectChatOverlayTheme('candy')"><div class="co-theme-demo co-theme-candy"><span></span></div><b>Candy</b></button>
-            <button type="button" class="co-theme-card" data-theme="mono" onclick="selectChatOverlayTheme('mono')"><div class="co-theme-demo co-theme-mono"><span></span></div><b>Mono</b></button>
-            <button type="button" class="co-theme-card" data-theme="cyber" onclick="selectChatOverlayTheme('cyber')"><div class="co-theme-demo co-theme-cyber"><span></span></div><b>Cyber</b></button>
-            <button type="button" class="co-theme-card" data-theme="royal" onclick="selectChatOverlayTheme('royal')"><div class="co-theme-demo co-theme-royal"><span></span></div><b>Royal</b></button>
-            <button type="button" class="co-theme-card" data-theme="transparent" onclick="selectChatOverlayTheme('transparent')"><div class="co-theme-demo co-theme-transparent"><span></span></div><b>Transparent</b></button>
+            <button type="button" class="co-theme-card" aria-pressed="false" data-theme="premium" onclick="selectChatOverlayTheme('premium')"><div class="co-theme-demo co-theme-premium"><span></span></div><b>Premium</b></button>
+            <button type="button" class="co-theme-card" aria-pressed="false" data-theme="glass" onclick="selectChatOverlayTheme('glass')"><div class="co-theme-demo co-theme-glass"><span></span></div><b>Glass</b></button>
+            <button type="button" class="co-theme-card" aria-pressed="false" data-theme="minimal" onclick="selectChatOverlayTheme('minimal')"><div class="co-theme-demo co-theme-minimal"><span></span></div><b>Minimal</b></button>
+            <button type="button" class="co-theme-card" aria-pressed="false" data-theme="neon" onclick="selectChatOverlayTheme('neon')"><div class="co-theme-demo co-theme-neon"><span></span></div><b>Neon</b></button>
+            <button type="button" class="co-theme-card" aria-pressed="false" data-theme="kick" onclick="selectChatOverlayTheme('kick')"><div class="co-theme-demo co-theme-kick"><span></span></div><b>Kick</b></button>
+            <button type="button" class="co-theme-card" aria-pressed="false" data-theme="ocean" onclick="selectChatOverlayTheme('ocean')"><div class="co-theme-demo co-theme-ocean"><span></span></div><b>Ocean</b></button>
+            <button type="button" class="co-theme-card" aria-pressed="false" data-theme="sunset" onclick="selectChatOverlayTheme('sunset')"><div class="co-theme-demo co-theme-sunset"><span></span></div><b>Sunset</b></button>
+            <button type="button" class="co-theme-card" aria-pressed="false" data-theme="candy" onclick="selectChatOverlayTheme('candy')"><div class="co-theme-demo co-theme-candy"><span></span></div><b>Candy</b></button>
+            <button type="button" class="co-theme-card" aria-pressed="false" data-theme="mono" onclick="selectChatOverlayTheme('mono')"><div class="co-theme-demo co-theme-mono"><span></span></div><b>Mono</b></button>
+            <button type="button" class="co-theme-card" aria-pressed="false" data-theme="cyber" onclick="selectChatOverlayTheme('cyber')"><div class="co-theme-demo co-theme-cyber"><span></span></div><b>Cyber</b></button>
+            <button type="button" class="co-theme-card" aria-pressed="false" data-theme="royal" onclick="selectChatOverlayTheme('royal')"><div class="co-theme-demo co-theme-royal"><span></span></div><b>Royal</b></button>
+            <button type="button" class="co-theme-card" aria-pressed="false" data-theme="transparent" onclick="selectChatOverlayTheme('transparent')"><div class="co-theme-demo co-theme-transparent"><span></span></div><b>Transparent</b></button>
           </div>
           <div class="co-save-bar"><button class="dark-btn" onclick="saveChatOverlaySettings()">ENREGISTRER LES RÉGLAGES</button></div>
           <div class="obs-link-box">
@@ -5584,6 +5584,36 @@ try {
 
 // ── Chat Overlay ──────────────────────────────────────────────────────────────
 const CHAT_OVERLAY_LOCAL_KEY = 'bot7up_chat_overlay_settings_backup';
+let chatOverlaySaveTimer = null;
+let chatOverlaySaveInFlight = false;
+let chatOverlayPendingSave = false;
+
+function chatOverlayStreamerSlug() {
+  const match = location.pathname.match(/^\/s\/([^/]+)/i);
+  return String(match?.[1] || '').trim().toLowerCase() || 'default';
+}
+
+function chatOverlayStorageKey() {
+  return `${CHAT_OVERLAY_LOCAL_KEY}:${chatOverlayStreamerSlug()}`;
+}
+
+function persistChatOverlayDraft() {
+  try {
+    localStorage.setItem(
+      chatOverlayStorageKey(),
+      JSON.stringify(currentChatOverlaySettingsFromForm())
+    );
+  } catch (error) {}
+}
+
+function scheduleChatOverlaySave(delay = 650) {
+  persistChatOverlayDraft();
+  clearTimeout(chatOverlaySaveTimer);
+  chatOverlaySaveTimer = setTimeout(() => {
+    saveChatOverlaySettings({ silent: true });
+  }, delay);
+}
+
 function currentChatOverlaySettingsFromForm() {
   return {
     enabled: !!document.getElementById('co-enabled')?.checked,
@@ -5605,9 +5635,26 @@ function currentChatOverlaySettingsFromForm() {
   };
 }
 function selectChatOverlayTheme(theme) {
-  setVal('co-design', theme);
-  document.querySelectorAll('#widget-chat-settings .co-theme-card').forEach(card => card.classList.toggle('active', card.dataset.theme === theme));
+  const allowed = new Set([
+    'premium', 'glass', 'minimal', 'neon',
+    'kick', 'ocean', 'sunset', 'candy',
+    'mono', 'cyber', 'royal', 'transparent'
+  ]);
+  const selected = allowed.has(String(theme || '').toLowerCase())
+    ? String(theme).toLowerCase()
+    : 'premium';
+
+  setVal('co-design', selected);
+  document
+    .querySelectorAll('#widget-chat-settings .co-theme-card')
+    .forEach(card => {
+      const active = card.dataset.theme === selected;
+      card.classList.toggle('active', active);
+      card.setAttribute('aria-pressed', active ? 'true' : 'false');
+    });
+
   renderChatOverlayPreview();
+  scheduleChatOverlaySave(120);
 }
 function renderChatOverlayPreview() {
   const box = document.getElementById('co-preview');
@@ -5661,23 +5708,111 @@ function applyChatOverlaySettings(d) {
 }
 async function loadChatOverlaySettings() {
   let backup = null;
-  try { backup = JSON.parse(localStorage.getItem(CHAT_OVERLAY_LOCAL_KEY) || 'null'); } catch(e) {}
-  if (backup) applyChatOverlaySettings(backup);
   try {
-    const r = await fetch(API + '/api/widgets/chat-overlay?ts=' + Date.now(), { cache:'no-store' });
-    const d = await r.json();
-    applyChatOverlaySettings(d);
-    try { localStorage.setItem(CHAT_OVERLAY_LOCAL_KEY, JSON.stringify(d)); } catch(e) {}
-  } catch(e) {
-    if (!backup) applyChatOverlaySettings({ enabled:true, hideBots:true, hideCommands:true, showPlatformIcon:true, showTime:false, ignoredUsers:'BotRix,botrix', fontSize:21, messageDuration:10, maxMessages:8, animation:'pop', design:'premium', showAvatars:true, showBadges:true, groupMessages:true, groupWindow:12, highlightRoles:true });
+    backup = JSON.parse(
+      localStorage.getItem(chatOverlayStorageKey()) || 'null'
+    );
+  } catch (error) {}
+
+  if (backup) applyChatOverlaySettings(backup);
+
+  try {
+    const response = await fetch(
+      API + '/api/widgets/chat-overlay?ts=' + Date.now(),
+      { cache: 'no-store' }
+    );
+    const data = await response.json().catch(() => ({}));
+
+    if (!response.ok || data.error) {
+      throw new Error(data.error || 'Impossible de charger les réglages');
+    }
+
+    applyChatOverlaySettings(data);
+    try {
+      localStorage.setItem(
+        chatOverlayStorageKey(),
+        JSON.stringify(data)
+      );
+    } catch (error) {}
+  } catch (error) {
+    if (!backup) {
+      applyChatOverlaySettings({
+        enabled: true,
+        hideBots: true,
+        hideCommands: true,
+        showPlatformIcon: true,
+        showTime: false,
+        ignoredUsers: 'BotRix,botrix',
+        fontSize: 21,
+        messageDuration: 10,
+        maxMessages: 8,
+        animation: 'pop',
+        design: 'premium',
+        showAvatars: true,
+        showBadges: true,
+        groupMessages: true,
+        groupWindow: 12,
+        highlightRoles: true
+      });
+    }
   }
 }
-async function saveChatOverlaySettings() {
+
+async function saveChatOverlaySettings(options = {}) {
+  const silent = Boolean(options.silent);
+
+  if (chatOverlaySaveInFlight) {
+    chatOverlayPendingSave = true;
+    return;
+  }
+
+  chatOverlaySaveInFlight = true;
   const body = currentChatOverlaySettingsFromForm();
-  try { localStorage.setItem(CHAT_OVERLAY_LOCAL_KEY, JSON.stringify(body)); } catch(e) {}
-  await fetch(API + '/api/admin/widgets/chat-overlay/settings', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body) });
-  toast('Chat Overlay enregistré ✓');
-  loadChatOverlaySettings();
+
+  try {
+    localStorage.setItem(
+      chatOverlayStorageKey(),
+      JSON.stringify(body)
+    );
+  } catch (error) {}
+
+  try {
+    const response = await fetch(
+      API + '/api/admin/widgets/chat-overlay/settings',
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+      }
+    );
+    const result = await response.json().catch(() => ({}));
+
+    if (!response.ok || !result.success) {
+      throw new Error(result.error || 'Enregistrement impossible');
+    }
+
+    const saved = result.settings || body;
+    applyChatOverlaySettings(saved);
+
+    try {
+      localStorage.setItem(
+        chatOverlayStorageKey(),
+        JSON.stringify(saved)
+      );
+    } catch (error) {}
+
+    if (!silent) toast('Chat Overlay enregistré ✓');
+  } catch (error) {
+    if (!silent) toast(error.message || 'Erreur d’enregistrement');
+    console.error('[CHAT OVERLAY SAVE]', error);
+  } finally {
+    chatOverlaySaveInFlight = false;
+
+    if (chatOverlayPendingSave) {
+      chatOverlayPendingSave = false;
+      scheduleChatOverlaySave(100);
+    }
+  }
 }
 async function testChatOverlay() {
   const status = document.getElementById('co-test-status');
@@ -5698,10 +5833,15 @@ async function testChatOverlay() {
   }
 }
 document.addEventListener('input', event => {
-  if (event.target?.closest?.('#widget-chat-settings')) renderChatOverlayPreview();
+  if (!event.target?.closest?.('#widget-chat-settings')) return;
+  renderChatOverlayPreview();
+  scheduleChatOverlaySave(700);
 });
+
 document.addEventListener('change', event => {
-  if (event.target?.closest?.('#widget-chat-settings')) renderChatOverlayPreview();
+  if (!event.target?.closest?.('#widget-chat-settings')) return;
+  renderChatOverlayPreview();
+  scheduleChatOverlaySave(250);
 });
 
 
