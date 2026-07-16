@@ -5683,7 +5683,14 @@ window.selectChatOverlayTheme = function selectChatOverlayTheme(theme) {
     ? String(theme).toLowerCase()
     : 'premium';
 
-  setVal('co-design', selected);
+  const designInput = document.getElementById('co-design');
+
+if (designInput) {
+  designInput.value = selected;
+  designInput.dispatchEvent(
+    new Event('change', { bubbles: true })
+  );
+}
   document
     .querySelectorAll('#widget-chat-settings .co-theme-card')
     .forEach(card => {
@@ -5789,7 +5796,12 @@ function applyChatOverlaySettings(d) {
   setVal('co-duration', d.messageDuration ?? 10);
   setVal('co-max', d.maxMessages || 8);
   setVal('co-animation', d.animation || 'pop');
-  setVal('co-design', d.design || 'premium');
+  const designInput =
+  document.getElementById('co-design');
+
+if (designInput) {
+  designInput.value = d.design || 'premium';
+}
   hydrateAllObsLinks();
   document.querySelectorAll('#widget-chat-settings .co-theme-card').forEach(card => {
     const active = card.dataset.theme === (d.design || 'premium');
