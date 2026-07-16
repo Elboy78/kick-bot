@@ -452,6 +452,13 @@ async function handleChatMessageScoped(payload, ctx = null) {
       content,
       badges,
       color: payload?.sender?.identity?.color || payload?.sender?.color || '',
+      avatarUrl:
+        payload?.sender?.profile_picture ||
+        payload?.sender?.profilePicture ||
+        payload?.sender?.avatar ||
+        payload?.sender?.identity?.profile_picture ||
+        payload?.sender?.identity?.avatar ||
+        '',
       platform: 'Kick',
       at: new Date().toISOString()
     }, ctx || currentChatContext());

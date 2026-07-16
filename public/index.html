@@ -1184,14 +1184,19 @@ Option 3" rows="4"></textarea><div style="display:flex;gap:6px;margin-top:10px">
         <label class="co-toggle-line"><span class="co-switch"><input type="checkbox" id="co-hide-commands"><span></span></span><b>Masquer les commandes qui commencent par !</b></label>
         <label class="co-toggle-line"><span class="co-switch"><input type="checkbox" id="co-show-platform"><span></span></span><b>Afficher l’icône Kick</b></label>
         <label class="co-toggle-line"><span class="co-switch"><input type="checkbox" id="co-show-time"><span></span></span><b>Afficher l’heure du message</b></label>
+        <label class="co-toggle-line"><span class="co-switch"><input type="checkbox" id="co-show-avatars"><span></span></span><b>Afficher les avatars</b></label>
+        <label class="co-toggle-line"><span class="co-switch"><input type="checkbox" id="co-show-badges"><span></span></span><b>Afficher les badges</b></label>
+        <label class="co-toggle-line"><span class="co-switch"><input type="checkbox" id="co-group-messages"><span></span></span><b>Regrouper les messages successifs</b></label>
+        <label class="co-toggle-line"><span class="co-switch"><input type="checkbox" id="co-highlight-roles"><span></span></span><b>Mettre en valeur streamer et modérateurs</b></label>
         <label class="lbl">Utilisateurs ignorés</label>
         <input class="inp" id="co-ignored" placeholder="BotRix, autrebot" style="margin-bottom:10px">
         <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px">
           <div><label class="lbl">Taille police</label><input type="number" class="inp" id="co-font-size" min="10" max="42"></div>
           <div><label class="lbl">Durée message</label><input type="number" class="inp" id="co-duration" min="0" max="60"></div>
           <div><label class="lbl">Messages affichés</label><input type="number" class="inp" id="co-max" min="1" max="30"></div>
+          <div><label class="lbl">Délai de regroupement</label><input type="number" class="inp" id="co-group-window" min="2" max="60"></div>
           <div><label class="lbl">Animation</label><select class="inp" id="co-animation"><option value="pop">Pop In</option><option value="slide">Slide</option><option value="fade">Fade</option><option value="none">Aucune</option></select></div>
-          <div style="grid-column:1/-1"><label class="lbl">Design</label><select class="inp" id="co-design"><option value="glass">Glass propre</option><option value="minimal">Minimal</option><option value="neon">Neon</option></select></div>
+          <div style="grid-column:1/-1"><label class="lbl">Design</label><select class="inp" id="co-design"><option value="premium">Premium</option><option value="glass">Glass</option><option value="minimal">Minimal</option><option value="neon">Neon</option></select></div>
         </div>
         <button class="dark-btn" onclick="saveChatOverlaySettings()" style="width:100%;justify-content:center;margin-top:12px">ENREGISTRER</button>
         <div class="obs-link-box">
@@ -1203,9 +1208,12 @@ Option 3" rows="4"></textarea><div style="display:flex;gap:6px;margin-top:10px">
       <div class="panel">
         <h3>👀 Aperçu</h3>
         <div style="height:360px;border-radius:12px;border:1px solid var(--brd);background:radial-gradient(circle at top,#1e293b,#060814);padding:16px;display:flex;align-items:flex-end;overflow:hidden">
-          <div style="width:100%">
-            <div style="font-size:18px;font-weight:950;margin:8px 0;color:#fff"><span style="color:#22c55e">⬢ Elboy78</span> : GG le chat overlay est propre 🔥</div>
-            <div style="font-size:18px;font-weight:950;margin:8px 0;color:#fff"><span style="color:#a78bfa">⬢ Viewer</span> : test depuis Kick</div>
+          <div id="co-preview" style="width:100%;display:flex;flex-direction:column;gap:9px">
+            <div style="display:flex;gap:10px;align-items:flex-start;padding:11px 13px;border-radius:16px;border:1px solid rgba(255,255,255,.15);background:linear-gradient(135deg,rgba(8,12,21,.86),rgba(18,24,42,.62));box-shadow:0 14px 34px rgba(0,0,0,.32)">
+              <div style="width:38px;height:38px;border-radius:12px;background:linear-gradient(135deg,#22c55e,#15803d);display:grid;place-items:center;font-weight:950;color:#061208">E</div>
+              <div style="min-width:0;flex:1"><div style="display:flex;align-items:center;gap:6px"><span style="font-size:9px;padding:2px 6px;border-radius:999px;background:#22c55e;color:#071106;font-weight:950">LIVE</span><b style="color:#53fc18">Elboy78</b><small style="color:#94a3b8">15:42</small></div><div style="font-size:17px;font-weight:750;margin-top:4px;color:#fff">GG le nouvel overlay est propre 🔥</div></div>
+            </div>
+            <div style="display:flex;gap:10px;align-items:flex-start;padding:11px 13px;border-radius:16px;border:1px solid rgba(255,255,255,.12);background:rgba(10,14,27,.72)"><div style="width:38px;height:38px;border-radius:12px;background:linear-gradient(135deg,#a78bfa,#7c3aed);display:grid;place-items:center;font-weight:950">V</div><div><b style="color:#a78bfa">Viewer</b><div style="font-size:17px;font-weight:750;margin-top:4px">test depuis Kick</div></div></div>
           </div>
         </div>
         <button class="dark-btn" onclick="testChatOverlay()" style="width:100%;justify-content:center;margin-top:12px">ENVOYER UN TEST SUR OBS</button>
@@ -5512,12 +5520,17 @@ function applyChatOverlaySettings(d) {
   setCheck('co-hide-commands', !!d.hideCommands);
   setCheck('co-show-platform', !!d.showPlatformIcon);
   setCheck('co-show-time', !!d.showTime);
+  setCheck('co-show-avatars', d.showAvatars !== false);
+  setCheck('co-show-badges', d.showBadges !== false);
+  setCheck('co-group-messages', d.groupMessages !== false);
+  setCheck('co-highlight-roles', d.highlightRoles !== false);
+  setVal('co-group-window', d.groupWindow || 12);
   setVal('co-ignored', d.ignoredUsers || 'BotRix,botrix');
   setVal('co-font-size', d.fontSize || 21);
   setVal('co-duration', d.messageDuration ?? 10);
   setVal('co-max', d.maxMessages || 8);
   setVal('co-animation', d.animation || 'pop');
-  setVal('co-design', d.design || 'glass');
+  setVal('co-design', d.design || 'premium');
   hydrateAllObsLinks();
   hydrateAllObsLinks();
 }
@@ -5531,7 +5544,7 @@ async function loadChatOverlaySettings() {
     applyChatOverlaySettings(d);
     try { localStorage.setItem(CHAT_OVERLAY_LOCAL_KEY, JSON.stringify(d)); } catch(e) {}
   } catch(e) {
-    if (!backup) applyChatOverlaySettings({ enabled:true, hideBots:true, hideCommands:true, showPlatformIcon:true, showTime:false, ignoredUsers:'BotRix,botrix', fontSize:21, messageDuration:10, maxMessages:8, animation:'pop', design:'glass' });
+    if (!backup) applyChatOverlaySettings({ enabled:true, hideBots:true, hideCommands:true, showPlatformIcon:true, showTime:false, ignoredUsers:'BotRix,botrix', fontSize:21, messageDuration:10, maxMessages:8, animation:'pop', design:'premium', showAvatars:true, showBadges:true, groupMessages:true, groupWindow:12, highlightRoles:true });
   }
 }
 async function saveChatOverlaySettings() {
@@ -5541,12 +5554,17 @@ async function saveChatOverlaySettings() {
     hideCommands: !!document.getElementById('co-hide-commands')?.checked,
     showPlatformIcon: !!document.getElementById('co-show-platform')?.checked,
     showTime: !!document.getElementById('co-show-time')?.checked,
+    showAvatars: !!document.getElementById('co-show-avatars')?.checked,
+    showBadges: !!document.getElementById('co-show-badges')?.checked,
+    groupMessages: !!document.getElementById('co-group-messages')?.checked,
+    groupWindow: Number(document.getElementById('co-group-window')?.value || 12),
+    highlightRoles: !!document.getElementById('co-highlight-roles')?.checked,
     ignoredUsers: document.getElementById('co-ignored')?.value || '',
     fontSize: Number(document.getElementById('co-font-size')?.value || 21),
     messageDuration: Number(document.getElementById('co-duration')?.value || 10),
     maxMessages: Number(document.getElementById('co-max')?.value || 8),
     animation: document.getElementById('co-animation')?.value || 'pop',
-    design: document.getElementById('co-design')?.value || 'glass'
+    design: document.getElementById('co-design')?.value || 'premium'
   };
   try { localStorage.setItem(CHAT_OVERLAY_LOCAL_KEY, JSON.stringify(body)); } catch(e) {}
   await fetch(API + '/api/admin/widgets/chat-overlay/settings', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body) });

@@ -2766,10 +2766,15 @@ const CHAT_OVERLAY_DEFAULTS = {
   hideCommands: true,
   showPlatformIcon: true,
   showTime: false,
+  showAvatars: true,
+  showBadges: true,
+  groupMessages: true,
+  groupWindow: 12,
+  highlightRoles: true,
   fontSize: 21,
   messageDuration: 10,
   animation: 'pop',
-  design: 'glass',
+  design: 'premium',
   maxMessages: 8
 };
 
@@ -2803,6 +2808,11 @@ async function getChatOverlaySettings(source = null) {
     hideCommands: (await get('chat_overlay_hide_commands', '1')) === '1',
     showPlatformIcon: (await get('chat_overlay_show_platform_icon', '1')) === '1',
     showTime: (await get('chat_overlay_show_time', '0')) === '1',
+    showAvatars: (await get('chat_overlay_show_avatars', '1')) === '1',
+    showBadges: (await get('chat_overlay_show_badges', '1')) === '1',
+    groupMessages: (await get('chat_overlay_group_messages', '1')) === '1',
+    groupWindow: Math.min(60, Math.max(2, parseInt(await get('chat_overlay_group_window', String(CHAT_OVERLAY_DEFAULTS.groupWindow))) || CHAT_OVERLAY_DEFAULTS.groupWindow)),
+    highlightRoles: (await get('chat_overlay_highlight_roles', '1')) === '1',
     fontSize: Math.min(42, Math.max(10, parseInt(await get('chat_overlay_font_size', String(CHAT_OVERLAY_DEFAULTS.fontSize))) || CHAT_OVERLAY_DEFAULTS.fontSize)),
     messageDuration: Math.min(60, Math.max(0, parseInt(await get('chat_overlay_message_duration', String(CHAT_OVERLAY_DEFAULTS.messageDuration))) || CHAT_OVERLAY_DEFAULTS.messageDuration)),
     animation: await get('chat_overlay_animation', CHAT_OVERLAY_DEFAULTS.animation),
@@ -2852,6 +2862,7 @@ async function emitChatOverlayMessage(msg = {}, ctx = null) {
       badges,
       platform: msg.platform || 'Kick',
       color: String(msg.color || '').slice(0, 30),
+      avatarUrl: String(msg.avatarUrl || msg.avatar_url || '').slice(0, 500),
       at: msg.at || new Date().toISOString()
     };
     tm.emit('chat-overlay-message', payload);
@@ -2886,6 +2897,11 @@ app.post('/api/admin/widgets/chat-overlay/settings', requireAuth, async (req, re
     if (typeof b.hideCommands === 'boolean') await tm.setSetting('chat_overlay_hide_commands', b.hideCommands ? '1' : '0');
     if (typeof b.showPlatformIcon === 'boolean') await tm.setSetting('chat_overlay_show_platform_icon', b.showPlatformIcon ? '1' : '0');
     if (typeof b.showTime === 'boolean') await tm.setSetting('chat_overlay_show_time', b.showTime ? '1' : '0');
+    if (typeof b.showAvatars === 'boolean') await tm.setSetting('chat_overlay_show_avatars', b.showAvatars ? '1' : '0');
+    if (typeof b.showBadges === 'boolean') await tm.setSetting('chat_overlay_show_badges', b.showBadges ? '1' : '0');
+    if (typeof b.groupMessages === 'boolean') await tm.setSetting('chat_overlay_group_messages', b.groupMessages ? '1' : '0');
+    if (b.groupWindow !== undefined) await tm.setSetting('chat_overlay_group_window', String(Math.min(60, Math.max(2, parseInt(b.groupWindow) || CHAT_OVERLAY_DEFAULTS.groupWindow))));
+    if (typeof b.highlightRoles === 'boolean') await tm.setSetting('chat_overlay_highlight_roles', b.highlightRoles ? '1' : '0');
     if (typeof b.ignoredUsers === 'string') await tm.setSetting('chat_overlay_ignored_users', b.ignoredUsers.slice(0, 500));
     if (b.fontSize !== undefined) await tm.setSetting('chat_overlay_font_size', String(Math.min(42, Math.max(10, parseInt(b.fontSize) || CHAT_OVERLAY_DEFAULTS.fontSize))));
     if (b.messageDuration !== undefined) await tm.setSetting('chat_overlay_message_duration', String(Math.min(60, Math.max(0, parseInt(b.messageDuration) || CHAT_OVERLAY_DEFAULTS.messageDuration))));
@@ -2908,6 +2924,7 @@ app.post('/api/admin/widgets/chat-overlay/test', requireAuth, async (req, res) =
       badges: [{type:'moderator', text:'Modo'}],
       platform: 'Kick',
       color: '#53fc18',
+      avatarUrl: '',
       at: new Date().toISOString()
     }, tm);
     res.json({ success: true, streamer:tm.slug });
