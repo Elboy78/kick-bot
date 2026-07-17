@@ -548,23 +548,33 @@ body.light .card,body.light .panel,body.light .widget-engine-card{background:lin
     <a onclick="showPage('settings')">⚙️ Paramètres</a>
   </nav>
 
-  <div class="bot-status">
-    <p class="bot-status-title">STATUT DU BOT</p>
-    <p class="online">● En ligne</p>
-    <p>Chaîne : <b id="sb-channel">—</b></p>
-    <p>Uptime : <b id="sb-uptime">—</b></p>
-    <p>Followers : <b id="sb-followers">—</b></p>
-    <div class="live-pill off" id="live-pill"><div class="lpd" id="live-dot"></div><span id="live-text">Vérification…</span></div>
-  </div>
-
-  <div class="sb-bottom">
-    <button class="sb-btnx" onclick="logout()">🚪 Déconnexion</button>
+  <div class="sb-bottom ref-sidebar-bottom">
+    <div class="ref-sidebar-tools">
+      <button class="ref-sidebar-tool" type="button" onclick="openInterfaceCustomizer()">
+        <span class="ref-sidebar-tool-icon">🛠️</span>
+        <span><b>Personnalisation</b><small>Thème et apparence</small></span>
+        <em>›</em>
+      </button>
+      <button class="ref-sidebar-tool" type="button" onclick="openHelpSupport()">
+        <span class="ref-sidebar-tool-icon">❓</span>
+        <span><b>Aide &amp; Support</b><small>Assistance ElBot</small></span>
+        <em>›</em>
+      </button>
+    </div>
     <div class="sb-upd" id="upd"></div>
     <div class="sb-profile" onclick="showPage('settings')">
       <div class="sb-prof-avatar" id="prof-avatar">?</div>
       <div><div class="sb-prof-name" id="prof-name">—</div><div class="sb-prof-role">Admin</div></div>
     </div>
   </div>
+
+<div class="ref-compat-hidden" aria-hidden="true">
+  <b id="sb-channel">—</b>
+  <b id="sb-uptime">—</b>
+  <b id="sb-followers">—</b>
+  <div id="live-pill"><div id="live-dot"></div><span id="live-text">—</span></div>
+</div>
+
 </aside>
 
 <main class="main">
@@ -681,7 +691,14 @@ body.light .card,body.light .panel,body.light .widget-engine-card{background:lin
             </div>
             <footer>
               <div><strong>File d'attente</strong><small><b id="ref-sr-count">0</b> titre(s)</small></div>
-              <div class="ref-volume">🔊 <span id="ref-sr-volume">100%</span></div>
+              <div class="ref-volume ref-volume-control">
+                <span class="ref-volume-emoji">🔊</span>
+                <input id="ref-sr-volume-slider" type="range" min="0" max="100" step="1" value="100"
+                  aria-label="Volume de la musique"
+                  oninput="setReferenceSongVolume(this.value)"
+                  onchange="commitReferenceSongVolume(this.value)">
+                <span id="ref-sr-volume">100%</span>
+              </div>
             </footer>
           </article>
 
@@ -1720,6 +1737,52 @@ Option 3" rows="4"></textarea><div style="display:flex;gap:6px;margin-top:10px">
 @media(max-width:1450px){.ref-shell{grid-template-columns:1fr}.ref-rail{display:grid;grid-template-columns:repeat(4,1fr)}.ref-main-row{grid-template-columns:1fr 1.35fr .8fr}}
 @media(max-width:1100px){.ref-kpis{grid-template-columns:repeat(3,1fr)}.ref-main-row,.ref-lower-row{grid-template-columns:1fr 1fr}.ref-goal-card{grid-column:span 2}.ref-rail{grid-template-columns:1fr 1fr}}
 @media(max-width:760px){.ref-welcome{align-items:flex-start;flex-direction:column}.ref-primary-actions{width:100%}.ref-primary-actions button{flex:1}.ref-kpis,.ref-main-row,.ref-lower-row,.ref-rail{grid-template-columns:1fr}.ref-goal-card{grid-column:auto}}
+
+
+
+/* ══ ELBOT V5 — Sidebar basse, personnalisation et volume SR ══ */
+.ref-compat-hidden{display:none!important}
+.sidebar{padding-bottom:12px!important}
+.menu{padding-bottom:12px}
+.ref-sidebar-bottom{margin-top:auto!important;display:flex!important;flex-direction:column!important;gap:9px!important}
+.ref-sidebar-tools{display:flex;flex-direction:column;gap:6px;padding-top:9px;border-top:1px solid rgba(85,151,236,.12)}
+.ref-sidebar-tool{width:100%;display:grid;grid-template-columns:31px 1fr auto;align-items:center;gap:8px;padding:9px;border:1px solid rgba(72,140,227,.14);border-radius:9px;background:linear-gradient(145deg,rgba(7,28,61,.75),rgba(4,17,39,.78));color:#d6e3f4;text-align:left;cursor:pointer;transition:.2s;box-shadow:inset 0 1px 0 rgba(255,255,255,.03)}
+.ref-sidebar-tool:hover{transform:translateX(2px);border-color:rgba(41,143,255,.4);background:linear-gradient(145deg,rgba(10,43,91,.88),rgba(5,25,57,.9))}
+.ref-sidebar-tool-icon{width:29px;height:29px;border-radius:8px;display:grid;place-items:center;background:rgba(21,118,233,.14);border:1px solid rgba(48,143,255,.16);font-size:13px}
+.ref-sidebar-tool b{display:block;font-size:9px}.ref-sidebar-tool small{display:block;margin-top:2px;color:#7289a7;font-size:6px}.ref-sidebar-tool em{font-style:normal;color:#7890ad;font-size:17px}
+.sb-profile{margin-top:0!important}
+.ref-volume-control{display:grid!important;grid-template-columns:auto minmax(70px,120px) 32px;align-items:center;gap:7px!important;padding:6px 8px!important}
+.ref-volume-control input{width:100%;height:4px;appearance:none;background:linear-gradient(90deg,var(--ref-blue) var(--vol,100%),rgba(102,156,222,.16) var(--vol,100%));border-radius:999px;outline:0;cursor:pointer}
+.ref-volume-control input::-webkit-slider-thumb{appearance:none;width:11px;height:11px;border-radius:50%;background:#dff4ff;border:2px solid var(--ref-blue);box-shadow:0 0 10px rgba(20,127,255,.65)}
+.ref-volume-control input::-moz-range-thumb{width:9px;height:9px;border-radius:50%;background:#dff4ff;border:2px solid var(--ref-blue)}
+.ref-volume-emoji{font-size:10px}
+.ref-drawer-backdrop{position:fixed;inset:0;z-index:9999;display:none;justify-content:flex-end;background:rgba(0,5,17,.62);backdrop-filter:blur(8px);opacity:0;transition:opacity .22s ease}
+.ref-drawer-backdrop.open{display:flex;opacity:1}
+.ref-customizer-drawer{width:min(405px,94vw);height:100%;padding:20px;background:linear-gradient(180deg,rgba(5,21,48,.99),rgba(2,11,27,.995));border-left:1px solid rgba(67,148,255,.24);box-shadow:-30px 0 70px rgba(0,4,18,.56);overflow-y:auto;transform:translateX(30px);animation:refDrawerIn .24s ease forwards}
+@keyframes refDrawerIn{to{transform:none}}
+.ref-customizer-drawer:not(.active){display:none}
+.ref-customizer-drawer>header{display:flex;align-items:center;justify-content:space-between;padding-bottom:18px;border-bottom:1px solid rgba(78,145,229,.13)}
+.ref-customizer-drawer>header>div{display:flex;align-items:center;gap:11px}.ref-customizer-drawer>header>div>span{width:38px;height:38px;border-radius:11px;display:grid;place-items:center;background:rgba(20,119,238,.16);font-size:17px}
+.ref-customizer-drawer header strong{display:block;font-size:15px}.ref-customizer-drawer header small{display:block;margin-top:3px;color:#7f94af;font-size:8px}.ref-customizer-drawer header button{border:0;background:rgba(77,132,199,.09);color:#a8bbd2;width:31px;height:31px;border-radius:8px;cursor:pointer}
+.ref-customizer-drawer section{padding:18px 0;border-bottom:1px solid rgba(77,144,227,.1)}.ref-customizer-drawer h3{margin-bottom:12px;font-size:9px;text-transform:uppercase;letter-spacing:.8px;color:#8ea5c1}
+.ref-theme-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}.ref-theme-grid button{display:flex;align-items:center;gap:9px;padding:10px;border:1px solid rgba(72,140,226,.14);border-radius:9px;background:rgba(26,72,132,.07);color:#c7d7e9;font:700 8px Inter;cursor:pointer}.ref-theme-grid button.active{border-color:var(--ref-blue);box-shadow:0 0 0 1px color-mix(in srgb,var(--ref-blue) 25%,transparent),0 0 18px color-mix(in srgb,var(--ref-blue) 18%,transparent)}.ref-theme-grid i{width:20px;height:20px;border-radius:6px;background:#1685ff}.ref-theme-grid [data-ref-theme="violet"] i{background:#8856ff}.ref-theme-grid [data-ref-theme="cyan"] i{background:#16c9e8}.ref-theme-grid [data-ref-theme="red"] i{background:#ef4770}.ref-theme-grid [data-ref-theme="green"] i{background:#24cb82}.ref-theme-grid [data-ref-theme="orange"] i{background:#ff8a34}
+.ref-custom-toggle{display:flex;align-items:center;justify-content:space-between;gap:14px;padding:10px 0;cursor:pointer}.ref-custom-toggle b{display:block;font-size:9px}.ref-custom-toggle small{display:block;margin-top:3px;color:#758ba7;font-size:7px}.ref-custom-toggle input{display:none}.ref-custom-toggle>i{width:34px;height:19px;border-radius:999px;background:rgba(92,137,193,.18);position:relative;transition:.2s}.ref-custom-toggle>i:after{content:"";position:absolute;width:13px;height:13px;left:3px;top:3px;border-radius:50%;background:#8094ad;transition:.2s}.ref-custom-toggle input:checked+i{background:color-mix(in srgb,var(--ref-blue) 48%,transparent)}.ref-custom-toggle input:checked+i:after{left:18px;background:#fff;box-shadow:0 0 9px var(--ref-blue)}
+.ref-bg-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}.ref-bg-grid button{padding:13px 5px;border:1px solid rgba(72,140,226,.14);border-radius:9px;background:rgba(26,72,132,.07);color:#c4d5e8;font:700 17px Inter;cursor:pointer}.ref-bg-grid span{display:block;margin-top:7px;font-size:7px}
+.ref-customizer-drawer footer{padding-top:18px}.ref-customizer-drawer footer button{width:100%;padding:10px;border:1px solid rgba(72,140,226,.18);border-radius:9px;background:rgba(24,70,128,.12);color:#9eb5ce;font:700 8px Inter;cursor:pointer}
+.ref-help-list{display:flex;flex-direction:column;gap:7px}.ref-help-list button{display:grid;grid-template-columns:35px 1fr auto;align-items:center;gap:10px;width:100%;padding:11px;border:1px solid rgba(72,140,226,.13);border-radius:10px;background:rgba(29,72,127,.07);color:#cbd9ea;text-align:left;cursor:pointer}.ref-help-list button>span{width:32px;height:32px;border-radius:8px;display:grid;place-items:center;background:rgba(20,119,238,.13)}.ref-help-list b{display:block;font-size:9px}.ref-help-list small{display:block;margin-top:3px;color:#748aa5;font-size:7px}.ref-help-list em{font-style:normal;color:#8297af}
+.ref-support-card{display:flex;align-items:flex-start;gap:11px;margin-top:18px;padding:14px;border-radius:11px;background:linear-gradient(145deg,rgba(15,105,219,.14),rgba(5,47,102,.12));border:1px solid rgba(41,135,248,.17)}.ref-support-card>span{font-size:20px}.ref-support-card strong{display:block;font-size:10px}.ref-support-card small{display:block;margin-top:4px;color:#7e94ae;font-size:7px;line-height:1.5}
+body.ref-no-glow .ref-kpi,body.ref-no-glow .ref-panel,body.ref-no-glow .ref-primary-actions button{box-shadow:inset 0 1px 0 rgba(255,255,255,.04)!important}
+body.ref-no-motion *,body.ref-no-motion *:before,body.ref-no-motion *:after{animation:none!important;transition:none!important}
+body.ref-compact .ref-panel{padding:11px}body.ref-compact .ref-main-row,body.ref-compact .ref-lower-row,body.ref-compact .ref-content,body.ref-compact .ref-rail{gap:8px}
+body[data-ref-theme="violet"]{--accent:#8856ff;--accent2:#6632dc}body[data-ref-theme="violet"] .ref-dashboard{--ref-blue:#8856ff;--ref-cyan:#bd85ff}
+body[data-ref-theme="cyan"]{--accent:#16c9e8;--accent2:#0793b2}body[data-ref-theme="cyan"] .ref-dashboard{--ref-blue:#16c9e8;--ref-cyan:#68edff}
+body[data-ref-theme="red"]{--accent:#ef4770;--accent2:#b9254b}body[data-ref-theme="red"] .ref-dashboard{--ref-blue:#ef4770;--ref-cyan:#ff7898}
+body[data-ref-theme="green"]{--accent:#24cb82;--accent2:#138c59}body[data-ref-theme="green"] .ref-dashboard{--ref-blue:#24cb82;--ref-cyan:#65efb3}
+body[data-ref-theme="orange"]{--accent:#ff8a34;--accent2:#cf5f0d}body[data-ref-theme="orange"] .ref-dashboard{--ref-blue:#ff8a34;--ref-cyan:#ffc078}
+body[data-ref-bg="aurora"]{background:radial-gradient(circle at 42% -10%,color-mix(in srgb,var(--ref-blue,#1685ff) 22%,transparent),transparent 35%),radial-gradient(circle at 90% 30%,rgba(97,46,220,.13),transparent 30%),#020817!important}
+body[data-ref-bg="minimal"]{background:#020817!important}
+body[data-ref-bg="waves"]:before{content:"";position:fixed;inset:0;z-index:-1;pointer-events:none;background:radial-gradient(ellipse at 57% -5%,rgba(19,107,241,.2),transparent 32%),linear-gradient(130deg,transparent 38%,rgba(12,88,210,.08) 40%,transparent 43%)}
+@media(max-width:700px){.ref-volume-control{grid-template-columns:auto 1fr 30px}.ref-theme-grid{grid-template-columns:1fr}}
 
 </style>
     <div class="card" style="margin-bottom:16px"><div class="obs-link-head"><b>🔗 Lien overlay OBS Alertes</b><span><button class="obs-copy-btn" onclick="copyObsUrl('alerts-obs-url')">Copier</button><button class="obs-regenerate-btn" onclick="regenerateObsToken('alerts')">Régénérer</button></span></div><div class="obs-link-row"><code class="obs-link-code" id="alerts-obs-url">/widgets/alerts.html</code></div><div class="alert-mini">Chaque streamer possède son lien privé. Un lien régénéré invalide immédiatement l’ancien.</div></div>
@@ -7625,6 +7688,7 @@ async function loadReferenceSongRequest() {
     set('ref-sr-current', refFmtTime(player.currentTime || 0));
     set('ref-sr-duration', refFmtTime(player.duration || current?.duration || 0));
     set('ref-sr-volume', Math.round(Number(player.volume ?? 100)) + '%');
+    if (typeof refPaintDashboardVolume === 'function') refPaintDashboardVolume(player.volume ?? 100);
     const status = String(player.status || 'stopped').toLowerCase();
     set('ref-sr-active', status === 'playing' ? '● Actif' : status === 'paused' ? '● En pause' : '● Inactif');
     set('ref-rail-sr', status === 'playing' ? 'Actif' : status === 'paused' ? 'Pause' : 'Inactif');
@@ -7676,6 +7740,177 @@ setTimeout(loadReferenceDashboard, 50);
 setInterval(() => {
   if (document.getElementById('page-dashboard')?.classList.contains('active')) loadReferenceDashboard();
 }, 10000);
+
+</script>
+
+<div class="ref-drawer-backdrop" id="ref-drawer-backdrop" onclick="closeReferenceDrawers(event)">
+  <aside class="ref-customizer-drawer" id="ref-customizer-drawer" role="dialog" aria-modal="true" aria-labelledby="ref-customizer-title">
+    <header>
+      <div><span>🛠️</span><div><strong id="ref-customizer-title">Personnalisation</strong><small>Adapte complètement ton interface</small></div></div>
+      <button type="button" onclick="closeReferenceDrawers()">✕</button>
+    </header>
+    <section>
+      <h3>Thème principal</h3>
+      <div class="ref-theme-grid">
+        <button type="button" data-ref-theme="blue" onclick="applyReferenceTheme('blue')"><i></i><span>Bleu ElBot</span></button>
+        <button type="button" data-ref-theme="violet" onclick="applyReferenceTheme('violet')"><i></i><span>Violet</span></button>
+        <button type="button" data-ref-theme="cyan" onclick="applyReferenceTheme('cyan')"><i></i><span>Cyan</span></button>
+        <button type="button" data-ref-theme="red" onclick="applyReferenceTheme('red')"><i></i><span>Rouge</span></button>
+        <button type="button" data-ref-theme="green" onclick="applyReferenceTheme('green')"><i></i><span>Vert</span></button>
+        <button type="button" data-ref-theme="orange" onclick="applyReferenceTheme('orange')"><i></i><span>Orange</span></button>
+      </div>
+    </section>
+    <section>
+      <h3>Ambiance</h3>
+      <label class="ref-custom-toggle"><span><b>Effets lumineux</b><small>Halos et lueurs sur les cartes</small></span><input id="ref-glow-toggle" type="checkbox" checked onchange="toggleReferenceGlow(this.checked)"><i></i></label>
+      <label class="ref-custom-toggle"><span><b>Animations</b><small>Mouvements et transitions fluides</small></span><input id="ref-motion-toggle" type="checkbox" checked onchange="toggleReferenceMotion(this.checked)"><i></i></label>
+      <label class="ref-custom-toggle"><span><b>Interface compacte</b><small>Réduit légèrement les espacements</small></span><input id="ref-compact-toggle" type="checkbox" onchange="toggleReferenceCompact(this.checked)"><i></i></label>
+    </section>
+    <section>
+      <h3>Fond du panel</h3>
+      <div class="ref-bg-grid">
+        <button type="button" onclick="applyReferenceBackground('waves')">🌊<span>Vagues</span></button>
+        <button type="button" onclick="applyReferenceBackground('aurora')">🌌<span>Aurore</span></button>
+        <button type="button" onclick="applyReferenceBackground('minimal')">◼️<span>Minimal</span></button>
+      </div>
+    </section>
+    <footer><button type="button" onclick="resetReferenceAppearance()">Réinitialiser l'apparence</button></footer>
+  </aside>
+
+  <aside class="ref-customizer-drawer ref-help-drawer" id="ref-help-drawer" role="dialog" aria-modal="true" aria-labelledby="ref-help-title">
+    <header>
+      <div><span>❓</span><div><strong id="ref-help-title">Aide &amp; Support</strong><small>Tout ce qu'il faut pour utiliser ElBot</small></div></div>
+      <button type="button" onclick="closeReferenceDrawers()">✕</button>
+    </header>
+    <section class="ref-help-list">
+      <button type="button" onclick="showPage('settings');closeReferenceDrawers()"><span>⚙️</span><div><b>Paramètres du bot</b><small>Connexion, chaîne et configuration générale</small></div><em>›</em></button>
+      <button type="button" onclick="showPage('logs');closeReferenceDrawers()"><span>📋</span><div><b>Diagnostic &amp; logs</b><small>Vérifier le fonctionnement des modules</small></div><em>›</em></button>
+      <button type="button" onclick="showPage('widgets');closeReferenceDrawers()"><span>🧩</span><div><b>Aide sur les widgets</b><small>Configurer les overlays et Song Request</small></div><em>›</em></button>
+      <button type="button" onclick="showPage('commands');closeReferenceDrawers()"><span>💬</span><div><b>Commandes</b><small>Créer et gérer les commandes du chat</small></div><em>›</em></button>
+    </section>
+    <div class="ref-support-card">
+      <span>💙</span>
+      <div><strong>Besoin d'aide supplémentaire ?</strong><small>Consulte les logs puis contacte le support ElBot avec le message affiché.</small></div>
+    </div>
+  </aside>
+</div>
+
+
+<script>
+
+// ══ Personnalisation complète et volume Song Request dashboard ════════════════
+const REF_APPEARANCE_KEY = 'elbot_ref_appearance_v1';
+
+function refGetAppearance() {
+  try { return JSON.parse(localStorage.getItem(REF_APPEARANCE_KEY) || '{}'); }
+  catch (_) { return {}; }
+}
+function refSaveAppearance(patch) {
+  const next = { ...refGetAppearance(), ...patch };
+  localStorage.setItem(REF_APPEARANCE_KEY, JSON.stringify(next));
+  return next;
+}
+function refRefreshThemeButtons(theme) {
+  document.querySelectorAll('[data-ref-theme]').forEach(button => {
+    button.classList.toggle('active', button.dataset.refTheme === theme);
+  });
+}
+function applyReferenceTheme(theme, save = true) {
+  const allowed = ['blue','violet','cyan','red','green','orange'];
+  const value = allowed.includes(theme) ? theme : 'blue';
+  document.body.dataset.refTheme = value;
+  refRefreshThemeButtons(value);
+  if (save) refSaveAppearance({ theme:value });
+}
+function applyReferenceBackground(background, save = true) {
+  const allowed = ['waves','aurora','minimal'];
+  const value = allowed.includes(background) ? background : 'waves';
+  document.body.dataset.refBg = value;
+  if (save) refSaveAppearance({ background:value });
+}
+function toggleReferenceGlow(enabled, save = true) {
+  document.body.classList.toggle('ref-no-glow', !enabled);
+  if (save) refSaveAppearance({ glow:!!enabled });
+}
+function toggleReferenceMotion(enabled, save = true) {
+  document.body.classList.toggle('ref-no-motion', !enabled);
+  if (save) refSaveAppearance({ motion:!!enabled });
+}
+function toggleReferenceCompact(enabled, save = true) {
+  document.body.classList.toggle('ref-compact', !!enabled);
+  if (save) refSaveAppearance({ compact:!!enabled });
+}
+function loadReferenceAppearance() {
+  const saved = refGetAppearance();
+  const theme = saved.theme || 'blue';
+  const background = saved.background || 'waves';
+  const glow = saved.glow !== false;
+  const motion = saved.motion !== false;
+  const compact = saved.compact === true;
+  applyReferenceTheme(theme, false);
+  applyReferenceBackground(background, false);
+  toggleReferenceGlow(glow, false);
+  toggleReferenceMotion(motion, false);
+  toggleReferenceCompact(compact, false);
+  const glowInput = document.getElementById('ref-glow-toggle');
+  const motionInput = document.getElementById('ref-motion-toggle');
+  const compactInput = document.getElementById('ref-compact-toggle');
+  if (glowInput) glowInput.checked = glow;
+  if (motionInput) motionInput.checked = motion;
+  if (compactInput) compactInput.checked = compact;
+}
+function openReferenceDrawer(id) {
+  const backdrop = document.getElementById('ref-drawer-backdrop');
+  if (!backdrop) return;
+  document.querySelectorAll('.ref-customizer-drawer').forEach(drawer => drawer.classList.remove('active'));
+  document.getElementById(id)?.classList.add('active');
+  backdrop.classList.add('open');
+  document.body.style.overflow = 'hidden';
+}
+function openInterfaceCustomizer() { openReferenceDrawer('ref-customizer-drawer'); }
+function openHelpSupport() { openReferenceDrawer('ref-help-drawer'); }
+function closeReferenceDrawers(event) {
+  if (event && event.target !== event.currentTarget) return;
+  document.getElementById('ref-drawer-backdrop')?.classList.remove('open');
+  document.querySelectorAll('.ref-customizer-drawer').forEach(drawer => drawer.classList.remove('active'));
+  document.body.style.overflow = '';
+}
+function resetReferenceAppearance() {
+  localStorage.removeItem(REF_APPEARANCE_KEY);
+  loadReferenceAppearance();
+}
+function refPaintDashboardVolume(value) {
+  const volume = Math.max(0, Math.min(100, Number(value ?? 100)));
+  const slider = document.getElementById('ref-sr-volume-slider');
+  const label = document.getElementById('ref-sr-volume');
+  if (slider) {
+    slider.value = String(volume);
+    slider.style.setProperty('--vol', volume + '%');
+  }
+  if (label) label.textContent = Math.round(volume) + '%';
+}
+function setReferenceSongVolume(value) {
+  const volume = Math.max(0, Math.min(100, Number(value ?? 100)));
+  refPaintDashboardVolume(volume);
+  if (typeof setSongRequestVolumeLive === 'function') {
+    setSongRequestVolumeLive(volume);
+  }
+}
+function commitReferenceSongVolume(value) {
+  const volume = Math.max(0, Math.min(100, Number(value ?? 100)));
+  refPaintDashboardVolume(volume);
+  const settingsSlider = document.getElementById('sr-volume');
+  if (settingsSlider) settingsSlider.value = String(volume);
+  if (typeof flushSongRequestVolume === 'function') {
+    flushSongRequestVolume(true);
+  } else if (typeof sendSongRequestVolume === 'function') {
+    sendSongRequestVolume(volume);
+  }
+}
+document.addEventListener('keydown', event => {
+  if (event.key === 'Escape') closeReferenceDrawers();
+});
+loadReferenceAppearance();
 
 </script>
 </body>
