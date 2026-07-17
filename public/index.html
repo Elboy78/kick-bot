@@ -3644,6 +3644,133 @@ body:has(#page-dashboard.active) .ref-goal-card{
   }
 }
 
+
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   ELBOT V14 — bas de sidebar intégré au thème + Sub Goal centré et agrandi
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* Le bas gauche suit maintenant réellement le thème actif */
+body[data-ref-interface] .ref-sidebar-bottom{
+  background:linear-gradient(180deg,transparent 0%,rgba(3,13,31,.92) 20%,rgba(3,13,31,.98) 100%)!important;
+  border-top-color:var(--theme-panel-border)!important;
+}
+body[data-ref-interface] .ref-sidebar-tool,
+body[data-ref-interface] .sb-profile{
+  background:var(--theme-panel-bg)!important;
+  border-color:var(--theme-panel-border)!important;
+  color:var(--theme-text)!important;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.04),0 10px 24px rgba(0,7,25,.16)!important;
+}
+body[data-ref-interface] .ref-sidebar-tool small,
+body[data-ref-interface] .sb-prof-role,
+body[data-ref-interface] .sb-upd{
+  color:var(--theme-muted)!important;
+}
+body[data-ref-interface] .ref-sidebar-tool-icon{
+  background:var(--theme-soft-bg)!important;
+  border-color:var(--theme-soft-border)!important;
+}
+body[data-ref-interface] .ref-sidebar-tool:hover{
+  border-color:color-mix(in srgb,var(--ref-blue,#1685ff) 55%,transparent)!important;
+  background:color-mix(in srgb,var(--theme-panel-bg) 84%,var(--ref-blue,#1685ff) 16%)!important;
+}
+body[data-ref-interface] .sb-profile{
+  min-height:58px!important;
+}
+body[data-ref-interface] .sb-profile:hover{
+  border-color:color-mix(in srgb,var(--ref-blue,#1685ff) 45%,transparent)!important;
+}
+
+/* Variantes spécifiques pour le bas de sidebar */
+body[data-ref-interface="liquid"] .ref-sidebar-bottom{
+  background:linear-gradient(180deg,transparent,rgba(18,42,72,.68) 22%,rgba(12,28,52,.86) 100%)!important;
+  backdrop-filter:blur(18px)!important;
+  -webkit-backdrop-filter:blur(18px)!important;
+}
+body[data-ref-interface="neon"] .ref-sidebar-bottom{
+  background:linear-gradient(180deg,transparent,rgba(8,5,23,.94) 22%,rgba(3,3,10,.99) 100%)!important;
+}
+body[data-ref-interface="dbd"] .ref-sidebar-bottom{
+  background:linear-gradient(180deg,transparent,rgba(24,20,18,.95) 22%,rgba(7,7,7,.99) 100%)!important;
+}
+body[data-ref-interface="midnight"] .ref-sidebar-bottom{
+  background:linear-gradient(180deg,transparent,#080a0f 22%,#020305 100%)!important;
+}
+body[data-ref-interface="aurora"] .ref-sidebar-bottom{
+  background:linear-gradient(180deg,transparent,rgba(18,36,67,.84) 20%,rgba(25,13,55,.9) 100%)!important;
+}
+
+/* Sub Goal : parfaitement centré et beaucoup plus grand */
+.ref-goal-card{
+  display:grid!important;
+  grid-template-rows:auto minmax(0,1fr) auto!important;
+  place-items:stretch!important;
+  padding:12px!important;
+}
+.ref-goal-card>header{
+  width:100%!important;
+  margin-bottom:0!important;
+}
+.ref-goal-card .ref-goal-ring{
+  width:min(245px,84%)!important;
+  height:min(245px,84%)!important;
+  min-width:190px!important;
+  min-height:190px!important;
+  max-width:245px!important;
+  max-height:245px!important;
+  align-self:center!important;
+  justify-self:center!important;
+  margin:auto!important;
+}
+.ref-goal-ring:after{
+  inset:11px!important;
+}
+.ref-goal-ring strong{
+  font-size:48px!important;
+  line-height:1!important;
+}
+.ref-goal-ring span{
+  margin-top:6px!important;
+  font-size:15px!important;
+}
+.ref-goal-ring small{
+  margin-top:9px!important;
+  font-size:11px!important;
+}
+.ref-goal-card .ref-wide-button{
+  width:100%!important;
+  min-height:42px!important;
+  height:42px!important;
+  margin-top:8px!important;
+  border-radius:10px!important;
+  font-size:10px!important;
+}
+
+/* Rééquilibre légèrement la colonne Sub Goal */
+body:has(#page-dashboard.active) .ref-main-row{
+  grid-template-columns:1fr 1.42fr .9fr!important;
+}
+
+/* Écrans plus bas : reste centré et bien proportionné */
+@media(max-height:820px){
+  .ref-goal-card .ref-goal-ring{
+    width:min(200px,80%)!important;
+    height:min(200px,80%)!important;
+    min-width:165px!important;
+    min-height:165px!important;
+  }
+  .ref-goal-ring strong{font-size:40px!important}
+}
+@media(max-width:1180px){
+  .ref-goal-card .ref-goal-ring{
+    width:180px!important;
+    height:180px!important;
+    min-width:180px!important;
+    min-height:180px!important;
+  }
+}
+
 </style>
     <div class="card" style="margin-bottom:16px"><div class="obs-link-head"><b>🔗 Lien overlay OBS Alertes</b><span><button class="obs-copy-btn" onclick="copyObsUrl('alerts-obs-url')">Copier</button><button class="obs-regenerate-btn" onclick="regenerateObsToken('alerts')">Régénérer</button></span></div><div class="obs-link-row"><code class="obs-link-code" id="alerts-obs-url">/widgets/alerts.html</code></div><div class="alert-mini">Chaque streamer possède son lien privé. Un lien régénéré invalide immédiatement l’ancien.</div></div>
     <div class="card alert-toolbar"><span class="alert-profile-badge">Profil actif</span><select class="inp" id="alert-profile-select" onchange="activateAlertProfile(this.value)"></select><input class="inp" id="alert-profile-name" placeholder="Nouveau profil (Noël, DBD…)"><button class="btnx btn-outline btn-sm" onclick="createAlertProfile()">Créer</button><button class="btnx btn-red btn-sm" onclick="deleteAlertProfile()">Supprimer</button></div>
