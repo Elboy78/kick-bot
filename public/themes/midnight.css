@@ -1,0 +1,14 @@
+:root{
+  --theme-bg:#020712;
+  --theme-wallpaper:url("/assets/themes/midnight.webp?v=20");
+  --theme-overlay:linear-gradient(90deg,rgba(1,6,18,.34),rgba(1,6,18,.06) 60%,rgba(1,6,18,.18));
+  --theme-panel:linear-gradient(145deg,rgba(5,18,43,.54),rgba(2,8,22,.68));
+  --theme-border:rgba(73,139,255,.28);
+  --theme-soft:rgba(46,105,190,.13);
+  --theme-soft-border:rgba(85,151,255,.24);
+  --theme-text:#eef5ff;
+  --theme-muted:#93a8c8;
+  --theme-radius:15px;
+  --theme-accent:#5c9cff;
+  --theme-accent2:#2858b8;
+}

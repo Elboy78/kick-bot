@@ -485,8 +485,8 @@ body.light .card,body.light .panel,body.light .widget-engine-card{background:lin
 </script>
 
 
-<link rel="stylesheet" href="/themes/engine.css?v=19">
-<link rel="stylesheet" id="elbot-active-theme" href="/themes/control.css?v=19">
+<link rel="stylesheet" href="/themes/engine.css?v=20">
+<link rel="stylesheet" id="elbot-active-theme" href="/themes/control.css?v=20">
 </head>
 <body>
 
@@ -10375,6 +10375,58 @@ setInterval(() => {
           <span class="premium-theme-copy"><b>Riot Games</b><small>Esport • Dynamique • Compétitif</small></span>
           <em>Appliquer</em>
         </button>
+      
+        <button type
+
+    <section>
+      <h3>Visibilité du fond</h3>
+      <div class="ref-bg-intensity">
+        <label for="ref-bg-intensity-range">Intensité de l’image</label>
+        <output id="ref-bg-intensity-value">100%</output>
+        <input id="ref-bg-intensity-range" type="range" min="20" max="100" step="5" value="100"
+               oninput="setReferenceBackgroundIntensity(this.value)">
+      </div>
+    </section>
+="button" data-ref-interface="midnight" onclick="applyReferenceInterface('midnight')">
+          <span class="premium-theme-preview" style="background:url('/assets/themes/midnight.webp?v=20') center/cover">
+            <i class="pv-side"></i><i class="pv-top"></i><i class="pv-card a"></i><i class="pv-card b"></i><i class="pv-wide"></i>
+          </span>
+          <span class="premium-theme-copy"><b>Midnight Lake</b><small>Nuit • Lune • Bleu profond</small></span>
+          <em>Appliquer</em>
+        </button>
+
+        <button type="button" data-ref-interface="ocean" onclick="applyReferenceInterface('ocean')">
+          <span class="premium-theme-preview" style="background:url('/assets/themes/ocean.webp?v=20') center/cover">
+            <i class="pv-side"></i><i class="pv-top"></i><i class="pv-card a"></i><i class="pv-card b"></i><i class="pv-wide"></i>
+          </span>
+          <span class="premium-theme-copy"><b>Ocean Blue</b><small>Sous-marin • Profond • Lumineux</small></span>
+          <em>Appliquer</em>
+        </button>
+
+        <button type="button" data-ref-interface="sunset" onclick="applyReferenceInterface('sunset')">
+          <span class="premium-theme-preview" style="background:url('/assets/themes/sunset.webp?v=20') center/cover">
+            <i class="pv-side"></i><i class="pv-top"></i><i class="pv-card a"></i><i class="pv-card b"></i><i class="pv-wide"></i>
+          </span>
+          <span class="premium-theme-copy"><b>Sunset Paradise</b><small>Plage • Orange • Chaleureux</small></span>
+          <em>Appliquer</em>
+        </button>
+
+        <button type="button" data-ref-interface="forest" onclick="applyReferenceInterface('forest')">
+          <span class="premium-theme-preview" style="background:url('/assets/themes/forest.webp?v=20') center/cover">
+            <i class="pv-side"></i><i class="pv-top"></i><i class="pv-card a"></i><i class="pv-card b"></i><i class="pv-wide"></i>
+          </span>
+          <span class="premium-theme-copy"><b>Mystic Forest</b><small>Nature • Magique • Émeraude</small></span>
+          <em>Appliquer</em>
+        </button>
+
+        <button type="button" data-ref-interface="minimal" onclick="applyReferenceInterface('minimal')">
+          <span class="premium-theme-preview" style="background:url('/assets/themes/minimal.webp?v=20') center/cover">
+            <i class="pv-side"></i><i class="pv-top"></i><i class="pv-card a"></i><i class="pv-card b"></i><i class="pv-wide"></i>
+          </span>
+          <span class="premium-theme-copy"><b>Minimal White</b><small>Clair • Élégant • Apaisant</small></span>
+          <em>Appliquer</em>
+        </button>
+
       </div>
     </section>
     <section>
@@ -11052,6 +11104,6 @@ window.addEventListener('pageshow', loadReferenceAppearance);
 
 </script>
 
-<script src="/theme-engine.js?v=19"></script>
+<script src="/theme-engine.js?v=20"></script>
 </body>
 </html>

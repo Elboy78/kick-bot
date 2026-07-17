@@ -1,0 +1,14 @@
+:root{
+  --theme-bg:#00111f;
+  --theme-wallpaper:url("/assets/themes/ocean.webp?v=20");
+  --theme-overlay:linear-gradient(90deg,rgba(0,16,31,.30),rgba(0,16,31,.05) 60%,rgba(0,16,31,.18));
+  --theme-panel:linear-gradient(145deg,rgba(0,49,82,.46),rgba(0,22,39,.62));
+  --theme-border:rgba(55,190,255,.28);
+  --theme-soft:rgba(32,153,211,.12);
+  --theme-soft-border:rgba(65,190,248,.24);
+  --theme-text:#ecfbff;
+  --theme-muted:#93bfd1;
+  --theme-radius:16px;
+  --theme-accent:#26baf2;
+  --theme-accent2:#087eae;
+}
