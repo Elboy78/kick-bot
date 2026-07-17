@@ -580,9 +580,15 @@ body.light .card,body.light .panel,body.light .widget-engine-card{background:lin
 <main class="main">
 
   <header class="elbot-topbar">
-    <button class="elbot-search" type="button" onclick="openSearch()" aria-label="Ouvrir la recherche">
-      <span>⌕</span><span>Rechercher...</span><b>Ctrl + K</b>
-    </button>
+    <div class="elbot-search ref-live-search">
+      <span class="ref-search-icon">⌕</span>
+      <input id="top-search-input" type="search" placeholder="Rechercher..." autocomplete="off"
+        aria-label="Rechercher dans le panel"
+        onfocus="openSearchFromTop(this.value)"
+        oninput="openSearchFromTop(this.value)"
+        onkeydown="handleTopSearchKey(event)">
+      <b>Ctrl + K</b>
+    </div>
     <div class="elbot-top-actions">
       <button class="top-icon" type="button" onclick="setTheme(document.body.classList.contains('light')?'dark':'light')" title="Changer de thème">☾</button>
       <button class="top-icon" type="button" onclick="showPage('widgets')" title="Widgets">⊞</button>
@@ -606,7 +612,9 @@ body.light .card,body.light .panel,body.light .widget-engine-card{background:lin
   </div>
 
   <!-- ══ DASHBOARD — INTERFACE RÉFÉRENCE ══ -->
-  <div class="page active ref-dashboard" id="page-dashboard">
+  <div class="page active ref-dashboard" id="page-dashboard"><section class="ref-shell">
+      <main class="ref-content">
+
     <section class="ref-welcome">
       <div>
         <h1>Bonjour <span id="dashboard-greeting-name">—</span> ! <span class="ref-wave">👋</span></h1>
@@ -619,8 +627,7 @@ body.light .card,body.light .panel,body.light .widget-engine-card{background:lin
       </div>
     </section>
 
-    <section class="ref-shell">
-      <main class="ref-content">
+    
         <section class="ref-kpis">
           <article class="ref-kpi kpi-viewers">
             <div class="ref-kpi-head"><span class="ref-kpi-icon">👥</span><span>Viewers</span></div>
@@ -1783,6 +1790,271 @@ body[data-ref-bg="aurora"]{background:radial-gradient(circle at 42% -10%,color-m
 body[data-ref-bg="minimal"]{background:#020817!important}
 body[data-ref-bg="waves"]:before{content:"";position:fixed;inset:0;z-index:-1;pointer-events:none;background:radial-gradient(ellipse at 57% -5%,rgba(19,107,241,.2),transparent 32%),linear-gradient(130deg,transparent 38%,rgba(12,88,210,.08) 40%,transparent 43%)}
 @media(max-width:700px){.ref-volume-control{grid-template-columns:auto 1fr 30px}.ref-theme-grid{grid-template-columns:1fr}}
+
+
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   ELBOT V6 — plein écran, rail aligné, recherche fonctionnelle,
+   choix d'interfaces complètes.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.main{
+  padding-left:16px!important;
+  padding-right:16px!important;
+}
+.ref-dashboard{
+  max-width:none!important;
+  width:100%!important;
+  margin:0!important;
+}
+.ref-shell{
+  grid-template-columns:minmax(0,1fr) 260px!important;
+  align-items:start!important;
+}
+.ref-content{min-width:0}
+.ref-rail{
+  margin-top:0!important;
+  align-self:start!important;
+}
+.ref-welcome{
+  min-height:65px;
+  margin:0 0 12px!important;
+  padding:0 4px!important;
+  align-items:center!important;
+}
+.ref-primary-actions{
+  justify-content:flex-end;
+  margin-left:auto;
+}
+.ref-primary-actions button{
+  min-width:145px;
+}
+.ref-kpis{width:100%}
+.ref-main-row,.ref-lower-row{width:100%}
+
+/* Search input really usable */
+.ref-live-search{
+  cursor:text!important;
+}
+.ref-live-search input{
+  flex:1;
+  min-width:0;
+  height:100%;
+  border:0;
+  outline:0;
+  background:transparent;
+  color:var(--txt);
+  font:500 10px Inter,Arial,sans-serif;
+}
+.ref-live-search input::placeholder{color:#7f95b2}
+.ref-search-icon{font-size:13px!important;color:#8ba2be}
+.ref-live-search:focus-within{
+  border-color:color-mix(in srgb,var(--ref-blue,#1685ff) 58%,transparent)!important;
+  box-shadow:0 0 0 3px color-mix(in srgb,var(--ref-blue,#1685ff) 10%,transparent),
+             inset 0 1px 0 rgba(255,255,255,.05);
+}
+
+/* Complete interface selector */
+.ref-interface-grid{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:9px;
+}
+.ref-interface-grid>button{
+  padding:9px;
+  border:1px solid rgba(72,140,226,.14);
+  border-radius:11px;
+  background:rgba(26,72,132,.07);
+  color:#c7d7e9;
+  text-align:left;
+  cursor:pointer;
+  transition:.2s ease;
+}
+.ref-interface-grid>button:hover{
+  transform:translateY(-2px);
+  border-color:color-mix(in srgb,var(--ref-blue,#1685ff) 50%,transparent);
+}
+.ref-interface-grid>button.active{
+  border-color:var(--ref-blue,#1685ff);
+  box-shadow:0 0 0 1px color-mix(in srgb,var(--ref-blue,#1685ff) 22%,transparent),
+             0 10px 24px color-mix(in srgb,var(--ref-blue,#1685ff) 14%,transparent);
+}
+.ref-interface-grid b{display:block;margin-top:8px;font-size:9px}
+.ref-interface-grid small{display:block;margin-top:3px;color:#758ba7;font-size:6px}
+.ref-interface-preview{
+  height:61px;
+  display:grid;
+  grid-template-columns:27% 1fr;
+  grid-template-rows:21px 1fr;
+  gap:4px;
+  padding:5px;
+  overflow:hidden;
+  border-radius:8px;
+  background:#061329;
+  border:1px solid rgba(96,157,235,.14);
+}
+.ref-interface-preview i{
+  display:block;
+  border-radius:4px;
+  background:#0d2b5d;
+}
+.ref-interface-preview i:first-child{grid-row:1/3}
+.ref-interface-preview i:nth-child(2){background:#0b234d}
+.ref-interface-preview i:nth-child(3){background:linear-gradient(90deg,#0b2c64,#0b1c3d)}
+.preview-liquid{background:linear-gradient(145deg,#193254,#081426)}
+.preview-liquid i{background:rgba(173,213,255,.18)!important;border:1px solid rgba(204,230,255,.22);backdrop-filter:blur(5px)}
+.preview-neon{background:#03020d;box-shadow:inset 0 0 15px rgba(115,33,255,.23)}
+.preview-neon i{background:#0b0821!important;border:1px solid #6b33ff;box-shadow:0 0 7px #682cff}
+.preview-dbd{background:linear-gradient(145deg,#171312,#050505)}
+.preview-dbd i{background:#211b18!important;border:1px solid rgba(214,58,42,.38)}
+.preview-midnight{background:#020305}.preview-midnight i{background:#0b0d12!important;border:1px solid #22262f}
+.preview-aurora{background:linear-gradient(135deg,#092444,#39136b,#063d48)}
+.preview-aurora i{background:rgba(255,255,255,.11)!important;border:1px solid rgba(255,255,255,.18)}
+
+/* ── CLASSIC ─────────────────────────────────────────────────────────────── */
+body[data-ref-interface="classic"]{
+  --panel-bg:linear-gradient(145deg,rgba(7,29,65,.93),rgba(3,16,38,.94));
+}
+
+/* ── LIQUID GLASS ────────────────────────────────────────────────────────── */
+body[data-ref-interface="liquid"]{
+  background:
+    radial-gradient(circle at 22% 5%,rgba(77,173,255,.20),transparent 28%),
+    radial-gradient(circle at 84% 18%,rgba(135,76,255,.16),transparent 30%),
+    linear-gradient(145deg,#07182b,#020817 58%,#081326)!important;
+}
+body[data-ref-interface="liquid"] .sidebar,
+body[data-ref-interface="liquid"] .elbot-topbar,
+body[data-ref-interface="liquid"] .ref-kpi,
+body[data-ref-interface="liquid"] .ref-panel,
+body[data-ref-interface="liquid"] .ref-sidebar-tool,
+body[data-ref-interface="liquid"] .sb-profile{
+  background:linear-gradient(145deg,rgba(180,218,255,.105),rgba(18,46,79,.16))!important;
+  border-color:rgba(195,225,255,.20)!important;
+  backdrop-filter:blur(26px) saturate(155%)!important;
+  -webkit-backdrop-filter:blur(26px) saturate(155%)!important;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.18),0 20px 50px rgba(0,4,18,.25)!important;
+}
+body[data-ref-interface="liquid"] .ref-kpi:after,
+body[data-ref-interface="liquid"] .ref-panel:after{
+  content:"";
+  position:absolute;
+  inset:0;
+  pointer-events:none;
+  border-radius:inherit;
+  background:linear-gradient(135deg,rgba(255,255,255,.08),transparent 30%);
+}
+
+/* ── NEON ────────────────────────────────────────────────────────────────── */
+body[data-ref-interface="neon"]{
+  background:
+    radial-gradient(circle at 50% -10%,color-mix(in srgb,var(--ref-blue,#7b45ff) 18%,transparent),transparent 33%),
+    #020208!important;
+}
+body[data-ref-interface="neon"] .ref-kpi,
+body[data-ref-interface="neon"] .ref-panel,
+body[data-ref-interface="neon"] .sidebar,
+body[data-ref-interface="neon"] .elbot-topbar{
+  background:linear-gradient(145deg,rgba(10,7,29,.96),rgba(3,4,15,.98))!important;
+  border-color:color-mix(in srgb,var(--ref-blue,#7b45ff) 45%,transparent)!important;
+  box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--ref-blue,#7b45ff) 11%,transparent),
+             0 0 22px color-mix(in srgb,var(--ref-blue,#7b45ff) 13%,transparent)!important;
+}
+body[data-ref-interface="neon"] .ref-title-icon,
+body[data-ref-interface="neon"] .ref-kpi-icon{
+  box-shadow:0 0 18px color-mix(in srgb,var(--ref-blue,#7b45ff) 60%,transparent)!important;
+}
+
+/* ── DBD ─────────────────────────────────────────────────────────────────── */
+body[data-ref-interface="dbd"]{
+  --ref-blue:#d4493e;
+  --accent:#d4493e;
+  --accent2:#87251e;
+  background:
+    repeating-linear-gradient(112deg,transparent 0 48px,rgba(132,27,20,.035) 49px 51px,transparent 52px 95px),
+    radial-gradient(circle at 70% 0,rgba(130,29,22,.13),transparent 34%),
+    linear-gradient(#0c0b0a,#030303)!important;
+}
+body[data-ref-interface="dbd"]:before{
+  content:"";
+  position:fixed;
+  inset:0;
+  pointer-events:none;
+  z-index:-1;
+  opacity:.22;
+  background:
+    linear-gradient(105deg,transparent 45%,rgba(255,255,255,.035) 46%,transparent 47%),
+    radial-gradient(ellipse at 40% 90%,rgba(160,160,150,.09),transparent 35%);
+}
+body[data-ref-interface="dbd"] .sidebar,
+body[data-ref-interface="dbd"] .elbot-topbar,
+body[data-ref-interface="dbd"] .ref-kpi,
+body[data-ref-interface="dbd"] .ref-panel{
+  background:linear-gradient(145deg,rgba(30,25,22,.96),rgba(8,8,8,.98))!important;
+  border-color:rgba(173,64,51,.25)!important;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.035),0 15px 40px rgba(0,0,0,.35)!important;
+}
+body[data-ref-interface="dbd"] .menu a.active{
+  background:linear-gradient(100deg,#8d211c,#45110e)!important;
+  border-color:#bd473c!important;
+}
+body[data-ref-interface="dbd"] .ref-kpi-icon,
+body[data-ref-interface="dbd"] .ref-title-icon{
+  background:linear-gradient(145deg,#8e2b24,#43120f)!important;
+  color:#ffd0ca!important;
+}
+body[data-ref-interface="dbd"] .ref-sparkline:before{
+  filter:none!important;
+  background:linear-gradient(135deg,transparent 0 7%,#b43b31 7% 9%,transparent 9% 17%,#b43b31 17% 20%,transparent 20%)!important;
+}
+
+/* ── MIDNIGHT ────────────────────────────────────────────────────────────── */
+body[data-ref-interface="midnight"]{
+  background:#010204!important;
+}
+body[data-ref-interface="midnight"] .sidebar,
+body[data-ref-interface="midnight"] .elbot-topbar,
+body[data-ref-interface="midnight"] .ref-kpi,
+body[data-ref-interface="midnight"] .ref-panel{
+  background:linear-gradient(145deg,#080a0f,#030406)!important;
+  border-color:#1a2029!important;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.025)!important;
+}
+body[data-ref-interface="midnight"] .ref-kpi:before{display:none}
+
+/* ── AURORA ──────────────────────────────────────────────────────────────── */
+body[data-ref-interface="aurora"]{
+  background:
+    radial-gradient(circle at 20% 0,rgba(19,184,255,.18),transparent 28%),
+    radial-gradient(circle at 74% 8%,rgba(141,56,255,.20),transparent 33%),
+    radial-gradient(circle at 52% 100%,rgba(15,218,164,.10),transparent 38%),
+    #030818!important;
+}
+body[data-ref-interface="aurora"] .sidebar,
+body[data-ref-interface="aurora"] .elbot-topbar,
+body[data-ref-interface="aurora"] .ref-kpi,
+body[data-ref-interface="aurora"] .ref-panel{
+  background:linear-gradient(145deg,rgba(15,43,79,.72),rgba(28,13,62,.60))!important;
+  border-color:rgba(163,147,255,.20)!important;
+  backdrop-filter:blur(22px) saturate(145%)!important;
+}
+body[data-ref-interface="aurora"] .ref-kpi:nth-child(odd){
+  background:linear-gradient(145deg,rgba(12,63,88,.72),rgba(16,20,58,.68))!important;
+}
+
+@media(min-width:1700px){
+  .ref-shell{grid-template-columns:minmax(0,1fr) 285px!important}
+  .ref-primary-actions button{min-width:155px}
+}
+@media(max-width:1250px){
+  .ref-shell{grid-template-columns:1fr!important}
+  .ref-rail{display:grid!important;grid-template-columns:repeat(2,minmax(0,1fr))!important}
+}
+@media(max-width:760px){
+  .ref-interface-grid{grid-template-columns:1fr}
+  .ref-primary-actions{margin-left:0;width:100%}
+  .ref-primary-actions button{min-width:0}
+}
 
 </style>
     <div class="card" style="margin-bottom:16px"><div class="obs-link-head"><b>🔗 Lien overlay OBS Alertes</b><span><button class="obs-copy-btn" onclick="copyObsUrl('alerts-obs-url')">Copier</button><button class="obs-regenerate-btn" onclick="regenerateObsToken('alerts')">Régénérer</button></span></div><div class="obs-link-row"><code class="obs-link-code" id="alerts-obs-url">/widgets/alerts.html</code></div><div class="alert-mini">Chaque streamer possède son lien privé. Un lien régénéré invalide immédiatement l’ancien.</div></div>
@@ -7750,9 +8022,38 @@ setInterval(() => {
       <button type="button" onclick="closeReferenceDrawers()">✕</button>
     </header>
     <section>
-      <h3>Thème principal</h3>
+      <h3>Interface complète</h3>
+      <div class="ref-interface-grid">
+        <button type="button" data-ref-interface="classic" onclick="applyReferenceInterface('classic')">
+          <span class="ref-interface-preview preview-classic"><i></i><i></i><i></i></span>
+          <b>Classic</b><small>Interface actuelle ElBot</small>
+        </button>
+        <button type="button" data-ref-interface="liquid" onclick="applyReferenceInterface('liquid')">
+          <span class="ref-interface-preview preview-liquid"><i></i><i></i><i></i></span>
+          <b>Liquid Glass</b><small>Verre, profondeur et lumière</small>
+        </button>
+        <button type="button" data-ref-interface="neon" onclick="applyReferenceInterface('neon')">
+          <span class="ref-interface-preview preview-neon"><i></i><i></i><i></i></span>
+          <b>Neon</b><small>Contrastes et lueurs gaming</small>
+        </button>
+        <button type="button" data-ref-interface="dbd" onclick="applyReferenceInterface('dbd')">
+          <span class="ref-interface-preview preview-dbd"><i></i><i></i><i></i></span>
+          <b>DBD</b><small>Sombre, brume et griffures</small>
+        </button>
+        <button type="button" data-ref-interface="midnight" onclick="applyReferenceInterface('midnight')">
+          <span class="ref-interface-preview preview-midnight"><i></i><i></i><i></i></span>
+          <b>Midnight</b><small>Noir premium minimal</small>
+        </button>
+        <button type="button" data-ref-interface="aurora" onclick="applyReferenceInterface('aurora')">
+          <span class="ref-interface-preview preview-aurora"><i></i><i></i><i></i></span>
+          <b>Aurora</b><small>Dégradés colorés et doux</small>
+        </button>
+      </div>
+    </section>
+    <section>
+      <h3>Couleur d'accent</h3>
       <div class="ref-theme-grid">
-        <button type="button" data-ref-theme="blue" onclick="applyReferenceTheme('blue')"><i></i><span>Bleu ElBot</span></button>
+        <button type="button" data-ref-theme="blue" onclick="applyReferenceTheme('blue')"><i></i><span>Bleu</span></button>
         <button type="button" data-ref-theme="violet" onclick="applyReferenceTheme('violet')"><i></i><span>Violet</span></button>
         <button type="button" data-ref-theme="cyan" onclick="applyReferenceTheme('cyan')"><i></i><span>Cyan</span></button>
         <button type="button" data-ref-theme="red" onclick="applyReferenceTheme('red')"><i></i><span>Rouge</span></button>
@@ -7844,11 +8145,13 @@ function loadReferenceAppearance() {
   const saved = refGetAppearance();
   const theme = saved.theme || 'blue';
   const background = saved.background || 'waves';
+  const interfaceName = saved.interface || 'classic';
   const glow = saved.glow !== false;
   const motion = saved.motion !== false;
   const compact = saved.compact === true;
   applyReferenceTheme(theme, false);
   applyReferenceBackground(background, false);
+  applyReferenceInterface(interfaceName, false);
   toggleReferenceGlow(glow, false);
   toggleReferenceMotion(motion, false);
   toggleReferenceCompact(compact, false);
@@ -7911,6 +8214,69 @@ document.addEventListener('keydown', event => {
   if (event.key === 'Escape') closeReferenceDrawers();
 });
 loadReferenceAppearance();
+
+</script>
+
+<script>
+
+// ══ ElBot V6 — interfaces complètes et recherche topbar ══════════════════════
+function refRefreshInterfaceButtons(value) {
+  document.querySelectorAll('[data-ref-interface]').forEach(button => {
+    button.classList.toggle('active', button.dataset.refInterface === value);
+  });
+}
+function applyReferenceInterface(name, save = true) {
+  const allowed = ['classic','liquid','neon','dbd','midnight','aurora'];
+  const value = allowed.includes(name) ? name : 'classic';
+  document.body.dataset.refInterface = value;
+  refRefreshInterfaceButtons(value);
+  if (save && typeof refSaveAppearance === 'function') refSaveAppearance({ interface:value });
+}
+function openSearchFromTop(value = '') {
+  const overlay = document.getElementById('search-overlay');
+  const input = document.getElementById('search-input');
+  if (!overlay || !input) return;
+  overlay.classList.add('open');
+  input.value = value || '';
+  input.focus();
+  if (typeof runSearch === 'function') runSearch();
+  if (typeof get === 'function') {
+    get('/api/leaderboard?limit=200')
+      .then(data => { searchViewers = data || []; if (typeof runSearch === 'function') runSearch(); })
+      .catch(() => {});
+  }
+}
+function handleTopSearchKey(event) {
+  if (event.key === 'Escape') {
+    event.currentTarget.value = '';
+    if (typeof closeSearch === 'function') closeSearch();
+    event.currentTarget.blur();
+    return;
+  }
+  if (event.key === 'Enter' || event.key === 'ArrowDown') {
+    openSearchFromTop(event.currentTarget.value);
+  }
+}
+function syncTopSearchFromOverlay() {
+  const topInput = document.getElementById('top-search-input');
+  const overlayInput = document.getElementById('search-input');
+  if (topInput && overlayInput) topInput.value = overlayInput.value;
+}
+document.addEventListener('input', event => {
+  if (event.target?.id === 'search-input') syncTopSearchFromOverlay();
+});
+document.addEventListener('keydown', event => {
+  if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'k') {
+    event.preventDefault();
+    const topInput = document.getElementById('top-search-input');
+    if (topInput) {
+      topInput.focus();
+      openSearchFromTop(topInput.value);
+    } else if (typeof openSearch === 'function') {
+      openSearch();
+    }
+  }
+});
 
 </script>
 </body>
