@@ -2693,6 +2693,270 @@ body:not(:has(#page-dashboard.active)) .main{
   min-height:100vh!important;
 }
 
+
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   ELBOT V10 — cartes mieux remplies, sidebar scrollable, SR direct,
+   vrais fonds d'écran sélectionnables.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* Sidebar: seul le menu scrolle, pas tout le dashboard */
+.sidebar{
+  height:100vh!important;
+  overflow:hidden!important;
+  display:flex!important;
+  flex-direction:column!important;
+}
+.sidebar .menu{
+  flex:1 1 auto!important;
+  min-height:0!important;
+  overflow-y:auto!important;
+  overflow-x:hidden!important;
+  padding-right:4px!important;
+  scrollbar-width:thin;
+  scrollbar-color:rgba(55,132,235,.35) transparent;
+}
+.sidebar .menu::-webkit-scrollbar{width:5px}
+.sidebar .menu::-webkit-scrollbar-thumb{
+  background:rgba(55,132,235,.35);
+  border-radius:999px;
+}
+.sidebar .ref-sidebar-bottom{
+  flex:0 0 auto!important;
+  background:linear-gradient(180deg,transparent,rgba(3,13,31,.96) 18%)!important;
+  padding-top:10px!important;
+}
+
+/* Les contenus prennent réellement leur carte */
+.ref-main-row,.ref-lower-row{
+  align-items:stretch!important;
+}
+.ref-panel{
+  display:flex!important;
+  flex-direction:column!important;
+}
+.ref-panel>header{flex:0 0 auto!important}
+.ref-activity-feed,
+.ref-command-list,
+.ref-alert-list,
+.ref-chest-body,
+.ref-song-body{
+  flex:1 1 auto!important;
+  min-height:0!important;
+}
+
+/* Song Request plus riche et mieux rempli */
+.ref-song-card{
+  padding:12px!important;
+}
+.ref-song-body{
+  display:grid!important;
+  grid-template-columns:minmax(118px,24%) minmax(0,1fr)!important;
+  gap:15px!important;
+  align-items:stretch!important;
+}
+.ref-song-cover{
+  width:100%!important;
+  height:100%!important;
+  min-height:132px!important;
+  max-height:none!important;
+  border-radius:12px!important;
+  font-size:34px!important;
+  box-shadow:0 16px 36px rgba(0,36,104,.38)!important;
+}
+.ref-song-copy{
+  display:flex!important;
+  flex-direction:column!important;
+  justify-content:center!important;
+}
+.ref-song-copy strong{font-size:19px!important}
+.ref-song-copy>span{font-size:11px!important}
+.ref-progress{margin-top:15px!important}
+.ref-player-controls{
+  margin-top:13px!important;
+  gap:17px!important;
+}
+.ref-player-controls button{font-size:15px!important}
+.ref-player-controls .ref-play{
+  width:43px!important;
+  height:43px!important;
+  font-size:16px!important;
+}
+.ref-song-card footer{
+  margin-top:10px!important;
+  padding-top:10px!important;
+}
+.ref-volume-control{
+  min-width:190px!important;
+}
+
+/* Sub Goal: cercle et bouton occupent mieux la carte */
+.ref-goal-card{
+  justify-content:space-between!important;
+}
+.ref-goal-ring{
+  width:min(155px,19vh)!important;
+  height:min(155px,19vh)!important;
+  margin:auto!important;
+}
+.ref-goal-ring strong{font-size:31px!important}
+.ref-wide-button{min-height:36px!important}
+
+/* Coffre mieux réparti */
+.ref-chest-body{
+  grid-template-columns:minmax(150px,1.15fr) minmax(125px,.85fr)!important;
+  align-items:stretch!important;
+}
+.ref-chest-visual{
+  height:auto!important;
+  min-height:120px!important;
+}
+.ref-chest-secure{
+  display:flex!important;
+  flex-direction:column!important;
+  justify-content:center!important;
+}
+.ref-chest-secure button{margin-top:auto!important}
+
+/* Les listes occupent la hauteur sans grand vide central */
+.ref-command-list,.ref-alert-list{
+  display:flex!important;
+  flex-direction:column!important;
+  justify-content:flex-start!important;
+}
+.ref-empty-line{
+  flex:1!important;
+  min-height:0!important;
+}
+.ref-command-list .ref-empty-line,
+.ref-alert-list .ref-empty-line{
+  display:flex!important;
+  align-items:center!important;
+  justify-content:center!important;
+}
+
+/* Fond d'écran : sélecteur */
+.ref-wallpaper-grid{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:9px;
+}
+.ref-wallpaper-grid button{
+  border:1px solid rgba(72,140,226,.14);
+  border-radius:10px;
+  background:rgba(26,72,132,.07);
+  color:#c7d7e9;
+  padding:7px;
+  cursor:pointer;
+  text-align:left;
+  transition:.2s;
+}
+.ref-wallpaper-grid button:hover{transform:translateY(-2px)}
+.ref-wallpaper-grid button.active{
+  border-color:var(--ref-blue,#1685ff);
+  box-shadow:0 0 0 1px color-mix(in srgb,var(--ref-blue,#1685ff) 22%,transparent),
+             0 10px 24px color-mix(in srgb,var(--ref-blue,#1685ff) 14%,transparent);
+}
+.ref-wallpaper-grid b{display:block;margin-top:6px;font-size:8px}
+.ref-wallpaper-preview{
+  display:block;
+  height:64px;
+  border-radius:7px;
+  border:1px solid rgba(255,255,255,.12);
+  overflow:hidden;
+}
+.wallpaper-none{background:#061329}
+.wallpaper-storm{
+  background:
+    linear-gradient(128deg,transparent 38%,rgba(70,160,255,.28) 40%,transparent 43%),
+    radial-gradient(circle at 70% 15%,rgba(31,129,255,.65),transparent 28%),
+    linear-gradient(145deg,#041126,#071c3e);
+}
+.wallpaper-glasswaves{
+  background:
+    linear-gradient(122deg,transparent 30%,rgba(255,255,255,.18) 37%,transparent 45%),
+    radial-gradient(circle at 20% 10%,rgba(93,205,255,.72),transparent 34%),
+    radial-gradient(circle at 80% 30%,rgba(142,87,255,.62),transparent 36%),
+    #071426;
+}
+.wallpaper-neoncity{
+  background:
+    repeating-linear-gradient(90deg,transparent 0 13px,rgba(20,223,255,.16) 14px 15px),
+    linear-gradient(135deg,transparent 48%,rgba(166,42,255,.65) 49%,transparent 51%),
+    #05020d;
+}
+.wallpaper-dbdfog{
+  background:
+    repeating-linear-gradient(111deg,transparent 0 24px,rgba(180,42,32,.30) 25px 27px),
+    radial-gradient(ellipse at 50% 100%,rgba(180,180,170,.32),transparent 46%),
+    linear-gradient(#171310,#040404);
+}
+.wallpaper-aurorasky{
+  background:
+    linear-gradient(120deg,transparent 15%,rgba(39,226,255,.32) 35%,transparent 48%),
+    linear-gradient(138deg,transparent 45%,rgba(164,69,255,.38) 58%,transparent 70%),
+    linear-gradient(#081a31,#090a26);
+}
+
+/* Fonds d'écran réellement affichés au-dessus du fond de thème */
+body[data-ref-wallpaper]:before{
+  content:""!important;
+  position:fixed!important;
+  inset:0!important;
+  z-index:-1!important;
+  pointer-events:none!important;
+  background-size:cover!important;
+  background-position:center!important;
+  opacity:1!important;
+}
+body[data-ref-wallpaper="none"]:before{background:none!important}
+body[data-ref-wallpaper="storm"]:before{
+  background:
+    linear-gradient(128deg,transparent 31%,rgba(60,155,255,.10) 37%,transparent 43%),
+    linear-gradient(138deg,transparent 58%,rgba(25,103,255,.08) 64%,transparent 71%),
+    radial-gradient(circle at 72% 9%,rgba(29,125,255,.28),transparent 30%),
+    radial-gradient(circle at 18% 70%,rgba(11,75,170,.14),transparent 34%)!important;
+}
+body[data-ref-wallpaper="glasswaves"]:before{
+  background:
+    linear-gradient(120deg,transparent 24%,rgba(255,255,255,.055) 34%,transparent 44%),
+    linear-gradient(139deg,transparent 51%,rgba(92,182,255,.08) 59%,transparent 68%),
+    radial-gradient(circle at 18% 5%,rgba(91,201,255,.24),transparent 28%),
+    radial-gradient(circle at 84% 16%,rgba(142,88,255,.22),transparent 31%)!important;
+}
+body[data-ref-wallpaper="neoncity"]:before{
+  background:
+    repeating-linear-gradient(90deg,transparent 0 89px,rgba(17,213,255,.035) 90px 92px),
+    repeating-linear-gradient(0deg,transparent 0 63px,rgba(153,44,255,.025) 64px 66px),
+    linear-gradient(132deg,transparent 44%,rgba(159,40,255,.10) 50%,transparent 57%),
+    radial-gradient(circle at 70% 12%,rgba(16,209,255,.14),transparent 28%)!important;
+}
+body[data-ref-wallpaper="dbdfog"]:before{
+  background:
+    repeating-linear-gradient(111deg,transparent 0 118px,rgba(181,45,34,.07) 119px 122px,transparent 123px 181px),
+    radial-gradient(ellipse at 50% 100%,rgba(175,175,165,.12),transparent 35%),
+    radial-gradient(circle at 78% 7%,rgba(145,35,27,.13),transparent 31%)!important;
+}
+body[data-ref-wallpaper="aurorasky"]:before{
+  background:
+    linear-gradient(118deg,transparent 18%,rgba(31,224,255,.10) 33%,transparent 45%),
+    linear-gradient(136deg,transparent 43%,rgba(159,67,255,.13) 57%,transparent 69%),
+    linear-gradient(148deg,transparent 65%,rgba(39,232,176,.08) 75%,transparent 84%),
+    radial-gradient(circle at 16% 0%,rgba(24,194,255,.18),transparent 28%)!important;
+}
+
+/* Compatibilité écrans moins hauts */
+@media(max-height:800px){
+  .ref-song-cover{min-height:105px!important}
+  .ref-song-copy strong{font-size:17px!important}
+  .ref-goal-ring{width:min(126px,17vh)!important;height:min(126px,17vh)!important}
+}
+@media(max-width:980px){
+  .ref-song-body{grid-template-columns:105px 1fr!important}
+  .ref-song-cover{min-height:105px!important}
+  .ref-wallpaper-grid{grid-template-columns:1fr}
+}
+
 </style>
     <div class="card" style="margin-bottom:16px"><div class="obs-link-head"><b>🔗 Lien overlay OBS Alertes</b><span><button class="obs-copy-btn" onclick="copyObsUrl('alerts-obs-url')">Copier</button><button class="obs-regenerate-btn" onclick="regenerateObsToken('alerts')">Régénérer</button></span></div><div class="obs-link-row"><code class="obs-link-code" id="alerts-obs-url">/widgets/alerts.html</code></div><div class="alert-mini">Chaque streamer possède son lien privé. Un lien régénéré invalide immédiatement l’ancien.</div></div>
     <div class="card alert-toolbar"><span class="alert-profile-badge">Profil actif</span><select class="inp" id="alert-profile-select" onchange="activateAlertProfile(this.value)"></select><input class="inp" id="alert-profile-name" placeholder="Nouveau profil (Noël, DBD…)"><button class="btnx btn-outline btn-sm" onclick="createAlertProfile()">Créer</button><button class="btnx btn-red btn-sm" onclick="deleteAlertProfile()">Supprimer</button></div>
@@ -8599,6 +8863,7 @@ async function loadReferenceSongRequest() {
     set('ref-sr-volume', Math.round(Number(player.volume ?? 100)) + '%');
     if (typeof refPaintDashboardVolume === 'function') refPaintDashboardVolume(player.volume ?? 100);
     const status = String(player.status || 'stopped').toLowerCase();
+    refDashboardSrStatus = status;
     set('ref-sr-active', status === 'playing' ? '● Actif' : status === 'paused' ? '● En pause' : '● Inactif');
     if (typeof updateReferenceSongRequestButton === 'function') updateReferenceSongRequestButton(status);
     set('ref-rail-sr', status === 'playing' ? 'Actif' : status === 'paused' ? 'Pause' : 'Inactif');
@@ -8706,11 +8971,26 @@ setInterval(() => {
       <label class="ref-custom-toggle"><span><b>Interface compacte</b><small>Réduit légèrement les espacements</small></span><input id="ref-compact-toggle" type="checkbox" onchange="toggleReferenceCompact(this.checked)"><i></i></label>
     </section>
     <section>
-      <h3>Fond du panel</h3>
-      <div class="ref-bg-grid">
-        <button type="button" onclick="applyReferenceBackground('waves')">🌊<span>Vagues</span></button>
-        <button type="button" onclick="applyReferenceBackground('aurora')">🌌<span>Aurore</span></button>
-        <button type="button" onclick="applyReferenceBackground('minimal')">◼️<span>Minimal</span></button>
+      <h3>Fond d'écran</h3>
+      <div class="ref-wallpaper-grid">
+        <button type="button" data-ref-wallpaper="none" onclick="applyReferenceWallpaper('none')">
+          <span class="ref-wallpaper-preview wallpaper-none"></span><b>Aucun</b>
+        </button>
+        <button type="button" data-ref-wallpaper="storm" onclick="applyReferenceWallpaper('storm')">
+          <span class="ref-wallpaper-preview wallpaper-storm"></span><b>Tempête bleue</b>
+        </button>
+        <button type="button" data-ref-wallpaper="glasswaves" onclick="applyReferenceWallpaper('glasswaves')">
+          <span class="ref-wallpaper-preview wallpaper-glasswaves"></span><b>Vagues Glass</b>
+        </button>
+        <button type="button" data-ref-wallpaper="neoncity" onclick="applyReferenceWallpaper('neoncity')">
+          <span class="ref-wallpaper-preview wallpaper-neoncity"></span><b>Neon City</b>
+        </button>
+        <button type="button" data-ref-wallpaper="dbdfog" onclick="applyReferenceWallpaper('dbdfog')">
+          <span class="ref-wallpaper-preview wallpaper-dbdfog"></span><b>Brume DBD</b>
+        </button>
+        <button type="button" data-ref-wallpaper="aurorasky" onclick="applyReferenceWallpaper('aurorasky')">
+          <span class="ref-wallpaper-preview wallpaper-aurorasky"></span><b>Ciel Aurora</b>
+        </button>
       </div>
     </section>
     <footer><button type="button" onclick="resetReferenceAppearance()">Réinitialiser l'apparence</button></footer>
@@ -8784,12 +9064,14 @@ function loadReferenceAppearance() {
   const theme = saved.theme || 'blue';
   const background = saved.background || 'waves';
   const interfaceName = saved.interface || 'classic';
+  const wallpaper = saved.wallpaper || 'none';
   const glow = saved.glow !== false;
   const motion = saved.motion !== false;
   const compact = saved.compact === true;
   applyReferenceTheme(theme, false);
   applyReferenceBackground(background, false);
   applyReferenceInterface(interfaceName, false);
+  applyReferenceWallpaper(wallpaper, false);
   toggleReferenceGlow(glow, false);
   toggleReferenceMotion(motion, false);
   toggleReferenceCompact(compact, false);
@@ -9045,25 +9327,6 @@ window.addEventListener('resize', updateReferenceKpiCharts);
 <script>
 
 // ══ ElBot V8 — commandes Song Request directes depuis le Dashboard ═══════════
-async function toggleReferenceSongRequest() {
-  const button = document.getElementById('ref-sr-play-button');
-  if (button) button.disabled = true;
-  try {
-    if (typeof toggleSongRequest === 'function') {
-      await toggleSongRequest();
-    } else if (typeof setSongRequestPlayback === 'function') {
-      const currentlyPlaying = String(window.srPlayer?.status || '').toLowerCase() === 'playing';
-      await setSongRequestPlayback(currentlyPlaying ? 'paused' : 'playing');
-    }
-    await new Promise(resolve => setTimeout(resolve, 200));
-    if (typeof loadReferenceSongRequest === 'function') await loadReferenceSongRequest();
-  } catch (error) {
-    if (typeof toast === 'function') toast('Impossible de modifier la lecture Song Request', false);
-  } finally {
-    if (button) button.disabled = false;
-  }
-}
-
 async function restartReferenceSongRequest() {
   try {
     if (typeof commitSongRequestSeek === 'function') {
@@ -9091,6 +9354,56 @@ function updateReferenceSongRequestButton(status) {
   button.textContent = playing ? '❚❚' : '▶';
   button.classList.toggle('playing', playing);
   button.setAttribute('aria-label', playing ? 'Mettre en pause' : 'Lire');
+}
+
+</script>
+
+<script>
+
+// ══ ElBot V10 — lecture SR directe et fonds d'écran persistants ══════════════
+let refDashboardSrStatus = 'stopped';
+
+function refRefreshWallpaperButtons(value) {
+  document.querySelectorAll('[data-ref-wallpaper]').forEach(button => {
+    button.classList.toggle('active', button.dataset.refWallpaper === value);
+  });
+}
+function applyReferenceWallpaper(name, save = true) {
+  const allowed = ['none','storm','glasswaves','neoncity','dbdfog','aurorasky'];
+  const value = allowed.includes(name) ? name : 'none';
+  document.body.dataset.refWallpaper = value;
+  refRefreshWallpaperButtons(value);
+  if (save && typeof refSaveAppearance === 'function') refSaveAppearance({ wallpaper:value });
+}
+
+async function toggleReferenceSongRequest() {
+  const button = document.getElementById('ref-sr-play-button');
+  const nextStatus = String(refDashboardSrStatus).toLowerCase() === 'playing' ? 'paused' : 'playing';
+  const endpoint = nextStatus === 'playing'
+    ? '/api/admin/widgets/songrequest/play'
+    : '/api/admin/widgets/songrequest/pause';
+
+  if (button) button.disabled = true;
+  try {
+    const response = await fetch(API + endpoint, {
+      method:'POST',
+      headers:{'Content-Type':'application/json'}
+    });
+    const result = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(result.error || 'Impossible de modifier la lecture');
+
+    refDashboardSrStatus = String(result.player?.status || nextStatus).toLowerCase();
+    if (typeof updateReferenceSongRequestButton === 'function') {
+      updateReferenceSongRequestButton(refDashboardSrStatus);
+    }
+    if (typeof loadReferenceSongRequest === 'function') {
+      setTimeout(loadReferenceSongRequest, 180);
+    }
+  } catch (error) {
+    if (typeof toast === 'function') toast(error.message || 'Impossible de modifier la lecture', false);
+  } finally {
+    if (button) button.disabled = false;
+  }
 }
 
 </script>
