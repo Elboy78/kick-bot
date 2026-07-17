@@ -3193,6 +3193,248 @@ body[data-ref-interface="aurora"] .main{
   }
 }
 
+
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   ELBOT V12 — Song Request/Sub Goal pleine carte,
+   thème appliqué à tous les onglets, persistance renforcée.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* ── Song Request : toute la carte est utilisée ─────────────────────────── */
+.ref-song-card{
+  display:grid!important;
+  grid-template-rows:auto minmax(0,1fr) auto!important;
+  min-height:0!important;
+}
+.ref-song-body{
+  height:100%!important;
+  min-height:0!important;
+  display:grid!important;
+  grid-template-columns:minmax(170px,29%) minmax(0,1fr)!important;
+  align-items:stretch!important;
+  gap:18px!important;
+}
+.ref-song-cover{
+  width:100%!important;
+  height:100%!important;
+  min-height:0!important;
+  max-height:none!important;
+  border-radius:14px!important;
+  background-size:cover!important;
+  background-position:center!important;
+}
+.ref-song-copy{
+  min-height:0!important;
+  display:grid!important;
+  grid-template-rows:auto auto auto auto auto 1fr!important;
+  align-content:center!important;
+}
+.ref-song-copy small{font-size:9px!important}
+.ref-song-copy strong{font-size:22px!important}
+.ref-song-copy>span{font-size:12px!important}
+.ref-progress{margin-top:16px!important}
+.ref-song-times{font-size:9px!important}
+.ref-player-controls{
+  align-self:end!important;
+  margin-top:18px!important;
+}
+.ref-player-controls .ref-play{
+  width:54px!important;
+  height:54px!important;
+  font-size:20px!important;
+}
+.ref-song-card footer{
+  margin-top:12px!important;
+  padding-top:12px!important;
+}
+.ref-song-card footer strong{font-size:11px!important}
+.ref-song-card footer small{font-size:9px!important}
+.ref-volume-control{min-width:250px!important}
+
+/* ── Sub Goal : cercle et bouton remplissent la carte ───────────────────── */
+.ref-goal-card{
+  display:grid!important;
+  grid-template-rows:auto minmax(0,1fr) auto!important;
+  min-height:0!important;
+}
+.ref-goal-card .ref-goal-ring{
+  width:min(235px,86%)!important;
+  height:min(235px,86%)!important;
+  max-width:none!important;
+  max-height:none!important;
+  align-self:center!important;
+  justify-self:center!important;
+  margin:0!important;
+}
+.ref-goal-ring strong{font-size:44px!important}
+.ref-goal-ring span{font-size:14px!important}
+.ref-goal-ring small{font-size:11px!important}
+.ref-goal-card .ref-wide-button{
+  width:100%!important;
+  min-height:44px!important;
+  font-size:10px!important;
+}
+
+/* ── Thème appliqué à TOUT le panel, pas seulement au Dashboard ─────────── */
+body[data-ref-interface]{
+  --theme-panel-bg:linear-gradient(145deg,rgba(7,29,65,.94),rgba(3,16,38,.96));
+  --theme-panel-border:rgba(55,132,235,.22);
+  --theme-soft-bg:rgba(20,78,151,.10);
+  --theme-soft-border:rgba(78,150,241,.16);
+  --theme-text:#edf6ff;
+  --theme-muted:#8da3bf;
+}
+body[data-ref-interface] .page,
+body[data-ref-interface] .main,
+body[data-ref-interface] .panel,
+body[data-ref-interface] .card,
+body[data-ref-interface] .modal,
+body[data-ref-interface] .drawer,
+body[data-ref-interface] .settings-card,
+body[data-ref-interface] .widget-card,
+body[data-ref-interface] .config-card,
+body[data-ref-interface] .table-wrap,
+body[data-ref-interface] .form-section,
+body[data-ref-interface] .block,
+body[data-ref-interface] .box{
+  color:var(--theme-text)!important;
+}
+body[data-ref-interface] .panel,
+body[data-ref-interface] .card,
+body[data-ref-interface] .settings-card,
+body[data-ref-interface] .widget-card,
+body[data-ref-interface] .config-card,
+body[data-ref-interface] .table-wrap,
+body[data-ref-interface] .form-section,
+body[data-ref-interface] .block,
+body[data-ref-interface] .box{
+  background:var(--theme-panel-bg)!important;
+  border-color:var(--theme-panel-border)!important;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.04),0 14px 34px rgba(0,7,25,.16)!important;
+}
+body[data-ref-interface] input,
+body[data-ref-interface] select,
+body[data-ref-interface] textarea,
+body[data-ref-interface] .input,
+body[data-ref-interface] .select{
+  background:var(--theme-soft-bg)!important;
+  border-color:var(--theme-soft-border)!important;
+  color:var(--theme-text)!important;
+}
+body[data-ref-interface] table,
+body[data-ref-interface] th,
+body[data-ref-interface] td{
+  border-color:var(--theme-soft-border)!important;
+}
+body[data-ref-interface] th{
+  background:var(--theme-soft-bg)!important;
+}
+body[data-ref-interface] p,
+body[data-ref-interface] small,
+body[data-ref-interface] .muted,
+body[data-ref-interface] .sub,
+body[data-ref-interface] .desc{
+  color:var(--theme-muted)!important;
+}
+
+/* Liquid Glass sur tous les onglets */
+body[data-ref-interface="liquid"]{
+  --theme-panel-bg:linear-gradient(145deg,rgba(190,224,255,.11),rgba(20,47,80,.16));
+  --theme-panel-border:rgba(198,228,255,.22);
+  --theme-soft-bg:rgba(177,215,255,.09);
+  --theme-soft-border:rgba(210,233,255,.18);
+}
+body[data-ref-interface="liquid"] .panel,
+body[data-ref-interface="liquid"] .card,
+body[data-ref-interface="liquid"] .settings-card,
+body[data-ref-interface="liquid"] .widget-card,
+body[data-ref-interface="liquid"] .config-card,
+body[data-ref-interface="liquid"] .table-wrap,
+body[data-ref-interface="liquid"] .form-section,
+body[data-ref-interface="liquid"] .block,
+body[data-ref-interface="liquid"] .box{
+  backdrop-filter:blur(24px) saturate(155%)!important;
+  -webkit-backdrop-filter:blur(24px) saturate(155%)!important;
+}
+
+/* Neon sur tous les onglets */
+body[data-ref-interface="neon"]{
+  --theme-panel-bg:linear-gradient(145deg,rgba(12,8,31,.96),rgba(3,4,15,.98));
+  --theme-panel-border:color-mix(in srgb,var(--ref-blue,#8a4dff) 46%,transparent);
+  --theme-soft-bg:color-mix(in srgb,var(--ref-blue,#8a4dff) 9%,rgba(7,5,20,.9));
+  --theme-soft-border:color-mix(in srgb,var(--ref-blue,#8a4dff) 36%,transparent);
+}
+body[data-ref-interface="neon"] .panel,
+body[data-ref-interface="neon"] .card,
+body[data-ref-interface="neon"] .settings-card,
+body[data-ref-interface="neon"] .widget-card,
+body[data-ref-interface="neon"] .config-card,
+body[data-ref-interface="neon"] .table-wrap,
+body[data-ref-interface="neon"] .form-section,
+body[data-ref-interface="neon"] .block,
+body[data-ref-interface="neon"] .box{
+  box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--ref-blue,#8a4dff) 10%,transparent),
+             0 0 22px color-mix(in srgb,var(--ref-blue,#8a4dff) 13%,transparent)!important;
+}
+
+/* DBD sur tous les onglets */
+body[data-ref-interface="dbd"]{
+  --theme-panel-bg:linear-gradient(145deg,rgba(31,26,23,.97),rgba(8,8,8,.98));
+  --theme-panel-border:rgba(176,66,52,.26);
+  --theme-soft-bg:rgba(104,31,24,.12);
+  --theme-soft-border:rgba(176,66,52,.22);
+  --theme-muted:#a99690;
+}
+body[data-ref-interface="dbd"] .panel,
+body[data-ref-interface="dbd"] .card,
+body[data-ref-interface="dbd"] .settings-card,
+body[data-ref-interface="dbd"] .widget-card,
+body[data-ref-interface="dbd"] .config-card,
+body[data-ref-interface="dbd"] .table-wrap,
+body[data-ref-interface="dbd"] .form-section,
+body[data-ref-interface="dbd"] .block,
+body[data-ref-interface="dbd"] .box{
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.025),0 16px 40px rgba(0,0,0,.34)!important;
+}
+
+/* Midnight sur tous les onglets */
+body[data-ref-interface="midnight"]{
+  --theme-panel-bg:linear-gradient(145deg,#090b10,#030406);
+  --theme-panel-border:#1c222c;
+  --theme-soft-bg:#0b0e14;
+  --theme-soft-border:#232a35;
+  --theme-muted:#7f8996;
+}
+
+/* Aurora sur tous les onglets */
+body[data-ref-interface="aurora"]{
+  --theme-panel-bg:linear-gradient(145deg,rgba(13,58,82,.74),rgba(34,15,72,.66));
+  --theme-panel-border:rgba(167,150,255,.21);
+  --theme-soft-bg:rgba(112,94,190,.10);
+  --theme-soft-border:rgba(160,145,242,.18);
+}
+
+/* Toutes les pages gardent bien le fond du thème */
+body[data-ref-interface] .main{
+  background-attachment:fixed!important;
+}
+body[data-ref-interface] .page{
+  min-height:calc(100vh - 58px);
+}
+
+/* Sur écrans moins hauts, on conserve un remplissage harmonieux */
+@media(max-height:820px){
+  .ref-song-body{
+    grid-template-columns:minmax(130px,26%) minmax(0,1fr)!important;
+  }
+  .ref-song-cover{min-height:0!important}
+  .ref-song-copy strong{font-size:19px!important}
+  .ref-goal-card .ref-goal-ring{
+    width:min(180px,80%)!important;
+    height:min(180px,80%)!important;
+  }
+}
+
 </style>
     <div class="card" style="margin-bottom:16px"><div class="obs-link-head"><b>🔗 Lien overlay OBS Alertes</b><span><button class="obs-copy-btn" onclick="copyObsUrl('alerts-obs-url')">Copier</button><button class="obs-regenerate-btn" onclick="regenerateObsToken('alerts')">Régénérer</button></span></div><div class="obs-link-row"><code class="obs-link-code" id="alerts-obs-url">/widgets/alerts.html</code></div><div class="alert-mini">Chaque streamer possède son lien privé. Un lien régénéré invalide immédiatement l’ancien.</div></div>
     <div class="card alert-toolbar"><span class="alert-profile-badge">Profil actif</span><select class="inp" id="alert-profile-select" onchange="activateAlertProfile(this.value)"></select><input class="inp" id="alert-profile-name" placeholder="Nouveau profil (Noël, DBD…)"><button class="btnx btn-outline btn-sm" onclick="createAlertProfile()">Créer</button><button class="btnx btn-red btn-sm" onclick="deleteAlertProfile()">Supprimer</button></div>
@@ -9373,7 +9615,6 @@ function commitReferenceSongVolume(value) {
 document.addEventListener('keydown', event => {
   if (event.key === 'Escape') closeReferenceDrawers();
 });
-loadReferenceAppearance();
 
 </script>
 
@@ -9704,6 +9945,73 @@ function refStartSongProgressAnimation() {
   }, 1000);
 }
 refStartSongProgressAnimation();
+
+</script>
+
+<script>
+
+// ══ ElBot V12 — persistance fiable du thème et de l'apparence ═══════════════
+function refNormalizeAppearance(saved = {}) {
+  return {
+    interface: saved.interface || 'classic',
+    theme: saved.theme || 'blue',
+    wallpaper: saved.wallpaper || (typeof REF_INTERFACE_WALLPAPER !== 'undefined'
+      ? (REF_INTERFACE_WALLPAPER[saved.interface || 'classic'] || 'storm')
+      : 'storm'),
+    background: saved.background || 'waves',
+    glow: saved.glow !== false,
+    motion: saved.motion !== false,
+    compact: saved.compact === true
+  };
+}
+
+function refSaveAppearance(patch) {
+  const current = refNormalizeAppearance(refGetAppearance());
+  const next = { ...current, ...patch };
+  try {
+    localStorage.setItem(REF_APPEARANCE_KEY, JSON.stringify(next));
+  } catch (_) {}
+  return next;
+}
+
+function loadReferenceAppearance() {
+  const saved = refNormalizeAppearance(refGetAppearance());
+
+  if (typeof applyReferenceTheme === 'function') {
+    applyReferenceTheme(saved.theme, false);
+  }
+  if (typeof applyReferenceInterface === 'function') {
+    applyReferenceInterface(saved.interface, false);
+  }
+  if (typeof applyReferenceWallpaper === 'function') {
+    applyReferenceWallpaper(saved.wallpaper, false);
+  }
+  if (typeof applyReferenceBackground === 'function') {
+    applyReferenceBackground(saved.background, false);
+  }
+  if (typeof toggleReferenceGlow === 'function') {
+    toggleReferenceGlow(saved.glow, false);
+  }
+  if (typeof toggleReferenceMotion === 'function') {
+    toggleReferenceMotion(saved.motion, false);
+  }
+  if (typeof toggleReferenceCompact === 'function') {
+    toggleReferenceCompact(saved.compact, false);
+  }
+
+  const glowInput = document.getElementById('ref-glow-toggle');
+  const motionInput = document.getElementById('ref-motion-toggle');
+  const compactInput = document.getElementById('ref-compact-toggle');
+  if (glowInput) glowInput.checked = saved.glow;
+  if (motionInput) motionInput.checked = saved.motion;
+  if (compactInput) compactInput.checked = saved.compact;
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  loadReferenceAppearance();
+  setTimeout(loadReferenceAppearance, 50);
+});
+window.addEventListener('pageshow', loadReferenceAppearance);
 
 </script>
 </body>
