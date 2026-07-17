@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Bot7uP Dashboard</title>
+<title>ElBot — Panel de contrôle</title>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <style>
 *{margin:0;padding:0;box-sizing:border-box;font-family:Inter,Arial,sans-serif}
@@ -362,6 +362,104 @@ hr.div{border:none;border-top:1px solid var(--brd);margin:12px 0}
 .widget-engine-actions{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-top:10px;position:relative}
 .widget-engine-actions button{justify-content:center;min-height:35px}
 
+/* ═══════════════════════════════════════════════════════════════
+   ELBOT LIQUID GLASS — interface officielle
+   Les sélecteurs fonctionnels historiques restent inchangés.
+   ═══════════════════════════════════════════════════════════════ */
+:root{
+  --bg:#020817;--bg2:#071a39;--side:rgba(3,12,29,.68);
+  --card:rgba(7,21,48,.58);--card2:rgba(10,30,64,.54);
+  --brd:rgba(117,178,255,.13);--brd2:rgba(120,182,255,.18);--brd3:rgba(135,195,255,.24);
+  --text:#f7fbff;--muted:#95a8c6;--muted2:#627493;
+  --accent:#1597ff;--accent-l:#55c8ff;--accent-bg:rgba(21,151,255,.14);--accent-brd:rgba(69,174,255,.5);
+  --accent-grad1:#1479ff;--accent-grad2:#064fd6;
+  --glass-highlight:rgba(255,255,255,.10);--glass-shadow:0 24px 70px rgba(0,5,20,.38);
+}
+html{background:#020817}
+body{
+  background:
+    radial-gradient(900px 620px at 58% -8%,rgba(15,106,255,.30),transparent 62%),
+    radial-gradient(700px 520px at 84% 48%,rgba(0,140,255,.15),transparent 68%),
+    linear-gradient(145deg,#020713 0%,#041128 45%,#020817 100%);
+  background-attachment:fixed;overflow-x:hidden
+}
+body:before,body:after{content:'';position:fixed;pointer-events:none;z-index:-1;filter:blur(1px)}
+body:before{inset:-20% -10% auto 36%;height:70vh;background:linear-gradient(125deg,transparent 33%,rgba(30,116,255,.17) 34% 38%,transparent 39% 48%,rgba(25,93,220,.12) 49% 55%,transparent 56%);transform:rotate(-8deg)}
+body:after{width:520px;height:520px;border-radius:50%;right:-180px;bottom:-220px;background:rgba(30,138,255,.10);filter:blur(80px)}
+body.light{--bg:#eaf3ff;--bg2:#dcecff;--side:rgba(244,249,255,.70);--card:rgba(255,255,255,.60);--card2:rgba(255,255,255,.46);--brd:rgba(52,101,166,.13);--brd2:rgba(52,101,166,.18);--brd3:rgba(52,101,166,.25);--text:#08162c;--muted:#50627d;--muted2:#7d8ca4;background:radial-gradient(900px 620px at 58% -8%,rgba(42,145,255,.25),transparent 62%),linear-gradient(145deg,#e9f3ff,#dcecff 52%,#eff7ff)}
+
+/* Verre liquide partagé */
+.sidebar,.elbot-topbar,.card,.panel,.bot-status,.sb-profile,.btn,.inp,.widget-engine-card,#search-overlay>div{
+  -webkit-backdrop-filter:blur(24px) saturate(155%);backdrop-filter:blur(24px) saturate(155%);
+  box-shadow:inset 0 1px 0 var(--glass-highlight),var(--glass-shadow)
+}
+.card,.panel,.widget-engine-card{position:relative;overflow:hidden;background:linear-gradient(145deg,rgba(15,42,86,.64),rgba(4,15,37,.52));border:1px solid var(--brd2)}
+.card:before,.panel:before,.widget-engine-card:before{content:'';position:absolute;inset:0;pointer-events:none;background:linear-gradient(120deg,rgba(255,255,255,.075),transparent 24% 76%,rgba(68,157,255,.045));opacity:.85}
+body.light .card,body.light .panel,body.light .widget-engine-card{background:linear-gradient(145deg,rgba(255,255,255,.78),rgba(236,246,255,.48))}
+
+/* Navigation */
+.sidebar{width:224px;padding:18px 14px 16px;background:linear-gradient(180deg,rgba(4,15,37,.76),rgba(3,12,29,.58));border:1px solid rgba(124,187,255,.14);border-left:0;border-radius:0 22px 22px 0;z-index:100;scrollbar-width:none}
+.sidebar::-webkit-scrollbar{display:none}
+.logo{height:62px;margin:0 7px 12px;padding-bottom:14px;border-bottom:1px solid rgba(125,181,255,.12);font-size:25px;letter-spacing:-1px}
+.logo-mark{position:relative;width:33px;height:43px;display:inline-grid;place-items:center;color:#fff;font-size:24px;filter:drop-shadow(0 0 14px rgba(22,151,255,.7))}
+.logo-mark:before{content:'';position:absolute;inset:0;background:linear-gradient(150deg,#12c8ff,#1765ff 62%,#0b36c7);clip-path:polygon(35% 0,92% 0,65% 41%,95% 41%,20% 100%,37% 56%,5% 56%)}
+.logo-word span{color:#fff}.logo-word small{display:block;font-size:9px;letter-spacing:.2px;color:var(--muted);font-weight:500;margin-top:2px}
+.menu a{position:relative;min-height:39px;padding:10px 12px;margin:2px 0;border-radius:11px;color:#c9d7eb;font-size:11.5px;transition:.2s}
+.menu a:hover{background:rgba(37,130,255,.13);color:#fff;font-weight:600;transform:translateX(2px)}
+.menu a.active{background:linear-gradient(105deg,rgba(21,137,255,.92),rgba(9,81,218,.78));color:#fff;font-weight:700;border:1px solid rgba(111,198,255,.35);box-shadow:inset 0 1px 0 rgba(255,255,255,.2),0 8px 22px rgba(0,91,255,.25)}
+.menu a.active:after{content:'';position:absolute;width:5px;height:5px;border-radius:50%;right:11px;background:#6ac8ff;box-shadow:0 0 9px #38aaff}
+.menu-section{margin:13px 12px 4px;color:#617694;font-size:8px}
+#stream-mode-btn{margin:0 0 7px!important;justify-content:center;background:rgba(15,91,184,.12)}
+.bot-status{border-color:rgba(41,157,255,.22);background:rgba(7,27,58,.45);border-radius:13px;padding:12px;margin-top:13px}
+.sb-bottom{padding-top:10px}.sb-profile{background:rgba(8,30,64,.52);border-color:rgba(119,181,255,.16)}
+.sb-prof-avatar{background:linear-gradient(145deg,#178fff,#073dad);box-shadow:0 0 18px rgba(20,133,255,.32)}
+
+/* Surface principale et barre supérieure */
+.main{margin-left:224px;padding:15px 20px 26px;background:transparent;min-width:0}
+.elbot-topbar{position:sticky;top:10px;z-index:90;height:52px;margin:0 0 17px;display:flex;align-items:center;gap:12px;padding:7px 10px 7px 14px;border:1px solid rgba(125,187,255,.14);border-radius:16px;background:linear-gradient(110deg,rgba(7,23,52,.72),rgba(5,17,39,.50))}
+.elbot-search{display:flex;align-items:center;gap:9px;width:min(330px,32vw);height:36px;padding:0 11px;border:1px solid rgba(131,190,255,.13);border-radius:11px;background:rgba(4,16,38,.46);color:var(--muted);cursor:pointer}
+.elbot-search span{font-size:12px}.elbot-search b{margin-left:auto;padding:3px 6px;border-radius:5px;background:rgba(112,164,224,.10);font-size:8px;color:#91a4c0;font-weight:600}
+.elbot-top-actions{margin-left:auto;display:flex;align-items:center;gap:5px}.top-icon{width:34px;height:34px;border:0;background:transparent;color:#dce8f8;border-radius:10px;cursor:pointer;font-size:15px}.top-icon:hover{background:rgba(45,139,255,.13)}
+.top-profile{height:38px;min-width:160px;display:flex;align-items:center;gap:9px;padding:4px 10px 4px 5px;border:1px solid rgba(120,182,255,.13);border-radius:13px;background:rgba(6,21,48,.46)}
+.top-profile-avatar{width:28px;height:28px;border-radius:50%;display:grid;place-items:center;background:linear-gradient(145deg,#1b93ff,#073cb4);font-weight:800;font-size:10px;box-shadow:0 0 15px rgba(31,147,255,.25)}
+.top-profile strong{font-size:10px}.top-profile small{display:block;color:var(--muted);font-size:8px;margin-top:1px}
+
+/* Dashboard */
+#page-dashboard{max-width:1600px;margin:0 auto}
+#page-dashboard .header{margin-bottom:15px;padding:0 4px}
+#page-dashboard .header h1{font-size:22px;letter-spacing:-.55px}
+#page-dashboard .header p{font-size:11px;color:#91a4c0}
+#page-dashboard .header-right{gap:8px}
+.btn{background:linear-gradient(145deg,rgba(20,51,96,.62),rgba(5,19,45,.48));border-color:rgba(124,187,255,.16);border-radius:11px;color:#eaf4ff}
+.btn:hover{border-color:rgba(48,161,255,.55);background:rgba(16,74,146,.42);transform:translateY(-1px)}
+.btn-connected{color:#55e996;background:rgba(25,174,101,.10);border-color:rgba(50,219,132,.25)}
+.cards{gap:10px;margin-bottom:12px}.card{min-height:123px;border-radius:15px;padding:15px 15px 13px}
+.card:hover{border-color:rgba(61,163,255,.48);transform:translateY(-2px);box-shadow:inset 0 1px 0 rgba(255,255,255,.12),0 20px 45px rgba(0,71,170,.16)}
+.card .icon{float:left;width:36px;height:36px;margin:0 10px 9px 0;border-radius:11px;background:linear-gradient(145deg,rgba(28,139,255,.90),rgba(4,61,173,.9));box-shadow:0 7px 18px rgba(0,100,255,.24),inset 0 1px 0 rgba(255,255,255,.2)}
+.card p{padding-top:2px;font-size:9px;text-transform:uppercase;letter-spacing:.35px}.card h2{clear:both;font-size:24px;margin:6px 0 3px}.card .green{padding:0;color:#37df8b;text-transform:none;letter-spacing:0;font-size:9px}
+.grid{grid-template-columns:1.55fr 1fr .86fr;gap:12px}.bottom{grid-template-columns:1.35fr 1fr .8fr;gap:12px;margin-top:12px}
+.panel{border-radius:15px;padding:16px}.panel h3{font-size:12px;margin-bottom:12px}.chart{height:195px;border-radius:10px;background:linear-gradient(180deg,rgba(20,117,255,.025),rgba(20,117,255,.13));border-bottom-color:rgba(49,151,255,.25)}
+.chart-bar{background:linear-gradient(180deg,#42bcff,#0964ff 55%,rgba(4,77,211,.3));box-shadow:0 0 12px rgba(24,140,255,.16)}
+.quick{gap:7px}.quick button{min-height:72px;padding:12px 10px;border:1px solid rgba(123,188,255,.13);border-radius:11px;background:linear-gradient(145deg,rgba(15,64,129,.62),rgba(7,25,56,.52));font-size:10px;color:#eaf4ff}.quick button .qi{font-size:16px}.quick button:hover{border-color:rgba(44,160,255,.5);background:linear-gradient(145deg,rgba(18,106,212,.65),rgba(7,42,98,.58))}
+.commands li,.events li,.info li,.cmd-row{border-color:rgba(115,172,236,.10)}
+.bar{background:rgba(99,145,204,.12)}.bar span{background:linear-gradient(90deg,#0877ff,#42c5ff)}
+.cpill{background:rgba(12,112,255,.13);border-color:rgba(55,155,255,.25);color:#55c7ff}
+.donut{filter:drop-shadow(0 0 22px rgba(25,132,255,.18))}.donut div{background:#071632}
+.online{color:#46e996}
+.inp{background:rgba(5,20,47,.55);border-color:rgba(125,187,255,.18)}
+.inp:focus{border-color:#219eff;box-shadow:0 0 0 3px rgba(24,147,255,.12)}
+
+/* Pages secondaires : même langage visuel */
+.page>.header:not(#page-dashboard .header){padding:4px}.page>.panel,.page>.g2>.panel,.g2>.panel{box-shadow:inset 0 1px 0 rgba(255,255,255,.075),0 20px 55px rgba(0,5,20,.25)}
+.btn-primary{background:linear-gradient(135deg,#168fff,#0757d8);color:#fff;box-shadow:0 8px 20px rgba(0,102,255,.24)}
+.btn-outline{background:rgba(15,137,255,.1);color:#57c2ff;border-color:rgba(38,157,255,.3)}
+.btn-ghost{background:rgba(7,27,58,.45);border-color:rgba(122,183,255,.18)}
+.toggle input:checked+.tsl{background:rgba(22,145,255,.22);border-color:#1998ff}.toggle input:checked+.tsl:before{background:#52c9ff;box-shadow:0 0 10px #1998ff}
+
+@media(max-width:1180px){.cards{grid-template-columns:repeat(3,1fr)}.grid,.bottom{grid-template-columns:1fr 1fr}.grid>.panel:first-child,.bottom>.panel:first-child{grid-column:1/-1}}
+@media(max-width:850px){.sidebar{display:none}.main{margin-left:0;padding:10px}.elbot-topbar{top:5px}.elbot-search{width:44px}.elbot-search span:not(:first-child),.elbot-search b{display:none}.top-profile{min-width:0}.top-profile>div:nth-child(2){display:none}.cards{grid-template-columns:1fr 1fr}.grid,.bottom{grid-template-columns:1fr}.grid>.panel:first-child,.bottom>.panel:first-child{grid-column:auto}}
+@media(max-width:520px){.cards{grid-template-columns:1fr}.header-right{width:100%}.header-right .btn{flex:1;justify-content:center}.top-icon:nth-child(-n+2){display:none}}
+
 </style>
 
 <script>
@@ -423,7 +521,7 @@ hr.div{border:none;border-top:1px solid var(--brd);margin:12px 0}
 </div>
 
 <aside class="sidebar">
-  <div class="logo">🤖 Bot7uP</div>
+  <div class="logo"><span class="logo-mark" aria-hidden="true"></span><span class="logo-word"><span>ElBot</span><small>Panel de contrôle</small></span></div>
   <button class="sb-btnx" id="stream-mode-btn" onclick="toggleStreamMode()" style="margin:6px 0 4px">🎥 Mode stream</button>
   <nav class="menu">
     <a class="active" onclick="showPage('dashboard')">🏠 Dashboard</a>
@@ -470,6 +568,23 @@ hr.div{border:none;border-top:1px solid var(--brd);margin:12px 0}
 </aside>
 
 <main class="main">
+
+  <header class="elbot-topbar">
+    <button class="elbot-search" type="button" onclick="openSearch()" aria-label="Ouvrir la recherche">
+      <span>⌕</span><span>Rechercher...</span><b>Ctrl + K</b>
+    </button>
+    <div class="elbot-top-actions">
+      <button class="top-icon" type="button" onclick="setTheme(document.body.classList.contains('light')?'dark':'light')" title="Changer de thème">☾</button>
+      <button class="top-icon" type="button" onclick="showPage('widgets')" title="Widgets">⊞</button>
+      <button class="top-icon" type="button" onclick="showPage('alertes')" title="Alertes">♧</button>
+      <button class="top-icon" type="button" onclick="showPage('settings')" title="Aide et paramètres">?</button>
+      <button class="top-profile" type="button" onclick="showPage('settings')">
+        <span class="top-profile-avatar" id="top-prof-avatar">E</span>
+        <span><strong id="top-prof-name">ElBot</strong><small>Streamer</small></span>
+        <span style="margin-left:auto;color:var(--muted)">⌄</span>
+      </button>
+    </div>
+  </header>
 
   <div id="token-alert-banner" style="display:none;background:linear-gradient(135deg,rgba(255,59,95,.15),rgba(255,59,95,.05));border:1px solid rgba(255,59,95,.4);border-radius:12px;padding:12px 16px;margin-bottom:18px;display:none;align-items:center;gap:12px">
     <span style="font-size:20px">⚠️</span>
@@ -2058,15 +2173,17 @@ async function loadConnectedStreamerIdentity() {
     setText('dashboard-greeting-name', displayName);
     setText('sb-channel', activeKickChannel || '—');
     setText('prof-name', displayName);
+    setText('top-prof-name', displayName);
 
     const avatar = document.getElementById('prof-avatar');
-    if (avatar) {
-      avatar.textContent = '';
-      avatar.style.backgroundImage = avatarUrl ? `url("${String(avatarUrl).replace(/"/g, '%22')}")` : '';
-      avatar.style.backgroundSize = 'cover';
-      avatar.style.backgroundPosition = 'center';
-      if (!avatarUrl) avatar.textContent = displayName.charAt(0).toUpperCase() || '?';
-    }
+    const topAvatar = document.getElementById('top-prof-avatar');
+    [avatar, topAvatar].filter(Boolean).forEach(el => {
+      el.textContent = '';
+      el.style.backgroundImage = avatarUrl ? `url("${String(avatarUrl).replace(/"/g, '%22')}")` : '';
+      el.style.backgroundSize = 'cover';
+      el.style.backgroundPosition = 'center';
+      if (!avatarUrl) el.textContent = displayName.charAt(0).toUpperCase() || '?';
+    });
     return profile;
   } catch (e) {
     console.warn('[PANEL] Identité Kick indisponible:', e.message);
@@ -6543,7 +6660,7 @@ const TRANSLATIONS = {
 };
 let currentLang = localStorage.getItem('bot7up_lang') || 'fr';
 let currentTheme = localStorage.getItem('bot7up_theme') || 'dark';
-let currentAccent = localStorage.getItem('bot7up_accent') || '#28ff66';
+let currentAccent = localStorage.getItem('bot7up_accent') || '#1597ff';
 
 function initSettings() {
   const ls = document.getElementById('lang-select');
@@ -6889,7 +7006,7 @@ function toggleNotifs(enabled) {
 function resetSettings() {
   if(!confirm('Réinitialiser tous les paramètres ?')) return;
   ['bot7up_lang','bot7up_theme','bot7up_accent','bot7up_fontsize','bot7up_notifs'].forEach(k => localStorage.removeItem(k));
-  currentLang = 'fr'; currentTheme = 'dark'; currentAccent = '#28ff66';
+  currentLang = 'fr'; currentTheme = 'dark'; currentAccent = '#1597ff';
   document.body.classList.remove('light');
   document.body.style.fontSize = '';
   document.documentElement.style.removeProperty('--accent');
@@ -6903,7 +7020,7 @@ function resetSettings() {
 // Appliquer les préférences sauvegardées au chargement
 function applyStoredPrefs() {
   if(currentTheme === 'light') document.body.classList.add('light');
-  if(currentAccent !== '#28ff66') applyAccent(currentAccent, false);
+  if(currentAccent !== '#1597ff') applyAccent(currentAccent, false);
   const fs = localStorage.getItem('bot7up_fontsize');
   if(fs) document.body.style.fontSize = fs + 'px';
   if(currentLang !== 'fr') setLanguage(currentLang);
