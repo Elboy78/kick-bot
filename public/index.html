@@ -3771,6 +3771,159 @@ body:has(#page-dashboard.active) .ref-main-row{
   }
 }
 
+
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   ELBOT V15 — Sub Goal recentré et agrandi, logs et sidebar plus lisibles
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* ── SUB GOAL : centre réel et diamètre encore augmenté ─────────────────── */
+.ref-goal-card{
+  position:relative!important;
+  display:grid!important;
+  grid-template-rows:auto minmax(0,1fr) auto!important;
+  align-items:stretch!important;
+}
+.ref-goal-card>header{
+  position:relative!important;
+  z-index:2!important;
+}
+.ref-goal-card .ref-goal-ring{
+  width:min(270px,88%)!important;
+  height:min(270px,88%)!important;
+  min-width:220px!important;
+  min-height:220px!important;
+  max-width:270px!important;
+  max-height:270px!important;
+  place-self:center!important;
+  margin:0!important;
+}
+.ref-goal-ring:after{
+  inset:12px!important;
+}
+.ref-goal-ring strong{
+  font-size:54px!important;
+  line-height:1!important;
+}
+.ref-goal-ring span{
+  margin-top:7px!important;
+  font-size:17px!important;
+}
+.ref-goal-ring small{
+  margin-top:10px!important;
+  font-size:12px!important;
+}
+.ref-goal-card .ref-wide-button{
+  width:100%!important;
+  min-height:44px!important;
+  height:44px!important;
+  font-size:11px!important;
+  font-weight:800!important;
+  margin-top:8px!important;
+}
+
+/* ── LOGS SYSTÈME : vraie lisibilité ────────────────────────────────────── */
+.ref-logs-card>header{
+  margin-bottom:10px!important;
+}
+.ref-logs-card>header strong{
+  font-size:15px!important;
+  letter-spacing:-.1px!important;
+}
+.ref-logs-card>header button{
+  font-size:9px!important;
+}
+.ref-logs-card ul{
+  display:flex!important;
+  flex-direction:column!important;
+  gap:2px!important;
+}
+.ref-logs-card li{
+  grid-template-columns:9px minmax(0,1fr) auto!important;
+  gap:9px!important;
+  padding:10px 0!important;
+  min-height:36px!important;
+  font-size:10px!important;
+  line-height:1.25!important;
+}
+.ref-logs-card li span{
+  font-size:10px!important;
+  font-weight:600!important;
+}
+.ref-logs-card li time{
+  font-size:9px!important;
+  color:#8ea2ba!important;
+}
+.ref-logs-card i{
+  width:7px!important;
+  height:7px!important;
+}
+
+/* ── PERSONNALISATION / AIDE : textes et icônes plus grands ─────────────── */
+.ref-sidebar-tools{
+  gap:8px!important;
+}
+.ref-sidebar-tool{
+  min-height:58px!important;
+  grid-template-columns:37px minmax(0,1fr) 18px!important;
+  gap:10px!important;
+  padding:10px 11px!important;
+  border-radius:11px!important;
+}
+.ref-sidebar-tool-icon{
+  width:35px!important;
+  height:35px!important;
+  border-radius:9px!important;
+  font-size:17px!important;
+}
+.ref-sidebar-tool b{
+  font-size:10px!important;
+  line-height:1.2!important;
+}
+.ref-sidebar-tool small{
+  margin-top:3px!important;
+  font-size:7.5px!important;
+  line-height:1.2!important;
+}
+.ref-sidebar-tool em{
+  font-size:21px!important;
+}
+.sb-profile{
+  min-height:64px!important;
+  padding:10px 11px!important;
+}
+.sb-prof-avatar{
+  width:39px!important;
+  height:39px!important;
+  font-size:15px!important;
+}
+.sb-prof-name{
+  font-size:11px!important;
+}
+.sb-prof-role{
+  font-size:8px!important;
+}
+
+/* Ajustement pour les écrans plus petits */
+@media(max-height:820px){
+  .ref-goal-card .ref-goal-ring{
+    width:220px!important;
+    height:220px!important;
+    min-width:190px!important;
+    min-height:190px!important;
+  }
+  .ref-goal-ring strong{font-size:46px!important}
+}
+@media(max-width:1180px){
+  .ref-goal-card .ref-goal-ring{
+    width:195px!important;
+    height:195px!important;
+    min-width:195px!important;
+    min-height:195px!important;
+  }
+  .ref-goal-ring strong{font-size:43px!important}
+}
+
 </style>
     <div class="card" style="margin-bottom:16px"><div class="obs-link-head"><b>🔗 Lien overlay OBS Alertes</b><span><button class="obs-copy-btn" onclick="copyObsUrl('alerts-obs-url')">Copier</button><button class="obs-regenerate-btn" onclick="regenerateObsToken('alerts')">Régénérer</button></span></div><div class="obs-link-row"><code class="obs-link-code" id="alerts-obs-url">/widgets/alerts.html</code></div><div class="alert-mini">Chaque streamer possède son lien privé. Un lien régénéré invalide immédiatement l’ancien.</div></div>
     <div class="card alert-toolbar"><span class="alert-profile-badge">Profil actif</span><select class="inp" id="alert-profile-select" onchange="activateAlertProfile(this.value)"></select><input class="inp" id="alert-profile-name" placeholder="Nouveau profil (Noël, DBD…)"><button class="btnx btn-outline btn-sm" onclick="createAlertProfile()">Créer</button><button class="btnx btn-red btn-sm" onclick="deleteAlertProfile()">Supprimer</button></div>
