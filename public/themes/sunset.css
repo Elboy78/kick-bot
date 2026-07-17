@@ -1,14 +1,1 @@
-:root{
-  --theme-bg:#391313;
-  --theme-wallpaper:url("/assets/themes/sunset.webp?v=20");
-  --theme-overlay:linear-gradient(90deg,rgba(45,8,14,.30),rgba(45,8,14,.04) 62%,rgba(45,8,14,.18));
-  --theme-panel:linear-gradient(145deg,rgba(83,26,34,.45),rgba(33,12,18,.60));
-  --theme-border:rgba(255,154,91,.31);
-  --theme-soft:rgba(255,126,75,.12);
-  --theme-soft-border:rgba(255,154,91,.24);
-  --theme-text:#fff5ec;
-  --theme-muted:#d9b29c;
-  --theme-radius:16px;
-  --theme-accent:#ff8a4a;
-  --theme-accent2:#d94a37;
-}
+/* ElBot V23 — sunset: fond uniquement. Le design du panel reste inchangé. */

@@ -66,7 +66,7 @@
     const theme = normalize(name);
     ensureWallpaperLayer();
     document.body.dataset.refInterface = theme;
-    ensureLink().href = `/themes/${theme}.css?v=22`;
+    ensureLink().href = `/themes/${theme}.css?v=23`;
     refreshButtons(theme);
     if (shouldSave) write({interface:theme});
   };
