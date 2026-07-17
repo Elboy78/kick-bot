@@ -689,10 +689,10 @@ body.light .card,body.light .panel,body.light .widget-engine-card{background:lin
                 <div class="ref-progress"><i id="ref-sr-progress"></i></div>
                 <div class="ref-song-times"><span id="ref-sr-current">0:00</span><span id="ref-sr-duration">0:00</span></div>
                 <div class="ref-player-controls">
-                  <button type="button" onclick="showPage('widgets')">|◀</button>
-                  <button class="ref-play" type="button" onclick="showPage('widgets')">▶</button>
-                  <button type="button" onclick="nextSongRequest()">▶|</button>
-                  <button type="button" onclick="showPage('widgets')">≫</button>
+                  <button type="button" onclick="restartReferenceSongRequest()">|◀</button>
+                  <button class="ref-play" id="ref-sr-play-button" type="button" onclick="toggleReferenceSongRequest()">▶</button>
+                  <button type="button" onclick="nextSongRequest();setTimeout(loadReferenceSongRequest,250)">▶|</button>
+                  <button type="button" onclick="nextSongRequest();setTimeout(loadReferenceSongRequest,250)">≫</button>
                 </div>
               </div>
             </div>
@@ -2201,6 +2201,223 @@ body{min-height:100vh!important}
 @media(max-width:1250px){
   .ref-content{display:flex!important}
   .ref-rail{display:grid!important;grid-template-columns:repeat(2,minmax(0,1fr))!important;grid-template-rows:auto!important}
+}
+
+
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   ELBOT V8 — navigation restaurée, dashboard remonté, typographie lisible,
+   fonds réellement personnalisés et contrôles SR directs.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* A page must behave like a page again */
+.ref-dashboard:not(.active){display:none!important}
+.page:not(.active){display:none!important}
+.page.active{display:block!important}
+.ref-dashboard.active{display:flex!important}
+
+/* Correct dashboard structure: welcome + KPI + main row + lower row */
+.ref-content{
+  display:grid!important;
+  grid-template-rows:auto auto minmax(245px,1fr) minmax(235px,.92fr)!important;
+  gap:10px!important;
+  align-content:stretch!important;
+}
+.ref-welcome{margin-bottom:0!important}
+.ref-kpis{margin-bottom:0!important}
+.ref-main-row,.ref-lower-row{
+  align-items:stretch!important;
+  gap:10px!important;
+}
+.ref-main-row>.ref-panel,.ref-lower-row>.ref-panel{
+  aspect-ratio:auto!important;
+  min-height:235px!important;
+}
+.ref-chat-activity,.ref-song-card,.ref-goal-card{
+  min-height:255px!important;
+}
+.ref-commands-card,.ref-chest-card,.ref-alert-card{
+  min-height:235px!important;
+}
+.ref-shell{
+  min-height:calc(100vh - 118px)!important;
+}
+.ref-content,.ref-rail{
+  height:100%!important;
+}
+.ref-rail{
+  gap:10px!important;
+  grid-template-rows:auto auto minmax(215px,1fr) minmax(150px,.62fr)!important;
+}
+
+/* Slightly larger overall typography */
+.ref-dashboard{
+  font-size:11px!important;
+}
+.ref-welcome h1{font-size:25px!important}
+.ref-welcome p{font-size:11px!important}
+.ref-panel>header strong{font-size:12px!important}
+.ref-kpi-head{font-size:9px!important}
+.ref-kpi-value{font-size:26px!important}
+.ref-song-copy strong{font-size:16px!important}
+.ref-song-copy>span{font-size:10px!important}
+.ref-song-copy small{font-size:8px!important}
+.ref-command-list .cmd-row-top span:first-child,
+.ref-command-list .cmd-row-top span:last-child{
+  font-size:9px!important;
+}
+.ref-alert-list .ev-name,
+.ref-alert-list .ev-detail,
+.ref-alert-list .ev-time,
+.ref-alert-list .ev-amt{
+  font-size:8px!important;
+}
+
+/* Right rail: readable status, activity and logs */
+.ref-rail .ref-panel>header strong{font-size:13px!important}
+.ref-online-hero strong{font-size:11px!important}
+.ref-online-hero small{font-size:8px!important}
+.ref-status-card li{
+  padding:10px 0!important;
+  font-size:9px!important;
+}
+.ref-status-card li b{font-size:10px!important}
+.ref-current-item{
+  min-height:39px!important;
+  padding:9px!important;
+}
+.ref-current-item b{font-size:9px!important}
+.ref-current-item em{font-size:8px!important}
+.ref-logs-card li{
+  padding:9px 0!important;
+  font-size:8px!important;
+}
+.ref-logs-card time{font-size:8px!important}
+.ref-live-viewers header span,
+.ref-viewers-chart{font-size:8px!important}
+.ref-viewer-labels{font-size:7px!important}
+
+/* Better distribution on wide/large screens */
+@media(min-width:1500px){
+  .ref-shell{grid-template-columns:minmax(0,1fr) 280px!important}
+  .ref-content{
+    grid-template-rows:auto auto minmax(270px,1fr) minmax(255px,.94fr)!important;
+  }
+  .ref-main-row>.ref-panel{min-height:270px!important}
+  .ref-lower-row>.ref-panel{min-height:255px!important}
+}
+@media(min-width:1800px){
+  .ref-shell{grid-template-columns:minmax(0,1fr) 300px!important}
+  .ref-main-row{grid-template-columns:1.02fr 1.38fr .72fr!important}
+  .ref-lower-row{grid-template-columns:.95fr 1.08fr 1fr!important}
+}
+
+/* Full, distinct backgrounds for every interface */
+body[data-ref-interface]{position:relative}
+body[data-ref-interface]:after{
+  content:"";
+  position:fixed;
+  inset:0;
+  z-index:-2;
+  pointer-events:none;
+  background-size:cover;
+  background-position:center;
+}
+
+/* Classic: deep blue technical grid */
+body[data-ref-interface="classic"]{
+  background:
+    radial-gradient(circle at 55% -8%,rgba(16,91,226,.22),transparent 32%),
+    linear-gradient(180deg,#031029,#020817 54%,#01040b)!important;
+}
+body[data-ref-interface="classic"]:after{
+  opacity:.28;
+  background-image:
+    linear-gradient(rgba(53,113,190,.035) 1px,transparent 1px),
+    linear-gradient(90deg,rgba(53,113,190,.035) 1px,transparent 1px),
+    linear-gradient(135deg,transparent 48%,rgba(20,111,255,.025) 49%,transparent 50%);
+  background-size:42px 42px,42px 42px,180px 180px;
+}
+
+/* Liquid Glass: fluid light waves */
+body[data-ref-interface="liquid"]{
+  background:
+    radial-gradient(circle at 18% 2%,rgba(77,184,255,.26),transparent 27%),
+    radial-gradient(circle at 82% 12%,rgba(123,84,255,.22),transparent 30%),
+    linear-gradient(145deg,#071a31,#020817 58%,#09152a)!important;
+}
+body[data-ref-interface="liquid"]:after{
+  opacity:.52;
+  background-image:
+    radial-gradient(ellipse at 15% 35%,rgba(255,255,255,.08),transparent 24%),
+    radial-gradient(ellipse at 75% 25%,rgba(107,190,255,.09),transparent 22%),
+    linear-gradient(122deg,transparent 38%,rgba(255,255,255,.05) 40%,transparent 43%),
+    linear-gradient(138deg,transparent 55%,rgba(73,149,255,.05) 57%,transparent 60%);
+}
+
+/* Neon: electric diagonal energy field */
+body[data-ref-interface="neon"]{
+  background:
+    radial-gradient(circle at 50% -8%,color-mix(in srgb,var(--ref-blue,#7b45ff) 26%,transparent),transparent 35%),
+    linear-gradient(180deg,#03020b,#010106)!important;
+}
+body[data-ref-interface="neon"]:after{
+  opacity:.6;
+  background-image:
+    repeating-linear-gradient(125deg,transparent 0 72px,color-mix(in srgb,var(--ref-blue,#7b45ff) 8%,transparent) 73px 75px,transparent 76px 145px),
+    radial-gradient(circle at 82% 75%,color-mix(in srgb,var(--ref-blue,#7b45ff) 12%,transparent),transparent 22%);
+}
+
+/* DBD: fog, scratches and blood-red atmosphere */
+body[data-ref-interface="dbd"]{
+  background:
+    radial-gradient(ellipse at 50% 110%,rgba(126,126,116,.12),transparent 35%),
+    radial-gradient(circle at 78% 6%,rgba(132,32,25,.16),transparent 30%),
+    linear-gradient(180deg,#11100e,#050505 58%,#020202)!important;
+}
+body[data-ref-interface="dbd"]:after{
+  opacity:.52;
+  background-image:
+    repeating-linear-gradient(112deg,transparent 0 115px,rgba(180,45,33,.055) 116px 118px,transparent 119px 170px),
+    linear-gradient(101deg,transparent 35%,rgba(255,255,255,.022) 36%,transparent 37%),
+    radial-gradient(ellipse at 35% 84%,rgba(170,170,160,.08),transparent 30%);
+}
+
+/* Midnight: subtle stars and black metallic gradient */
+body[data-ref-interface="midnight"]{
+  background:
+    radial-gradient(circle at 50% -5%,rgba(47,61,90,.15),transparent 32%),
+    linear-gradient(180deg,#05070b,#010204 70%)!important;
+}
+body[data-ref-interface="midnight"]:after{
+  opacity:.45;
+  background-image:
+    radial-gradient(circle at 15% 18%,rgba(255,255,255,.22) 0 1px,transparent 1.5px),
+    radial-gradient(circle at 75% 30%,rgba(255,255,255,.14) 0 1px,transparent 1.5px),
+    radial-gradient(circle at 42% 76%,rgba(255,255,255,.12) 0 1px,transparent 1.5px);
+  background-size:180px 180px,240px 240px,320px 320px;
+}
+
+/* Aurora: colored ribbons */
+body[data-ref-interface="aurora"]{
+  background:
+    radial-gradient(circle at 20% -5%,rgba(26,188,255,.22),transparent 28%),
+    radial-gradient(circle at 78% 8%,rgba(141,62,255,.25),transparent 32%),
+    radial-gradient(circle at 50% 110%,rgba(26,220,164,.12),transparent 36%),
+    #030818!important;
+}
+body[data-ref-interface="aurora"]:after{
+  opacity:.5;
+  background-image:
+    linear-gradient(118deg,transparent 20%,rgba(37,220,255,.06) 32%,transparent 42%),
+    linear-gradient(132deg,transparent 45%,rgba(155,73,255,.08) 54%,transparent 65%),
+    linear-gradient(145deg,transparent 64%,rgba(35,224,170,.05) 72%,transparent 80%);
+}
+
+/* Song Request play button state */
+.ref-play.playing{
+  background:#0b63d8!important;
+  box-shadow:0 0 25px rgba(20,127,255,.55)!important;
 }
 
 </style>
@@ -8110,6 +8327,7 @@ async function loadReferenceSongRequest() {
     if (typeof refPaintDashboardVolume === 'function') refPaintDashboardVolume(player.volume ?? 100);
     const status = String(player.status || 'stopped').toLowerCase();
     set('ref-sr-active', status === 'playing' ? '● Actif' : status === 'paused' ? '● En pause' : '● Inactif');
+    if (typeof updateReferenceSongRequestButton === 'function') updateReferenceSongRequestButton(status);
     set('ref-rail-sr', status === 'playing' ? 'Actif' : status === 'paused' ? 'Pause' : 'Inactif');
     const duration = Math.max(Number(player.duration || current?.duration || 0), 0);
     const progress = duration ? Math.min(100, Math.max(0, Number(player.currentTime || 0) / duration * 100)) : 0;
@@ -8548,6 +8766,59 @@ function refScheduleKpiUpdate() {
 refScheduleKpiUpdate();
 setInterval(refScheduleKpiUpdate, 30000);
 window.addEventListener('resize', updateReferenceKpiCharts);
+
+</script>
+
+<script>
+
+// ══ ElBot V8 — commandes Song Request directes depuis le Dashboard ═══════════
+async function toggleReferenceSongRequest() {
+  const button = document.getElementById('ref-sr-play-button');
+  if (button) button.disabled = true;
+  try {
+    if (typeof toggleSongRequest === 'function') {
+      await toggleSongRequest();
+    } else if (typeof setSongRequestPlayback === 'function') {
+      const currentlyPlaying = String(window.srPlayer?.status || '').toLowerCase() === 'playing';
+      await setSongRequestPlayback(currentlyPlaying ? 'paused' : 'playing');
+    }
+    await new Promise(resolve => setTimeout(resolve, 200));
+    if (typeof loadReferenceSongRequest === 'function') await loadReferenceSongRequest();
+  } catch (error) {
+    if (typeof toast === 'function') toast('Impossible de modifier la lecture Song Request', false);
+  } finally {
+    if (button) button.disabled = false;
+  }
+}
+
+async function restartReferenceSongRequest() {
+  try {
+    if (typeof commitSongRequestSeek === 'function') {
+      await commitSongRequestSeek(0);
+    } else {
+      const response = await fetch(API + '/api/admin/widgets/songrequest/seek', {
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({ currentTime:0 })
+      });
+      if (!response.ok) throw new Error('seek failed');
+    }
+    if (typeof loadReferenceSongRequest === 'function') {
+      setTimeout(loadReferenceSongRequest, 180);
+    }
+  } catch (error) {
+    if (typeof toast === 'function') toast('Impossible de revenir au début', false);
+  }
+}
+
+function updateReferenceSongRequestButton(status) {
+  const button = document.getElementById('ref-sr-play-button');
+  if (!button) return;
+  const playing = String(status || '').toLowerCase() === 'playing';
+  button.textContent = playing ? '❚❚' : '▶';
+  button.classList.toggle('playing', playing);
+  button.setAttribute('aria-label', playing ? 'Mettre en pause' : 'Lire');
+}
 
 </script>
 </body>
