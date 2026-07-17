@@ -3990,6 +3990,350 @@ body:has(#page-dashboard.active) .ref-main-row{
     inset 0 0 28px rgba(0,0,0,.26)!important;
 }
 
+
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   ELBOT V17 — MOTEUR DE THÈMES PREMIUM COMPLETS
+   8 univers visuels appliqués à tout le panel.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.premium-theme-gallery{
+  display:grid;
+  grid-template-columns:1fr;
+  gap:10px;
+}
+.premium-theme-gallery>button{
+  display:grid;
+  grid-template-columns:118px minmax(0,1fr) auto;
+  align-items:center;
+  gap:12px;
+  width:100%;
+  padding:9px;
+  border:1px solid rgba(72,140,226,.15);
+  border-radius:12px;
+  background:rgba(24,64,116,.07);
+  color:#d4e3f4;
+  text-align:left;
+  cursor:pointer;
+  transition:.22s ease;
+}
+.premium-theme-gallery>button:hover{
+  transform:translateY(-2px);
+  border-color:color-mix(in srgb,var(--ref-blue,#1685ff) 55%,transparent);
+}
+.premium-theme-gallery>button.active{
+  border-color:var(--ref-blue,#1685ff);
+  box-shadow:
+    0 0 0 1px color-mix(in srgb,var(--ref-blue,#1685ff) 20%,transparent),
+    0 14px 30px color-mix(in srgb,var(--ref-blue,#1685ff) 14%,transparent);
+}
+.premium-theme-gallery em{
+  font-style:normal;
+  padding:6px 8px;
+  border-radius:7px;
+  background:color-mix(in srgb,var(--ref-blue,#1685ff) 16%,transparent);
+  color:#dff1ff;
+  font-size:7px;
+  font-weight:800;
+}
+.premium-theme-copy b{display:block;font-size:9px}
+.premium-theme-copy small{display:block;margin-top:3px;color:#778da8;font-size:6.5px}
+
+.premium-theme-preview{
+  position:relative;
+  display:grid;
+  grid-template-columns:26px 1fr 1fr;
+  grid-template-rows:17px 28px 18px;
+  gap:4px;
+  height:75px;
+  padding:5px;
+  border-radius:9px;
+  overflow:hidden;
+  border:1px solid rgba(255,255,255,.13);
+}
+.premium-theme-preview i{display:block;border-radius:4px}
+.premium-theme-preview .pv-side{grid-row:1/4}
+.premium-theme-preview .pv-top{grid-column:2/4}
+.premium-theme-preview .pv-wide{grid-column:2/4}
+
+.theme-control-preview{background:linear-gradient(145deg,#06162d,#0a2858)}
+.theme-control-preview i{background:linear-gradient(145deg,#0c326a,#0c2145);border:1px solid rgba(62,158,255,.28)}
+.theme-dbd-preview{background:repeating-linear-gradient(112deg,#120d0b 0 28px,#2b0f0c 29px 31px,#080707 32px 60px)}
+.theme-dbd-preview i{background:#170e0c;border:1px solid rgba(220,55,42,.35)}
+.theme-obs-preview{background:#111416}.theme-obs-preview i{background:#20262a;border:1px solid #343b40}
+.theme-vision-preview{background:linear-gradient(145deg,#dcecff,#eef4fb)}
+.theme-vision-preview i{background:rgba(255,255,255,.56);border:1px solid rgba(91,130,175,.18)}
+.theme-neon-preview{background:#05020e;box-shadow:inset 0 0 20px rgba(142,31,255,.32)}
+.theme-neon-preview i{background:#100824;border:1px solid #8b2cff;box-shadow:0 0 7px #6f21ff}
+.theme-elite-preview{background:linear-gradient(145deg,#080808,#15110a)}
+.theme-elite-preview i{background:#12110e;border:1px solid rgba(214,166,75,.35)}
+.theme-steam-preview{background:linear-gradient(145deg,#132737,#0c1721)}
+.theme-steam-preview .a{background:#17658d}.theme-steam-preview .b{background:#408c59}.theme-steam-preview i{border:1px solid rgba(255,255,255,.12)}
+.theme-riot-preview{background:linear-gradient(145deg,#130506,#050506)}
+.theme-riot-preview i{background:#170a0b;border:1px solid rgba(235,46,46,.42)}
+
+/* Shared theme tokens */
+body[data-ref-interface]{
+  --theme-page-bg:#020817;
+  --theme-panel-bg:linear-gradient(145deg,rgba(7,29,65,.95),rgba(3,16,38,.97));
+  --theme-panel-border:rgba(55,132,235,.22);
+  --theme-panel-shadow:inset 0 1px 0 rgba(255,255,255,.04),0 14px 34px rgba(0,7,25,.18);
+  --theme-soft-bg:rgba(20,78,151,.10);
+  --theme-soft-border:rgba(78,150,241,.16);
+  --theme-text:#edf6ff;
+  --theme-muted:#8da3bf;
+  --theme-radius:13px;
+  --theme-button-bg:linear-gradient(145deg,#1062cc,#08479c);
+}
+body[data-ref-interface] .sidebar,
+body[data-ref-interface] .elbot-topbar,
+body[data-ref-interface] .panel,
+body[data-ref-interface] .card,
+body[data-ref-interface] .ref-kpi,
+body[data-ref-interface] .ref-panel,
+body[data-ref-interface] .settings-card,
+body[data-ref-interface] .widget-card,
+body[data-ref-interface] .config-card,
+body[data-ref-interface] .table-wrap,
+body[data-ref-interface] .form-section,
+body[data-ref-interface] .block,
+body[data-ref-interface] .box,
+body[data-ref-interface] .modal-content{
+  background:var(--theme-panel-bg)!important;
+  border-color:var(--theme-panel-border)!important;
+  box-shadow:var(--theme-panel-shadow)!important;
+  border-radius:var(--theme-radius)!important;
+  color:var(--theme-text)!important;
+}
+body[data-ref-interface] .main{
+  background:var(--theme-page-bg)!important;
+}
+body[data-ref-interface] input,
+body[data-ref-interface] select,
+body[data-ref-interface] textarea{
+  background:var(--theme-soft-bg)!important;
+  border-color:var(--theme-soft-border)!important;
+  color:var(--theme-text)!important;
+}
+body[data-ref-interface] .btn-primary,
+body[data-ref-interface] .ref-primary-actions button:first-child,
+body[data-ref-interface] .ref-wide-button{
+  background:var(--theme-button-bg)!important;
+}
+body[data-ref-interface] p,
+body[data-ref-interface] small,
+body[data-ref-interface] .muted,
+body[data-ref-interface] .desc{
+  color:var(--theme-muted)!important;
+}
+body[data-ref-interface] table,
+body[data-ref-interface] th,
+body[data-ref-interface] td{
+  border-color:var(--theme-soft-border)!important;
+}
+body[data-ref-interface] th{background:var(--theme-soft-bg)!important}
+
+/* 1. CONTROL CENTER */
+body[data-ref-interface="control"]{
+  --ref-blue:#1685ff;
+  --accent:#1685ff;
+  --accent2:#0759d8;
+  --theme-page-bg:
+    linear-gradient(rgba(37,116,213,.035) 1px,transparent 1px),
+    linear-gradient(90deg,rgba(37,116,213,.035) 1px,transparent 1px),
+    radial-gradient(circle at 58% -10%,rgba(20,111,255,.25),transparent 34%),
+    linear-gradient(180deg,#06152f,#020817 62%,#01040a);
+  --theme-panel-bg:linear-gradient(145deg,rgba(7,31,70,.94),rgba(3,17,40,.96));
+  --theme-panel-border:rgba(55,140,255,.24);
+  --theme-radius:14px;
+}
+
+/* 2. DEAD BY DAYLIGHT */
+body[data-ref-interface="dbd"]{
+  --ref-blue:#d84639;
+  --accent:#d84639;
+  --accent2:#8e211a;
+  --theme-page-bg:
+    repeating-linear-gradient(111deg,transparent 0 116px,rgba(192,48,35,.075) 117px 121px,transparent 122px 184px),
+    radial-gradient(ellipse at 50% 103%,rgba(190,190,176,.15),transparent 37%),
+    radial-gradient(circle at 82% 2%,rgba(156,40,30,.22),transparent 31%),
+    linear-gradient(180deg,#171310,#070605 58%,#020202);
+  --theme-panel-bg:linear-gradient(145deg,rgba(31,25,22,.97),rgba(8,7,7,.98));
+  --theme-panel-border:rgba(181,61,48,.28);
+  --theme-soft-bg:rgba(110,31,24,.13);
+  --theme-soft-border:rgba(181,61,48,.24);
+  --theme-muted:#a99891;
+  --theme-radius:8px;
+  --theme-button-bg:linear-gradient(145deg,#9e2b23,#55120e);
+}
+body[data-ref-interface="dbd"] .menu a.active{background:linear-gradient(100deg,#98271f,#4b0f0c)!important}
+body[data-ref-interface="dbd"] .ref-kpi-icon,
+body[data-ref-interface="dbd"] .ref-title-icon{background:linear-gradient(145deg,#9f3027,#4e130f)!important}
+
+/* 3. OBS STUDIO NEXT GEN */
+body[data-ref-interface="obs"]{
+  --ref-blue:#78a5b9;
+  --accent:#6d97aa;
+  --accent2:#456571;
+  --theme-page-bg:linear-gradient(180deg,#15191c,#0e1113 68%,#0a0c0d);
+  --theme-panel-bg:linear-gradient(145deg,#20262a,#15191c);
+  --theme-panel-border:#343c41;
+  --theme-soft-bg:#171c1f;
+  --theme-soft-border:#343c41;
+  --theme-muted:#9ca8ad;
+  --theme-radius:5px;
+  --theme-button-bg:linear-gradient(145deg,#3c4c54,#29343a);
+  --theme-panel-shadow:inset 0 1px 0 rgba(255,255,255,.03),0 8px 20px rgba(0,0,0,.22);
+}
+body[data-ref-interface="obs"] .sidebar,
+body[data-ref-interface="obs"] .elbot-topbar{background:linear-gradient(180deg,#1b2023,#111416)!important}
+body[data-ref-interface="obs"] .ref-kpi,
+body[data-ref-interface="obs"] .ref-panel{border-radius:5px!important}
+
+/* 4. APPLE VISION PRO */
+body[data-ref-interface="vision"]{
+  --ref-blue:#357eea;
+  --accent:#357eea;
+  --accent2:#2065ce;
+  --theme-page-bg:
+    radial-gradient(circle at 18% 2%,rgba(141,200,255,.42),transparent 28%),
+    radial-gradient(circle at 82% 12%,rgba(221,203,255,.44),transparent 31%),
+    linear-gradient(145deg,#dce8f6,#f3f5f8 60%,#e8edf4);
+  --theme-panel-bg:linear-gradient(145deg,rgba(255,255,255,.58),rgba(241,247,255,.40));
+  --theme-panel-border:rgba(94,124,159,.18);
+  --theme-soft-bg:rgba(255,255,255,.48);
+  --theme-soft-border:rgba(94,124,159,.18);
+  --theme-text:#15325a;
+  --theme-muted:#5d7594;
+  --theme-radius:19px;
+  --theme-button-bg:linear-gradient(145deg,#4c8df2,#2e6ed7);
+  --theme-panel-shadow:inset 0 1px 0 rgba(255,255,255,.85),0 20px 45px rgba(56,87,126,.15);
+}
+body[data-ref-interface="vision"] .sidebar,
+body[data-ref-interface="vision"] .elbot-topbar,
+body[data-ref-interface="vision"] .panel,
+body[data-ref-interface="vision"] .card,
+body[data-ref-interface="vision"] .ref-kpi,
+body[data-ref-interface="vision"] .ref-panel{
+  backdrop-filter:blur(30px) saturate(145%)!important;
+  -webkit-backdrop-filter:blur(30px) saturate(145%)!important;
+}
+body[data-ref-interface="vision"] .menu a,
+body[data-ref-interface="vision"] .logo,
+body[data-ref-interface="vision"] .header h1,
+body[data-ref-interface="vision"] .ref-welcome h1{color:#18365e!important}
+
+/* 5. CYBER NEON */
+body[data-ref-interface="neon"]{
+  --ref-blue:#b146ff;
+  --accent:#b146ff;
+  --accent2:#6418c7;
+  --theme-page-bg:
+    repeating-linear-gradient(122deg,transparent 0 78px,rgba(179,42,255,.10) 79px 82px,transparent 83px 158px),
+    repeating-linear-gradient(90deg,transparent 0 130px,rgba(0,230,255,.045) 131px 133px),
+    radial-gradient(circle at 72% 8%,rgba(173,43,255,.32),transparent 34%),
+    radial-gradient(circle at 16% 82%,rgba(0,230,255,.15),transparent 27%),
+    linear-gradient(180deg,#080318,#020207 72%,#010103);
+  --theme-panel-bg:linear-gradient(145deg,rgba(15,7,35,.97),rgba(4,2,15,.98));
+  --theme-panel-border:rgba(178,55,255,.44);
+  --theme-soft-bg:rgba(116,24,204,.12);
+  --theme-soft-border:rgba(180,53,255,.35);
+  --theme-muted:#a58ab7;
+  --theme-radius:12px;
+  --theme-button-bg:linear-gradient(145deg,#a52df0,#5f13b7);
+  --theme-panel-shadow:inset 0 0 0 1px rgba(179,53,255,.10),0 0 24px rgba(124,27,255,.16);
+}
+body[data-ref-interface="neon"] .ref-kpi-icon,
+body[data-ref-interface="neon"] .ref-title-icon{box-shadow:0 0 18px rgba(174,47,255,.65)!important}
+
+/* 6. ELITE BLACK */
+body[data-ref-interface="elite"]{
+  --ref-blue:#d1a64a;
+  --accent:#d1a64a;
+  --accent2:#8f681d;
+  --theme-page-bg:
+    radial-gradient(circle at 65% -5%,rgba(206,160,65,.11),transparent 30%),
+    repeating-linear-gradient(135deg,rgba(255,255,255,.012) 0 1px,transparent 1px 10px),
+    linear-gradient(180deg,#0a0a09,#030303 72%,#010101);
+  --theme-panel-bg:linear-gradient(145deg,#11110f,#080806);
+  --theme-panel-border:rgba(209,166,74,.28);
+  --theme-soft-bg:rgba(209,166,74,.06);
+  --theme-soft-border:rgba(209,166,74,.20);
+  --theme-muted:#a49b89;
+  --theme-radius:10px;
+  --theme-button-bg:linear-gradient(145deg,#8d6a22,#4f370b);
+  --theme-panel-shadow:inset 0 1px 0 rgba(255,255,255,.025),0 16px 38px rgba(0,0,0,.34);
+}
+
+/* 7. STEAM DECK / VALVE */
+body[data-ref-interface="steam"]{
+  --ref-blue:#3c9ed0;
+  --accent:#3c9ed0;
+  --accent2:#25769d;
+  --theme-page-bg:
+    radial-gradient(circle at 20% -5%,rgba(47,138,184,.20),transparent 29%),
+    linear-gradient(180deg,#132431,#0a1218 70%,#070b0e);
+  --theme-panel-bg:linear-gradient(145deg,#172b39,#0e1b24);
+  --theme-panel-border:rgba(83,144,177,.24);
+  --theme-soft-bg:rgba(65,125,158,.12);
+  --theme-soft-border:rgba(80,146,181,.22);
+  --theme-muted:#91a9b6;
+  --theme-radius:12px;
+  --theme-button-bg:linear-gradient(145deg,#2f85ad,#1b5b79);
+}
+body[data-ref-interface="steam"] .ref-kpi:nth-child(1){background:linear-gradient(145deg,#176388,#10364b)!important}
+body[data-ref-interface="steam"] .ref-kpi:nth-child(2){background:linear-gradient(145deg,#3e8152,#21482f)!important}
+body[data-ref-interface="steam"] .ref-kpi:nth-child(3){background:linear-gradient(145deg,#5e448d,#33234e)!important}
+body[data-ref-interface="steam"] .ref-kpi:nth-child(4){background:linear-gradient(145deg,#a15b30,#5d321b)!important}
+
+/* 8. RIOT GAMES */
+body[data-ref-interface="riot"]{
+  --ref-blue:#ef3f44;
+  --accent:#ef3f44;
+  --accent2:#9d171b;
+  --theme-page-bg:
+    linear-gradient(145deg,transparent 35%,rgba(201,28,33,.08) 45%,transparent 56%),
+    radial-gradient(circle at 82% 6%,rgba(221,30,36,.19),transparent 31%),
+    linear-gradient(180deg,#140608,#060708 70%,#020303);
+  --theme-panel-bg:linear-gradient(145deg,rgba(25,10,12,.97),rgba(7,8,9,.98));
+  --theme-panel-border:rgba(235,49,55,.34);
+  --theme-soft-bg:rgba(186,27,32,.11);
+  --theme-soft-border:rgba(235,49,55,.25);
+  --theme-muted:#aa8f91;
+  --theme-radius:8px;
+  --theme-button-bg:linear-gradient(145deg,#c6292e,#761417);
+  --theme-panel-shadow:inset 0 1px 0 rgba(255,255,255,.025),0 14px 34px rgba(0,0,0,.30);
+}
+body[data-ref-interface="riot"] .menu a.active{background:linear-gradient(100deg,#c3272c,#731316)!important}
+
+/* Theme-aware sidebar bottom */
+body[data-ref-interface] .ref-sidebar-bottom{
+  background:linear-gradient(180deg,transparent,color-mix(in srgb,var(--theme-panel-bg) 88%,transparent) 25%)!important;
+}
+body[data-ref-interface] .ref-sidebar-tool,
+body[data-ref-interface] .sb-profile{
+  background:var(--theme-panel-bg)!important;
+  border-color:var(--theme-panel-border)!important;
+}
+
+/* Theme transitions */
+body.ref-theme-transition *,
+body.ref-theme-transition *:before,
+body.ref-theme-transition *:after{
+  transition:
+    background .28s ease,
+    border-color .28s ease,
+    color .28s ease,
+    box-shadow .28s ease!important;
+}
+
+@media(max-width:650px){
+  .premium-theme-gallery>button{
+    grid-template-columns:95px 1fr;
+  }
+  .premium-theme-gallery em{display:none}
+}
+
 </style>
     <div class="card" style="margin-bottom:16px"><div class="obs-link-head"><b>🔗 Lien overlay OBS Alertes</b><span><button class="obs-copy-btn" onclick="copyObsUrl('alerts-obs-url')">Copier</button><button class="obs-regenerate-btn" onclick="regenerateObsToken('alerts')">Régénérer</button></span></div><div class="obs-link-row"><code class="obs-link-code" id="alerts-obs-url">/widgets/alerts.html</code></div><div class="alert-mini">Chaque streamer possède son lien privé. Un lien régénéré invalide immédiatement l’ancien.</div></div>
     <div class="card alert-toolbar"><span class="alert-profile-badge">Profil actif</span><select class="inp" id="alert-profile-select" onchange="activateAlertProfile(this.value)"></select><input class="inp" id="alert-profile-name" placeholder="Nouveau profil (Noël, DBD…)"><button class="btnx btn-outline btn-sm" onclick="createAlertProfile()">Créer</button><button class="btnx btn-red btn-sm" onclick="deleteAlertProfile()">Supprimer</button></div>
@@ -9963,31 +10307,70 @@ setInterval(() => {
       <button type="button" onclick="closeReferenceDrawers()">✕</button>
     </header>
     <section>
-      <h3>Interface complète</h3>
-      <div class="ref-interface-grid">
-        <button type="button" data-ref-interface="classic" onclick="applyReferenceInterface('classic')">
-          <span class="ref-interface-preview preview-classic"><i></i><i></i><i></i></span>
-          <b>Classic</b><small>Interface actuelle ElBot</small>
+      <h3>Thèmes Premium ElBot</h3>
+      <div class="premium-theme-gallery">
+        <button type="button" data-ref-interface="control" onclick="applyReferenceInterface('control')">
+          <span class="premium-theme-preview theme-control-preview">
+            <i class="pv-side"></i><i class="pv-top"></i><i class="pv-card a"></i><i class="pv-card b"></i><i class="pv-wide"></i>
+          </span>
+          <span class="premium-theme-copy"><b>Control Center</b><small>Glassmorphism • Bleu • Moderne</small></span>
+          <em>Appliquer</em>
         </button>
-        <button type="button" data-ref-interface="liquid" onclick="applyReferenceInterface('liquid')">
-          <span class="ref-interface-preview preview-liquid"><i></i><i></i><i></i></span>
-          <b>Liquid Glass</b><small>Verre, profondeur et lumière</small>
-        </button>
-        <button type="button" data-ref-interface="neon" onclick="applyReferenceInterface('neon')">
-          <span class="ref-interface-preview preview-neon"><i></i><i></i><i></i></span>
-          <b>Neon</b><small>Contrastes et lueurs gaming</small>
-        </button>
+
         <button type="button" data-ref-interface="dbd" onclick="applyReferenceInterface('dbd')">
-          <span class="ref-interface-preview preview-dbd"><i></i><i></i><i></i></span>
-          <b>DBD</b><small>Sombre, brume et griffures</small>
+          <span class="premium-theme-preview theme-dbd-preview">
+            <i class="pv-side"></i><i class="pv-top"></i><i class="pv-card a"></i><i class="pv-card b"></i><i class="pv-wide"></i>
+          </span>
+          <span class="premium-theme-copy"><b>Dead by Daylight Premium</b><small>Horreur • Rouge • Cinématique</small></span>
+          <em>Appliquer</em>
         </button>
-        <button type="button" data-ref-interface="midnight" onclick="applyReferenceInterface('midnight')">
-          <span class="ref-interface-preview preview-midnight"><i></i><i></i><i></i></span>
-          <b>Midnight</b><small>Noir premium minimal</small>
+
+        <button type="button" data-ref-interface="obs" onclick="applyReferenceInterface('obs')">
+          <span class="premium-theme-preview theme-obs-preview">
+            <i class="pv-side"></i><i class="pv-top"></i><i class="pv-card a"></i><i class="pv-card b"></i><i class="pv-wide"></i>
+          </span>
+          <span class="premium-theme-copy"><b>OBS Studio Next Gen</b><small>Professionnel • Modulaire • Compact</small></span>
+          <em>Appliquer</em>
         </button>
-        <button type="button" data-ref-interface="aurora" onclick="applyReferenceInterface('aurora')">
-          <span class="ref-interface-preview preview-aurora"><i></i><i></i><i></i></span>
-          <b>Aurora</b><small>Dégradés colorés et doux</small>
+
+        <button type="button" data-ref-interface="vision" onclick="applyReferenceInterface('vision')">
+          <span class="premium-theme-preview theme-vision-preview">
+            <i class="pv-side"></i><i class="pv-top"></i><i class="pv-card a"></i><i class="pv-card b"></i><i class="pv-wide"></i>
+          </span>
+          <span class="premium-theme-copy"><b>Apple Vision Pro</b><small>Glass • Minimaliste • Épuré</small></span>
+          <em>Appliquer</em>
+        </button>
+
+        <button type="button" data-ref-interface="neon" onclick="applyReferenceInterface('neon')">
+          <span class="premium-theme-preview theme-neon-preview">
+            <i class="pv-side"></i><i class="pv-top"></i><i class="pv-card a"></i><i class="pv-card b"></i><i class="pv-wide"></i>
+          </span>
+          <span class="premium-theme-copy"><b>Cyber Neon</b><small>Cyberpunk • Néon • Énergétique</small></span>
+          <em>Appliquer</em>
+        </button>
+
+        <button type="button" data-ref-interface="elite" onclick="applyReferenceInterface('elite')">
+          <span class="premium-theme-preview theme-elite-preview">
+            <i class="pv-side"></i><i class="pv-top"></i><i class="pv-card a"></i><i class="pv-card b"></i><i class="pv-wide"></i>
+          </span>
+          <span class="premium-theme-copy"><b>Elite Black</b><small>Luxe • Noir • Minimaliste</small></span>
+          <em>Appliquer</em>
+        </button>
+
+        <button type="button" data-ref-interface="steam" onclick="applyReferenceInterface('steam')">
+          <span class="premium-theme-preview theme-steam-preview">
+            <i class="pv-side"></i><i class="pv-top"></i><i class="pv-card a"></i><i class="pv-card b"></i><i class="pv-wide"></i>
+          </span>
+          <span class="premium-theme-copy"><b>Steam Deck / Valve</b><small>Gaming • Simple • Accessible</small></span>
+          <em>Appliquer</em>
+        </button>
+
+        <button type="button" data-ref-interface="riot" onclick="applyReferenceInterface('riot')">
+          <span class="premium-theme-preview theme-riot-preview">
+            <i class="pv-side"></i><i class="pv-top"></i><i class="pv-card a"></i><i class="pv-card b"></i><i class="pv-wide"></i>
+          </span>
+          <span class="premium-theme-copy"><b>Riot Games</b><small>Esport • Dynamique • Compétitif</small></span>
+          <em>Appliquer</em>
         </button>
       </div>
     </section>
@@ -10562,9 +10945,105 @@ function loadReferenceAppearance() {
   if (compactInput) compactInput.checked = saved.compact;
 }
 
+
+
+</script>
+
+<script>
+
+// ══ ElBot V17 — moteur de thèmes premium complet ════════════════════════════
+const ELBOT_PREMIUM_THEMES = ['control','dbd','obs','vision','neon','elite','steam','riot'];
+
+const ELBOT_LEGACY_THEME_MAP = {
+  classic:'control',
+  liquid:'control',
+  midnight:'elite',
+  aurora:'vision'
+};
+
+const ELBOT_THEME_ACCENTS = {
+  control:'blue',
+  dbd:'red',
+  obs:'cyan',
+  vision:'blue',
+  neon:'violet',
+  elite:'orange',
+  steam:'cyan',
+  riot:'red'
+};
+
+function normalizePremiumTheme(name) {
+  const mapped = ELBOT_LEGACY_THEME_MAP[name] || name;
+  return ELBOT_PREMIUM_THEMES.includes(mapped) ? mapped : 'control';
+}
+
+function refRefreshInterfaceButtons(value) {
+  document.querySelectorAll('[data-ref-interface]').forEach(button => {
+    button.classList.toggle('active', button.dataset.refInterface === value);
+    const action = button.querySelector('em');
+    if (action) action.textContent = button.dataset.refInterface === value ? 'Actif' : 'Appliquer';
+  });
+}
+
+function applyReferenceInterface(name, save = true) {
+  const value = normalizePremiumTheme(name);
+
+  document.body.classList.add('ref-theme-transition');
+  document.body.dataset.refInterface = value;
+  refRefreshInterfaceButtons(value);
+
+  const accent = ELBOT_THEME_ACCENTS[value] || 'blue';
+  if (typeof applyReferenceTheme === 'function') {
+    applyReferenceTheme(accent, false);
+  }
+
+  if (save && typeof refSaveAppearance === 'function') {
+    refSaveAppearance({
+      interface:value,
+      theme:accent,
+      wallpaper:'none'
+    });
+  }
+
+  window.setTimeout(() => {
+    document.body.classList.remove('ref-theme-transition');
+  }, 320);
+}
+
+function refNormalizeAppearance(saved = {}) {
+  const interfaceName = normalizePremiumTheme(saved.interface || 'control');
+  return {
+    interface:interfaceName,
+    theme:saved.theme || ELBOT_THEME_ACCENTS[interfaceName] || 'blue',
+    wallpaper:'none',
+    background:saved.background || 'waves',
+    glow:saved.glow !== false,
+    motion:saved.motion !== false,
+    compact:saved.compact === true
+  };
+}
+
+function loadReferenceAppearance() {
+  const saved = refNormalizeAppearance(refGetAppearance());
+
+  applyReferenceInterface(saved.interface, false);
+
+  if (typeof toggleReferenceGlow === 'function') toggleReferenceGlow(saved.glow, false);
+  if (typeof toggleReferenceMotion === 'function') toggleReferenceMotion(saved.motion, false);
+  if (typeof toggleReferenceCompact === 'function') toggleReferenceCompact(saved.compact, false);
+
+  const glowInput = document.getElementById('ref-glow-toggle');
+  const motionInput = document.getElementById('ref-motion-toggle');
+  const compactInput = document.getElementById('ref-compact-toggle');
+
+  if (glowInput) glowInput.checked = saved.glow;
+  if (motionInput) motionInput.checked = saved.motion;
+  if (compactInput) compactInput.checked = saved.compact;
+}
+
 document.addEventListener('DOMContentLoaded', () => {
   loadReferenceAppearance();
-  setTimeout(loadReferenceAppearance, 50);
+  window.setTimeout(loadReferenceAppearance, 80);
 });
 window.addEventListener('pageshow', loadReferenceAppearance);
 
