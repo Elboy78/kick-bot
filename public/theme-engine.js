@@ -19,6 +19,18 @@
     localStorage.setItem(KEY, JSON.stringify({...current,...patch}));
   }
 
+
+  function ensureWallpaperLayer(){
+    let layer = document.getElementById('elbot-theme-wallpaper');
+    if (!layer) {
+      layer = document.createElement('div');
+      layer.id = 'elbot-theme-wallpaper';
+      layer.setAttribute('aria-hidden','true');
+      document.body.prepend(layer);
+    }
+    return layer;
+  }
+
   function ensureLink(){
     if (themeLink) return themeLink;
     themeLink = document.getElementById('elbot-active-theme');
@@ -52,8 +64,9 @@
 
   window.applyReferenceInterface = function(name, shouldSave=true){
     const theme = normalize(name);
+    ensureWallpaperLayer();
     document.body.dataset.refInterface = theme;
-    ensureLink().href = `/themes/${theme}.css?v=21`;
+    ensureLink().href = `/themes/${theme}.css?v=22`;
     refreshButtons(theme);
     if (shouldSave) write({interface:theme});
   };

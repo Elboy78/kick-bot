@@ -249,3 +249,150 @@ body[data-ref-interface="forest"]{
 @media(max-width:900px){
   body{background-position:58% center!important}
 }
+
+
+/* ═══════════════════════════════════════════════════════════════════════
+   ELBOT V22 — couche de fond indépendante et impossible à masquer
+   ═══════════════════════════════════════════════════════════════════════ */
+html,body{
+  min-height:100%;
+  background:#020817!important;
+}
+body{
+  isolation:isolate;
+  background-image:none!important;
+}
+
+/* Le fond n'est plus porté par body : il vit dans sa propre couche fixe. */
+#elbot-theme-wallpaper{
+  position:fixed!important;
+  inset:0!important;
+  z-index:-2!important;
+  display:block!important;
+  pointer-events:none!important;
+  background-color:var(--theme-bg,#020817)!important;
+  background-image:var(--theme-overlay),var(--theme-wallpaper)!important;
+  background-repeat:no-repeat!important;
+  background-size:cover!important;
+  background-position:center center!important;
+  opacity:var(--wallpaper-opacity,1)!important;
+  transform:translateZ(0);
+  transition:opacity .25s ease,background-image .25s ease!important;
+}
+
+/* Léger voile seulement, séparé du fond principal. */
+#elbot-theme-wallpaper::after{
+  content:"";
+  position:absolute;
+  inset:0;
+  background:radial-gradient(circle at 58% -10%,color-mix(in srgb,var(--theme-accent) 9%,transparent),transparent 38%);
+  pointer-events:none;
+}
+
+/* Neutralise les anciens pseudo-calques. */
+body::before,
+body::after{
+  content:none!important;
+  display:none!important;
+}
+
+/* Tout le logiciel passe au-dessus de la couche wallpaper. */
+body > :not(#elbot-theme-wallpaper){
+  position:relative;
+  z-index:1;
+}
+
+/* Tous les conteneurs plein écran deviennent réellement transparents. */
+body[data-ref-interface] .main,
+body[data-ref-interface] main,
+body[data-ref-interface] .content,
+body[data-ref-interface] .page,
+body[data-ref-interface] .page-content,
+body[data-ref-interface] #app,
+body[data-ref-interface] .app-shell,
+body[data-ref-interface] .dashboard,
+body[data-ref-interface] .dashboard-grid,
+body[data-ref-interface] .page-wrapper,
+body[data-ref-interface] .container,
+body[data-ref-interface] [id^="page-"]{
+  background-color:transparent!important;
+  background-image:none!important;
+}
+
+/* Transparence volontairement plus forte pour que l'image soit visible. */
+body[data-ref-interface] .sidebar,
+body[data-ref-interface] .elbot-topbar{
+  background:color-mix(in srgb,var(--theme-bg) 38%,transparent)!important;
+  backdrop-filter:blur(22px) saturate(138%)!important;
+  -webkit-backdrop-filter:blur(22px) saturate(138%)!important;
+}
+body[data-ref-interface] .panel,
+body[data-ref-interface] .card,
+body[data-ref-interface] .ref-kpi,
+body[data-ref-interface] .ref-panel,
+body[data-ref-interface] .settings-card,
+body[data-ref-interface] .widget-card,
+body[data-ref-interface] .config-card,
+body[data-ref-interface] .table-wrap,
+body[data-ref-interface] .form-section,
+body[data-ref-interface] .block,
+body[data-ref-interface] .box,
+body[data-ref-interface] .modal-content{
+  background:color-mix(in srgb,var(--theme-bg) 31%,transparent)!important;
+  backdrop-filter:blur(15px) saturate(130%)!important;
+  -webkit-backdrop-filter:blur(15px) saturate(130%)!important;
+}
+
+/* Les grandes zones vides ne doivent plus être peintes en noir. */
+body[data-ref-interface] .main::before,
+body[data-ref-interface] .main::after,
+body[data-ref-interface] [id^="page-"]::before,
+body[data-ref-interface] [id^="page-"]::after{
+  background:none!important;
+}
+
+/* Mapping direct des images, même si le CSS individuel du thème tarde à charger. */
+body[data-ref-interface="control"]{--theme-wallpaper:url("/assets/themes/control.webp?v=22")}
+body[data-ref-interface="dbd"]{--theme-wallpaper:url("/assets/themes/dbd.webp?v=22")}
+body[data-ref-interface="obs"]{--theme-wallpaper:url("/assets/themes/obs.webp?v=22")}
+body[data-ref-interface="vision"]{--theme-wallpaper:url("/assets/themes/vision.webp?v=22")}
+body[data-ref-interface="neon"]{--theme-wallpaper:url("/assets/themes/neon.webp?v=22")}
+body[data-ref-interface="elite"]{--theme-wallpaper:url("/assets/themes/elite.webp?v=22")}
+body[data-ref-interface="steam"]{--theme-wallpaper:url("/assets/themes/steam.webp?v=22")}
+body[data-ref-interface="riot"]{--theme-wallpaper:url("/assets/themes/riot.webp?v=22")}
+body[data-ref-interface="midnight"]{--theme-wallpaper:url("/assets/themes/midnight.webp?v=22")}
+body[data-ref-interface="ocean"]{--theme-wallpaper:url("/assets/themes/ocean.webp?v=22")}
+body[data-ref-interface="sunset"]{--theme-wallpaper:url("/assets/themes/sunset.webp?v=22")}
+body[data-ref-interface="forest"]{--theme-wallpaper:url("/assets/themes/forest.webp?v=22")}
+body[data-ref-interface="minimal"]{--theme-wallpaper:url("/assets/themes/minimal.webp?v=22")}
+
+/* Vision/Minimal : verre clair lisible. */
+body[data-ref-interface="vision"] .panel,
+body[data-ref-interface="vision"] .card,
+body[data-ref-interface="vision"] .ref-kpi,
+body[data-ref-interface="vision"] .ref-panel,
+body[data-ref-interface="minimal"] .panel,
+body[data-ref-interface="minimal"] .card,
+body[data-ref-interface="minimal"] .ref-kpi,
+body[data-ref-interface="minimal"] .ref-panel{
+  background:rgba(255,255,255,.19)!important;
+  border-color:rgba(255,255,255,.66)!important;
+}
+
+/* DBD / Neon : verre sombre, mais l'image reste perceptible. */
+body[data-ref-interface="dbd"] .panel,
+body[data-ref-interface="dbd"] .card,
+body[data-ref-interface="dbd"] .ref-kpi,
+body[data-ref-interface="dbd"] .ref-panel{
+  background:rgba(8,7,7,.36)!important;
+}
+body[data-ref-interface="neon"] .panel,
+body[data-ref-interface="neon"] .card,
+body[data-ref-interface="neon"] .ref-kpi,
+body[data-ref-interface="neon"] .ref-panel{
+  background:rgba(6,2,18,.34)!important;
+}
+
+@media(max-width:900px){
+  #elbot-theme-wallpaper{background-position:60% center!important}
+}
