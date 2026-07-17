@@ -596,205 +596,65 @@ body.light .card,body.light .panel,body.light .widget-engine-card{background:lin
   </div>
 
   <!-- ══ DASHBOARD ══ -->
-  <div class="page active" id="page-dashboard">
-    <div class="header dash-head">
-      <div>
-        <div class="dash-kicker">CENTRE DE CONTRÔLE</div>
-        <h1>Bonjour, <span id="dashboard-greeting-name">—</span> !</h1>
-        <p>Ton activité, tes widgets et les informations importantes en un coup d'œil.</p>
-      </div>
-      <div class="header-right">
-        <button class="btn dash-chat-btn" id="open-kick-chat" onclick="openConnectedKickChannel()">💬 Ouvrir le chat</button>
-        <button class="btn btn-connected" id="dash-bot-status">● Bot connecté</button>
+  <div class="page active exact-dashboard" id="page-dashboard">
+    <div class="exact-hero">
+      <div><h1>Bonjour <span id="dashboard-greeting-name">—</span> ! <span class="wave">👋</span></h1><p>Voici un aperçu de ton stream en temps réel.</p></div>
+      <div class="exact-actions">
+        <button onclick="showPage('jeux')"><span>🎁</span>Lancer un giveaway</button>
+        <button onclick="showWidgetSettings('songrequest')"><span>🎵</span>Ouvrir la SR</button>
+        <button onclick="openConnectedKickChannel()"><span>🔗</span>Modifier le stream</button>
       </div>
     </div>
 
-    <section class="cards dash-stats">
-      <article class="card dash-stat-card accent-purple">
-        <div class="dash-stat-top"><div class="icon ic-purple">✦</div><span>GLOBAL</span></div>
-        <p>Points distribués</p>
-        <h2 id="s-points">—</h2>
-        <div class="dash-stat-foot">Total cumulé</div>
-      </article>
-      <article class="card dash-stat-card accent-blue">
-        <div class="dash-stat-top"><div class="icon ic-blue">👥</div><span>COMMUNAUTÉ</span></div>
-        <p>Viewers enregistrés</p>
-        <h2 id="sc-active">—</h2>
-        <div class="dash-stat-foot">Comptes suivis</div>
-      </article>
-      <article class="card dash-stat-card accent-cyan">
-        <div class="dash-stat-top"><div class="icon ic-green">◷</div><span>FIDÉLITÉ</span></div>
-        <p>Temps regardé</p>
-        <h2 id="s-minutes">—</h2>
-        <div class="dash-stat-foot">Tous viewers confondus</div>
-      </article>
-      <article class="card dash-stat-card accent-pink">
-        <div class="dash-stat-top"><div class="icon ic-pink">♥</div><span>CHAÎNE</span></div>
-        <p>Followers</p>
-        <h2 id="s-followers">—</h2>
-        <div class="dash-stat-foot" id="sc-follow-t">Total chaîne</div>
-      </article>
-      <article class="card dash-stat-card accent-orange">
-        <div class="dash-stat-top"><div class="icon ic-orange">♛</div><span>TOP</span></div>
-        <p>Meilleur viewer</p>
-        <h2 id="s-top">—</h2>
-        <div class="dash-stat-foot" id="s-top-sub">—</div>
-      </article>
-    </section>
+    <div class="exact-shell">
+      <main class="exact-main">
+        <section class="exact-kpis">
+          <article class="exact-kpi"><div class="kpi-head"><i>👥</i><span>VIEWERS</span></div><div class="kpi-value" id="sc-active">—</div><small class="kpi-up">▲ Communauté</small><div class="mini-line"></div></article>
+          <article class="exact-kpi"><div class="kpi-head"><i>♡</i><span>FOLLOWERS</span></div><div class="kpi-value" id="s-followers">—</div><small class="kpi-up" id="sc-follow-t">Total chaîne</small><div class="mini-line l2"></div></article>
+          <article class="exact-kpi"><div class="kpi-head"><i>★</i><span>POINTS</span></div><div class="kpi-value" id="s-points">—</div><small class="kpi-up">▲ Total distribué</small><div class="mini-line l3"></div></article>
+          <article class="exact-kpi"><div class="kpi-head"><i>◆</i><span>TOP VIEWER</span></div><div class="kpi-value kpi-name" id="s-top">—</div><small class="kpi-up" id="s-top-sub">Classement</small><div class="mini-line l4"></div></article>
+          <article class="exact-kpi exact-time"><div class="kpi-head"><i>◷</i><span>TEMPS REGARDÉ</span></div><div class="kpi-value" id="s-minutes">—</div><small><b class="live-dot"></b> En direct</small></article>
+        </section>
 
-    <section class="dash-layout">
-      <div class="dash-main-column">
-        <article class="panel dash-panel dash-activity-panel">
-          <div class="dash-panel-head">
-            <div><span class="dash-panel-icon">⌁</span><div><h3>Activité du chat</h3><p>Évolution sur les 7 derniers jours</p></div></div>
-            <span class="dash-live-chip" id="dash-activity-chip">Temps réel</span>
-          </div>
-          <div class="chart dash-chart" id="activity-chart">
-            <div id="activity-bars" class="dash-bars"></div>
-          </div>
-          <div id="activity-day-labels" class="dash-day-labels"></div>
-          <div class="dash-chart-summary">
-            <span id="chart-stat-viewers">— messages cette semaine</span>
-            <span id="chart-stat-minutes">— jour le plus actif</span>
-          </div>
-        </article>
+        <section class="exact-mid">
+          <article class="exact-card activity-feed">
+            <header><h3>♟ Activité du chat</h3><span class="live-label">● En direct</span></header>
+            <div class="activity-items" id="dash-events"><div class="activity-empty">Les événements apparaîtront ici en temps réel.</div></div>
+          </article>
 
-        <div class="dash-two">
-          <article class="panel dash-panel">
-            <div class="dash-panel-head">
-              <div><span class="dash-panel-icon">♫</span><div><h3>Song Request</h3><p>Lecture et file d'attente</p></div></div>
-              <button class="see-all" onclick="showWidgetSettings('songrequest')">Gérer</button>
-            </div>
-            <div class="dash-song">
-              <div class="dash-song-cover" id="dash-sr-cover">♫</div>
-              <div class="dash-song-info">
-                <strong id="dash-sr-title">Aucune musique en lecture</strong>
-                <span id="dash-sr-meta">La file est vide</span>
-                <div class="dash-song-progress"><i id="dash-sr-progress"></i></div>
-                <div class="dash-song-times"><span id="dash-sr-time">0:00</span><span id="dash-sr-duration">0:00</span></div>
+          <article class="exact-card player-card">
+            <header><h3>♫ Song Request</h3><span class="active-label">● <span id="dash-sr-state">Arrêté</span></span></header>
+            <div class="player-body">
+              <div class="player-cover" id="dash-sr-cover">♫</div>
+              <div class="player-info"><span>Demandé via ElBot</span><strong id="dash-sr-title">Aucune musique en lecture</strong><small id="dash-sr-meta">La file est vide</small>
+                <div class="player-progress"><i id="dash-sr-progress"></i></div><div class="player-times"><span id="dash-sr-time">0:00</span><span id="dash-sr-duration">0:00</span></div>
+                <div class="player-controls"><button>◀</button><button class="play">▶</button><button>▶|</button><button>»</button></div>
               </div>
             </div>
-            <div class="dash-song-footer">
-              <span><b id="dash-sr-count">0</b> titre(s) dans la file</span>
-              <span id="dash-sr-state" class="dash-state-pill">Arrêté</span>
-            </div>
+            <footer><div><b>File d'attente</b><span><strong id="dash-sr-count">0</strong> titre(s)</span></div><div class="volume">🔊 <span>80%</span></div></footer>
           </article>
 
-          <article class="panel dash-panel">
-            <div class="dash-panel-head">
-              <div><span class="dash-panel-icon">◎</span><div><h3>Sub Goal</h3><p>Progression actuelle</p></div></div>
-              <button class="see-all" onclick="showWidgetSettings('subgoal')">Configurer</button>
-            </div>
-            <div class="dash-subgoal">
-              <div class="dash-goal-ring" id="dash-goal-ring">
-                <div><strong id="dash-sub-current">0</strong><span>sur <b id="dash-sub-target">50</b></span></div>
-              </div>
-              <div class="dash-goal-copy">
-                <strong id="dash-sub-label">Sub Goal</strong>
-                <span id="dash-sub-percent">0% accompli</span>
-                <div class="dash-mini-stats">
-                  <div><b id="dash-sub-session">0</b><small>Session</small></div>
-                  <div><b id="dash-sub-gifts">0</b><small>Gifts</small></div>
-                  <div><b id="dash-sub-renewals">0</b><small>Renouvellements</small></div>
-                </div>
-              </div>
-            </div>
+          <article class="exact-card goal-card">
+            <header><h3>⚑ Sub Goal</h3><button onclick="showWidgetSettings('subgoal')">◷</button></header>
+            <div class="goal-ring" id="dash-goal-ring"><div><strong id="dash-sub-current">0</strong><span>/ <b id="dash-sub-target">50</b></span><small id="dash-sub-percent">0%</small></div></div>
+            <button class="goal-btn" onclick="showWidgetSettings('subgoal')">📈 Gérer le Sub Goal</button>
           </article>
-        </div>
+        </section>
 
-        <div class="dash-two">
-          <article class="panel dash-panel">
-            <div class="dash-panel-head">
-              <div><span class="dash-panel-icon">⌘</span><div><h3>Commandes populaires</h3><p>Les plus utilisées</p></div></div>
-              <button class="see-all" onclick="showPage('commands')">Voir tout</button>
-            </div>
-            <div id="cmd-usage-list"><div class="empty"><p>Chargement…</p></div></div>
-          </article>
+        <section class="exact-bottom">
+          <article class="exact-card command-card"><header><h3>Commandes populaires</h3><button onclick="showPage('commands')">⌕</button></header><div id="cmd-usage-list"><div class="activity-empty">Aucune commande utilisée pour le moment</div></div><button class="wide-link" onclick="showPage('commands')">Voir toutes les commandes <span>→</span></button></article>
+          <article class="exact-card chest-card"><header><h3>Coffres</h3><button onclick="showPage('chests')">♧</button></header><div class="chest-content"><div class="big-chest">🔐</div><div class="secured"><span>Coffre sécurisé</span><strong id="dash-chest-number">Aucun</strong><small>Utilisation</small><button onclick="showPage('chests')">Changer</button></div></div><div class="chest-stats"><div><span>Coffres ouverts</span><b id="dash-chest-opened">0</b></div><div><span>Restants</span><b id="dash-chest-left">30</b></div></div></article>
+          <article class="exact-card alerts-card"><header><h3>Alertes récentes</h3><button onclick="showPage('alerts')">Tout voir</button></header><div class="alert-list"><div><i>★</i><span>Nouveau follower</span><b>En attente</b></div><div><i>✦</i><span>Nouveau sub</span><b>En attente</b></div><div><i>◈</i><span>Bits / cadeaux</span><b>En attente</b></div><div><i>♟</i><span>Nouveau don</span><b>En attente</b></div></div></article>
+        </section>
+      </main>
 
-          <article class="panel dash-panel">
-            <div class="dash-panel-head">
-              <div><span class="dash-panel-icon">⚡</span><div><h3>Actions rapides</h3><p>Accès direct aux modules</p></div></div>
-            </div>
-            <div class="quick dash-quick">
-              <button class="purple" onclick="showPage('commands')"><span class="qi">💬</span><b>Commandes</b></button>
-              <button class="pink" onclick="showPage('jeux')"><span class="qi">🎁</span><b>Giveaway</b></button>
-              <button class="blue" onclick="showPage('lobby')"><span class="qi">🎮</span><b>Lobby</b></button>
-              <button class="orange" onclick="showPage('outils')"><span class="qi">📢</span><b>Annonces</b></button>
-            </div>
-          </article>
-        </div>
-
-        <article class="panel dash-panel">
-          <div class="dash-panel-head">
-            <div><span class="dash-panel-icon">↺</span><div><h3>Événements récents</h3><p>Dernières activités enregistrées</p></div></div>
-            <button class="see-all" onclick="showPage('historique')">Historique</button>
-          </div>
-          <ul class="events dash-events" id="dash-events"><li><div class="empty"><p>Chargement…</p></div></li></ul>
-        </article>
-      </div>
-
-      <aside class="dash-side-column">
-        <article class="panel dash-panel dash-status-card">
-          <div class="dash-panel-head">
-            <div><span class="dash-panel-icon">●</span><div><h3>État du système</h3><p>Informations en direct</p></div></div>
-          </div>
-          <div class="dash-status-hero">
-            <span class="dash-pulse"></span>
-            <div><strong>ElBot opérationnel</strong><small id="ic-bot-live-status">Vérification…</small></div>
-          </div>
-          <ul class="info dash-info">
-            <li><span>Chaîne</span><span id="settings-channel-name">Connecté</span></li>
-            <li><span>Viewers</span><span id="ic-viewers">—</span></li>
-            <li><span>Followers</span><span id="ic-followers">—</span></li>
-            <li><span>Live</span><span id="ic-live-badge" class="ic-offline-badge">Hors ligne</span></li>
-            <li><span>Uptime</span><span id="ic-uptime">—</span></li>
-          </ul>
-        </article>
-
-        <article class="panel dash-panel">
-          <div class="dash-panel-head">
-            <div><span class="dash-panel-icon">▣</span><div><h3>Coffre sécurisé</h3><p>Saison en cours</p></div></div>
-            <button class="see-all" onclick="showPage('chests')">Ouvrir</button>
-          </div>
-          <div class="dash-chest-card">
-            <div class="dash-chest-visual">🔒</div>
-            <div><span>Coffre protégé</span><strong id="dash-chest-number">Aucun</strong></div>
-          </div>
-          <div class="dash-chest-meta">
-            <div><b id="dash-chest-season">—</b><span>Saison</span></div>
-            <div><b id="dash-chest-opened">0</b><span>Ouverts</span></div>
-            <div><b id="dash-chest-left">30</b><span>Restants</span></div>
-          </div>
-        </article>
-
-        <article class="panel dash-panel">
-          <div class="dash-panel-head">
-            <div><span class="dash-panel-icon">📈</span><div><h3>Viewers en direct</h3><p id="viewers-live-status">Hors ligne</p></div></div>
-          </div>
-          <div id="viewers-live-chart" class="dash-viewers-chart">
-            <div class="dash-chart-empty">Démarre automatiquement pendant le live</div>
-          </div>
-          <div class="dash-viewers-foot">
-            <span id="viewers-live-min">min</span>
-            <span id="viewers-live-avg">moy</span>
-            <span id="viewers-live-peak">pic</span>
-          </div>
-        </article>
-
-        <article class="panel dash-panel">
-          <div class="dash-panel-head">
-            <div><span class="dash-panel-icon">◫</span><div><h3>Utilisation des commandes</h3><p>Répartition globale</p></div></div>
-          </div>
-          <div class="donut-wrap dash-donut">
-            <div class="dash-donut-wrap">
-              <svg viewBox="0 0 200 200" id="cmd-donut-svg-wrap"><g id="cmd-donut-svg"></g></svg>
-              <div><b id="donut-total">0</b><small>Total</small></div>
-            </div>
-            <div class="donut-legend" id="donut-legend"></div>
-          </div>
-        </article>
+      <aside class="exact-side">
+        <article class="exact-card bot-card"><header><h3>Statut du bot</h3></header><div class="bot-online"><i>◆</i><div><b>En ligne</b><span id="ic-bot-live-status">Vérification…</span></div></div><ul><li><span>♢ Viewers</span><b id="ic-viewers">—</b></li><li><span>♡ Followers</span><b id="ic-followers">—</b></li><li><span>♧ Chaîne</span><b id="settings-channel-name">—</b></li><li><span>◷ Uptime</span><b id="ic-uptime">—</b></li></ul><span id="ic-live-badge" class="hidden-live-badge">Hors ligne</span></article>
+        <article class="exact-card current-card"><header><h3>Activité en cours</h3></header><div><span>🎵 Song Request</span><b id="sr-side-status">Actif</b></div><div><span>🎯 Sub Goal</span><b><span id="dash-sub-session">0</span>/<span id="dash-sub-target-side">50</span></b></div><div><span>🎁 Giveaway</span><b>Disponible</b></div><div><span>🔐 Coffre sécurisé</span><b>Disponible</b></div></article>
+        <article class="exact-card logs-card"><header><h3>Logs système</h3><button onclick="showPage('logs')">Tout voir</button></header><div class="system-log"><p><i></i><span>Connexion au chat</span><time>Actif</time></p><p><i></i><span>Bot connecté</span><time>OK</time></p><p><i></i><span>Modules chargés</span><time>OK</time></p><p><i></i><span>Panel prêt</span><time>OK</time></p></div></article>
       </aside>
-    </section>
+    </div>
+    <div style="display:none"><span id="chart-stat-viewers"></span><span id="chart-stat-minutes"></span><div id="activity-bars"></div><div id="activity-day-labels"></div><div id="activity-chart"></div><div id="viewers-live-chart"></div><span id="viewers-live-status"></span><span id="viewers-live-min"></span><span id="viewers-live-avg"></span><span id="viewers-live-peak"></span><svg><g id="cmd-donut-svg"></g></svg><span id="donut-total"></span><div id="donut-legend"></div><span id="dash-chest-season"></span><span id="dash-sub-gifts"></span><span id="dash-sub-renewals"></span><span id="dash-sub-label"></span><button id="open-kick-chat"></button><button id="dash-bot-status"></button></div>
   </div>
 
   <!-- ══ CLASSEMENT ══ -->
@@ -1828,6 +1688,21 @@ body:after{content:'';position:fixed;inset:0;pointer-events:none;z-index:-1;opac
 @media(max-width:1450px){.dash-layout{grid-template-columns:minmax(0,1fr) 320px!important}.dash-stats{gap:10px!important}.dash-stat-card{padding:14px!important}}
 @media(max-width:1180px){.dash-layout{grid-template-columns:1fr!important}.dash-side-column{display:grid!important;grid-template-columns:repeat(2,1fr)!important}.dash-stats{grid-template-columns:repeat(3,1fr)!important}}
 @media(max-width:760px){#page-dashboard{padding:0 3px 24px}.dash-head h1{font-size:25px!important}.dash-stats{grid-template-columns:1fr 1fr!important}.dash-two,.dash-side-column{grid-template-columns:1fr!important}}
+
+
+/* === ELBOT EXACT REFERENCE DASHBOARD V3 === */
+.exact-dashboard{max-width:none!important;width:100%!important;padding:0 4px 28px!important}
+.exact-dashboard *{box-sizing:border-box}.exact-hero{display:flex;align-items:center;justify-content:space-between;gap:24px;margin:4px 8px 16px}.exact-hero h1{font-size:25px;letter-spacing:-.7px;margin:0;color:#fff}.exact-hero p{font-size:11px;color:#8fa4c2;margin-top:5px}.wave{display:inline-block;animation:wave 2s ease-in-out infinite;transform-origin:70% 70%}@keyframes wave{0%,100%{transform:rotate(0)}20%{transform:rotate(16deg)}40%{transform:rotate(-8deg)}60%{transform:rotate(12deg)}}
+.exact-actions{display:flex;gap:12px}.exact-actions button{height:44px;padding:0 18px;border-radius:10px;border:1px solid rgba(40,143,255,.33);background:linear-gradient(180deg,rgba(11,48,101,.78),rgba(5,27,65,.82));color:#f3f8ff;font-size:10px;font-weight:750;box-shadow:inset 0 1px rgba(255,255,255,.06),0 9px 24px rgba(0,61,152,.2);cursor:pointer}.exact-actions button:first-child{border-color:#147fff;box-shadow:0 0 26px rgba(20,116,255,.25)}.exact-actions span{font-size:15px;margin-right:8px;color:#28b7ff}
+.exact-shell{display:grid;grid-template-columns:minmax(0,1fr) 265px;gap:16px}.exact-main{min-width:0;display:flex;flex-direction:column;gap:14px}.exact-side{display:flex;flex-direction:column;gap:14px}.exact-card,.exact-kpi{border:1px solid rgba(65,144,235,.18);background:linear-gradient(145deg,rgba(6,24,58,.89),rgba(3,14,36,.92));box-shadow:inset 0 1px rgba(255,255,255,.045),0 16px 40px rgba(0,3,15,.24);border-radius:13px;overflow:hidden}.exact-card:hover,.exact-kpi:hover{border-color:rgba(40,145,255,.36)}
+.exact-kpis{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:6px}.exact-kpi{position:relative;min-height:126px;padding:15px 17px}.kpi-head{display:flex;align-items:center;gap:10px}.kpi-head i{width:37px;height:37px;border-radius:10px;display:grid;place-items:center;background:linear-gradient(145deg,#126cff,#07368d);font-style:normal;font-size:17px;box-shadow:0 0 18px rgba(26,123,255,.35)}.kpi-head span{font-size:9px;color:#c8d6e8;font-weight:700}.kpi-value{font-size:24px;font-weight:850;margin:8px 0 2px;color:white;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.kpi-name{font-size:18px}.kpi-up{font-size:8px;color:#28df88}.exact-time small{font-size:8px;color:#9eb2cb}.live-dot{display:inline-block;width:7px;height:7px;border-radius:50%;background:#1285ff;margin-right:5px}.mini-line{position:absolute;left:14px;right:14px;bottom:11px;height:29px;opacity:.8;background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 200 40'%3E%3Cpath d='M0 31 L10 27 L20 33 L30 16 L40 25 L52 20 L62 31 L72 12 L82 26 L92 18 L102 25 L114 11 L125 18 L136 8 L147 21 L157 15 L167 23 L180 7 L200 13' fill='none' stroke='%23188fff' stroke-width='2'/%3E%3C/svg%3E") center/100% 100% no-repeat}.l2{filter:hue-rotate(18deg)}.l3{filter:hue-rotate(42deg)}.l4{filter:hue-rotate(-15deg)}
+.exact-mid{display:grid;grid-template-columns:1.05fr 1.35fr .78fr;gap:14px}.exact-card header{height:45px;padding:0 15px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid rgba(91,154,232,.1)}.exact-card header h3{font-size:11px;margin:0}.exact-card header button{border:0;background:rgba(32,105,207,.13);color:#89bdff;border-radius:7px;padding:5px 8px;font-size:8px;cursor:pointer}.live-label,.active-label{font-size:8px;color:#168cff}.activity-feed{min-height:258px}.activity-items{padding:9px 14px;max-height:210px;overflow:auto}.activity-empty{height:100%;min-height:100px;display:grid;place-items:center;text-align:center;font-size:9px;color:#647b98}.activity-items li{list-style:none;padding:9px 0;border-bottom:1px solid rgba(104,159,220,.08)}
+.player-card{min-height:258px}.player-body{display:flex;gap:13px;padding:14px}.player-cover{width:82px;height:82px;border-radius:9px;display:grid;place-items:center;flex:0 0 auto;background:radial-gradient(circle at 30% 20%,#1f92ff,#071f52);background-size:cover;background-position:center;font-size:25px}.player-info{flex:1;min-width:0}.player-info>span,.player-info>small{display:block;color:#7e93af;font-size:8px}.player-info strong{display:block;font-size:14px;margin:4px 0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.player-progress{height:4px;margin-top:12px;background:#11294d;border-radius:99px}.player-progress i{display:block;height:100%;width:0;background:#138cff;border-radius:inherit}.player-times{display:flex;justify-content:space-between;font-size:7px;color:#8397b1;margin-top:4px}.player-controls{display:flex;justify-content:center;gap:14px;margin-top:6px}.player-controls button{border:0;background:transparent;color:#80bfff;font-size:14px}.player-controls .play{width:34px;height:34px;border-radius:50%;background:#117cff;color:white}.player-card footer{display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border-top:1px solid rgba(88,154,236,.09)}.player-card footer b,.player-card footer span{display:block;font-size:8px}.player-card footer span{color:#8499b3;margin-top:2px}.volume{padding:7px 9px;background:#0b244b;border-radius:8px;font-size:9px}.volume span{display:inline!important;margin:0!important}
+.goal-card{text-align:center;min-height:258px}.goal-ring{width:150px;height:150px;border-radius:50%;margin:11px auto;display:grid;place-items:center;background:conic-gradient(#168cff var(--goal-angle,0deg),#0a2044 0);position:relative;box-shadow:0 0 25px rgba(16,128,255,.22)}.goal-ring:before{content:'';position:absolute;inset:9px;border-radius:50%;background:#061631}.goal-ring>div{position:relative;z-index:1}.goal-ring strong{font-size:31px}.goal-ring span{font-size:14px;color:#dbe8f8}.goal-ring small{display:block;font-size:9px;color:#29b7ff;margin-top:12px}.goal-btn{width:calc(100% - 28px);height:34px;border:0;border-radius:8px;background:linear-gradient(90deg,#0d4b9e,#082d67);color:#dcecff;font-size:9px;font-weight:700}
+.exact-bottom{display:grid;grid-template-columns:1fr 1.12fr 1fr;gap:14px}.command-card,.chest-card,.alerts-card{min-height:224px}.wide-link{height:34px;margin:0 14px 12px;width:calc(100% - 28px);border:0;border-radius:7px;background:#0b244b;color:#dcecff;font-size:9px;display:flex;align-items:center;justify-content:center;gap:20px}.chest-content{display:flex;gap:13px;padding:12px}.big-chest{flex:1;min-height:93px;border-radius:10px;display:grid;place-items:center;font-size:54px;background:radial-gradient(circle at 50% 70%,rgba(15,110,255,.32),transparent 55%)}.secured{width:122px;padding:11px;border-radius:9px;background:#0a2147}.secured span,.secured small{font-size:7px;color:#7e94ae;display:block}.secured strong{display:block;font-size:18px;margin:5px 0}.secured button{width:100%;height:29px;border:0;border-radius:6px;background:#0a4cad;color:white;font-size:8px;margin-top:8px}.chest-stats{display:grid;grid-template-columns:1fr 1fr;padding:0 12px 12px;gap:8px}.chest-stats div{padding:8px 10px;border-radius:8px;background:#071d3f}.chest-stats span{font-size:7px;color:#8498b0}.chest-stats b{display:block;font-size:18px;margin-top:3px}.alert-list{padding:8px 14px}.alert-list div{display:grid;grid-template-columns:25px 1fr auto;align-items:center;gap:7px;padding:7px 0;border-bottom:1px solid rgba(98,154,222,.08)}.alert-list i{width:24px;height:24px;display:grid;place-items:center;border-radius:7px;background:#351582;color:#d6c4ff;font-style:normal}.alert-list span,.alert-list b{font-size:8px}.alert-list b{font-weight:500;color:#8ca1bb}
+.bot-card{min-height:215px}.bot-online{margin:12px;padding:11px;display:flex;gap:10px;align-items:center;border-radius:9px;background:rgba(12,83,64,.22)}.bot-online i{width:35px;height:35px;display:grid;place-items:center;border-radius:50%;background:#083f2d;color:#25ef8e;font-style:normal}.bot-online b,.bot-online span{display:block;font-size:9px}.bot-online span{font-size:7px;color:#90a5bd;margin-top:2px}.bot-card ul{padding:0 14px}.bot-card li{display:flex;justify-content:space-between;padding:7px 0;font-size:8px;color:#91a5bd}.bot-card li b{color:#eef6ff}.hidden-live-badge{display:none}.current-card{padding-bottom:10px}.current-card>div{margin:8px 12px 0;padding:9px;border-radius:8px;background:#071d3f;display:flex;justify-content:space-between;font-size:8px}.current-card>div b{color:#2dc4ff}.logs-card{flex:1;min-height:230px}.system-log{padding:10px 14px}.system-log p{display:grid;grid-template-columns:12px 1fr auto;align-items:center;padding:7px 0;font-size:8px;color:#9fb0c5}.system-log i{width:7px;height:7px;border-radius:50%;border:2px solid #1ee686}.system-log time{color:#879bb4}
+@media(max-width:1350px){.exact-shell{grid-template-columns:1fr}.exact-side{display:grid;grid-template-columns:repeat(3,1fr)}.exact-mid{grid-template-columns:1fr 1.2fr}.goal-card{grid-column:1/-1}.exact-bottom{grid-template-columns:1fr 1fr}.alerts-card{grid-column:1/-1}}
+@media(max-width:900px){.exact-actions{display:none}.exact-kpis{grid-template-columns:repeat(2,1fr)}.exact-mid,.exact-bottom,.exact-side{grid-template-columns:1fr}.goal-card,.alerts-card{grid-column:auto}.exact-shell{display:block}.exact-side{margin-top:14px}.exact-hero{margin-top:12px}}
 
 </style>
     <div class="card" style="margin-bottom:16px"><div class="obs-link-head"><b>🔗 Lien overlay OBS Alertes</b><span><button class="obs-copy-btn" onclick="copyObsUrl('alerts-obs-url')">Copier</button><button class="obs-regenerate-btn" onclick="regenerateObsToken('alerts')">Régénérer</button></span></div><div class="obs-link-row"><code class="obs-link-code" id="alerts-obs-url">/widgets/alerts.html</code></div><div class="alert-mini">Chaque streamer possède son lien privé. Un lien régénéré invalide immédiatement l’ancien.</div></div>
@@ -7792,6 +7667,10 @@ setInterval(() => {
   }
 }, 10000);
 
+</script>
+
+<script>
+(function(){const obs=new MutationObserver(()=>{const a=document.getElementById('dash-sub-target'),b=document.getElementById('dash-sub-target-side');if(a&&b)b.textContent=a.textContent;});obs.observe(document.documentElement,{subtree:true,childList:true,characterData:true});})();
 </script>
 </body>
 </html>
