@@ -3924,6 +3924,72 @@ body:has(#page-dashboard.active) .ref-main-row{
   .ref-goal-ring strong{font-size:43px!important}
 }
 
+
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   ELBOT V16 — Sub Goal parfaitement centré
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.ref-goal-card{
+  display:flex!important;
+  flex-direction:column!important;
+  align-items:stretch!important;
+  justify-content:space-between!important;
+}
+
+.ref-goal-card>header{
+  flex:0 0 auto!important;
+  width:100%!important;
+}
+
+.ref-goal-card .ref-goal-ring{
+  flex:0 0 auto!important;
+  align-self:center!important;
+  justify-self:auto!important;
+  margin:auto!important;
+  position:relative!important;
+  left:auto!important;
+  right:auto!important;
+  transform:none!important;
+}
+
+.ref-goal-card .ref-wide-button{
+  flex:0 0 auto!important;
+  width:100%!important;
+  margin-top:auto!important;
+}
+
+/* Conteneur central visuel : force un vrai centrage horizontal */
+.ref-goal-card::before{
+  content:"";
+  flex:1 1 auto;
+  min-height:0;
+  order:1;
+}
+
+.ref-goal-card .ref-goal-ring{
+  order:2;
+}
+
+.ref-goal-card .ref-wide-button{
+  order:3;
+}
+
+/* Le header reste en premier */
+.ref-goal-card>header{
+  order:0;
+}
+
+/* Compensation visuelle douce : centre le cercle dans la zone utile */
+.ref-goal-card .ref-goal-ring{
+  margin-top:auto!important;
+  margin-bottom:auto!important;
+  box-shadow:
+    0 0 42px color-mix(in srgb,var(--ref-blue,#1685ff) 28%,transparent),
+    0 14px 34px rgba(0,25,70,.28),
+    inset 0 0 28px rgba(0,0,0,.26)!important;
+}
+
 </style>
     <div class="card" style="margin-bottom:16px"><div class="obs-link-head"><b>🔗 Lien overlay OBS Alertes</b><span><button class="obs-copy-btn" onclick="copyObsUrl('alerts-obs-url')">Copier</button><button class="obs-regenerate-btn" onclick="regenerateObsToken('alerts')">Régénérer</button></span></div><div class="obs-link-row"><code class="obs-link-code" id="alerts-obs-url">/widgets/alerts.html</code></div><div class="alert-mini">Chaque streamer possède son lien privé. Un lien régénéré invalide immédiatement l’ancien.</div></div>
     <div class="card alert-toolbar"><span class="alert-profile-badge">Profil actif</span><select class="inp" id="alert-profile-select" onchange="activateAlertProfile(this.value)"></select><input class="inp" id="alert-profile-name" placeholder="Nouveau profil (Noël, DBD…)"><button class="btnx btn-outline btn-sm" onclick="createAlertProfile()">Créer</button><button class="btnx btn-red btn-sm" onclick="deleteAlertProfile()">Supprimer</button></div>
