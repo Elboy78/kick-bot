@@ -3435,6 +3435,215 @@ body[data-ref-interface] .page{
   }
 }
 
+
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   ELBOT V13 — Song Request et Sub Goal conformes à la référence compacte
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* Donne plus de place aux 2 cartes sans créer de vide */
+body:has(#page-dashboard.active) .ref-main-row{
+  grid-template-columns:1fr 1.48fr .82fr!important;
+  min-height:250px!important;
+}
+body:has(#page-dashboard.active) .ref-song-card,
+body:has(#page-dashboard.active) .ref-goal-card{
+  min-height:250px!important;
+  height:100%!important;
+}
+
+/* ── SONG REQUEST : disposition comme la référence ─────────────────────── */
+.ref-song-card{
+  display:grid!important;
+  grid-template-rows:auto minmax(0,1fr) auto!important;
+  padding:12px!important;
+}
+.ref-song-card>header{
+  margin-bottom:10px!important;
+}
+.ref-song-body{
+  display:grid!important;
+  grid-template-columns:108px minmax(0,1fr)!important;
+  gap:14px!important;
+  align-items:center!important;
+  min-height:0!important;
+}
+.ref-song-cover{
+  width:108px!important;
+  height:108px!important;
+  min-height:108px!important;
+  align-self:center!important;
+  border-radius:11px!important;
+  background-size:cover!important;
+  background-position:center!important;
+}
+.ref-song-copy{
+  display:block!important;
+  align-self:center!important;
+  min-width:0!important;
+}
+.ref-song-copy small{
+  display:block!important;
+  margin-bottom:4px!important;
+  font-size:8.5px!important;
+}
+.ref-song-copy strong{
+  display:block!important;
+  margin:0!important;
+  font-size:18px!important;
+  line-height:1.15!important;
+}
+.ref-song-copy>span{
+  display:block!important;
+  margin-top:5px!important;
+  font-size:10.5px!important;
+}
+.ref-progress{
+  height:5px!important;
+  margin-top:13px!important;
+}
+.ref-song-times{
+  margin-top:4px!important;
+  font-size:8px!important;
+}
+.ref-player-controls{
+  margin-top:11px!important;
+  justify-content:center!important;
+  gap:18px!important;
+}
+.ref-player-controls button{
+  font-size:14px!important;
+}
+.ref-player-controls .ref-play{
+  width:43px!important;
+  height:43px!important;
+  font-size:16px!important;
+}
+.ref-song-card footer{
+  display:grid!important;
+  grid-template-columns:1fr minmax(180px,240px)!important;
+  gap:14px!important;
+  align-items:center!important;
+  margin-top:10px!important;
+  padding-top:10px!important;
+}
+.ref-song-card footer>div:first-child strong{
+  font-size:10px!important;
+}
+.ref-song-card footer>div:first-child small{
+  font-size:8.5px!important;
+}
+.ref-volume-control{
+  min-width:0!important;
+  width:100%!important;
+  grid-template-columns:auto 1fr 34px!important;
+  padding:7px 9px!important;
+}
+
+/* ── SUB GOAL : cercle large, centré, bouton en bas ────────────────────── */
+.ref-goal-card{
+  display:grid!important;
+  grid-template-rows:auto minmax(0,1fr) auto!important;
+  padding:12px!important;
+}
+.ref-goal-card>header{
+  margin-bottom:6px!important;
+}
+.ref-goal-card .ref-goal-ring{
+  width:min(180px,78%)!important;
+  height:min(180px,78%)!important;
+  min-width:145px!important;
+  min-height:145px!important;
+  max-width:180px!important;
+  max-height:180px!important;
+  align-self:center!important;
+  justify-self:center!important;
+  margin:auto!important;
+}
+.ref-goal-ring:after{
+  inset:9px!important;
+}
+.ref-goal-ring strong{
+  font-size:34px!important;
+}
+.ref-goal-ring span{
+  margin-top:3px!important;
+  font-size:12px!important;
+}
+.ref-goal-ring small{
+  margin-top:7px!important;
+  font-size:9px!important;
+}
+.ref-goal-card .ref-wide-button{
+  min-height:38px!important;
+  height:38px!important;
+  margin-top:8px!important;
+  font-size:9px!important;
+}
+
+/* Plus de profondeur comme la référence */
+.ref-song-card,
+.ref-goal-card{
+  background:
+    radial-gradient(circle at 72% 8%,color-mix(in srgb,var(--ref-blue,#1685ff) 12%,transparent),transparent 36%),
+    linear-gradient(145deg,rgba(7,29,65,.96),rgba(3,16,38,.97))!important;
+}
+.ref-song-cover{
+  box-shadow:
+    0 12px 28px rgba(0,38,105,.34),
+    0 0 0 1px rgba(93,175,255,.16)!important;
+}
+.ref-goal-ring{
+  box-shadow:
+    0 0 34px color-mix(in srgb,var(--ref-blue,#1685ff) 22%,transparent),
+    inset 0 0 24px rgba(0,0,0,.28)!important;
+}
+
+/* Garde une belle proportion sur écrans plus petits */
+@media(max-width:1180px){
+  .ref-song-body{
+    grid-template-columns:94px 1fr!important;
+  }
+  .ref-song-cover{
+    width:94px!important;
+    height:94px!important;
+    min-height:94px!important;
+  }
+  .ref-song-copy strong{font-size:16px!important}
+  .ref-goal-card .ref-goal-ring{
+    width:150px!important;
+    height:150px!important;
+    min-width:150px!important;
+    min-height:150px!important;
+  }
+}
+@media(max-height:780px){
+  .ref-song-card,
+  .ref-goal-card{
+    padding:10px!important;
+  }
+  .ref-song-body{
+    grid-template-columns:88px 1fr!important;
+  }
+  .ref-song-cover{
+    width:88px!important;
+    height:88px!important;
+    min-height:88px!important;
+  }
+  .ref-song-copy strong{font-size:16px!important}
+  .ref-player-controls{margin-top:8px!important}
+  .ref-player-controls .ref-play{
+    width:39px!important;
+    height:39px!important;
+  }
+  .ref-goal-card .ref-goal-ring{
+    width:140px!important;
+    height:140px!important;
+    min-width:140px!important;
+    min-height:140px!important;
+  }
+}
+
 </style>
     <div class="card" style="margin-bottom:16px"><div class="obs-link-head"><b>🔗 Lien overlay OBS Alertes</b><span><button class="obs-copy-btn" onclick="copyObsUrl('alerts-obs-url')">Copier</button><button class="obs-regenerate-btn" onclick="regenerateObsToken('alerts')">Régénérer</button></span></div><div class="obs-link-row"><code class="obs-link-code" id="alerts-obs-url">/widgets/alerts.html</code></div><div class="alert-mini">Chaque streamer possède son lien privé. Un lien régénéré invalide immédiatement l’ancien.</div></div>
     <div class="card alert-toolbar"><span class="alert-profile-badge">Profil actif</span><select class="inp" id="alert-profile-select" onchange="activateAlertProfile(this.value)"></select><input class="inp" id="alert-profile-name" placeholder="Nouveau profil (Noël, DBD…)"><button class="btnx btn-outline btn-sm" onclick="createAlertProfile()">Créer</button><button class="btnx btn-red btn-sm" onclick="deleteAlertProfile()">Supprimer</button></div>
