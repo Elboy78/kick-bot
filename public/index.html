@@ -597,102 +597,203 @@ body.light .card,body.light .panel,body.light .widget-engine-card{background:lin
 
   <!-- ══ DASHBOARD ══ -->
   <div class="page active" id="page-dashboard">
-    <div class="header">
+    <div class="header dash-head">
       <div>
-        <h1>Bonjour, <span id="dashboard-greeting-name">—</span> ! 👋</h1>
-        <p>Voici un aperçu complet de ton bot</p>
+        <div class="dash-kicker">CENTRE DE CONTRÔLE</div>
+        <h1>Bonjour, <span id="dashboard-greeting-name">—</span> !</h1>
+        <p>Ton activité, tes widgets et les informations importantes en un coup d'œil.</p>
       </div>
       <div class="header-right">
-        <button class="btn" id="open-kick-chat" onclick="openConnectedKickChannel()">💬 Voir le chat</button>
-        <button class="btn btn-connected">● Bot connecté</button>
+        <button class="btn dash-chat-btn" id="open-kick-chat" onclick="openConnectedKickChannel()">💬 Ouvrir le chat</button>
+        <button class="btn btn-connected" id="dash-bot-status">● Bot connecté</button>
       </div>
     </div>
 
-    <section class="cards">
-      <div class="card"><div class="icon ic-purple">⭐</div><p>Points distribués</p><h2 id="s-points">—</h2><p class="green">total cumulé</p></div>
-      <div class="card"><div class="icon ic-blue">👥</div><p>Viewers enregistrés</p><h2 id="sc-active">—</h2><p class="green">total chaîne</p></div>
-      <div class="card"><div class="icon ic-green">⏱</div><p>Temps regardé</p><h2 id="s-minutes" style="font-size:18px">—</h2><p class="green">cumulé tous viewers</p></div>
-      <div class="card"><div class="icon ic-pink">❤️</div><p>Followers</p><h2 id="s-followers">—</h2><p class="green" id="sc-follow-t">total chaîne</p></div>
-      <div class="card"><div class="icon ic-orange">👑</div><p>Top viewer</p><h2 id="s-top" style="font-size:16px">—</h2><p class="green" id="s-top-sub"></p></div>
+    <section class="cards dash-stats">
+      <article class="card dash-stat-card accent-purple">
+        <div class="dash-stat-top"><div class="icon ic-purple">✦</div><span>GLOBAL</span></div>
+        <p>Points distribués</p>
+        <h2 id="s-points">—</h2>
+        <div class="dash-stat-foot">Total cumulé</div>
+      </article>
+      <article class="card dash-stat-card accent-blue">
+        <div class="dash-stat-top"><div class="icon ic-blue">👥</div><span>COMMUNAUTÉ</span></div>
+        <p>Viewers enregistrés</p>
+        <h2 id="sc-active">—</h2>
+        <div class="dash-stat-foot">Comptes suivis</div>
+      </article>
+      <article class="card dash-stat-card accent-cyan">
+        <div class="dash-stat-top"><div class="icon ic-green">◷</div><span>FIDÉLITÉ</span></div>
+        <p>Temps regardé</p>
+        <h2 id="s-minutes">—</h2>
+        <div class="dash-stat-foot">Tous viewers confondus</div>
+      </article>
+      <article class="card dash-stat-card accent-pink">
+        <div class="dash-stat-top"><div class="icon ic-pink">♥</div><span>CHAÎNE</span></div>
+        <p>Followers</p>
+        <h2 id="s-followers">—</h2>
+        <div class="dash-stat-foot" id="sc-follow-t">Total chaîne</div>
+      </article>
+      <article class="card dash-stat-card accent-orange">
+        <div class="dash-stat-top"><div class="icon ic-orange">♛</div><span>TOP</span></div>
+        <p>Meilleur viewer</p>
+        <h2 id="s-top">—</h2>
+        <div class="dash-stat-foot" id="s-top-sub">—</div>
+      </article>
     </section>
 
-    <section class="grid">
-      <div class="panel">
-        <h3>Activité du chat <span style="font-size:9px;color:var(--muted2);font-weight:400">7 derniers jours</span></h3>
-        <div class="chart" id="activity-chart" style="flex-direction:column;justify-content:flex-end;padding:10px 4px 0">
-          <div id="activity-bars" style="display:flex;align-items:flex-end;gap:5px;flex:1;width:100%"></div>
-        </div>
-        <div id="activity-day-labels" style="display:flex;justify-content:space-between;padding:0 4px;margin-top:6px"></div>
-        <div class="chart-labels"><span id="chart-stat-viewers">— messages cette semaine</span><span id="chart-stat-minutes">— jour le plus actif</span></div>
-      </div>
-
-      <div class="panel">
-        <h3>Commandes populaires <button class="see-all" onclick="showPage('commands')">Voir tout</button></h3>
-        <div id="cmd-usage-list"><div class="empty"><p>Chargement…</p></div></div>
-      </div>
-
-      <div class="panel">
-        <h3>Actions rapides</h3>
-        <div class="quick">
-          <button class="purple" onclick="showPage('commands')"><span class="qi">💬</span>Commandes</button>
-          <button class="pink" onclick="showPage('jeux')"><span class="qi">🎁</span>Giveaway</button>
-          <button class="blue" onclick="showPage('lobby')"><span class="qi">🎮</span>Lobby</button>
-          <button class="orange" onclick="showPage('outils')"><span class="qi">📢</span>Annonces</button>
-          <button class="greenbg" onclick="showPage('moderation')"><span class="qi">🛡️</span>Modération</button>
-          <button class="dark" onclick="showPage('settings')"><span class="qi">⚙️</span>Paramètres</button>
-        </div>
-      </div>
-    </section>
-
-    <section class="bottom">
-      <div class="panel">
-        <h3>Événements récents <button class="see-all" onclick="showPage('historique')">Voir tout</button></h3>
-        <ul class="events" id="dash-events"><li><div class="empty"><p>Chargement…</p></div></li></ul>
-      </div>
-
-      <div class="panel">
-        <h3>Utilisation des commandes</h3>
-        <div class="donut-wrap">
-          <div style="position:relative;width:220px;height:220px;margin:15px auto">
-            <svg viewBox="0 0 200 200" width="220" height="220" id="cmd-donut-svg-wrap">
-              <g id="cmd-donut-svg"></g>
-            </svg>
-            <div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center">
-              <b id="donut-total" style="font-size:28px">0</b>
-              <small style="font-size:10px;color:var(--muted)">Total</small>
-            </div>
+    <section class="dash-layout">
+      <div class="dash-main-column">
+        <article class="panel dash-panel dash-activity-panel">
+          <div class="dash-panel-head">
+            <div><span class="dash-panel-icon">⌁</span><div><h3>Activité du chat</h3><p>Évolution sur les 7 derniers jours</p></div></div>
+            <span class="dash-live-chip" id="dash-activity-chip">Temps réel</span>
           </div>
-          <div class="donut-legend" id="donut-legend"></div>
+          <div class="chart dash-chart" id="activity-chart">
+            <div id="activity-bars" class="dash-bars"></div>
+          </div>
+          <div id="activity-day-labels" class="dash-day-labels"></div>
+          <div class="dash-chart-summary">
+            <span id="chart-stat-viewers">— messages cette semaine</span>
+            <span id="chart-stat-minutes">— jour le plus actif</span>
+          </div>
+        </article>
+
+        <div class="dash-two">
+          <article class="panel dash-panel">
+            <div class="dash-panel-head">
+              <div><span class="dash-panel-icon">♫</span><div><h3>Song Request</h3><p>Lecture et file d'attente</p></div></div>
+              <button class="see-all" onclick="showWidgetSettings('songrequest')">Gérer</button>
+            </div>
+            <div class="dash-song">
+              <div class="dash-song-cover" id="dash-sr-cover">♫</div>
+              <div class="dash-song-info">
+                <strong id="dash-sr-title">Aucune musique en lecture</strong>
+                <span id="dash-sr-meta">La file est vide</span>
+                <div class="dash-song-progress"><i id="dash-sr-progress"></i></div>
+                <div class="dash-song-times"><span id="dash-sr-time">0:00</span><span id="dash-sr-duration">0:00</span></div>
+              </div>
+            </div>
+            <div class="dash-song-footer">
+              <span><b id="dash-sr-count">0</b> titre(s) dans la file</span>
+              <span id="dash-sr-state" class="dash-state-pill">Arrêté</span>
+            </div>
+          </article>
+
+          <article class="panel dash-panel">
+            <div class="dash-panel-head">
+              <div><span class="dash-panel-icon">◎</span><div><h3>Sub Goal</h3><p>Progression actuelle</p></div></div>
+              <button class="see-all" onclick="showWidgetSettings('subgoal')">Configurer</button>
+            </div>
+            <div class="dash-subgoal">
+              <div class="dash-goal-ring" id="dash-goal-ring">
+                <div><strong id="dash-sub-current">0</strong><span>sur <b id="dash-sub-target">50</b></span></div>
+              </div>
+              <div class="dash-goal-copy">
+                <strong id="dash-sub-label">Sub Goal</strong>
+                <span id="dash-sub-percent">0% accompli</span>
+                <div class="dash-mini-stats">
+                  <div><b id="dash-sub-session">0</b><small>Session</small></div>
+                  <div><b id="dash-sub-gifts">0</b><small>Gifts</small></div>
+                  <div><b id="dash-sub-renewals">0</b><small>Renouvellements</small></div>
+                </div>
+              </div>
+            </div>
+          </article>
         </div>
+
+        <div class="dash-two">
+          <article class="panel dash-panel">
+            <div class="dash-panel-head">
+              <div><span class="dash-panel-icon">⌘</span><div><h3>Commandes populaires</h3><p>Les plus utilisées</p></div></div>
+              <button class="see-all" onclick="showPage('commands')">Voir tout</button>
+            </div>
+            <div id="cmd-usage-list"><div class="empty"><p>Chargement…</p></div></div>
+          </article>
+
+          <article class="panel dash-panel">
+            <div class="dash-panel-head">
+              <div><span class="dash-panel-icon">⚡</span><div><h3>Actions rapides</h3><p>Accès direct aux modules</p></div></div>
+            </div>
+            <div class="quick dash-quick">
+              <button class="purple" onclick="showPage('commands')"><span class="qi">💬</span><b>Commandes</b></button>
+              <button class="pink" onclick="showPage('jeux')"><span class="qi">🎁</span><b>Giveaway</b></button>
+              <button class="blue" onclick="showPage('lobby')"><span class="qi">🎮</span><b>Lobby</b></button>
+              <button class="orange" onclick="showPage('outils')"><span class="qi">📢</span><b>Annonces</b></button>
+            </div>
+          </article>
+        </div>
+
+        <article class="panel dash-panel">
+          <div class="dash-panel-head">
+            <div><span class="dash-panel-icon">↺</span><div><h3>Événements récents</h3><p>Dernières activités enregistrées</p></div></div>
+            <button class="see-all" onclick="showPage('historique')">Historique</button>
+          </div>
+          <ul class="events dash-events" id="dash-events"><li><div class="empty"><p>Chargement…</p></div></li></ul>
+        </article>
       </div>
 
-      <div class="panel">
-        <h3>Informations</h3>
-        <ul class="info">
-          <li><span>Statut</span><span class="online">● En ligne</span></li>
-          <li><span>Chaîne</span><span id="settings-channel-name">Connecté</span></li>
-          <li><span>Viewers</span><span id="ic-viewers">—</span></li>
-          <li><span>Followers</span><span id="ic-followers">—</span></li>
-          <li><span>Statut live</span><span id="ic-live-badge" class="ic-offline-badge">Hors ligne</span></li>
-          <li><span>Vu par le bot</span><span id="ic-bot-live-status">—</span></li>
-          <li><span>Uptime</span><span id="ic-uptime">—</span></li>
-          <li><span>Langue</span><span>🇫🇷 Français</span></li>
-          <li><span>Version</span><span>v2.1.0</span></li>
-        </ul>
-      </div>
+      <aside class="dash-side-column">
+        <article class="panel dash-panel dash-status-card">
+          <div class="dash-panel-head">
+            <div><span class="dash-panel-icon">●</span><div><h3>État du système</h3><p>Informations en direct</p></div></div>
+          </div>
+          <div class="dash-status-hero">
+            <span class="dash-pulse"></span>
+            <div><strong>ElBot opérationnel</strong><small id="ic-bot-live-status">Vérification…</small></div>
+          </div>
+          <ul class="info dash-info">
+            <li><span>Chaîne</span><span id="settings-channel-name">Connecté</span></li>
+            <li><span>Viewers</span><span id="ic-viewers">—</span></li>
+            <li><span>Followers</span><span id="ic-followers">—</span></li>
+            <li><span>Live</span><span id="ic-live-badge" class="ic-offline-badge">Hors ligne</span></li>
+            <li><span>Uptime</span><span id="ic-uptime">—</span></li>
+          </ul>
+        </article>
 
-      <!-- Courbe viewers live -->
-      <div class="panel">
-        <h3>📈 Viewers en direct <span id="viewers-live-status" style="font-size:10px;color:var(--muted);font-weight:400">hors ligne</span></h3>
-        <div id="viewers-live-chart" style="height:80px;display:flex;align-items:flex-end;gap:3px;padding:4px 0">
-          <div style="color:var(--muted);font-size:11px;width:100%;text-align:center;line-height:80px">Démarre quand tu es en live</div>
-        </div>
-        <div style="display:flex;justify-content:space-between;font-size:9px;color:var(--muted2);margin-top:4px">
-          <span id="viewers-live-min">min</span>
-          <span id="viewers-live-avg">moy</span>
-          <span id="viewers-live-peak">pic</span>
-        </div>
-      </div>
+        <article class="panel dash-panel">
+          <div class="dash-panel-head">
+            <div><span class="dash-panel-icon">▣</span><div><h3>Coffre sécurisé</h3><p>Saison en cours</p></div></div>
+            <button class="see-all" onclick="showPage('chests')">Ouvrir</button>
+          </div>
+          <div class="dash-chest-card">
+            <div class="dash-chest-visual">🔒</div>
+            <div><span>Coffre protégé</span><strong id="dash-chest-number">Aucun</strong></div>
+          </div>
+          <div class="dash-chest-meta">
+            <div><b id="dash-chest-season">—</b><span>Saison</span></div>
+            <div><b id="dash-chest-opened">0</b><span>Ouverts</span></div>
+            <div><b id="dash-chest-left">30</b><span>Restants</span></div>
+          </div>
+        </article>
+
+        <article class="panel dash-panel">
+          <div class="dash-panel-head">
+            <div><span class="dash-panel-icon">📈</span><div><h3>Viewers en direct</h3><p id="viewers-live-status">Hors ligne</p></div></div>
+          </div>
+          <div id="viewers-live-chart" class="dash-viewers-chart">
+            <div class="dash-chart-empty">Démarre automatiquement pendant le live</div>
+          </div>
+          <div class="dash-viewers-foot">
+            <span id="viewers-live-min">min</span>
+            <span id="viewers-live-avg">moy</span>
+            <span id="viewers-live-peak">pic</span>
+          </div>
+        </article>
+
+        <article class="panel dash-panel">
+          <div class="dash-panel-head">
+            <div><span class="dash-panel-icon">◫</span><div><h3>Utilisation des commandes</h3><p>Répartition globale</p></div></div>
+          </div>
+          <div class="donut-wrap dash-donut">
+            <div class="dash-donut-wrap">
+              <svg viewBox="0 0 200 200" id="cmd-donut-svg-wrap"><g id="cmd-donut-svg"></g></svg>
+              <div><b id="donut-total">0</b><small>Total</small></div>
+            </div>
+            <div class="donut-legend" id="donut-legend"></div>
+          </div>
+        </article>
+      </aside>
     </section>
   </div>
 
@@ -1575,7 +1676,83 @@ Option 3" rows="4"></textarea><div style="display:flex;gap:6px;margin-top:10px">
     <style>
       .alert-toolbar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:16px}.alert-toolbar .inp{max-width:220px}.alert-tabs{display:flex;gap:8px;flex-wrap:wrap;margin:12px 0 18px}.alert-tab{border:1px solid var(--brd);background:#151824;color:var(--text);border-radius:10px;padding:10px 14px;font-weight:900;cursor:pointer}.alert-tab.active{border-color:#22c55e;background:rgba(34,197,94,.18)}
       .alert-grid{display:grid;grid-template-columns:minmax(0,1fr) 430px;gap:18px}.alert-form{display:grid;grid-template-columns:190px minmax(0,1fr);gap:12px;align-items:center}.alert-form label{color:var(--muted);font-weight:800;font-size:12px}.alert-preview{min-height:310px;display:flex;align-items:center;justify-content:center;background:radial-gradient(circle at 50% 10%,rgba(34,197,94,.12),rgba(0,0,0,.25));border:1px solid var(--brd);border-radius:16px;overflow:hidden;padding:20px}.alert-preview-card{min-width:260px;max-width:370px;text-align:center;padding:24px;border-radius:20px;background:rgba(5,8,15,.86);box-shadow:0 18px 50px rgba(0,0,0,.45);border:1px solid rgba(255,255,255,.12)}.alert-preview-card img,.alert-preview-card video{max-width:150px;max-height:110px;object-fit:contain;border-radius:12px;margin-bottom:12px}.alert-layout-left{display:flex;align-items:center;gap:16px;text-align:left}.alert-layout-right{display:flex;align-items:center;gap:16px;flex-direction:row-reverse;text-align:right}.alert-layout-left img,.alert-layout-left video,.alert-layout-right img,.alert-layout-right video{margin:0}.alert-text-only img,.alert-text-only video{display:none}.alert-mini{font-size:11px;color:var(--muted);line-height:1.5}.alert-actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:16px}.alert-switch{position:relative;width:46px;height:24px;display:inline-block}.alert-switch input{opacity:0;width:0;height:0}.alert-switch span{position:absolute;inset:0;border-radius:999px;background:#2c3140;cursor:pointer;transition:.2s}.alert-switch span:after{content:"";position:absolute;width:18px;height:18px;left:3px;top:3px;border-radius:50%;background:#fff;transition:.2s}.alert-switch input:checked+span{background:#22c55e}.alert-switch input:checked+span:after{transform:translateX(22px)}.alert-upload-row{display:flex;gap:8px;align-items:center}.alert-upload-row input[type=file]{max-width:180px;font-size:11px}.alert-profile-badge{font-size:11px;font-weight:900;color:#86efac;border:1px solid rgba(34,197,94,.35);padding:6px 9px;border-radius:999px}.alert-history{max-height:250px;overflow:auto;display:flex;flex-direction:column;gap:8px}.alert-history-item{padding:10px 12px;border-radius:10px;border:1px solid var(--brd);background:rgba(255,255,255,.025);font-size:11px}.alert-history-item b{display:block;margin-bottom:3px}.alert-range{display:flex;gap:10px;align-items:center}.alert-range output{min-width:42px;text-align:right;font-weight:900;color:#86efac}@media(max-width:1050px){.alert-grid{grid-template-columns:1fr}.alert-form{grid-template-columns:1fr}}
-    </style>
+    
+/* ══ DASHBOARD LIQUID GLASS COMPLET ══ */
+#page-dashboard{max-width:1680px;margin:0 auto;animation:dashEnter .42s cubic-bezier(.2,.8,.2,1)}
+@keyframes dashEnter{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+.dash-head{margin-bottom:16px!important}
+.dash-kicker{font-size:8px;letter-spacing:1.8px;color:#58bdff;font-weight:800;margin-bottom:5px}
+.dash-head h1{font-size:25px!important}
+.dash-head .btn{height:38px}
+.dash-chat-btn{background:rgba(10,89,176,.22)!important}
+.dash-stats{gap:11px!important;margin-bottom:12px!important}
+.dash-stat-card{position:relative;overflow:hidden;min-height:132px;padding:15px!important;border-color:rgba(117,179,255,.13)!important;background:linear-gradient(145deg,rgba(11,35,76,.77),rgba(5,17,42,.62))!important;backdrop-filter:blur(24px);box-shadow:inset 0 1px 0 rgba(255,255,255,.07),0 15px 36px rgba(0,7,25,.22)}
+.dash-stat-card:after{content:'';position:absolute;width:110px;height:110px;border-radius:50%;right:-45px;top:-55px;background:var(--stat-glow,rgba(52,146,255,.22));filter:blur(10px);transition:.35s}
+.dash-stat-card:hover{transform:translateY(-4px)!important;box-shadow:inset 0 1px 0 rgba(255,255,255,.1),0 22px 48px rgba(0,7,25,.35)}
+.dash-stat-card:hover:after{transform:scale(1.25)}
+.dash-stat-card.accent-purple{--stat-glow:rgba(137,84,255,.32)}
+.dash-stat-card.accent-blue{--stat-glow:rgba(35,130,255,.32)}
+.dash-stat-card.accent-cyan{--stat-glow:rgba(46,211,255,.28)}
+.dash-stat-card.accent-pink{--stat-glow:rgba(255,67,159,.26)}
+.dash-stat-card.accent-orange{--stat-glow:rgba(255,139,51,.28)}
+.dash-stat-top{display:flex;align-items:center;justify-content:space-between}
+.dash-stat-top .icon{margin:0;width:35px;height:35px;border-radius:11px;font-size:15px}
+.dash-stat-top>span{font-size:7px;letter-spacing:1.25px;color:#6f89aa;font-weight:800}
+.dash-stat-card>p{margin-top:13px;font-size:9px!important}
+.dash-stat-card h2{font-size:23px!important;margin:5px 0 3px!important;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.dash-stat-foot{font-size:8px;color:#54bdff;font-weight:650}
+.dash-layout{display:grid;grid-template-columns:minmax(0,1fr) 315px;gap:12px;align-items:start}
+.dash-main-column,.dash-side-column{display:flex;flex-direction:column;gap:12px;min-width:0}
+.dash-two{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.dash-panel{padding:15px!important;border-radius:16px!important;background:linear-gradient(145deg,rgba(8,29,65,.74),rgba(4,15,38,.64))!important;border-color:rgba(116,181,255,.13)!important;backdrop-filter:blur(26px);box-shadow:inset 0 1px 0 rgba(255,255,255,.065),0 18px 45px rgba(0,7,24,.18);transition:transform .22s ease,border-color .22s ease,box-shadow .22s ease}
+.dash-panel:hover{border-color:rgba(55,159,255,.28)!important;box-shadow:inset 0 1px 0 rgba(255,255,255,.08),0 24px 56px rgba(0,7,24,.28)}
+.dash-panel-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:13px}
+.dash-panel-head>div{display:flex;align-items:center;gap:9px;min-width:0}
+.dash-panel-head h3{margin:0!important;font-size:11px!important}
+.dash-panel-head p{font-size:8px;color:#7890ad;margin-top:2px}
+.dash-panel-icon{width:29px;height:29px;display:grid;place-items:center;border-radius:9px;background:linear-gradient(145deg,rgba(30,133,255,.24),rgba(15,82,178,.15));border:1px solid rgba(64,164,255,.2);color:#62c4ff;font-size:12px;flex-shrink:0}
+.dash-live-chip,.dash-state-pill{font-size:8px;padding:4px 8px;border-radius:999px;background:rgba(38,226,146,.1);border:1px solid rgba(54,230,153,.22);color:#55e6a2}
+.dash-chart{height:178px!important;padding:8px 5px 0!important;background:linear-gradient(180deg,rgba(19,124,255,.02),rgba(20,134,255,.1))!important;border-radius:11px 11px 0 0;border-bottom-color:rgba(81,166,255,.2)!important}
+.dash-bars{display:flex;align-items:flex-end;gap:6px;flex:1;width:100%}
+.dash-bars>div{transition:transform .2s ease}.dash-bars>div:hover{transform:translateY(-3px)}
+.dash-day-labels{display:flex;justify-content:space-between;padding:5px 4px 0}
+.dash-day-labels span{font-size:8px;color:#637895}
+.dash-chart-summary{display:flex;justify-content:space-between;gap:10px;margin-top:8px;font-size:8px;color:#7289a5}
+.dash-song{display:flex;gap:12px;align-items:center}
+.dash-song-cover{width:68px;height:68px;border-radius:13px;display:grid;place-items:center;flex-shrink:0;background:radial-gradient(circle at 30% 20%,#2e9fff,#0a3d91 55%,#061d48);border:1px solid rgba(98,191,255,.28);box-shadow:0 9px 24px rgba(0,82,190,.26);font-size:24px;overflow:hidden;background-size:cover;background-position:center}
+.dash-song-info{min-width:0;flex:1}
+.dash-song-info strong{font-size:11px;display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.dash-song-info>span{font-size:8px;color:#7890ad;display:block;margin:4px 0 10px}
+.dash-song-progress{height:4px;border-radius:999px;background:rgba(135,188,255,.12);overflow:hidden}
+.dash-song-progress i{display:block;height:100%;width:0;background:linear-gradient(90deg,#2b9fff,#72d4ff);border-radius:inherit;transition:width .35s linear}
+.dash-song-times,.dash-song-footer{display:flex;justify-content:space-between;align-items:center;font-size:7px;color:#7086a1;margin-top:5px}
+.dash-song-footer{border-top:1px solid rgba(120,182,255,.1);padding-top:10px;margin-top:12px;font-size:8px}
+.dash-subgoal{display:flex;align-items:center;gap:18px}
+.dash-goal-ring{width:116px;height:116px;border-radius:50%;display:grid;place-items:center;flex-shrink:0;background:conic-gradient(#2c9fff 0deg,#2c9fff var(--goal-angle,0deg),rgba(105,169,255,.11) var(--goal-angle,0deg));position:relative;box-shadow:0 0 30px rgba(32,139,255,.16)}
+.dash-goal-ring:after{content:'';position:absolute;inset:9px;border-radius:50%;background:linear-gradient(145deg,#071a3d,#051229);border:1px solid rgba(115,185,255,.13)}
+.dash-goal-ring>div{position:relative;z-index:1;text-align:center}.dash-goal-ring strong{font-size:25px;display:block}.dash-goal-ring span{font-size:8px;color:#7e94ae}.dash-goal-ring b{color:#65c6ff}
+.dash-goal-copy{flex:1}.dash-goal-copy>strong{font-size:12px}.dash-goal-copy>span{display:block;font-size:8px;color:#57c4ff;margin-top:5px}
+.dash-mini-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:5px;margin-top:12px}.dash-mini-stats div{padding:7px 4px;border-radius:8px;background:rgba(60,139,232,.08);text-align:center}.dash-mini-stats b{display:block;font-size:11px}.dash-mini-stats small{font-size:6px;color:#758aa4}
+.dash-quick{grid-template-columns:1fr 1fr!important}.dash-quick button{min-height:70px;padding:11px!important;border-radius:11px!important;gap:5px!important}.dash-quick b{font-size:9px}.dash-quick .qi{font-size:15px!important}
+.dash-events{display:grid;grid-template-columns:1fr 1fr;gap:0 16px}.dash-events li{min-height:54px}
+.dash-status-hero{display:flex;align-items:center;gap:10px;padding:11px;border-radius:11px;background:linear-gradient(135deg,rgba(35,220,142,.1),rgba(16,119,255,.08));border:1px solid rgba(50,220,149,.15);margin-bottom:8px}
+.dash-pulse{width:10px;height:10px;border-radius:50%;background:#46e996;box-shadow:0 0 0 6px rgba(70,233,150,.09),0 0 18px rgba(70,233,150,.65);animation:dashPulse 1.8s infinite}
+@keyframes dashPulse{50%{box-shadow:0 0 0 10px rgba(70,233,150,0),0 0 20px rgba(70,233,150,.45)}}
+.dash-status-hero strong{display:block;font-size:10px}.dash-status-hero small{display:block;color:#7e95af;font-size:7px;margin-top:2px}
+.dash-info li{padding:8px 0!important}
+.dash-chest-card{display:flex;align-items:center;gap:12px;padding:12px;border-radius:12px;background:radial-gradient(circle at 20% 20%,rgba(255,176,65,.18),transparent 42%),linear-gradient(145deg,rgba(78,45,17,.34),rgba(19,18,29,.52));border:1px solid rgba(255,179,73,.18)}
+.dash-chest-visual{width:57px;height:57px;border-radius:12px;display:grid;place-items:center;background:linear-gradient(145deg,#8a5328,#3b2011);border:2px solid #99714a;font-size:23px;box-shadow:0 10px 24px rgba(0,0,0,.3)}
+.dash-chest-card span{font-size:8px;color:#a89178;display:block}.dash-chest-card strong{font-size:19px;color:#ffbd67}
+.dash-chest-meta{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-top:9px}.dash-chest-meta div{text-align:center;padding:7px 3px;border-radius:8px;background:rgba(103,147,203,.07)}.dash-chest-meta b{display:block;font-size:11px}.dash-chest-meta span{font-size:6px;color:#7186a0}
+.dash-viewers-chart{height:90px;display:flex;align-items:flex-end;gap:3px;padding:4px 0}.dash-chart-empty{margin:auto;color:#667d99;font-size:8px;text-align:center}
+.dash-viewers-foot{display:flex;justify-content:space-between;font-size:7px;color:#637894;margin-top:4px}
+.dash-donut-wrap{position:relative;width:150px;height:150px;margin:3px auto 10px}.dash-donut-wrap svg{width:150px;height:150px}.dash-donut-wrap>div{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center}.dash-donut-wrap b{font-size:22px}.dash-donut-wrap small{font-size:7px;color:#7187a1}
+.dash-donut .donut-legend{max-height:92px;overflow:auto}
+@media(max-width:1280px){.dash-layout{grid-template-columns:1fr}.dash-side-column{display:grid;grid-template-columns:1fr 1fr}.dash-stats{grid-template-columns:repeat(3,1fr)!important}}
+@media(max-width:850px){.dash-two,.dash-side-column{grid-template-columns:1fr}.dash-events{grid-template-columns:1fr}.dash-stats{grid-template-columns:1fr 1fr!important}}
+@media(max-width:520px){.dash-stats{grid-template-columns:1fr!important}.dash-subgoal{align-items:flex-start}.dash-goal-ring{width:98px;height:98px}}
+
+</style>
     <div class="card" style="margin-bottom:16px"><div class="obs-link-head"><b>🔗 Lien overlay OBS Alertes</b><span><button class="obs-copy-btn" onclick="copyObsUrl('alerts-obs-url')">Copier</button><button class="obs-regenerate-btn" onclick="regenerateObsToken('alerts')">Régénérer</button></span></div><div class="obs-link-row"><code class="obs-link-code" id="alerts-obs-url">/widgets/alerts.html</code></div><div class="alert-mini">Chaque streamer possède son lien privé. Un lien régénéré invalide immédiatement l’ancien.</div></div>
     <div class="card alert-toolbar"><span class="alert-profile-badge">Profil actif</span><select class="inp" id="alert-profile-select" onchange="activateAlertProfile(this.value)"></select><input class="inp" id="alert-profile-name" placeholder="Nouveau profil (Noël, DBD…)"><button class="btnx btn-outline btn-sm" onclick="createAlertProfile()">Créer</button><button class="btnx btn-red btn-sm" onclick="deleteAlertProfile()">Supprimer</button></div>
     <div class="alert-tabs" id="alert-tabs"></div>
@@ -2202,6 +2379,7 @@ async function loadAll() {
   loadLiveStatus();
   checkBotTokenStatus();
   await Promise.all([loadStats(), loadDashLB(), loadDashLogs(), loadCmdUsage(), loadLevels(), loadActiveGiveaway(), loadChatActivityWeek()]);
+  await loadDashboardModules();
   const el = document.getElementById('upd');
   if(el) el.textContent = new Date().toLocaleTimeString('fr-FR');
 }
@@ -7444,5 +7622,99 @@ document.addEventListener('keydown', event => {
 });
 </script>
 
+
+<script>
+
+// ── Dashboard enrichi ─────────────────────────────────────────────────────────
+async function loadDashboardModules() {
+  await Promise.allSettled([
+    loadDashboardSongRequest(),
+    loadDashboardSubGoal(),
+    loadDashboardChest()
+  ]);
+}
+
+async function loadDashboardSongRequest() {
+  try {
+    const r = await fetch(API + '/api/widgets/songrequest?ts=' + Date.now(), { cache:'no-store' });
+    const d = await r.json();
+    const queue = Array.isArray(d.queue) ? d.queue : [];
+    const player = d.player || {};
+    const current = queue[0] || null;
+    const setText = (id, value) => { const el = document.getElementById(id); if (el) el.textContent = value; };
+
+    setText('dash-sr-count', queue.length);
+    setText('dash-sr-title', current?.title || 'Aucune musique en lecture');
+    setText('dash-sr-meta', current ? (current.requestedBy ? 'Demandé par ' + current.requestedBy : 'Song Request') : 'La file est vide');
+    setText('dash-sr-time', fmtSongTime(player.currentTime || 0));
+    setText('dash-sr-duration', fmtSongTime(player.duration || current?.duration || 0));
+
+    const status = String(player.status || 'stopped').toLowerCase();
+    setText('dash-sr-state', status === 'playing' ? 'Lecture' : status === 'paused' ? 'Pause' : 'Arrêté');
+
+    const state = document.getElementById('dash-sr-state');
+    if (state) state.classList.toggle('paused', status !== 'playing');
+
+    const duration = Math.max(Number(player.duration || current?.duration || 0), 0);
+    const pct = duration > 0 ? Math.min(100, Math.max(0, Number(player.currentTime || 0) / duration * 100)) : 0;
+    const progress = document.getElementById('dash-sr-progress');
+    if (progress) progress.style.width = pct + '%';
+
+    const cover = document.getElementById('dash-sr-cover');
+    if (cover) {
+      const image = current?.thumbnail || current?.thumbnailUrl || current?.image || '';
+      cover.style.backgroundImage = image ? `url("${String(image).replace(/"/g, '%22')}")` : '';
+      cover.textContent = image ? '' : '♫';
+    }
+  } catch (e) {}
+}
+
+async function loadDashboardSubGoal() {
+  try {
+    const r = await fetch(API + '/api/widgets/subcounter?ts=' + Date.now(), { cache:'no-store' });
+    const d = await r.json();
+    const current = parseInt(d.total || d.current || 0, 10) || 0;
+    const target = parseInt(d.target || 50, 10) || 50;
+    const pct = target > 0 ? Math.min(100, Math.round(current / target * 100)) : 0;
+    const setText = (id, value) => { const el = document.getElementById(id); if (el) el.textContent = value; };
+
+    setText('dash-sub-current', current);
+    setText('dash-sub-target', target);
+    setText('dash-sub-percent', pct + '% accompli');
+    setText('dash-sub-label', d.label || 'Sub Goal');
+    setText('dash-sub-session', parseInt(d.session || 0, 10) || 0);
+    setText('dash-sub-gifts', parseInt(d.gifts || 0, 10) || 0);
+    setText('dash-sub-renewals', parseInt(d.renewals || 0, 10) || 0);
+
+    const ring = document.getElementById('dash-goal-ring');
+    if (ring) ring.style.setProperty('--goal-angle', (pct * 3.6) + 'deg');
+  } catch (e) {}
+}
+
+async function loadDashboardChest() {
+  try {
+    const r = await fetch(API + '/api/chests?ts=' + Date.now(), { cache:'no-store' });
+    const d = await r.json();
+    const chests = Array.isArray(d.chests) ? d.chests : [];
+    const secured = chests.find(chest => chest.secured);
+    const opened = chests.filter(chest => chest.opened).length;
+    const total = chests.length || 30;
+    const setText = (id, value) => { const el = document.getElementById(id); if (el) el.textContent = value; };
+
+    setText('dash-chest-number', secured ? '#' + String(secured.number).padStart(2, '0') : 'Aucun');
+    setText('dash-chest-season', d.season?.num ?? '—');
+    setText('dash-chest-opened', opened);
+    setText('dash-chest-left', Math.max(0, total - opened));
+  } catch (e) {}
+}
+
+setInterval(() => {
+  if (document.getElementById('page-dashboard')?.classList.contains('active')) {
+    loadDashboardSongRequest();
+    loadDashboardSubGoal();
+  }
+}, 10000);
+
+</script>
 </body>
 </html>
