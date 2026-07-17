@@ -2420,6 +2420,279 @@ body[data-ref-interface="aurora"]:after{
   box-shadow:0 0 25px rgba(20,127,255,.55)!important;
 }
 
+
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   ELBOT V9 — dashboard sans scroll, fonds visibles, textes plus lisibles
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* Le fond choisi doit réellement apparaître derrière tout le panel */
+.main{
+  background:transparent!important;
+  position:relative;
+}
+body[data-ref-interface="classic"] .main{
+  background:
+    linear-gradient(rgba(33,112,211,.025) 1px,transparent 1px),
+    linear-gradient(90deg,rgba(33,112,211,.025) 1px,transparent 1px),
+    radial-gradient(circle at 52% -12%,rgba(13,102,242,.24),transparent 34%),
+    linear-gradient(180deg,#06152f 0%,#020817 58%,#01040a 100%)!important;
+  background-size:46px 46px,46px 46px,auto,auto!important;
+}
+body[data-ref-interface="liquid"] .main{
+  background:
+    radial-gradient(ellipse at 12% 8%,rgba(91,200,255,.30),transparent 26%),
+    radial-gradient(ellipse at 86% 13%,rgba(146,89,255,.28),transparent 29%),
+    radial-gradient(ellipse at 52% 88%,rgba(43,125,255,.16),transparent 35%),
+    linear-gradient(135deg,#102b48 0%,#071426 42%,#05091a 70%,#111a35 100%)!important;
+}
+body[data-ref-interface="liquid"] .main:before{
+  content:"";position:absolute;inset:0;pointer-events:none;opacity:.72;
+  background:
+    linear-gradient(118deg,transparent 28%,rgba(255,255,255,.07) 35%,transparent 43%),
+    linear-gradient(136deg,transparent 52%,rgba(99,187,255,.08) 59%,transparent 68%);
+}
+body[data-ref-interface="neon"] .main{
+  background:
+    repeating-linear-gradient(122deg,transparent 0 84px,color-mix(in srgb,var(--ref-blue,#874dff) 9%,transparent) 85px 87px,transparent 88px 166px),
+    radial-gradient(circle at 70% 5%,color-mix(in srgb,var(--ref-blue,#874dff) 28%,transparent),transparent 34%),
+    radial-gradient(circle at 18% 78%,rgba(0,230,255,.11),transparent 26%),
+    linear-gradient(180deg,#070315 0%,#020207 70%,#010103 100%)!important;
+}
+body[data-ref-interface="dbd"] .main{
+  background:
+    repeating-linear-gradient(111deg,transparent 0 128px,rgba(185,47,35,.065) 129px 132px,transparent 133px 188px),
+    radial-gradient(ellipse at 50% 102%,rgba(177,177,164,.13),transparent 34%),
+    radial-gradient(circle at 80% 0%,rgba(151,38,29,.18),transparent 31%),
+    linear-gradient(180deg,#171412 0%,#080706 55%,#020202 100%)!important;
+}
+body[data-ref-interface="dbd"] .main:before{
+  content:"";position:absolute;inset:0;pointer-events:none;opacity:.4;
+  background:
+    linear-gradient(101deg,transparent 35%,rgba(255,255,255,.03) 36%,transparent 37%),
+    linear-gradient(106deg,transparent 62%,rgba(160,31,22,.08) 63%,transparent 64%);
+}
+body[data-ref-interface="midnight"] .main{
+  background:
+    radial-gradient(circle at 12% 20%,rgba(255,255,255,.12) 0 1px,transparent 1.4px),
+    radial-gradient(circle at 78% 34%,rgba(255,255,255,.10) 0 1px,transparent 1.4px),
+    radial-gradient(circle at 45% 75%,rgba(255,255,255,.08) 0 1px,transparent 1.4px),
+    radial-gradient(circle at 52% -8%,rgba(71,86,119,.18),transparent 34%),
+    linear-gradient(180deg,#080b12 0%,#020306 76%,#010102 100%)!important;
+  background-size:210px 210px,270px 270px,340px 340px,auto,auto!important;
+}
+body[data-ref-interface="aurora"] .main{
+  background:
+    linear-gradient(118deg,transparent 16%,rgba(24,220,255,.10) 31%,transparent 43%),
+    linear-gradient(133deg,transparent 43%,rgba(155,72,255,.13) 56%,transparent 68%),
+    linear-gradient(147deg,transparent 63%,rgba(37,231,173,.08) 74%,transparent 83%),
+    radial-gradient(circle at 18% -8%,rgba(21,197,255,.27),transparent 29%),
+    radial-gradient(circle at 80% 4%,rgba(148,62,255,.29),transparent 33%),
+    linear-gradient(180deg,#071b31 0%,#080924 53%,#03101b 100%)!important;
+}
+
+/* Dashboard : aucune barre de défilement et tout tient dans la fenêtre */
+body:has(#page-dashboard.active){
+  overflow:hidden!important;
+}
+body:has(#page-dashboard.active) .sidebar{
+  overflow:hidden!important;
+}
+body:has(#page-dashboard.active) .main{
+  height:100vh!important;
+  min-height:100vh!important;
+  overflow:hidden!important;
+  padding:0 10px 8px!important;
+}
+body:has(#page-dashboard.active) .elbot-topbar{
+  position:relative!important;
+  top:0!important;
+  height:46px!important;
+  margin:0 0 6px!important;
+  border-radius:0 0 13px 13px!important;
+  flex:0 0 46px!important;
+}
+body:has(#page-dashboard.active) .ref-dashboard{
+  height:calc(100vh - 52px)!important;
+  min-height:0!important;
+  padding:0 0 8px!important;
+  overflow:hidden!important;
+}
+body:has(#page-dashboard.active) .ref-shell{
+  height:100%!important;
+  min-height:0!important;
+  grid-template-columns:minmax(0,1fr) 250px!important;
+  gap:8px!important;
+}
+body:has(#page-dashboard.active) .ref-content{
+  height:100%!important;
+  min-height:0!important;
+  display:grid!important;
+  grid-template-rows:52px 84px minmax(0,1.04fr) minmax(0,.96fr)!important;
+  gap:7px!important;
+}
+body:has(#page-dashboard.active) .ref-rail{
+  height:100%!important;
+  min-height:0!important;
+  display:grid!important;
+  grid-template-rows:auto auto minmax(0,1fr) minmax(125px,.62fr)!important;
+  gap:7px!important;
+}
+body:has(#page-dashboard.active) .ref-welcome{
+  min-height:0!important;
+  height:52px!important;
+  margin:0!important;
+  padding:0 4px!important;
+}
+body:has(#page-dashboard.active) .ref-welcome h1{
+  font-size:22px!important;
+}
+body:has(#page-dashboard.active) .ref-welcome p{
+  margin-top:2px!important;
+}
+body:has(#page-dashboard.active) .ref-primary-actions button{
+  height:34px!important;
+  min-width:128px!important;
+  padding:0 12px!important;
+}
+body:has(#page-dashboard.active) .ref-kpis{
+  height:84px!important;
+  gap:7px!important;
+}
+body:has(#page-dashboard.active) .ref-kpi{
+  height:84px!important;
+  min-height:84px!important;
+  padding:9px!important;
+}
+body:has(#page-dashboard.active) .ref-kpi-icon{
+  width:27px!important;height:27px!important;font-size:12px!important;
+}
+body:has(#page-dashboard.active) .ref-kpi-value{
+  margin-top:5px!important;
+  font-size:21px!important;
+}
+body:has(#page-dashboard.active) .ref-kpi-name,
+body:has(#page-dashboard.active) .ref-kpi-time{
+  font-size:15px!important;
+}
+body:has(#page-dashboard.active) .ref-real-spark{
+  height:19px!important;
+  bottom:4px!important;
+}
+body:has(#page-dashboard.active) .ref-trend{
+  top:39px!important;
+  right:8px!important;
+}
+body:has(#page-dashboard.active) .ref-kpi-sub{
+  top:58px!important;
+  left:9px!important;
+}
+body:has(#page-dashboard.active) .ref-main-row,
+body:has(#page-dashboard.active) .ref-lower-row{
+  min-height:0!important;
+  height:100%!important;
+  gap:7px!important;
+}
+body:has(#page-dashboard.active) .ref-main-row>.ref-panel,
+body:has(#page-dashboard.active) .ref-lower-row>.ref-panel{
+  min-height:0!important;
+  height:100%!important;
+  padding:11px!important;
+}
+body:has(#page-dashboard.active) .ref-panel>header{
+  margin-bottom:8px!important;
+}
+body:has(#page-dashboard.active) .ref-activity-feed{
+  min-height:0!important;
+  height:calc(100% - 31px)!important;
+}
+body:has(#page-dashboard.active) .ref-song-cover{
+  width:68px!important;height:68px!important;
+}
+body:has(#page-dashboard.active) .ref-goal-ring{
+  width:min(118px,17vh)!important;
+  height:min(118px,17vh)!important;
+  margin:2px auto 7px!important;
+}
+body:has(#page-dashboard.active) .ref-song-card footer{
+  margin-top:7px!important;
+  padding-top:7px!important;
+}
+body:has(#page-dashboard.active) .ref-command-list{
+  overflow:hidden!important;
+}
+body:has(#page-dashboard.active) .ref-empty-line{
+  height:auto!important;
+  min-height:70px!important;
+}
+body:has(#page-dashboard.active) .ref-chest-visual{
+  height:min(92px,13vh)!important;
+}
+body:has(#page-dashboard.active) .ref-status-card,
+body:has(#page-dashboard.active) .ref-current-card,
+body:has(#page-dashboard.active) .ref-logs-card,
+body:has(#page-dashboard.active) .ref-live-viewers{
+  min-height:0!important;
+  height:100%!important;
+  padding:11px!important;
+}
+body:has(#page-dashboard.active) .ref-status-card li{
+  padding:7px 0!important;
+}
+body:has(#page-dashboard.active) .ref-current-item{
+  min-height:31px!important;
+  padding:6px!important;
+  margin-bottom:5px!important;
+}
+body:has(#page-dashboard.active) .ref-logs-card li{
+  padding:6px 0!important;
+}
+body:has(#page-dashboard.active) .ref-viewers-chart{
+  min-height:0!important;
+}
+
+/* Texte encore plus lisible, surtout dans la colonne droite */
+.ref-dashboard{font-size:12px!important}
+.ref-welcome h1{font-size:26px!important}
+.ref-welcome p{font-size:11px!important}
+.ref-panel>header strong{font-size:13px!important}
+.ref-panel>header{font-size:11px!important}
+.ref-kpi-head{font-size:9.5px!important}
+.ref-trend{font-size:8px!important}
+.ref-kpi-sub{font-size:8px!important}
+.ref-song-copy strong{font-size:17px!important}
+.ref-song-copy>span{font-size:10px!important}
+.ref-song-copy small{font-size:8.5px!important}
+.ref-song-card footer strong{font-size:10px!important}
+.ref-song-card footer small{font-size:8px!important}
+.ref-wide-button,.ref-footer-link{font-size:9px!important}
+.ref-rail .ref-panel>header strong{font-size:14px!important}
+.ref-online-hero strong{font-size:12px!important}
+.ref-online-hero small{font-size:9px!important}
+.ref-status-card li{font-size:10px!important}
+.ref-status-card li b{font-size:11px!important}
+.ref-current-item b{font-size:10px!important}
+.ref-current-item em{font-size:9px!important}
+.ref-logs-card li{font-size:9px!important}
+.ref-logs-card time{font-size:8.5px!important}
+.ref-viewers-chart{font-size:9px!important}
+.ref-viewer-labels{font-size:8px!important}
+.ref-alert-list .ev-name,
+.ref-alert-list .ev-detail,
+.ref-alert-list .ev-time,
+.ref-alert-list .ev-amt{font-size:9px!important}
+.ref-command-list .cmd-row-top span:first-child,
+.ref-command-list .cmd-row-top span:last-child{font-size:10px!important}
+
+/* Les autres pages gardent leur défilement normal */
+body:not(:has(#page-dashboard.active)){
+  overflow:auto!important;
+}
+body:not(:has(#page-dashboard.active)) .main{
+  overflow:visible!important;
+  min-height:100vh!important;
+}
+
 </style>
     <div class="card" style="margin-bottom:16px"><div class="obs-link-head"><b>🔗 Lien overlay OBS Alertes</b><span><button class="obs-copy-btn" onclick="copyObsUrl('alerts-obs-url')">Copier</button><button class="obs-regenerate-btn" onclick="regenerateObsToken('alerts')">Régénérer</button></span></div><div class="obs-link-row"><code class="obs-link-code" id="alerts-obs-url">/widgets/alerts.html</code></div><div class="alert-mini">Chaque streamer possède son lien privé. Un lien régénéré invalide immédiatement l’ancien.</div></div>
     <div class="card alert-toolbar"><span class="alert-profile-badge">Profil actif</span><select class="inp" id="alert-profile-select" onchange="activateAlertProfile(this.value)"></select><input class="inp" id="alert-profile-name" placeholder="Nouveau profil (Noël, DBD…)"><button class="btnx btn-outline btn-sm" onclick="createAlertProfile()">Créer</button><button class="btnx btn-red btn-sm" onclick="deleteAlertProfile()">Supprimer</button></div>
