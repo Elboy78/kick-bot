@@ -629,31 +629,31 @@ body.light .card,body.light .panel,body.light .widget-engine-card{background:lin
 
     
         <section class="ref-kpis">
-          <article class="ref-kpi kpi-viewers">
+          <article class="ref-kpi kpi-viewers ref-kpi-rich">
             <div class="ref-kpi-head"><span class="ref-kpi-icon">👥</span><span>Viewers</span></div>
             <div class="ref-kpi-value" id="sc-active">—</div>
             <div class="ref-trend" id="spark-viewers-trend">● En attente</div>
             <div class="ref-sparkline ref-real-spark"><svg viewBox="0 0 220 42" preserveAspectRatio="none"><path id="spark-viewers-area" class="spark-area"></path><path id="spark-viewers-line" class="spark-line"></path></svg></div>
           </article>
-          <article class="ref-kpi kpi-followers">
+          <article class="ref-kpi kpi-followers ref-kpi-rich">
             <div class="ref-kpi-head"><span class="ref-kpi-icon">♡</span><span>Followers</span></div>
             <div class="ref-kpi-value" id="s-followers">—</div>
             <div class="ref-trend" id="spark-followers-trend">● En attente</div>
             <div class="ref-sparkline ref-real-spark"><svg viewBox="0 0 220 42" preserveAspectRatio="none"><path id="spark-followers-area" class="spark-area"></path><path id="spark-followers-line" class="spark-line"></path></svg></div>
           </article>
-          <article class="ref-kpi kpi-points">
+          <article class="ref-kpi kpi-points ref-kpi-rich">
             <div class="ref-kpi-head"><span class="ref-kpi-icon">✦</span><span>Points</span></div>
             <div class="ref-kpi-value" id="s-points">—</div>
             <div class="ref-trend" id="spark-points-trend">● En attente</div>
             <div class="ref-sparkline ref-real-spark"><svg viewBox="0 0 220 42" preserveAspectRatio="none"><path id="spark-points-area" class="spark-area"></path><path id="spark-points-line" class="spark-line"></path></svg></div>
           </article>
-          <article class="ref-kpi kpi-watch">
+          <article class="ref-kpi kpi-watch ref-kpi-rich">
             <div class="ref-kpi-head"><span class="ref-kpi-icon">◈</span><span>Top viewer</span></div>
             <div class="ref-kpi-value ref-kpi-name" id="s-top">—</div>
             <div class="ref-trend" id="spark-top-trend">● En attente</div><div class="ref-kpi-sub" id="s-top-sub">—</div>
             <div class="ref-sparkline ref-real-spark"><svg viewBox="0 0 220 42" preserveAspectRatio="none"><path id="spark-top-area" class="spark-area"></path><path id="spark-top-line" class="spark-line"></path></svg></div>
           </article>
-          <article class="ref-kpi kpi-live">
+          <article class="ref-kpi kpi-live ref-kpi-rich">
             <div class="ref-kpi-head"><span class="ref-kpi-icon">◷</span><span>Temps regardé</span></div>
             <div class="ref-kpi-value ref-kpi-time" id="s-minutes">—</div>
             <div class="ref-live-dot"><i></i> Cumul communauté</div>
@@ -686,7 +686,7 @@ body.light .card,body.light .panel,body.light .widget-engine-card{background:lin
                 <small id="ref-sr-requester">File d'attente</small>
                 <strong id="ref-sr-title">Aucune musique en lecture</strong>
                 <span id="ref-sr-artist">Song Request</span>
-                <div class="ref-progress"><i id="ref-sr-progress"></i></div>
+                <div class="ref-progress"><i id="ref-sr-progress"></i><b id="ref-sr-progress-thumb"></b></div>
                 <div class="ref-song-times"><span id="ref-sr-current">0:00</span><span id="ref-sr-duration">0:00</span></div>
                 <div class="ref-player-controls">
                   <button type="button" onclick="restartReferenceSongRequest()">|◀</button>
@@ -2955,6 +2955,242 @@ body[data-ref-wallpaper="aurorasky"]:before{
   .ref-song-body{grid-template-columns:105px 1fr!important}
   .ref-song-cover{min-height:105px!important}
   .ref-wallpaper-grid{grid-template-columns:1fr}
+}
+
+
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   ELBOT V11 — KPI premium, Sub Goal plein cadre, thème = fond associé,
+   progression SR animée et disposition mieux équilibrée.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* KPI : plus grands, plus élégants, plus lisibles */
+body:has(#page-dashboard.active) .ref-content{
+  grid-template-rows:56px 104px minmax(0,1.04fr) minmax(0,.96fr)!important;
+}
+body:has(#page-dashboard.active) .ref-kpis{
+  height:104px!important;
+  grid-template-columns:1.05fr 1.05fr 1.05fr 1.05fr .95fr!important;
+}
+body:has(#page-dashboard.active) .ref-kpi{
+  height:104px!important;
+  min-height:104px!important;
+  padding:11px 12px!important;
+  border-radius:14px!important;
+}
+.ref-kpi-rich{
+  background:
+    radial-gradient(circle at 86% -15%,color-mix(in srgb,var(--ref-blue,#1685ff) 20%,transparent),transparent 45%),
+    linear-gradient(145deg,rgba(8,34,75,.96),rgba(3,17,40,.97))!important;
+}
+.ref-kpi-rich:after{
+  content:"";
+  position:absolute;
+  inset:auto 0 0 0;
+  height:40%;
+  pointer-events:none;
+  background:linear-gradient(180deg,transparent,color-mix(in srgb,var(--ref-blue,#1685ff) 6%,transparent));
+}
+.ref-kpi-head{
+  gap:10px!important;
+  letter-spacing:.7px!important;
+  font-size:10px!important;
+}
+.ref-kpi-icon{
+  width:32px!important;
+  height:32px!important;
+  border-radius:10px!important;
+  font-size:14px!important;
+}
+.ref-kpi-value{
+  margin-top:7px!important;
+  font-size:25px!important;
+  line-height:1!important;
+}
+.ref-trend{
+  top:47px!important;
+  right:11px!important;
+  padding:3px 6px;
+  border-radius:999px;
+  background:rgba(30,211,133,.08);
+  font-size:8px!important;
+}
+.ref-trend.negative{background:rgba(255,87,113,.09)}
+.ref-trend.neutral{background:rgba(122,148,180,.08)}
+.ref-kpi-sub{
+  top:69px!important;
+  left:12px!important;
+  font-size:8px!important;
+}
+.ref-real-spark{
+  left:11px!important;
+  right:11px!important;
+  bottom:7px!important;
+  height:24px!important;
+}
+.spark-line{stroke-width:2.5!important}
+.spark-area{fill:color-mix(in srgb,var(--ref-blue,#1685ff) 19%,transparent)!important}
+.kpi-live .ref-live-dot{
+  margin-top:10px!important;
+  font-size:9px!important;
+}
+.kpi-live .ref-kpi-value{
+  font-size:21px!important;
+  margin-top:10px!important;
+}
+
+/* Main rows a little more balanced */
+body:has(#page-dashboard.active) .ref-main-row{
+  grid-template-columns:1.02fr 1.42fr .80fr!important;
+}
+body:has(#page-dashboard.active) .ref-lower-row{
+  grid-template-columns:.95fr 1.10fr 1fr!important;
+}
+
+/* Song Request: use the whole card elegantly */
+.ref-song-body{
+  grid-template-columns:minmax(145px,27%) minmax(0,1fr)!important;
+  gap:18px!important;
+}
+.ref-song-cover{
+  min-height:150px!important;
+  border-radius:14px!important;
+}
+.ref-song-copy strong{font-size:21px!important}
+.ref-song-copy>span{font-size:12px!important}
+.ref-progress{
+  position:relative!important;
+  height:6px!important;
+  overflow:visible!important;
+}
+.ref-progress i{
+  position:relative;
+  z-index:1;
+}
+.ref-progress b{
+  position:absolute;
+  z-index:2;
+  top:50%;
+  left:var(--sr-progress,0%);
+  width:13px;
+  height:13px;
+  border-radius:50%;
+  background:#e7f6ff;
+  border:3px solid var(--ref-blue,#1685ff);
+  box-shadow:0 0 13px color-mix(in srgb,var(--ref-blue,#1685ff) 65%,transparent);
+  transform:translate(-50%,-50%);
+  transition:left .3s linear;
+}
+.ref-song-times{font-size:8px!important}
+.ref-player-controls{margin-top:15px!important}
+.ref-player-controls .ref-play{
+  width:48px!important;
+  height:48px!important;
+  font-size:18px!important;
+}
+.ref-volume-control{
+  min-width:230px!important;
+}
+
+/* Sub Goal fills its card */
+.ref-goal-card{
+  padding:12px!important;
+}
+.ref-goal-card .ref-goal-ring{
+  width:min(205px,24vh)!important;
+  height:min(205px,24vh)!important;
+  max-width:88%!important;
+  max-height:calc(100% - 74px)!important;
+  margin:auto!important;
+  box-shadow:
+    0 0 35px color-mix(in srgb,var(--ref-blue,#1685ff) 20%,transparent),
+    inset 0 0 25px rgba(0,0,0,.2)!important;
+}
+.ref-goal-ring:after{inset:11px!important}
+.ref-goal-ring strong{font-size:38px!important}
+.ref-goal-ring span{font-size:13px!important}
+.ref-goal-ring small{font-size:10px!important}
+.ref-goal-card .ref-wide-button{
+  min-height:42px!important;
+  font-size:10px!important;
+}
+
+/* Each interface immediately gets its dedicated wallpaper */
+body[data-ref-interface="classic"]{--auto-wallpaper:classic}
+body[data-ref-interface="liquid"]{--auto-wallpaper:liquid}
+body[data-ref-interface="neon"]{--auto-wallpaper:neon}
+body[data-ref-interface="dbd"]{--auto-wallpaper:dbd}
+body[data-ref-interface="midnight"]{--auto-wallpaper:midnight}
+body[data-ref-interface="aurora"]{--auto-wallpaper:aurora}
+
+/* Stronger associated backgrounds, visible even without separate wallpaper choice */
+body[data-ref-interface="classic"] .main{
+  background:
+    linear-gradient(rgba(43,122,220,.045) 1px,transparent 1px),
+    linear-gradient(90deg,rgba(43,122,220,.045) 1px,transparent 1px),
+    radial-gradient(circle at 60% -8%,rgba(16,107,255,.28),transparent 34%),
+    linear-gradient(180deg,#061833 0%,#020a19 58%,#01040a 100%)!important;
+  background-size:44px 44px,44px 44px,auto,auto!important;
+}
+body[data-ref-interface="liquid"] .main{
+  background:
+    linear-gradient(122deg,transparent 28%,rgba(255,255,255,.08) 36%,transparent 45%),
+    linear-gradient(138deg,transparent 52%,rgba(107,197,255,.10) 60%,transparent 70%),
+    radial-gradient(ellipse at 12% 5%,rgba(103,215,255,.34),transparent 29%),
+    radial-gradient(ellipse at 86% 12%,rgba(156,91,255,.30),transparent 31%),
+    linear-gradient(145deg,#113454,#071426 48%,#060b1c 74%,#121b39)!important;
+}
+body[data-ref-interface="neon"] .main{
+  background:
+    repeating-linear-gradient(122deg,transparent 0 78px,color-mix(in srgb,var(--ref-blue,#8a4dff) 13%,transparent) 79px 82px,transparent 83px 158px),
+    repeating-linear-gradient(90deg,transparent 0 130px,rgba(0,230,255,.045) 131px 133px),
+    radial-gradient(circle at 72% 8%,color-mix(in srgb,var(--ref-blue,#8a4dff) 34%,transparent),transparent 34%),
+    radial-gradient(circle at 16% 82%,rgba(0,230,255,.15),transparent 27%),
+    linear-gradient(180deg,#080318,#020207 72%,#010103)!important;
+}
+body[data-ref-interface="dbd"] .main{
+  background:
+    repeating-linear-gradient(111deg,transparent 0 116px,rgba(191,49,36,.09) 117px 121px,transparent 122px 183px),
+    radial-gradient(ellipse at 50% 102%,rgba(190,190,177,.16),transparent 36%),
+    radial-gradient(circle at 82% 2%,rgba(160,42,31,.22),transparent 31%),
+    linear-gradient(180deg,#1b1714 0%,#090806 56%,#020202 100%)!important;
+}
+body[data-ref-interface="midnight"] .main{
+  background:
+    radial-gradient(circle at 12% 20%,rgba(255,255,255,.18) 0 1px,transparent 1.5px),
+    radial-gradient(circle at 78% 34%,rgba(255,255,255,.14) 0 1px,transparent 1.5px),
+    radial-gradient(circle at 45% 75%,rgba(255,255,255,.11) 0 1px,transparent 1.5px),
+    radial-gradient(circle at 52% -8%,rgba(78,94,133,.23),transparent 34%),
+    linear-gradient(180deg,#0a0e17 0%,#020306 76%,#010102 100%)!important;
+  background-size:190px 190px,250px 250px,320px 320px,auto,auto!important;
+}
+body[data-ref-interface="aurora"] .main{
+  background:
+    linear-gradient(116deg,transparent 14%,rgba(34,227,255,.14) 31%,transparent 45%),
+    linear-gradient(134deg,transparent 42%,rgba(164,72,255,.17) 57%,transparent 70%),
+    linear-gradient(148deg,transparent 63%,rgba(41,235,179,.10) 75%,transparent 84%),
+    radial-gradient(circle at 17% -6%,rgba(28,204,255,.32),transparent 29%),
+    radial-gradient(circle at 82% 4%,rgba(158,67,255,.34),transparent 33%),
+    linear-gradient(180deg,#08213b 0%,#0a0b2c 53%,#04131f 100%)!important;
+}
+
+/* On small-height screens keep balance */
+@media(max-height:820px){
+  body:has(#page-dashboard.active) .ref-content{
+    grid-template-rows:50px 90px minmax(0,1.02fr) minmax(0,.98fr)!important;
+  }
+  body:has(#page-dashboard.active) .ref-kpis{
+    height:90px!important;
+  }
+  body:has(#page-dashboard.active) .ref-kpi{
+    height:90px!important;
+    min-height:90px!important;
+  }
+  .ref-song-cover{min-height:118px!important}
+  .ref-goal-card .ref-goal-ring{
+    width:min(165px,20vh)!important;
+    height:min(165px,20vh)!important;
+  }
 }
 
 </style>
@@ -8868,9 +9104,14 @@ async function loadReferenceSongRequest() {
     if (typeof updateReferenceSongRequestButton === 'function') updateReferenceSongRequestButton(status);
     set('ref-rail-sr', status === 'playing' ? 'Actif' : status === 'paused' ? 'Pause' : 'Inactif');
     const duration = Math.max(Number(player.duration || current?.duration || 0), 0);
-    const progress = duration ? Math.min(100, Math.max(0, Number(player.currentTime || 0) / duration * 100)) : 0;
+    refSrAnimatedTime = Math.max(0, Number(player.currentTime || 0));
+    refSrAnimatedDuration = duration;
+    refSrAnimationStatus = status;
+    const progress = duration ? Math.min(100, Math.max(0, refSrAnimatedTime / duration * 100)) : 0;
     const bar = document.getElementById('ref-sr-progress');
     if (bar) bar.style.width = progress + '%';
+    const progressThumb = document.getElementById('ref-sr-progress-thumb');
+    if (progressThumb) progressThumb.style.setProperty('--sr-progress', progress + '%');
     const cover = document.getElementById('ref-sr-cover');
     if (cover) {
       const image = current?.thumbnail || current?.thumbnailUrl || current?.image || '';
@@ -9071,7 +9312,6 @@ function loadReferenceAppearance() {
   applyReferenceTheme(theme, false);
   applyReferenceBackground(background, false);
   applyReferenceInterface(interfaceName, false);
-  applyReferenceWallpaper(wallpaper, false);
   toggleReferenceGlow(glow, false);
   toggleReferenceMotion(motion, false);
   toggleReferenceCompact(compact, false);
@@ -9405,6 +9645,65 @@ async function toggleReferenceSongRequest() {
     if (button) button.disabled = false;
   }
 }
+
+</script>
+
+<script>
+
+// ══ ElBot V11 — fond automatique par thème et progression SR locale ══════════
+const REF_INTERFACE_WALLPAPER = {
+  classic:'storm',
+  liquid:'glasswaves',
+  neon:'neoncity',
+  dbd:'dbdfog',
+  midnight:'none',
+  aurora:'aurorasky'
+};
+
+let refSrAnimatedTime = 0;
+let refSrAnimatedDuration = 0;
+let refSrAnimationStatus = 'stopped';
+let refSrAnimationTimer = null;
+
+function applyReferenceInterface(name, save = true) {
+  const allowed = ['classic','liquid','neon','dbd','midnight','aurora'];
+  const value = allowed.includes(name) ? name : 'classic';
+  document.body.dataset.refInterface = value;
+  if (typeof refRefreshInterfaceButtons === 'function') refRefreshInterfaceButtons(value);
+
+  const wallpaper = REF_INTERFACE_WALLPAPER[value] || 'none';
+  if (typeof applyReferenceWallpaper === 'function') applyReferenceWallpaper(wallpaper, false);
+
+  if (save && typeof refSaveAppearance === 'function') {
+    refSaveAppearance({ interface:value, wallpaper });
+  }
+}
+
+function refUpdateAnimatedSongProgress() {
+  const duration = Math.max(0, Number(refSrAnimatedDuration || 0));
+  const current = Math.max(0, Number(refSrAnimatedTime || 0));
+  const pct = duration > 0 ? Math.min(100, current / duration * 100) : 0;
+
+  const bar = document.getElementById('ref-sr-progress');
+  const thumb = document.getElementById('ref-sr-progress-thumb');
+  const currentLabel = document.getElementById('ref-sr-current');
+
+  if (bar) bar.style.width = pct + '%';
+  if (thumb) thumb.style.setProperty('--sr-progress', pct + '%');
+  if (currentLabel && typeof refFmtTime === 'function') currentLabel.textContent = refFmtTime(current);
+}
+
+function refStartSongProgressAnimation() {
+  if (refSrAnimationTimer) clearInterval(refSrAnimationTimer);
+  refSrAnimationTimer = setInterval(() => {
+    if (String(refSrAnimationStatus).toLowerCase() !== 'playing') return;
+    if (refSrAnimatedDuration > 0 && refSrAnimatedTime < refSrAnimatedDuration) {
+      refSrAnimatedTime += 1;
+      refUpdateAnimatedSongProgress();
+    }
+  }, 1000);
+}
+refStartSongProgressAnimation();
 
 </script>
 </body>
