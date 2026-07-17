@@ -1,10 +1,42 @@
 
-:root{--theme-bg:#e7eef6;--theme-wallpaper:url("/assets/themes/vision.webp");--theme-panel:linear-gradient(145deg,rgba(255,255,255,.48),rgba(235,244,255,.30));--theme-border:rgba(255,255,255,.62);--theme-soft:rgba(255,255,255,.38);--theme-soft-border:rgba(94,124,159,.20);--theme-text:#15325a;--theme-muted:#5d7594;--theme-radius:22px;--theme-accent:#4b8ff0;--theme-accent2:#2c6fd6;--theme-shadow:inset 0 1px 0 rgba(255,255,255,.92),0 24px 55px rgba(65,96,132,.16)}
-.sidebar,.elbot-topbar,.panel,.card,.ref-kpi,.ref-panel,.settings-card,.widget-card,.config-card,.table-wrap,.form-section,.block,.box,.modal-content,.ref-sidebar-tool,.sb-profile{
-  backdrop-filter:blur(34px) saturate(165%)!important;
-  -webkit-backdrop-filter:blur(34px) saturate(165%)!important;
+:root{--theme-bg:#e7eef6;--theme-wallpaper:url("/assets/themes/vision.webp?v=19");--theme-overlay:linear-gradient(90deg,rgba(228,238,248,.22),rgba(255,255,255,.04),rgba(219,228,241,.15));--theme-panel:linear-gradient(145deg,rgba(255,255,255,.36),rgba(228,239,252,.20));--theme-border:rgba(255,255,255,.74);--theme-soft:rgba(255,255,255,.30);--theme-soft-border:rgba(255,255,255,.62);--theme-text:#14345d;--theme-muted:#587393;--theme-radius:24px;--theme-accent:#4b8ff0;--theme-accent2:#2c6fd6;--theme-shadow:inset 0 1px 0 rgba(255,255,255,.96),inset 0 -1px 0 rgba(101,135,170,.08),0 24px 60px rgba(65,96,132,.17)}
+.sidebar,.elbot-topbar,.panel,.card,.ref-kpi,.ref-panel,.settings-card,.widget-card,.config-card,.table-wrap,.form-section,.block,.box,.modal-content,.ref-sidebar-tool,.sb-profile,.ref-customizer-drawer{
+  background:
+    linear-gradient(145deg,rgba(255,255,255,.44),rgba(228,240,255,.20))!important;
+  border:1px solid rgba(255,255,255,.72)!important;
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.98),
+    inset 0 -1px 0 rgba(83,119,154,.08),
+    0 22px 55px rgba(60,91,126,.16)!important;
+  backdrop-filter:blur(42px) saturate(185%) brightness(1.04)!important;
+  -webkit-backdrop-filter:blur(42px) saturate(185%) brightness(1.04)!important;
 }
-.sidebar{background:linear-gradient(180deg,rgba(255,255,255,.46),rgba(230,240,251,.30))!important}
-.menu a,.logo,.header h1,.ref-welcome h1,.ref-sidebar-tool b,.sb-prof-name{color:#17385f!important}
-.menu a:hover{background:rgba(255,255,255,.28)!important}
-.ref-sidebar-bottom{background:linear-gradient(180deg,transparent,rgba(231,239,248,.80) 28%)!important}
+.sidebar{
+  margin:14px 0 14px 14px!important;
+  height:calc(100vh - 28px)!important;
+  border-radius:30px!important;
+  overflow:hidden!important;
+}
+.elbot-topbar{
+  margin:14px 14px 0 14px!important;
+  border-radius:22px!important;
+}
+.menu a{
+  color:#17385f!important;
+  border:1px solid transparent!important;
+  border-radius:16px!important;
+}
+.menu a:hover{
+  background:rgba(255,255,255,.35)!important;
+  border-color:rgba(255,255,255,.58)!important;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.80)!important;
+}
+.menu a.active{
+  color:white!important;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.30),0 9px 22px rgba(55,111,190,.22)!important;
+}
+.logo,.header h1,.ref-welcome h1,.ref-sidebar-tool b,.sb-prof-name{color:#17385f!important}
+.ref-sidebar-bottom{background:linear-gradient(180deg,transparent,rgba(226,237,248,.62) 28%)!important}
+::-webkit-scrollbar{width:10px}
+::-webkit-scrollbar-track{background:rgba(255,255,255,.16);border-radius:20px}
+::-webkit-scrollbar-thumb{background:rgba(255,255,255,.60);border:1px solid rgba(255,255,255,.78);border-radius:20px}
