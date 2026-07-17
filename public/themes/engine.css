@@ -129,3 +129,123 @@ body>*{position:relative;z-index:1}
   width:100%;
   accent-color:var(--theme-accent);
 }
+
+
+/* ═══════════════════════════════════════════════════════════════════════
+   ELBOT V21 — correction structure + fonds réellement visibles
+   ═══════════════════════════════════════════════════════════════════════ */
+html,body{
+  min-height:100%;
+  background-color:var(--theme-bg)!important;
+}
+body{
+  background-image:var(--theme-overlay),var(--theme-wallpaper)!important;
+  background-repeat:no-repeat!important;
+  background-size:cover!important;
+  background-position:center center!important;
+  background-attachment:fixed!important;
+}
+/* Désactive les anciens calques qui pouvaient cacher ou doubler le fond. */
+body::after{
+  content:none!important;
+  display:none!important;
+}
+body::before{
+  z-index:0!important;
+  opacity:.45!important;
+}
+body>*{
+  position:relative;
+  z-index:1;
+}
+
+/* Aucun bloc général ne doit repeindre toute la page. */
+body[data-ref-interface] .main,
+body[data-ref-interface] .content,
+body[data-ref-interface] .page,
+body[data-ref-interface] .page-content,
+body[data-ref-interface] #app,
+body[data-ref-interface] .app-shell,
+body[data-ref-interface] .dashboard,
+body[data-ref-interface] .page-wrapper,
+body[data-ref-interface] [id^="page-"]{
+  background:transparent!important;
+  background-image:none!important;
+}
+
+/* Verre plus transparent : le fond reste clairement perceptible. */
+body[data-ref-interface] .sidebar,
+body[data-ref-interface] .elbot-topbar{
+  background:color-mix(in srgb,var(--theme-bg) 52%,transparent)!important;
+  backdrop-filter:blur(24px) saturate(145%)!important;
+  -webkit-backdrop-filter:blur(24px) saturate(145%)!important;
+}
+body[data-ref-interface] .panel,
+body[data-ref-interface] .card,
+body[data-ref-interface] .ref-kpi,
+body[data-ref-interface] .ref-panel,
+body[data-ref-interface] .settings-card,
+body[data-ref-interface] .widget-card,
+body[data-ref-interface] .config-card,
+body[data-ref-interface] .table-wrap,
+body[data-ref-interface] .form-section,
+body[data-ref-interface] .block,
+body[data-ref-interface] .box,
+body[data-ref-interface] .modal-content{
+  background:color-mix(in srgb,var(--theme-bg) 47%,transparent)!important;
+  backdrop-filter:blur(18px) saturate(135%)!important;
+  -webkit-backdrop-filter:blur(18px) saturate(135%)!important;
+}
+
+/* Le tiroir reste un panneau latéral, sans casser la largeur du dashboard. */
+.ref-drawer-backdrop{
+  position:fixed!important;
+  inset:0!important;
+  display:none!important;
+  justify-content:flex-end!important;
+  align-items:stretch!important;
+  z-index:99999!important;
+}
+.ref-drawer-backdrop.open{display:flex!important}
+.ref-customizer-drawer{
+  flex:0 0 min(430px,94vw)!important;
+  width:min(430px,94vw)!important;
+  max-width:94vw!important;
+  height:100vh!important;
+  margin:0!important;
+  position:relative!important;
+  overflow-x:hidden!important;
+  overflow-y:auto!important;
+}
+.premium-theme-gallery{
+  grid-template-columns:1fr!important;
+}
+.premium-theme-preview{
+  background-size:cover!important;
+  background-position:center!important;
+}
+.ref-customizer-drawer section{
+  width:100%!important;
+  box-sizing:border-box!important;
+}
+.ref-bg-intensity input{
+  display:block!important;
+  width:100%!important;
+}
+
+/* Ajuste la lisibilité sans cacher les images. */
+body[data-ref-interface="dbd"]{
+  --theme-overlay:linear-gradient(90deg,rgba(0,0,0,.24),rgba(0,0,0,.03) 64%,rgba(12,0,0,.14));
+}
+body[data-ref-interface="neon"]{
+  --theme-overlay:linear-gradient(90deg,rgba(2,0,10,.18),rgba(2,0,10,.02) 64%,rgba(7,0,15,.10));
+}
+body[data-ref-interface="midnight"],
+body[data-ref-interface="ocean"],
+body[data-ref-interface="forest"]{
+  --theme-overlay:linear-gradient(90deg,rgba(0,7,18,.18),rgba(0,7,18,.02) 64%,rgba(0,7,18,.10));
+}
+
+@media(max-width:900px){
+  body{background-position:58% center!important}
+}

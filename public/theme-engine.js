@@ -53,7 +53,7 @@
   window.applyReferenceInterface = function(name, shouldSave=true){
     const theme = normalize(name);
     document.body.dataset.refInterface = theme;
-    ensureLink().href = `/themes/${theme}.css?v=20`;
+    ensureLink().href = `/themes/${theme}.css?v=21`;
     refreshButtons(theme);
     if (shouldSave) write({interface:theme});
   };
