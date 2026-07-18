@@ -10435,20 +10435,71 @@ setInterval(() => {
     </section>
 
     <section>
-      <h3>Couleur d'accent</h3>
-      <div class="ref-theme-grid">
-        <button type="button" data-ref-theme="blue" onclick="applyReferenceTheme('blue')"><i></i><span>Bleu</span></button>
-        <button type="button" data-ref-theme="violet" onclick="applyReferenceTheme('violet')"><i></i><span>Violet</span></button>
-        <button type="button" data-ref-theme="cyan" onclick="applyReferenceTheme('cyan')"><i></i><span>Cyan</span></button>
-        <button type="button" data-ref-theme="red" onclick="applyReferenceTheme('red')"><i></i><span>Rouge</span></button>
-        <button type="button" data-ref-theme="green" onclick="applyReferenceTheme('green')"><i></i><span>Vert</span></button>
-        <button type="button" data-ref-theme="orange" onclick="applyReferenceTheme('orange')"><i></i><span>Orange</span></button>
+      <h3>Couleurs de l'interface</h3>
+      <div class="elbot-color-pickers">
+        <label>
+          <span><b>Couleur principale</b><small>Boutons, liens, jauges et sélections</small></span>
+          <span class="elbot-color-control">
+            <input id="ref-primary-color" type="color" value="#28ff66"
+                   oninput="setReferencePrimaryColor(this.value)">
+            <code id="ref-primary-color-value">#28FF66</code>
+          </span>
+        </label>
+        <label>
+          <span><b>Couleur secondaire</b><small>Dégradés, halos et effets premium</small></span>
+          <span class="elbot-color-control">
+            <input id="ref-secondary-color" type="color" value="#1874ff"
+                   oninput="setReferenceSecondaryColor(this.value)">
+            <code id="ref-secondary-color-value">#1874FF</code>
+          </span>
+        </label>
+      </div>
+
+      <div class="elbot-color-presets" aria-label="Couleurs prédéfinies">
+        <button type="button" onclick="applyReferenceColorPreset('kick')" data-color-preset="kick"><i></i><span>Kick</span></button>
+        <button type="button" onclick="applyReferenceColorPreset('ocean')" data-color-preset="ocean"><i></i><span>Océan</span></button>
+        <button type="button" onclick="applyReferenceColorPreset('violet')" data-color-preset="violet"><i></i><span>Violet</span></button>
+        <button type="button" onclick="applyReferenceColorPreset('dbd')" data-color-preset="dbd"><i></i><span>DBD</span></button>
+        <button type="button" onclick="applyReferenceColorPreset('sunset')" data-color-preset="sunset"><i></i><span>Sunset</span></button>
+        <button type="button" onclick="applyReferenceColorPreset('gold')" data-color-preset="gold"><i></i><span>Or</span></button>
       </div>
     </section>
 
     <section>
-      <h3>Ambiance</h3>
-      <label class="ref-custom-toggle"><span><b>Effets lumineux</b><small>Halos et lueurs sur les cartes</small></span><input id="ref-glow-toggle" type="checkbox" checked onchange="toggleReferenceGlow(this.checked)"><i></i></label>
+      <h3>Colonne des onglets</h3>
+      <div class="elbot-segmented" role="radiogroup" aria-label="Fond de la colonne des onglets">
+        <button type="button" data-sidebar-mode="solid" onclick="setReferenceSidebarMode('solid')">Classique</button>
+        <button type="button" data-sidebar-mode="theme" onclick="setReferenceSidebarMode('theme')">Fond du thème</button>
+        <button type="button" data-sidebar-mode="transparent" onclick="setReferenceSidebarMode('transparent')">Transparent</button>
+        <button type="button" data-sidebar-mode="glass" onclick="setReferenceSidebarMode('glass')">Liquid Glass</button>
+      </div>
+      <label class="ref-custom-toggle">
+        <span><b>Fond continu sous la sidebar</b><small>Le wallpaper passe aussi derrière toute la colonne des onglets</small></span>
+        <input id="ref-sidebar-wallpaper-toggle" type="checkbox" checked
+               onchange="toggleReferenceSidebarWallpaper(this.checked)"><i></i>
+      </label>
+      <label class="ref-custom-toggle">
+        <span><b>Barre supérieure transparente</b><small>Laisse également apparaître le fond derrière la topbar</small></span>
+        <input id="ref-topbar-transparent-toggle" type="checkbox"
+               onchange="toggleReferenceTopbarTransparent(this.checked)"><i></i>
+      </label>
+    </section>
+
+    <section>
+      <h3>Liquid Glass et ambiance</h3>
+      <div class="ref-bg-intensity">
+        <label for="ref-glass-blur-range">Intensité du flou</label>
+        <output id="ref-glass-blur-value">16px</output>
+        <input id="ref-glass-blur-range" type="range" min="0" max="36" step="1" value="16"
+               oninput="setReferenceGlassBlur(this.value)">
+      </div>
+      <div class="ref-bg-intensity">
+        <label for="ref-reflection-range">Reflets du verre</label>
+        <output id="ref-reflection-value">45%</output>
+        <input id="ref-reflection-range" type="range" min="0" max="100" step="5" value="45"
+               oninput="setReferenceReflection(this.value)">
+      </div>
+      <label class="ref-custom-toggle"><span><b>Effets lumineux</b><small>Halos et lueurs colorés sur les cartes</small></span><input id="ref-glow-toggle" type="checkbox" checked onchange="toggleReferenceGlow(this.checked)"><i></i></label>
       <label class="ref-custom-toggle"><span><b>Animations</b><small>Mouvements et transitions fluides</small></span><input id="ref-motion-toggle" type="checkbox" checked onchange="toggleReferenceMotion(this.checked)"><i></i></label>
       <label class="ref-custom-toggle"><span><b>Interface compacte</b><small>Réduit légèrement les espacements</small></span><input id="ref-compact-toggle" type="checkbox" onchange="toggleReferenceCompact(this.checked)"><i></i></label>
     </section>
@@ -11090,7 +11141,7 @@ window.addEventListener('pageshow', loadReferenceAppearance);
 </script>
 
 <!-- ElBot Theme Engine V2 — chargé en dernier pour rester prioritaire -->
-<link rel="stylesheet" href="/themes/engine.css?v=30">
-<script src="/theme-engine.js?v=30"></script>
+<link rel="stylesheet" href="/themes/engine.css?v=31">
+<script src="/theme-engine.js?v=31"></script>
 </body>
 </html>
