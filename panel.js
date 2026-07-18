@@ -617,14 +617,15 @@ async function recordSubEvent(type, payload = {}, source = null) {
       at: new Date().toISOString()
     };
 
-    // Le total représente le nombre actif suivi par le bot : nouveau sub et gifts l'augmentent.
-    // Un renouvellement ne l'augmente pas, mais compte dans la session.
+    // Chaque soutien reçu pendant le live fait progresser l'objectif : nouveau sub,
+    // renouvellement et gifts. Les compteurs détaillés restent disponibles séparément.
     if (type === 'new' || type === 'gift') {
       state.total += amount;
       state.session += amount;
     }
     if (type === 'gift') state.gifts += amount;
     if (type === 'renewal') {
+      state.total += amount;
       state.session += amount;
       state.renewals += amount;
     }
