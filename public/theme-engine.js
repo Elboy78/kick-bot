@@ -1,153 +1,159 @@
+(() => {
+  'use strict';
 
-(function(){
-  const THEMES = [
+  const STORAGE_KEY = 'elbot_theme_v2';
+  const LEGACY_STORAGE_KEY = 'elbot_ref_appearance_v1';
+
+  const THEMES = new Set([
     'control','dbd','obs','vision','neon','elite','steam','riot',
     'midnight','ocean','sunset','forest','minimal'
-  ];
+  ]);
 
-  const KEY = 'elbot_ref_appearance_v1';
-  const legacy = {classic:'control',liquid:'control',aurora:'vision'};
-
-  const overlays = {
-    control:[2,8,20],
-    dbd:[0,0,0],
-    obs:[4,7,9],
-    vision:[225,235,248],
-    neon:[2,0,10],
-    elite:[0,0,0],
-    steam:[4,12,18],
-    riot:[10,1,3],
-    midnight:[0,5,18],
-    ocean:[0,12,28],
-    sunset:[38,8,12],
-    forest:[0,16,13],
-    minimal:[245,247,251]
+  const LEGACY_NAMES = {
+    classic:'control',
+    liquid:'control',
+    aurora:'vision'
   };
 
-  function normalize(name){
-    const value = legacy[name] || name;
-    return THEMES.includes(value) ? value : 'control';
+  const clamp = (value, min, max, fallback) => {
+    const number = Number(value);
+    return Number.isFinite(number)
+      ? Math.min(max, Math.max(min, number))
+      : fallback;
+  };
+
+  function normalizeTheme(value){
+    const mapped = LEGACY_NAMES[value] || value;
+    return THEMES.has(mapped) ? mapped : 'control';
   }
 
-  function read(){
+  function readState(){
     try {
-      return JSON.parse(localStorage.getItem(KEY) || '{}');
+      const current = JSON.parse(localStorage.getItem(STORAGE_KEY) || 'null');
+      if (current && typeof current === 'object') return current;
+    } catch (_) {}
+
+    /* Migration automatique des anciennes préférences. */
+    try {
+      const legacy = JSON.parse(localStorage.getItem(LEGACY_STORAGE_KEY) || '{}');
+      return {
+        theme:normalizeTheme(legacy.interface),
+        backgroundVisibility:legacy.backgroundIntensity ?? 100,
+        panelOpacity:legacy.panelOpacity ?? 92
+      };
     } catch (_) {
       return {};
     }
   }
 
-  function write(patch){
-    localStorage.setItem(KEY, JSON.stringify({...read(),...patch}));
+  function saveState(patch){
+    const next = {...readState(), ...patch};
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
+    return next;
   }
 
-  function refreshButtons(theme){
+  function refreshThemeButtons(theme){
     document.querySelectorAll('[data-ref-interface]').forEach(button => {
       const active = button.dataset.refInterface === theme;
       button.classList.toggle('active', active);
-      const action = button.querySelector('em');
-      if (action) action.textContent = active ? 'Actif' : 'Appliquer';
+
+      const label = button.querySelector('em');
+      if (label) label.textContent = active ? 'Actif' : 'Appliquer';
     });
   }
 
-  function paintWallpaper(theme){
-    const saved = read();
-    const intensity = Math.max(
-      35,
-      Math.min(100, Number(saved.backgroundIntensity ?? 100))
+  function applyBackgroundVisibility(value, save = true){
+    const visibility = clamp(value, 35, 100, 100);
+
+    /* 100% = voile très léger ; 35% = fond plus discret. */
+    const overlayAlpha = 0.08 + ((100 - visibility) / 65) * 0.54;
+    document.documentElement.style.setProperty(
+      '--panel-overlay-alpha',
+      overlayAlpha.toFixed(3)
     );
-
-    const darkness = (100 - intensity) / 100 * 0.58;
-    const [r,g,b] = overlays[theme] || overlays.control;
-    const url = `/assets/themes/${theme}.webp?v=27`;
-
-    const backgroundImage =
-      `linear-gradient(rgba(${r},${g},${b},${darkness}),rgba(${r},${g},${b},${darkness})),url("${url}")`;
-
-    document.body.style.setProperty('background-color', '#020817', 'important');
-    document.body.style.setProperty('background-image', backgroundImage, 'important');
-    document.body.style.setProperty('background-repeat', 'no-repeat', 'important');
-    document.body.style.setProperty('background-size', 'cover', 'important');
-    document.body.style.setProperty('background-position', 'center center', 'important');
-    document.body.style.setProperty('background-attachment', 'fixed', 'important');
-    document.body.style.setProperty('min-height', '100vh', 'important');
-  }
-
-  window.setReferenceBackgroundIntensity = function(value, shouldSave=true){
-    const intensity = Math.max(35, Math.min(100, Number(value) || 100));
 
     const range = document.getElementById('ref-bg-intensity-range');
     const output = document.getElementById('ref-bg-intensity-value');
-    if (range) range.value = String(intensity);
-    if (output) output.textContent = intensity + '%';
+    if (range) range.value = String(visibility);
+    if (output) output.textContent = `${visibility}%`;
 
-    if (shouldSave) write({backgroundIntensity:intensity});
+    if (save) saveState({backgroundVisibility:visibility});
+  }
 
-    paintWallpaper(
-      normalize(document.body.dataset.refInterface || read().interface || 'control')
+  function applyPanelOpacity(value, save = true){
+    const opacity = clamp(value, 65, 100, 92);
+
+    document.documentElement.style.setProperty(
+      '--panel-surface-opacity',
+      `${opacity}%`
     );
-  };
-
-  window.setReferencePanelOpacity = function(value, shouldSave=true){
-    const opacity = Math.max(65, Math.min(100, Number(value) || 92));
-    document.documentElement.style.setProperty('--elbot-panel-opacity', opacity + '%');
 
     const range = document.getElementById('ref-panel-opacity-range');
     const output = document.getElementById('ref-panel-opacity-value');
     if (range) range.value = String(opacity);
-    if (output) output.textContent = opacity + '%';
+    if (output) output.textContent = `${opacity}%`;
 
-    if (shouldSave) write({panelOpacity:opacity});
-  };
+    if (save) saveState({panelOpacity:opacity});
+  }
 
-  window.applyReferenceInterface = function(name, shouldSave=true){
-    const theme = normalize(name);
+  function applyTheme(value, save = true){
+    const theme = normalizeTheme(value);
 
-    document.documentElement.dataset.refInterface = theme;
-    document.body.dataset.refInterface = theme;
+    /*
+      Important : on retire les anciens attributs responsables des anciens
+      gradients et des anciennes variantes complètes d'interface.
+    */
+    document.body.removeAttribute('data-ref-interface');
+    document.body.removeAttribute('data-ref-wallpaper');
+    document.body.removeAttribute('data-ref-bg');
 
-    if (shouldSave) write({interface:theme});
+    document.documentElement.dataset.panelTheme = theme;
+    refreshThemeButtons(theme);
 
-    paintWallpaper(theme);
-    refreshButtons(theme);
-  };
+    if (save) saveState({theme});
+  }
 
-  window.loadReferenceAppearance = function(){
-    const saved = read();
-    const theme = normalize(saved.interface || 'control');
+  function loadAppearance(){
+    const state = readState();
 
-    document.documentElement.dataset.refInterface = theme;
-    document.body.dataset.refInterface = theme;
-
-    window.setReferencePanelOpacity(
-      saved.panelOpacity == null ? 92 : saved.panelOpacity,
+    applyTheme(state.theme || state.interface || 'control', false);
+    applyBackgroundVisibility(
+      state.backgroundVisibility ?? state.backgroundIntensity ?? 100,
       false
     );
+    applyPanelOpacity(state.panelOpacity ?? 92, false);
+  }
 
-    const intensity = saved.backgroundIntensity == null
-      ? 100
-      : saved.backgroundIntensity;
+  /* API publique utilisée par les boutons existants de l'interface. */
+  window.applyReferenceInterface = applyTheme;
+  window.setReferenceBackgroundIntensity = applyBackgroundVisibility;
+  window.setReferencePanelOpacity = applyPanelOpacity;
+  window.loadReferenceAppearance = loadAppearance;
 
-    const range = document.getElementById('ref-bg-intensity-range');
-    const output = document.getElementById('ref-bg-intensity-value');
-    if (range) range.value = String(intensity);
-    if (output) output.textContent = intensity + '%';
+  /* Les anciens moteurs de décor ne doivent plus rien repeindre. */
+  window.applyReferenceWallpaper = () => {};
+  window.applyReferenceBackground = () => {};
 
-    paintWallpaper(theme);
-    refreshButtons(theme);
+  window.resetReferenceAppearance = () => {
+    localStorage.removeItem(STORAGE_KEY);
+    localStorage.removeItem(LEGACY_STORAGE_KEY);
+
+    applyTheme('control', false);
+    applyBackgroundVisibility(100, false);
+    applyPanelOpacity(92, false);
+
+    saveState({
+      theme:'control',
+      backgroundVisibility:100,
+      panelOpacity:92
+    });
   };
 
-  window.resetReferenceAppearance = function(){
-    localStorage.removeItem(KEY);
-    window.applyReferenceInterface('control', false);
-    window.setReferencePanelOpacity(92, false);
-    window.setReferenceBackgroundIntensity(100, false);
-  };
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', loadAppearance, {once:true});
+  } else {
+    loadAppearance();
+  }
 
-  document.addEventListener('DOMContentLoaded', window.loadReferenceAppearance);
-  window.addEventListener('pageshow', window.loadReferenceAppearance);
-
-  /* Repeint une dernière fois après les anciens scripts du fichier. */
-  window.setTimeout(window.loadReferenceAppearance, 120);
-  window.setTimeout(window.loadReferenceAppearance, 500);
+  window.addEventListener('pageshow', loadAppearance);
 })();

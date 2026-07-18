@@ -1,56 +1,53 @@
-
-/* ═══════════════════════════════════════════════════════════════════════
-   ELBOT V24 — FOND GLOBAL SANS MODIFIER LA MISE EN PAGE
-   Le fond est porté par <html>, derrière tout le panel et tous les onglets.
-   Aucun positionnement, aucune largeur et aucun composant ne sont modifiés.
-   ═══════════════════════════════════════════════════════════════════════ */
+/* ==========================================================================
+   ELBOT THEME ENGINE V2
+   Un seul moteur. Le fond est appliqué à .main, donc présent sur tous les
+   onglets sans créer de calque DOM ni modifier la mise en page.
+   ========================================================================== */
 
 :root{
-  --elbot-wallpaper:url("/assets/themes/control.webp?v=24");
-  --elbot-wallpaper-overlay:rgba(1,7,18,.24);
-  --elbot-wallpaper-opacity:1;
+  --panel-wallpaper:url("/assets/themes/control.webp");
+  --panel-overlay-rgb:2 8 20;
+  --panel-overlay-alpha:.10;
+  --panel-surface-opacity:92%;
 }
 
-/* Le vrai fond global. Il n'ajoute aucun élément dans le layout. */
-html{
-  min-height:100%;
+/* Neutralisation des anciens décors globaux. */
+body::before,
+body::after,
+.main::before,
+.main::after,
+body[data-ref-interface]::before,
+body[data-ref-interface]::after,
+body[data-ref-wallpaper]::before,
+body[data-ref-wallpaper]::after{
+  content:none!important;
+  display:none!important;
+  background:none!important;
+  background-image:none!important;
+}
+
+/* Le fond est porté par la zone principale existante.
+   Aucun élément supplémentaire = aucun décalage possible. */
+body .main{
   background-color:#020817!important;
   background-image:
     linear-gradient(
-      var(--elbot-wallpaper-overlay),
-      var(--elbot-wallpaper-overlay)
+      rgb(var(--panel-overlay-rgb) / var(--panel-overlay-alpha)),
+      rgb(var(--panel-overlay-rgb) / var(--panel-overlay-alpha))
     ),
-    var(--elbot-wallpaper)!important;
+    var(--panel-wallpaper)!important;
   background-repeat:no-repeat!important;
   background-size:cover!important;
   background-position:center center!important;
   background-attachment:fixed!important;
+  min-height:100vh!important;
 }
 
-/* Le body laisse apparaître le fond de <html>. */
-body{
-  min-height:100vh;
-  background-color:transparent!important;
-  background-image:none!important;
-}
-
-/* Neutralise uniquement les anciens grands fonds décoratifs plein écran.
-   Aucun style de carte, sidebar, topbar, bouton ou widget n'est modifié. */
-body::before,
-body::after{
-  content:none!important;
-  display:none!important;
-}
-
-/* Les enveloppes de pages doivent laisser voir le fond global.
-   Cela s'applique au Dashboard et à chaque onglet. */
-body .main,
-body main,
-body .content,
+/* Toutes les pages laissent apparaître le fond de .main. */
 body .page,
+body .page.active,
 body .page-content,
-body #app,
-body .app-shell,
+body .content,
 body .dashboard,
 body .dashboard-grid,
 body .page-wrapper,
@@ -61,7 +58,44 @@ body [id^="page-"]{
   background-image:none!important;
 }
 
-/* Le tiroir reste flottant. Aucun impact sur la largeur du panel. */
+/* Transparence réglable des surfaces, sans toucher aux tailles ni aux positions. */
+body .sidebar{
+  background:color-mix(
+    in srgb,
+    var(--side) var(--panel-surface-opacity),
+    transparent
+  )!important;
+  backdrop-filter:blur(16px) saturate(122%);
+  -webkit-backdrop-filter:blur(16px) saturate(122%);
+}
+
+body .elbot-topbar,
+body .panel,
+body .card,
+body .ref-kpi,
+body .ref-panel,
+body .settings-card,
+body .widget-card,
+body .config-card,
+body .table-wrap,
+body .form-section,
+body .block,
+body .box,
+body .modal-content,
+body .ref-status-card,
+body .ref-current-card,
+body .ref-logs-card,
+body .ref-live-viewers{
+  background:color-mix(
+    in srgb,
+    var(--card) var(--panel-surface-opacity),
+    transparent
+  )!important;
+  backdrop-filter:blur(12px) saturate(116%);
+  -webkit-backdrop-filter:blur(12px) saturate(116%);
+}
+
+/* Le tiroir de personnalisation flotte et ne réduit jamais le panel. */
 .ref-drawer-backdrop{
   position:fixed!important;
   inset:0!important;
@@ -70,9 +104,8 @@ body [id^="page-"]{
   align-items:stretch!important;
   z-index:99999!important;
 }
-.ref-drawer-backdrop.open{
-  display:flex!important;
-}
+.ref-drawer-backdrop.open{display:flex!important}
+
 .ref-customizer-drawer{
   flex:0 0 min(430px,94vw)!important;
   width:min(430px,94vw)!important;
@@ -82,15 +115,14 @@ body [id^="page-"]{
   overflow-x:hidden!important;
   overflow-y:auto!important;
 }
-.premium-theme-gallery{
-  grid-template-columns:1fr!important;
-}
+
+.premium-theme-gallery{grid-template-columns:1fr!important}
 .premium-theme-preview{
   background-size:cover!important;
   background-position:center!important;
 }
 
-/* Curseur d'intensité du fond. */
+/* Réglages. */
 .ref-bg-intensity{
   display:grid;
   grid-template-columns:1fr auto;
@@ -98,12 +130,9 @@ body [id^="page-"]{
   gap:8px;
   margin-top:12px;
 }
-.ref-bg-intensity label{
-  font-size:8px;
-  font-weight:800;
-}
+.ref-bg-intensity label{font-size:8px;font-weight:800}
 .ref-bg-intensity output{
-  min-width:34px;
+  min-width:36px;
   font-size:8px;
   font-weight:900;
   text-align:right;
@@ -113,69 +142,60 @@ body [id^="page-"]{
   width:100%;
 }
 
-/* L'intensité choisie agit via un voile noir :
-   100% = image très visible ; 35% = image plus discrète. */
-html{
-  --elbot-wallpaper-darkness:
-    calc((100 - var(--elbot-background-percent,100)) * .0065);
+/* Mapping unique des fonds. */
+html[data-panel-theme="control"]{
+  --panel-wallpaper:url("/assets/themes/control.webp");
+  --panel-overlay-rgb:2 8 20;
 }
-
-/* Les 13 fonds, appliqués directement à la racine du document. */
-html[data-ref-interface="control"]{
-  --elbot-wallpaper:url("/assets/themes/control.webp?v=24");
-  --elbot-wallpaper-overlay:rgba(1,7,18,var(--elbot-wallpaper-darkness));
+html[data-panel-theme="dbd"]{
+  --panel-wallpaper:url("/assets/themes/dbd.webp");
+  --panel-overlay-rgb:0 0 0;
 }
-html[data-ref-interface="dbd"]{
-  --elbot-wallpaper:url("/assets/themes/dbd.webp?v=24");
-  --elbot-wallpaper-overlay:rgba(0,0,0,var(--elbot-wallpaper-darkness));
+html[data-panel-theme="obs"]{
+  --panel-wallpaper:url("/assets/themes/obs.webp");
+  --panel-overlay-rgb:4 7 9;
 }
-html[data-ref-interface="obs"]{
-  --elbot-wallpaper:url("/assets/themes/obs.webp?v=24");
-  --elbot-wallpaper-overlay:rgba(4,7,9,var(--elbot-wallpaper-darkness));
+html[data-panel-theme="vision"]{
+  --panel-wallpaper:url("/assets/themes/vision.webp");
+  --panel-overlay-rgb:225 235 248;
 }
-html[data-ref-interface="vision"]{
-  --elbot-wallpaper:url("/assets/themes/vision.webp?v=24");
-  --elbot-wallpaper-overlay:rgba(220,232,248,calc(var(--elbot-wallpaper-darkness) * .35));
+html[data-panel-theme="neon"]{
+  --panel-wallpaper:url("/assets/themes/neon.webp");
+  --panel-overlay-rgb:2 0 10;
 }
-html[data-ref-interface="neon"]{
-  --elbot-wallpaper:url("/assets/themes/neon.webp?v=24");
-  --elbot-wallpaper-overlay:rgba(2,0,10,calc(var(--elbot-wallpaper-darkness) * .70));
+html[data-panel-theme="elite"]{
+  --panel-wallpaper:url("/assets/themes/elite.webp");
+  --panel-overlay-rgb:0 0 0;
 }
-html[data-ref-interface="elite"]{
-  --elbot-wallpaper:url("/assets/themes/elite.webp?v=24");
-  --elbot-wallpaper-overlay:rgba(0,0,0,var(--elbot-wallpaper-darkness));
+html[data-panel-theme="steam"]{
+  --panel-wallpaper:url("/assets/themes/steam.webp");
+  --panel-overlay-rgb:4 12 18;
 }
-html[data-ref-interface="steam"]{
-  --elbot-wallpaper:url("/assets/themes/steam.webp?v=24");
-  --elbot-wallpaper-overlay:rgba(4,12,18,var(--elbot-wallpaper-darkness));
+html[data-panel-theme="riot"]{
+  --panel-wallpaper:url("/assets/themes/riot.webp");
+  --panel-overlay-rgb:10 1 3;
 }
-html[data-ref-interface="riot"]{
-  --elbot-wallpaper:url("/assets/themes/riot.webp?v=24");
-  --elbot-wallpaper-overlay:rgba(10,1,3,var(--elbot-wallpaper-darkness));
+html[data-panel-theme="midnight"]{
+  --panel-wallpaper:url("/assets/themes/midnight.webp");
+  --panel-overlay-rgb:0 5 18;
 }
-html[data-ref-interface="midnight"]{
-  --elbot-wallpaper:url("/assets/themes/midnight.webp?v=24");
-  --elbot-wallpaper-overlay:rgba(0,5,18,calc(var(--elbot-wallpaper-darkness) * .70));
+html[data-panel-theme="ocean"]{
+  --panel-wallpaper:url("/assets/themes/ocean.webp");
+  --panel-overlay-rgb:0 12 28;
 }
-html[data-ref-interface="ocean"]{
-  --elbot-wallpaper:url("/assets/themes/ocean.webp?v=24");
-  --elbot-wallpaper-overlay:rgba(0,12,28,calc(var(--elbot-wallpaper-darkness) * .62));
+html[data-panel-theme="sunset"]{
+  --panel-wallpaper:url("/assets/themes/sunset.webp");
+  --panel-overlay-rgb:38 8 12;
 }
-html[data-ref-interface="sunset"]{
-  --elbot-wallpaper:url("/assets/themes/sunset.webp?v=24");
-  --elbot-wallpaper-overlay:rgba(38,8,12,calc(var(--elbot-wallpaper-darkness) * .55));
+html[data-panel-theme="forest"]{
+  --panel-wallpaper:url("/assets/themes/forest.webp");
+  --panel-overlay-rgb:0 16 13;
 }
-html[data-ref-interface="forest"]{
-  --elbot-wallpaper:url("/assets/themes/forest.webp?v=24");
-  --elbot-wallpaper-overlay:rgba(0,16,13,calc(var(--elbot-wallpaper-darkness) * .62));
-}
-html[data-ref-interface="minimal"]{
-  --elbot-wallpaper:url("/assets/themes/minimal.webp?v=24");
-  --elbot-wallpaper-overlay:rgba(245,247,251,calc(var(--elbot-wallpaper-darkness) * .22));
+html[data-panel-theme="minimal"]{
+  --panel-wallpaper:url("/assets/themes/minimal.webp");
+  --panel-overlay-rgb:245 247 251;
 }
 
 @media(max-width:900px){
-  html{
-    background-position:58% center!important;
-  }
+  body .main{background-position:58% center!important}
 }
