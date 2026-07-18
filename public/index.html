@@ -4971,12 +4971,14 @@ function openConnectedKickChannel() {
 
 // ── Load all ───────────────────────────────────────────────────────────────────
 async function loadAll() {
-  await loadConnectedStreamerIdentity();
-  loadLiveStatus();
-  checkBotTokenStatus();
-  await Promise.all([loadStats(), loadDashLB(), loadDashLogs(), loadCmdUsage(), loadLevels(), loadActiveGiveaway(), loadChatActivityWeek()]);
-  const el = document.getElementById('upd');
-  if(el) el.textContent = new Date().toLocaleTimeString('fr-FR');
+  if (document.hidden || loadAll.inFlight) return;
+  loadAll.inFlight = true;
+  try {
+    await loadConnectedStreamerIdentity();
+    await Promise.allSettled([loadLiveStatus(), checkBotTokenStatus(), loadStats(), loadDashLB(), loadDashLogs(), loadCmdUsage(), loadLevels(), loadActiveGiveaway(), loadChatActivityWeek()]);
+    const el = document.getElementById('upd');
+    if(el) el.textContent = new Date().toLocaleTimeString('fr-FR');
+  } finally { loadAll.inFlight = false; }
 }
 
 async function loadFollowers() {
@@ -7736,10 +7738,11 @@ function srUpdateProgressOnly(force = false) {
 function srStartSmoothUiLoop(){
   if (srRafTimer) cancelAnimationFrame(srRafTimer);
   const loop = () => {
-    if (isSongRequestOpen()) srUpdateProgressOnly(false);
+    if (document.hidden || !isSongRequestOpen()) { srRafTimer = null; return; }
+    srUpdateProgressOnly(false);
     srRafTimer = requestAnimationFrame(loop);
   };
-  srRafTimer = requestAnimationFrame(loop);
+  if (!document.hidden && isSongRequestOpen()) srRafTimer = requestAnimationFrame(loop);
 }
 async function loadSongRequest(silent = false) {
   try {
@@ -10022,9 +10025,8 @@ function logout() {
 applyStoredPrefs();
 checkPanelAuth().then(ok => { if (ok) { hydrateAllObsLinks(); loadAll(); } });
 setTimeout(() => { hydrateAllObsLinks(); if (document.getElementById('widget-engine-grid')) loadWidgetEngine(); }, 250);
-setInterval(loadAll,30000);
-setInterval(loadLiveStatus, 60000);
-setInterval(()=>{if(document.getElementById('page-lobby').classList.contains('active'))loadLobby();},10000);
+setInterval(() => { if (!document.hidden && document.getElementById('page-dashboard')?.classList.contains('active')) loadAll(); },60000);
+setInterval(()=>{if(!document.hidden && document.getElementById('page-lobby').classList.contains('active'))loadLobby();},30000);
 
 // Résolveur de dates de follow : le navigateur peut appeler l'API interne Kick
 // (bloquée depuis Render par Cloudflare) — il résout les viewers actifs sans date
@@ -10051,7 +10053,7 @@ async function resolveFollowDates() {
     }
   } catch(e) {}
 }
-setInterval(resolveFollowDates, 60000);
+setInterval(() => { if (!document.hidden) resolveFollowDates(); }, 120000);
 setTimeout(resolveFollowDates, 5000); // premier passage rapide après chargement
 
 
@@ -10309,8 +10311,8 @@ function loadReferenceDashboard() {
 }
 setTimeout(loadReferenceDashboard, 50);
 setInterval(() => {
-  if (document.getElementById('page-dashboard')?.classList.contains('active')) loadReferenceDashboard();
-}, 10000);
+  if (!document.hidden && document.getElementById('page-dashboard')?.classList.contains('active')) loadReferenceDashboard();
+}, 30000);
 
 </script>
 
@@ -10827,12 +10829,12 @@ function updateReferenceKpiCharts() {
   refSaveKpiHistory(history);
 }
 function refScheduleKpiUpdate() {
-  setTimeout(updateReferenceKpiCharts, 350);
-  setTimeout(updateReferenceKpiCharts, 1200);
+  if (!document.hidden && document.getElementById('page-dashboard')?.classList.contains('active')) setTimeout(updateReferenceKpiCharts, 350);
 }
 refScheduleKpiUpdate();
-setInterval(refScheduleKpiUpdate, 30000);
-window.addEventListener('resize', updateReferenceKpiCharts);
+setInterval(refScheduleKpiUpdate, 60000);
+let refResizeTimer = null;
+window.addEventListener('resize', () => { clearTimeout(refResizeTimer); refResizeTimer = setTimeout(updateReferenceKpiCharts, 200); });
 
 </script>
 
@@ -10968,6 +10970,7 @@ function refUpdateAnimatedSongProgress() {
 function refStartSongProgressAnimation() {
   if (refSrAnimationTimer) clearInterval(refSrAnimationTimer);
   refSrAnimationTimer = setInterval(() => {
+    if (document.hidden || !document.getElementById('page-dashboard')?.classList.contains('active')) return;
     if (String(refSrAnimationStatus).toLowerCase() !== 'playing') return;
     if (refSrAnimatedDuration > 0 && refSrAnimatedTime < refSrAnimatedDuration) {
       refSrAnimatedTime += 1;

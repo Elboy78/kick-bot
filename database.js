@@ -1653,6 +1653,11 @@ async function getStreamerById(id) {
   return get(`SELECT * FROM streamers WHERE id = ?`, [id]);
 }
 
+async function getStreamerByBroadcasterUserId(id) {
+  if (id === undefined || id === null || String(id).trim() === '') return null;
+  return get(`SELECT * FROM streamers WHERE CAST(broadcaster_user_id AS TEXT) = ? OR CAST(kick_user_id AS TEXT) = ?`, [String(id), String(id)]);
+}
+
 async function listStreamers() {
   return all(`SELECT * FROM streamers ORDER BY created_at ASC`);
 }
@@ -1942,6 +1947,6 @@ module.exports = {
   getPointsConfig, setPointsConfigValue, setPointsConfigBulk,
   setBotStatus, getBotStatus, getAllBotStatus,
   saveOAuthToken, getOAuthToken, deleteOAuthToken,
-  ensureDefaultStreamer, getStreamerBySlug, getStreamerById, listStreamers, upsertStreamer, updateStreamerKickMeta, getActiveStreamersForBot,
+  ensureDefaultStreamer, getStreamerBySlug, getStreamerById, getStreamerByBroadcasterUserId, listStreamers, upsertStreamer, updateStreamerKickMeta, getActiveStreamersForBot,
   getStreamerSetting, setStreamerSetting, getOrCreateOverlayToken, regenerateOverlayToken, getOverlayTokenByValue, getOverlayTokensForStreamer, saveOAuthTokenForStreamer, getOAuthTokenForStreamer, deleteOAuthTokenForStreamer,
 };

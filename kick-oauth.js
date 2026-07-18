@@ -15,6 +15,13 @@ function providerForStreamer(streamerId) { return streamerId ? `kick:${streamerI
 const CLIENT_ID     = process.env.KICK_CLIENT_ID || '';
 const CLIENT_SECRET = process.env.KICK_CLIENT_SECRET || '';
 const REDIRECT_URI  = process.env.KICK_REDIRECT_URI || '';
+const KICK_API_BASE = 'https://api.kick.com/public/v1';
+const STREAMER_EVENT_TYPES = [
+  'channel.followed',
+  'channel.subscription.new',
+  'channel.subscription.renewal',
+  'channel.subscription.gifts',
+];
 
 let pendingPKCE = null;
 
@@ -38,7 +45,23 @@ function safeJson(value, fallback = {}) {
 }
 
 function normalizeScopes(scopes) {
-  return scopes || process.env.KICK_OAUTH_SCOPES || 'user:read channel:read chat:write';
+  const requested = String(scopes || process.env.KICK_OAUTH_SCOPES || 'user:read channel:read chat:write');
+  return [...new Set(`${requested} events:subscribe`.trim().split(/\s+/))].join(' ');
+}
+
+async function subscribeStreamerEvents(accessToken, broadcasterUserId) {
+  if (!accessToken || !broadcasterUserId) throw new Error('Token ou broadcaster_user_id manquant');
+  const numericId = Number(broadcasterUserId);
+  const body = {
+    broadcaster_user_id: Number.isSafeInteger(numericId) ? numericId : String(broadcasterUserId),
+    events: STREAMER_EVENT_TYPES.map(name => ({ name, version: 1 })),
+    method: 'webhook',
+  };
+  const { data } = await axios.post(`${KICK_API_BASE}/events/subscriptions`, body, {
+    headers: { Authorization: `Bearer ${accessToken}`, Accept: 'application/json', 'Content-Type': 'application/json' },
+    timeout: 12000,
+  });
+  return data;
 }
 
 function getAuthorizationUrl(scopes, options = {}) {
@@ -256,4 +279,5 @@ module.exports = {
   fetchChannelInfoForUser,
   getValidBotAccessToken,
   isBotConnected,
+  subscribeStreamerEvents,
 };
