@@ -1609,13 +1609,38 @@ function normalizeStreamerSlug(value) {
     .replace(/^-|-$/g, '') || 'main';
 }
 
+function configuredAdminSlugs() {
+  return new Set(
+    String(process.env.PLATFORM_ADMIN_SLUGS || 'elboy78')
+      .split(',')
+      .map(normalizeStreamerSlug)
+      .filter(Boolean)
+  );
+}
+
+function canonicalStreamerRole(slug, requestedRole = 'streamer') {
+  const cleanSlug = normalizeStreamerSlug(slug);
+  if (configuredAdminSlugs().has(cleanSlug)) return 'admin';
+  return requestedRole === 'admin' ? 'admin' : 'streamer';
+}
+
+async function reconcileStreamerRoles() {
+  const admins = [...configuredAdminSlugs()];
+  // Aucun streamer ordinaire ne doit hériter du rôle owner parce qu'il est le
+  // tenant historique ou le premier compte créé.
+  await run(`UPDATE streamers SET role = 'streamer', updated_at = datetime('now') WHERE role = 'owner'`);
+  for (const slug of admins) {
+    await run(`UPDATE streamers SET role = 'admin', updated_at = datetime('now') WHERE slug = ?`, [slug]);
+  }
+}
+
 async function ensureDefaultStreamer(seed = {}) {
   const slug = normalizeStreamerSlug(seed.slug || process.env.DEFAULT_STREAMER_SLUG || process.env.KICK_CHANNEL || 'main');
   const existing = await get(`SELECT * FROM streamers WHERE slug = ?`, [slug]);
   if (existing) return existing;
   await run(
     `INSERT INTO streamers (slug, kick_username, display_name, role, status) VALUES (?, ?, ?, ?, 'active')`,
-    [slug, seed.kickUsername || process.env.KICK_CHANNEL || slug, seed.displayName || process.env.PANEL_OWNER || slug, seed.role || 'owner']
+    [slug, seed.kickUsername || process.env.KICK_CHANNEL || slug, seed.displayName || process.env.PANEL_OWNER || slug, canonicalStreamerRole(slug, seed.role)]
   );
   return get(`SELECT * FROM streamers WHERE slug = ?`, [slug]);
 }
@@ -1636,6 +1661,7 @@ async function upsertStreamer(data = {}) {
   const slug = normalizeStreamerSlug(data.slug || data.kick_username || data.kickUsername || data.display_name || data.displayName);
   const kickUsername = data.kick_username || data.kickUsername || slug;
   const displayName = data.display_name || data.displayName || kickUsername;
+  const role = canonicalStreamerRole(slug, data.role);
   await run(
     `INSERT INTO streamers (slug, kick_user_id, kick_username, display_name, avatar_url, role, status, channel_id, chatroom_id, broadcaster_user_id, bot_enabled, updated_at)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
@@ -1651,9 +1677,9 @@ async function upsertStreamer(data = {}) {
        broadcaster_user_id = COALESCE(?, broadcaster_user_id),
        bot_enabled = COALESCE(?, bot_enabled),
        updated_at = datetime('now')`,
-    [slug, data.kick_user_id || data.kickUserId || null, kickUsername, displayName, data.avatar_url || data.avatarUrl || null, data.role || 'streamer', data.status || 'active',
+    [slug, data.kick_user_id || data.kickUserId || null, kickUsername, displayName, data.avatar_url || data.avatarUrl || null, role, data.status || 'active',
      data.channel_id || data.channelId || null, data.chatroom_id || data.chatroomId || null, data.broadcaster_user_id || data.broadcasterUserId || null, data.bot_enabled ?? data.botEnabled ?? 1,
-     data.kick_user_id || data.kickUserId || null, kickUsername, displayName, data.avatar_url || data.avatarUrl || null, data.role || null, data.status || null,
+     data.kick_user_id || data.kickUserId || null, kickUsername, displayName, data.avatar_url || data.avatarUrl || null, role, data.status || null,
      data.channel_id || data.channelId || null, data.chatroom_id || data.chatroomId || null, data.broadcaster_user_id || data.broadcasterUserId || null, data.bot_enabled ?? data.botEnabled ?? null]
   );
   return getStreamerBySlug(slug);
@@ -1868,6 +1894,7 @@ async function ensureInit() {
     try {
       await initSchema();
       const defaultStreamer = await ensureDefaultStreamer();
+      await reconcileStreamerRoles();
       await migrateCoreScopedTables(defaultStreamer?.id || 1);
       await migrateLegacyRowsToDefaultStreamer(defaultStreamer?.id || 1);
     } catch(e) {

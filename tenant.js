@@ -38,7 +38,7 @@ function getDefaultStreamerSeed() {
     slug,
     kickUsername: process.env.KICK_CHANNEL || slug,
     displayName: process.env.PANEL_OWNER || process.env.KICK_CHANNEL || slug,
-    role: 'owner'
+    role: 'streamer'
   };
 }
 
