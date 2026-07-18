@@ -1,1 +1,2 @@
-/* ElBot V23 — control: fond uniquement. Le design du panel reste inchangé. */
+
+:root{--theme-bg:#020817;--theme-wallpaper:url("/assets/themes/control.webp?v=19");--theme-overlay:linear-gradient(90deg,rgba(1,7,20,.54),rgba(1,8,22,.16) 62%,rgba(0,4,15,.34));--theme-panel:linear-gradient(145deg,rgba(7,31,70,.78),rgba(3,17,40,.86));--theme-border:rgba(55,140,255,.27);--theme-soft:rgba(20,78,151,.14);--theme-soft-border:rgba(78,150,241,.20);--theme-text:#edf6ff;--theme-muted:#8da3bf;--theme-radius:14px;--theme-accent:#1685ff;--theme-accent2:#0759d8}

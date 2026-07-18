@@ -1,1 +1,20 @@
-/* ElBot V23 — minimal: fond uniquement. Le design du panel reste inchangé. */
+:root{
+  --theme-bg:#f3f5f8;
+  --theme-wallpaper:url("/assets/themes/minimal.webp?v=20");
+  --theme-overlay:linear-gradient(90deg,rgba(255,255,255,.10),rgba(255,255,255,.01),rgba(228,233,241,.08));
+  --theme-panel:linear-gradient(145deg,rgba(255,255,255,.42),rgba(244,247,251,.24));
+  --theme-border:rgba(255,255,255,.76);
+  --theme-soft:rgba(255,255,255,.38);
+  --theme-soft-border:rgba(180,190,205,.22);
+  --theme-text:#20324a;
+  --theme-muted:#667a94;
+  --theme-radius:22px;
+  --theme-accent:#7487a7;
+  --theme-accent2:#51647f;
+  --theme-shadow:inset 0 1px 0 rgba(255,255,255,.96),0 18px 48px rgba(91,108,132,.14);
+}
+.sidebar,.elbot-topbar,.panel,.card,.ref-kpi,.ref-panel,.settings-card,.widget-card,.config-card,.table-wrap,.form-section,.block,.box,.modal-content,.ref-sidebar-tool,.sb-profile{
+  backdrop-filter:blur(28px) saturate(150%)!important;
+  -webkit-backdrop-filter:blur(28px) saturate(150%)!important;
+}
+.menu a,.logo,.header h1,.ref-welcome h1,.ref-sidebar-tool b,.sb-prof-name{color:#20324a!important}

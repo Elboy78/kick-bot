@@ -1,1 +1,34 @@
-/* ElBot V23 — vision: fond uniquement. Le design du panel reste inchangé. */
+:root{
+  --theme-bg:#dce8f6;
+  --theme-wallpaper:url("/assets/themes/vision.webp?v=20");
+  --theme-overlay:linear-gradient(90deg,rgba(25,66,125,.12),rgba(255,255,255,.02),rgba(53,94,155,.10));
+  --theme-panel:linear-gradient(145deg,rgba(255,255,255,.22),rgba(226,239,255,.10));
+  --theme-border:rgba(255,255,255,.70);
+  --theme-soft:rgba(255,255,255,.22);
+  --theme-soft-border:rgba(255,255,255,.56);
+  --theme-text:#12335e;
+  --theme-muted:#506f94;
+  --theme-radius:26px;
+  --theme-accent:#4b8ff0;
+  --theme-accent2:#2c6fd6;
+  --theme-shadow:inset 0 1px 0 rgba(255,255,255,.94),0 24px 60px rgba(50,84,130,.18);
+}
+.sidebar,.elbot-topbar,.panel,.card,.ref-kpi,.ref-panel,.settings-card,.widget-card,.config-card,.table-wrap,.form-section,.block,.box,.modal-content,.ref-sidebar-tool,.sb-profile,.ref-customizer-drawer{
+  background:linear-gradient(145deg,rgba(255,255,255,.24),rgba(220,236,255,.11))!important;
+  border:1px solid rgba(255,255,255,.68)!important;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.96),0 22px 58px rgba(46,78,124,.18)!important;
+  backdrop-filter:blur(38px) saturate(175%) brightness(1.04)!important;
+  -webkit-backdrop-filter:blur(38px) saturate(175%) brightness(1.04)!important;
+}
+.sidebar{
+  margin:14px 0 14px 14px!important;
+  height:calc(100vh - 28px)!important;
+  border-radius:30px!important;
+  overflow:hidden!important;
+}
+.elbot-topbar{margin:14px 14px 0!important;border-radius:22px!important}
+.menu a{color:#17385f!important;border-radius:16px!important;border:1px solid transparent!important}
+.menu a:hover{background:rgba(255,255,255,.28)!important;border-color:rgba(255,255,255,.50)!important}
+.menu a.active{color:white!important;box-shadow:inset 0 1px 0 rgba(255,255,255,.28),0 9px 22px rgba(55,111,190,.22)!important}
+.logo,.header h1,.ref-welcome h1,.ref-sidebar-tool b,.sb-prof-name{color:#17385f!important}
+.ref-sidebar-bottom{background:linear-gradient(180deg,transparent,rgba(224,237,250,.42) 28%)!important}

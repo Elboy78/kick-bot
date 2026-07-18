@@ -24,6 +24,27 @@
     localStorage.setItem(KEY, JSON.stringify({...read(),...patch}));
   }
 
+  function wallpaperUrl(theme){
+    return `/assets/themes/${theme}.webp?v=26`;
+  }
+
+  function applyWallpaperFile(theme){
+    const url = wallpaperUrl(theme);
+    const probe = new Image();
+
+    probe.onload = function(){
+      const cssValue = `url("${url}")`;
+      document.documentElement.style.setProperty('--elbot-final-wallpaper', cssValue);
+      document.body.style.setProperty('--elbot-final-wallpaper', cssValue);
+    };
+
+    probe.onerror = function(){
+      console.error('[ElBot Theme] Fond introuvable :', url);
+    };
+
+    probe.src = url;
+  }
+
   function refreshButtons(theme){
     document.querySelectorAll('[data-ref-interface]').forEach(button => {
       const active = button.dataset.refInterface === theme;
@@ -59,14 +80,18 @@
 
   window.applyReferenceInterface = function(name, shouldSave=true){
     const theme = normalize(name);
+
     document.documentElement.dataset.refInterface = theme;
     document.body.dataset.refInterface = theme;
+    applyWallpaperFile(theme);
     refreshButtons(theme);
+
     if (shouldSave) write({interface:theme});
   };
 
   window.loadReferenceAppearance = function(){
     const saved = read();
+
     window.applyReferenceInterface(saved.interface || 'control', false);
     window.setReferenceBackgroundIntensity(
       saved.backgroundIntensity == null ? 100 : saved.backgroundIntensity,
@@ -76,16 +101,6 @@
       saved.panelOpacity == null ? 92 : saved.panelOpacity,
       false
     );
-
-    if (typeof toggleReferenceGlow === 'function') {
-      toggleReferenceGlow(saved.glow !== false, false);
-    }
-    if (typeof toggleReferenceMotion === 'function') {
-      toggleReferenceMotion(saved.motion !== false, false);
-    }
-    if (typeof toggleReferenceCompact === 'function') {
-      toggleReferenceCompact(saved.compact === true, false);
-    }
   };
 
   window.resetReferenceAppearance = function(){
