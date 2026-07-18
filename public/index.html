@@ -576,7 +576,7 @@ body.light .card,body.light .panel,body.light .widget-engine-card{background:lin
     <div class="sb-upd" id="upd"></div>
     <div class="sb-profile" onclick="showPage('settings')">
       <div class="sb-prof-avatar" id="prof-avatar">?</div>
-      <div><div class="sb-prof-name" id="prof-name">—</div><div class="sb-prof-role">Admin</div></div>
+      <div><div class="sb-prof-name" id="prof-name">—</div><div class="sb-prof-role" id="prof-role">Streamer</div></div>
     </div>
   </div>
 
@@ -608,7 +608,7 @@ body.light .card,body.light .panel,body.light .widget-engine-card{background:lin
       <button class="top-icon" type="button" onclick="showPage('settings')" title="Aide et paramètres">?</button>
       <button class="top-profile" type="button" onclick="showPage('settings')">
         <span class="top-profile-avatar" id="top-prof-avatar">E</span>
-        <span><strong id="top-prof-name">ElBot</strong><small>Streamer</small></span>
+        <span><strong id="top-prof-name">ElBot</strong><small id="top-prof-role">Streamer</small></span>
         <span style="margin-left:auto;color:var(--muted)">⌄</span>
       </button>
     </div>
@@ -4599,7 +4599,7 @@ body.ref-theme-transition *:after{
 
           <div id="oauth-not-configured-block" style="display:none">
             <div style="font-size:10px;color:var(--muted);margin-bottom:10px;line-height:1.6">
-              Pour activer le refresh automatique, crée une application sur <span class="cpill">dev.kick.com</span> et ajoute <span class="cpill">KICK_CLIENT_ID</span>, <span class="cpill">KICK_CLIENT_SECRET</span> et <span class="cpill">KICK_REDIRECT_URI</span> dans les variables Render.
+              Pour activer le renouvellement automatique, crée une application sur <span class="cpill">dev.kick.com</span> et configure <span class="cpill">KICK_CLIENT_ID</span>, <span class="cpill">KICK_CLIENT_SECRET</span> et <span class="cpill">KICK_REDIRECT_URI</span> sur ton serveur.
             </div>
           </div>
 
@@ -4614,10 +4614,9 @@ body.ref-theme-transition *:after{
               <button class="btnx btn-green btn-sm" onclick="copyDetectedToken()">📋 Copier</button>
             </div>
           </div>
-          <button class="btnx btn-ghost btn-sm" style="width:100%;justify-content:center;margin-top:6px" onclick="window.open('https://dashboard.render.com','_blank')">🔗 Ouvrir Render → Environment</button>
           <div id="token-msg" style="margin-top:7px"></div>
         </div>
-        <div class="panel" style="margin-bottom:14px"><h3>ℹ️ À propos</h3><ul class="info"><li><span>Version</span><span style="color:#8b35ff;font-weight:700">Bot7uP v2.1.0</span></li><li><span>Base de données</span><span>Turso (LibSQL)</span></li><li><span>Hébergement</span><span>Render.com</span></li><li><span>Chaîne</span><span id="settings-channel-name">Connecté</span></li></ul></div>
+        <div class="panel" style="margin-bottom:14px"><h3>ℹ️ À propos</h3><ul class="info"><li><span>Version</span><span style="color:#8b35ff;font-weight:700">ElBot v2.1.0</span></li><li><span>Base de données</span><span>SQLite</span></li><li><span>Hébergement</span><span>VPS ElBot</span></li><li><span>Chaîne</span><span id="settings-channel-name">Connecté</span></li></ul></div>
         <div class="danger"><div class="danger-t">⚠ Réinitialisation</div><p style="font-size:10px;color:#a1a1aa;margin-bottom:8px">Remet les préférences aux valeurs par défaut.</p><button class="btnx btn-red" style="width:100%;justify-content:center" onclick="resetSettings()">🔄 Réinitialiser</button></div>
       </div>
     </div>
@@ -4945,6 +4944,9 @@ async function loadConnectedStreamerIdentity() {
     setText('sb-channel', activeKickChannel || '—');
     setText('prof-name', displayName);
     setText('top-prof-name', displayName);
+    const role = profile.role === 'owner' ? 'Propriétaire' : (profile.role === 'admin' ? 'Admin' : 'Streamer');
+    setText('prof-role', role);
+    setText('top-prof-role', role);
 
     const avatar = document.getElementById('prof-avatar');
     const topAvatar = document.getElementById('top-prof-avatar');

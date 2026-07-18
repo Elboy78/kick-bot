@@ -1,7 +1,7 @@
 (() => {
   'use strict';
 
-  const STORAGE_KEY = 'elbot_theme_v3';
+  const BASE_STORAGE_KEY = 'elbot_theme_v3';
   const LEGACY_KEYS = ['elbot_theme_v2','elbot_ref_appearance_v1','elbot_ref_appearance'];
 
   const THEMES = new Set([
@@ -37,6 +37,13 @@
     compact:false
   };
 
+  function streamerSlug(){
+    const pathSlug = location.pathname.match(/^\/s\/([^/]+)/)?.[1];
+    return String(window.CURRENT_STREAMER_SLUG || pathSlug || 'default').toLowerCase();
+  }
+
+  function storageKey(){ return `${BASE_STORAGE_KEY}:${streamerSlug()}`; }
+
   function clamp(value,min,max,fallback){
     const number = Number(value);
     return Number.isFinite(number) ? Math.min(max,Math.max(min,number)) : fallback;
@@ -71,7 +78,7 @@
   }
 
   function readState(){
-    const current = readRaw(STORAGE_KEY);
+    const current = readRaw(storageKey());
     if (current) return {...DEFAULTS,...current};
 
     for (const key of LEGACY_KEYS){
@@ -94,7 +101,7 @@
 
   function saveState(patch){
     const next = {...readState(),...patch};
-    localStorage.setItem(STORAGE_KEY,JSON.stringify(next));
+    localStorage.setItem(storageKey(),JSON.stringify(next));
     return next;
   }
 
@@ -316,9 +323,9 @@
   window.loadReferenceAppearance = loadAppearance;
 
   window.resetReferenceAppearance = () => {
-    localStorage.removeItem(STORAGE_KEY);
+    localStorage.removeItem(storageKey());
     LEGACY_KEYS.forEach(key => localStorage.removeItem(key));
-    localStorage.setItem(STORAGE_KEY,JSON.stringify(DEFAULTS));
+    localStorage.setItem(storageKey(),JSON.stringify(DEFAULTS));
     loadAppearance();
   };
 

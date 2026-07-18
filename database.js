@@ -15,6 +15,52 @@ function getTenantStreamerId() {
 }
 function scopedStreamerId() { return getTenantStreamerId() || 1; }
 
+// Toutes les tables fonctionnelles appartiennent à un streamer. Cette garde
+// centrale évite qu'une nouvelle route oublie un WHERE streamer_id et mélange
+// silencieusement deux panels. Les tables d'identité plateforme restent
+// globales et utilisent leurs fonctions V2 dédiées.
+const TENANT_TABLES = new Set([
+  'viewers','points_log','stream_sessions','custom_commands','objectives','duels',
+  'giveaways','lobby','panel_access','quotes','counters','timers','queue','polls',
+  'shoutouts','announcements','banned_words','allowed_words','vod_moments',
+  'chest_seasons','chests','moderation_logs','command_usage','chat_activity_daily',
+  'level_config','points_config','tts_config','bot_status','tts_blacklist',
+  'tts_history','bot_settings','system_commands_state'
+]);
+
+function scopeSqlToTenant(sql, params = []) {
+  const sid = getTenantStreamerId();
+  if (!sid || typeof sql !== 'string' || /\bstreamer_id\b/i.test(sql)) return { sql, params };
+  const match = sql.match(/\b(?:FROM|UPDATE|DELETE\s+FROM|INSERT\s+INTO)\s+([a-z_][a-z0-9_]*)/i);
+  const table = match?.[1]?.toLowerCase();
+  if (!TENANT_TABLES.has(table)) return { sql, params };
+
+  if (/^\s*INSERT\s+INTO\b/i.test(sql)) {
+    const insert = sql.match(/^(\s*INSERT(?:\s+OR\s+\w+)?\s+INTO\s+[a-z_][a-z0-9_]*\s*)\(([^)]+)\)(\s*VALUES\s*)\(([^)]+)\)/i);
+    if (!insert) return { sql, params };
+    let scopedSql = sql.replace(insert[0], `${insert[1]}(${insert[2]}, streamer_id)${insert[3]}(${insert[4]}, ?)`);
+    scopedSql = scopedSql.replace(/ON\s+CONFLICT\s*\(([^)]+)\)/i, (full, columns) =>
+      /\bstreamer_id\b/i.test(columns) ? full : `ON CONFLICT(streamer_id, ${columns})`
+    );
+    const valuesBefore = (insert[4].match(/\?/g) || []).length;
+    const nextParams = [...params];
+    nextParams.splice(valuesBefore, 0, sid);
+    return { sql: scopedSql, params: nextParams };
+  }
+
+  const boundary = sql.search(/\b(?:GROUP\s+BY|ORDER\s+BY|LIMIT|RETURNING)\b/i);
+  const head = boundary >= 0 ? sql.slice(0, boundary) : sql;
+  const tail = boundary >= 0 ? sql.slice(boundary) : '';
+  const hasWhere = /\bWHERE\b/i.test(head);
+  const paramsBeforeScope = (head.match(/\?/g) || []).length;
+  const nextParams = [...params];
+  nextParams.splice(paramsBeforeScope, 0, sid);
+  return {
+    sql: `${head}${hasWhere ? ' AND' : ' WHERE'} ${table}.streamer_id = ? ${tail}`,
+    params: nextParams
+  };
+}
+
 
 function getDB() {
   if (!client) {
@@ -44,6 +90,7 @@ function getDB() {
 
 // Wrapper pour exécuter des requêtes compatibles Turso et SQLite
 async function run(sql, params = []) {
+  ({ sql, params } = scopeSqlToTenant(sql, params));
   const db = getDB();
   if (db.execute) {
     // Turso
@@ -55,6 +102,7 @@ async function run(sql, params = []) {
 }
 
 async function all(sql, params = []) {
+  ({ sql, params } = scopeSqlToTenant(sql, params));
   const db = getDB();
   if (db.execute) {
     const result = await db.execute({ sql, args: params });
@@ -141,6 +189,7 @@ async function initSchema() {
     )`,
     `CREATE TABLE IF NOT EXISTS stream_sessions (
       id            INTEGER PRIMARY KEY AUTOINCREMENT,
+      streamer_id   INTEGER NOT NULL DEFAULT 1,
       started_at    TEXT NOT NULL DEFAULT (datetime('now')),
       ended_at      TEXT,
       peak_viewers  INTEGER DEFAULT 0,
@@ -161,6 +210,7 @@ async function initSchema() {
     )`,
     `CREATE TABLE IF NOT EXISTS objectives (
       id          INTEGER PRIMARY KEY AUTOINCREMENT,
+      streamer_id INTEGER NOT NULL DEFAULT 1,
       title       TEXT NOT NULL,
       description TEXT,
       target      INTEGER NOT NULL,
@@ -171,6 +221,7 @@ async function initSchema() {
     )`,
     `CREATE TABLE IF NOT EXISTS duels (
       id          INTEGER PRIMARY KEY AUTOINCREMENT,
+      streamer_id INTEGER NOT NULL DEFAULT 1,
       challenger  TEXT NOT NULL,
       opponent    TEXT NOT NULL,
       amount      INTEGER NOT NULL,
@@ -180,6 +231,7 @@ async function initSchema() {
     )`,
     `CREATE TABLE IF NOT EXISTS giveaways (
       id         INTEGER PRIMARY KEY AUTOINCREMENT,
+      streamer_id INTEGER NOT NULL DEFAULT 1,
       title      TEXT NOT NULL,
       prize      TEXT NOT NULL,
       cost       INTEGER NOT NULL DEFAULT 0,
@@ -191,19 +243,24 @@ async function initSchema() {
     )`,
     `CREATE TABLE IF NOT EXISTS lobby (
       id        INTEGER PRIMARY KEY AUTOINCREMENT,
-      username  TEXT NOT NULL UNIQUE,
+      streamer_id INTEGER NOT NULL DEFAULT 1,
+      username  TEXT NOT NULL,
       joined_at TEXT NOT NULL DEFAULT (datetime('now'))
+      ,UNIQUE(streamer_id, username)
     )`,
     `CREATE TABLE IF NOT EXISTS panel_access (
       id         INTEGER PRIMARY KEY AUTOINCREMENT,
-      username   TEXT NOT NULL UNIQUE,
+      streamer_id INTEGER NOT NULL DEFAULT 1,
+      username   TEXT NOT NULL,
       status     TEXT NOT NULL DEFAULT 'pending',
       role       TEXT NOT NULL DEFAULT 'viewer',
       created_at TEXT NOT NULL DEFAULT (datetime('now')),
-      updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+      updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+      UNIQUE(streamer_id, username)
     )`,
     `CREATE TABLE IF NOT EXISTS quotes (
       id         INTEGER PRIMARY KEY AUTOINCREMENT,
+      streamer_id INTEGER NOT NULL DEFAULT 1,
       text       TEXT NOT NULL,
       author     TEXT,
       added_by   TEXT,
@@ -211,25 +268,32 @@ async function initSchema() {
     )`,
     `CREATE TABLE IF NOT EXISTS counters (
       id         INTEGER PRIMARY KEY AUTOINCREMENT,
-      name       TEXT NOT NULL UNIQUE,
+      streamer_id INTEGER NOT NULL DEFAULT 1,
+      name       TEXT NOT NULL,
       value      INTEGER NOT NULL DEFAULT 0,
-      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      UNIQUE(streamer_id, name)
     )`,
     `CREATE TABLE IF NOT EXISTS timers (
       id         INTEGER PRIMARY KEY AUTOINCREMENT,
-      name       TEXT NOT NULL UNIQUE,
+      streamer_id INTEGER NOT NULL DEFAULT 1,
+      name       TEXT NOT NULL,
       message    TEXT NOT NULL,
       interval_ms INTEGER NOT NULL DEFAULT 300000,
       enabled    INTEGER NOT NULL DEFAULT 1,
-      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      UNIQUE(streamer_id, name)
     )`,
     `CREATE TABLE IF NOT EXISTS queue (
       id         INTEGER PRIMARY KEY AUTOINCREMENT,
-      username   TEXT NOT NULL UNIQUE,
-      joined_at  TEXT NOT NULL DEFAULT (datetime('now'))
+      streamer_id INTEGER NOT NULL DEFAULT 1,
+      username   TEXT NOT NULL,
+      joined_at  TEXT NOT NULL DEFAULT (datetime('now')),
+      UNIQUE(streamer_id, username)
     )`,
     `CREATE TABLE IF NOT EXISTS polls (
       id         INTEGER PRIMARY KEY AUTOINCREMENT,
+      streamer_id INTEGER NOT NULL DEFAULT 1,
       question   TEXT NOT NULL,
       options    TEXT NOT NULL DEFAULT '[]',
       votes      TEXT NOT NULL DEFAULT '{}',
@@ -239,12 +303,14 @@ async function initSchema() {
     )`,
     `CREATE TABLE IF NOT EXISTS shoutouts (
       id         INTEGER PRIMARY KEY AUTOINCREMENT,
+      streamer_id INTEGER NOT NULL DEFAULT 1,
       username   TEXT NOT NULL,
       message    TEXT,
       created_at TEXT NOT NULL DEFAULT (datetime('now'))
     )`,
     `CREATE TABLE IF NOT EXISTS announcements (
       id          INTEGER PRIMARY KEY AUTOINCREMENT,
+      streamer_id INTEGER NOT NULL DEFAULT 1,
       message     TEXT NOT NULL,
       interval_ms INTEGER NOT NULL DEFAULT 600000,
       enabled     INTEGER NOT NULL DEFAULT 1,
@@ -253,20 +319,25 @@ async function initSchema() {
     )`,
     `CREATE TABLE IF NOT EXISTS banned_words (
       id         INTEGER PRIMARY KEY AUTOINCREMENT,
-      word       TEXT NOT NULL UNIQUE,
+      streamer_id INTEGER NOT NULL DEFAULT 1,
+      word       TEXT NOT NULL,
       action     TEXT NOT NULL DEFAULT 'timeout',
       duration   INTEGER NOT NULL DEFAULT 300,
       enabled    INTEGER NOT NULL DEFAULT 1,
-      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      UNIQUE(streamer_id, word)
     )`,
     `CREATE TABLE IF NOT EXISTS allowed_words (
       id         INTEGER PRIMARY KEY AUTOINCREMENT,
-      word       TEXT NOT NULL UNIQUE,
+      streamer_id INTEGER NOT NULL DEFAULT 1,
+      word       TEXT NOT NULL,
       note       TEXT NOT NULL DEFAULT '',
-      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      UNIQUE(streamer_id, word)
     )`,
     `CREATE TABLE IF NOT EXISTS vod_moments (
       id          INTEGER PRIMARY KEY AUTOINCREMENT,
+      streamer_id INTEGER NOT NULL DEFAULT 1,
       vod_id      TEXT NOT NULL,
       vod_title   TEXT NOT NULL DEFAULT '',
       vod_url     TEXT NOT NULL DEFAULT '',
@@ -278,6 +349,7 @@ async function initSchema() {
     )`,
     `CREATE TABLE IF NOT EXISTS chest_seasons (
       id          INTEGER PRIMARY KEY AUTOINCREMENT,
+      streamer_id INTEGER NOT NULL DEFAULT 1,
       season_num  INTEGER NOT NULL DEFAULT 1,
       fog_meter   INTEGER NOT NULL DEFAULT 0,
       started_at  TEXT NOT NULL DEFAULT (datetime('now')),
@@ -286,6 +358,7 @@ async function initSchema() {
     )`,
     `CREATE TABLE IF NOT EXISTS chests (
       id          INTEGER PRIMARY KEY AUTOINCREMENT,
+      streamer_id INTEGER NOT NULL DEFAULT 1,
       season_id   INTEGER NOT NULL,
       number      INTEGER NOT NULL,
       tier        TEXT NOT NULL,
@@ -302,6 +375,7 @@ async function initSchema() {
     )`,
     `CREATE TABLE IF NOT EXISTS moderation_logs (
       id           INTEGER PRIMARY KEY AUTOINCREMENT,
+      streamer_id INTEGER NOT NULL DEFAULT 1,
       type         TEXT NOT NULL DEFAULT 'ban',
       username     TEXT NOT NULL DEFAULT '',
       duration     INTEGER DEFAULT NULL,
@@ -318,26 +392,33 @@ async function initSchema() {
       created_at TEXT NOT NULL DEFAULT (datetime('now'))
     )`,
     `CREATE TABLE IF NOT EXISTS chat_activity_daily (
-      date            TEXT PRIMARY KEY,
+      streamer_id     INTEGER NOT NULL DEFAULT 1,
+      date            TEXT NOT NULL,
       message_count   INTEGER NOT NULL DEFAULT 0,
-      unique_chatters TEXT NOT NULL DEFAULT '[]'
+      unique_chatters TEXT NOT NULL DEFAULT '[]',
+      PRIMARY KEY(streamer_id, date)
     )`,
     `CREATE TABLE IF NOT EXISTS level_config (
       id         INTEGER PRIMARY KEY AUTOINCREMENT,
+      streamer_id INTEGER NOT NULL DEFAULT 1,
       name       TEXT NOT NULL,
       min_points INTEGER NOT NULL DEFAULT 0,
       emoji      TEXT NOT NULL DEFAULT '⭐',
       sort_order INTEGER NOT NULL DEFAULT 0
     )`,
     `CREATE TABLE IF NOT EXISTS points_config (
-      key        TEXT PRIMARY KEY,
+      streamer_id INTEGER NOT NULL DEFAULT 1,
+      key        TEXT NOT NULL,
       value      TEXT NOT NULL DEFAULT '',
-      updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+      updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+      PRIMARY KEY(streamer_id, key)
     )`,
     `CREATE TABLE IF NOT EXISTS tts_config (
-      key        TEXT PRIMARY KEY,
+      streamer_id INTEGER NOT NULL DEFAULT 1,
+      key        TEXT NOT NULL,
       value      TEXT NOT NULL DEFAULT '',
-      updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+      updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+      PRIMARY KEY(streamer_id, key)
     )`,
     `CREATE TABLE IF NOT EXISTS oauth_tokens (
       provider     TEXT PRIMARY KEY,
@@ -347,17 +428,22 @@ async function initSchema() {
       updated_at    TEXT NOT NULL DEFAULT (datetime('now'))
     )`,
     `CREATE TABLE IF NOT EXISTS bot_status (
-      key        TEXT PRIMARY KEY,
+      streamer_id INTEGER NOT NULL DEFAULT 1,
+      key        TEXT NOT NULL,
       value      TEXT NOT NULL DEFAULT '',
-      updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+      updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+      PRIMARY KEY(streamer_id, key)
     )`,
     `CREATE TABLE IF NOT EXISTS tts_blacklist (
       id         INTEGER PRIMARY KEY AUTOINCREMENT,
-      word       TEXT NOT NULL UNIQUE,
-      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+      streamer_id INTEGER NOT NULL DEFAULT 1,
+      word       TEXT NOT NULL,
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      UNIQUE(streamer_id, word)
     )`,
     `CREATE TABLE IF NOT EXISTS tts_history (
       id          INTEGER PRIMARY KEY AUTOINCREMENT,
+      streamer_id INTEGER NOT NULL DEFAULT 1,
       username    TEXT,
       message     TEXT NOT NULL,
       amount      REAL DEFAULT 0,
@@ -365,9 +451,11 @@ async function initSchema() {
       created_at  TEXT NOT NULL DEFAULT (datetime('now'))
     )`,
     `CREATE TABLE IF NOT EXISTS bot_settings (
-      key        TEXT PRIMARY KEY,
+      streamer_id INTEGER NOT NULL DEFAULT 1,
+      key        TEXT NOT NULL,
       value      TEXT NOT NULL DEFAULT '1',
-      updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+      updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+      PRIMARY KEY(streamer_id, key)
     )`,
     `CREATE TABLE IF NOT EXISTS system_commands_state (
       trigger  TEXT PRIMARY KEY,
@@ -410,6 +498,9 @@ async function initSchema() {
     `ALTER TABLE custom_commands ADD COLUMN display_trigger TEXT`,
     `ALTER TABLE system_commands_state ADD COLUMN streamer_id INTEGER`,
     `ALTER TABLE system_commands_state ADD COLUMN display_trigger TEXT`,
+    ...[...TENANT_TABLES]
+      .filter(table => !['viewers','points_log','stream_sessions','command_usage','chat_activity_daily','custom_commands','system_commands_state'].includes(table))
+      .map(table => `ALTER TABLE ${table} ADD COLUMN streamer_id INTEGER NOT NULL DEFAULT 1`),
     `ALTER TABLE streamers ADD COLUMN channel_id TEXT`,
     `ALTER TABLE streamers ADD COLUMN chatroom_id TEXT`,
     `ALTER TABLE streamers ADD COLUMN broadcaster_user_id TEXT`,
@@ -775,13 +866,8 @@ async function achieveObjective(id) {
 // ─── Sessions ─────────────────────────────────────────────────────────────────
 
 async function startSession() {
-  const db = getDB();
-  if (db.execute) {
-    const r = await db.execute({ sql: `INSERT INTO stream_sessions (started_at) VALUES (datetime('now'))`, args: [] });
-    return Number(r?.lastInsertRowid ?? r?.lastInsertRowID ?? r?.lastInsertId);
-  } else {
-    return db.prepare(`INSERT INTO stream_sessions (started_at) VALUES (datetime('now'))`).run().lastInsertRowid;
-  }
+  const r = await run(`INSERT INTO stream_sessions (started_at) VALUES (datetime('now'))`);
+  return Number(r?.lastInsertRowid ?? r?.lastInsertRowID ?? r?.lastInsertId);
 }
 
 async function recordViewerSample(id, viewerCount) {
@@ -1026,13 +1112,8 @@ async function setViewerFollowingSince(username, followingSince, subscribedFor) 
 
 
 async function createDuel(challenger, opponent, amount) {
-  const db = getDB();
-  if (db.execute) {
-    const r = await db.execute({ sql: `INSERT INTO duels (challenger, opponent, amount) VALUES (?, ?, ?)`, args: [challenger.toLowerCase(), opponent.toLowerCase(), amount] });
-    return Number(r?.lastInsertRowid ?? r?.lastInsertRowID ?? r?.lastInsertId);
-  } else {
-    return db.prepare(`INSERT INTO duels (challenger, opponent, amount) VALUES (?, ?, ?)`).run(challenger.toLowerCase(), opponent.toLowerCase(), amount).lastInsertRowid;
-  }
+  const r = await run(`INSERT INTO duels (challenger, opponent, amount) VALUES (?, ?, ?)`, [challenger.toLowerCase(), opponent.toLowerCase(), amount]);
+  return Number(r?.lastInsertRowid ?? r?.lastInsertRowID ?? r?.lastInsertId);
 }
 
 async function getPendingDuel(opponent) {
@@ -1054,13 +1135,8 @@ async function getRecentDuels(limit = 10) {
 // ─── Giveaway ─────────────────────────────────────────────────────────────────
 
 async function createGiveaway(title, prize, cost = 0) {
-  const db = getDB();
-  if (db.execute) {
-    const r = await db.execute({ sql: `INSERT INTO giveaways (title, prize, cost) VALUES (?, ?, ?)`, args: [title, prize, cost] });
-    return Number(r?.lastInsertRowid ?? r?.lastInsertRowID ?? r?.lastInsertId);
-  } else {
-    return db.prepare(`INSERT INTO giveaways (title, prize, cost) VALUES (?, ?, ?)`).run(title, prize, cost).lastInsertRowid;
-  }
+  const r = await run(`INSERT INTO giveaways (title, prize, cost) VALUES (?, ?, ?)`, [title, prize, cost]);
+  return Number(r?.lastInsertRowid ?? r?.lastInsertRowID ?? r?.lastInsertId);
 }
 
 async function getActiveGiveaway() {
@@ -1240,13 +1316,8 @@ async function isTTSBlacklisted(text) {
 
 async function getTTSHistory(limit = 30) { return all(`SELECT * FROM tts_history ORDER BY created_at DESC LIMIT ?`, [limit]); }
 async function addTTSHistory(username, message, amount, status) {
-  const db = getDB();
-  if (db.execute) {
-    const r = await db.execute({ sql: `INSERT INTO tts_history (username, message, amount, status) VALUES (?, ?, ?, ?)`, args: [username||'', message, amount||0, status||'played'] });
-    return Number(r?.lastInsertRowid ?? r?.lastInsertRowID ?? r?.lastInsertId);
-  } else {
-    return db.prepare(`INSERT INTO tts_history (username, message, amount, status) VALUES (?, ?, ?, ?)`).run(username||'', message, amount||0, status||'played').lastInsertRowid;
-  }
+  const r = await run(`INSERT INTO tts_history (username, message, amount, status) VALUES (?, ?, ?, ?)`, [username||'', message, amount||0, status||'played']);
+  return Number(r?.lastInsertRowid ?? r?.lastInsertRowID ?? r?.lastInsertId);
 }
 async function clearTTSHistory() { await run(`DELETE FROM tts_history`); }
 
@@ -1340,13 +1411,8 @@ async function isSystemCmdEnabled(trigger) {
 
 async function getQuotes() { return all(`SELECT * FROM quotes ORDER BY created_at DESC`); }
 async function addQuote(text, author, addedBy) {
-  const db = getDB();
-  if (db.execute) {
-    const r = await db.execute({ sql: `INSERT INTO quotes (text, author, added_by) VALUES (?, ?, ?)`, args: [text, author || '', addedBy || ''] });
-    return Number(r?.lastInsertRowid ?? r?.lastInsertRowID ?? r?.lastInsertId);
-  } else {
-    return db.prepare(`INSERT INTO quotes (text, author, added_by) VALUES (?, ?, ?)`).run(text, author || '', addedBy || '').lastInsertRowid;
-  }
+  const r = await run(`INSERT INTO quotes (text, author, added_by) VALUES (?, ?, ?)`, [text, author || '', addedBy || '']);
+  return Number(r?.lastInsertRowid ?? r?.lastInsertRowID ?? r?.lastInsertId);
 }
 async function getRandomQuote() {
   return get(`SELECT * FROM quotes ORDER BY RANDOM() LIMIT 1`);
@@ -1398,15 +1464,10 @@ async function getQueuePosition(username) {
 // ─── Polls ────────────────────────────────────────────────────────────────────
 
 async function createPoll(question, options) {
-  const db = getDB();
   const votes = {};
   options.forEach((_, i) => votes[i] = 0);
-  if (db.execute) {
-    const r = await db.execute({ sql: `INSERT INTO polls (question, options, votes) VALUES (?, ?, ?)`, args: [question, JSON.stringify(options), JSON.stringify(votes)] });
-    return Number(r?.lastInsertRowid ?? r?.lastInsertRowID ?? r?.lastInsertId);
-  } else {
-    return db.prepare(`INSERT INTO polls (question, options, votes) VALUES (?, ?, ?)`).run(question, JSON.stringify(options), JSON.stringify(votes)).lastInsertRowid;
-  }
+  const r = await run(`INSERT INTO polls (question, options, votes) VALUES (?, ?, ?)`, [question, JSON.stringify(options), JSON.stringify(votes)]);
+  return Number(r?.lastInsertRowid ?? r?.lastInsertRowID ?? r?.lastInsertId);
 }
 async function getActivePoll() { return get(`SELECT * FROM polls WHERE status = 'open' ORDER BY created_at DESC LIMIT 1`); }
 async function votePoll(id, username, optionIndex) {
@@ -1429,13 +1490,8 @@ async function getPolls(limit = 10) { return all(`SELECT * FROM polls ORDER BY c
 
 async function getAnnouncements() { return all(`SELECT * FROM announcements ORDER BY created_at DESC`); }
 async function addAnnouncement(message, interval_ms) {
-  const db = getDB();
-  if (db.execute) {
-    const r = await db.execute({ sql: `INSERT INTO announcements (message, interval_ms) VALUES (?, ?)`, args: [message, interval_ms] });
-    return Number(r?.lastInsertRowid ?? r?.lastInsertRowID ?? r?.lastInsertId);
-  } else {
-    return db.prepare(`INSERT INTO announcements (message, interval_ms) VALUES (?, ?)`).run(message, interval_ms).lastInsertRowid;
-  }
+  const r = await run(`INSERT INTO announcements (message, interval_ms) VALUES (?, ?)`, [message, interval_ms]);
+  return Number(r?.lastInsertRowid ?? r?.lastInsertRowID ?? r?.lastInsertId);
 }
 async function toggleAnnouncement(id, enabled) { await run(`UPDATE announcements SET enabled = ? WHERE id = ?`, [enabled ? 1 : 0, id]); }
 async function deleteAnnouncement(id) { await run(`DELETE FROM announcements WHERE id = ?`, [id]); }
