@@ -485,8 +485,8 @@ body.light .card,body.light .panel,body.light .widget-engine-card{background:lin
 </script>
 
 
-<link rel="stylesheet" href="/themes/engine.css?v=24">
-<link rel="stylesheet" id="elbot-active-theme" href="/themes/control.css?v=24">
+<link rel="stylesheet" href="/themes/engine.css?v=25">
+<link rel="stylesheet" id="elbot-active-theme" href="/themes/control.css?v=25">
 </head>
 <body>
 <!-- Modal animation ouverture de coffre -->
@@ -10409,12 +10409,18 @@ setInterval(() => {
     </section>
 
     <section>
-      <h3>Visibilité du fond</h3>
+      <h3>Fond et transparence</h3>
       <div class="ref-bg-intensity">
-        <label for="ref-bg-intensity-range">Intensité de l’image</label>
+        <label for="ref-bg-intensity-range">Visibilité de l’image</label>
         <output id="ref-bg-intensity-value">100%</output>
         <input id="ref-bg-intensity-range" type="range" min="35" max="100" step="5" value="100"
                oninput="setReferenceBackgroundIntensity(this.value)">
+      </div>
+      <div class="ref-bg-intensity">
+        <label for="ref-panel-opacity-range">Opacité des panneaux</label>
+        <output id="ref-panel-opacity-value">92%</output>
+        <input id="ref-panel-opacity-range" type="range" min="65" max="100" step="1" value="92"
+               oninput="setReferencePanelOpacity(this.value)">
       </div>
     </section>
 
@@ -11073,6 +11079,165 @@ window.addEventListener('pageshow', loadReferenceAppearance);
 
 </script>
 
-<script src="/theme-engine.js?v=24"></script>
+<script src="/theme-engine.js?v=25"></script>
+
+<style id="elbot-v25-wallpaper-final-fix">
+/* ═══════════════════════════════════════════════════════════════════════
+   ELBOT V25 — SUPPRESSION DÉFINITIVE DES ANCIENS FONDS CSS
+   Ce bloc est volontairement le dernier style de la page.
+   ═══════════════════════════════════════════════════════════════════════ */
+
+:root{
+  --elbot-bg-visible:1;
+  --elbot-panel-opacity:92%;
+  --elbot-final-wallpaper:url("/assets/themes/control.webp?v=25");
+  --elbot-final-overlay:rgba(2,8,20,0);
+}
+
+/* Le fond est porté par body : aucun élément ajouté, aucun décalage possible. */
+html{
+  min-height:100%!important;
+  background:#020817!important;
+}
+body,
+body[data-ref-interface]{
+  min-height:100vh!important;
+  background-color:#020817!important;
+  background-image:
+    linear-gradient(var(--elbot-final-overlay),var(--elbot-final-overlay)),
+    var(--elbot-final-wallpaper)!important;
+  background-repeat:no-repeat!important;
+  background-size:cover!important;
+  background-position:center center!important;
+  background-attachment:fixed!important;
+}
+
+/* Supprime tous les anciens décors diagonaux/grilles/pseudo-calques. */
+body::before,
+body::after,
+body[data-ref-interface]::before,
+body[data-ref-interface]::after,
+body[data-ref-interface] .main::before,
+body[data-ref-interface] .main::after,
+body[data-ref-interface] [id^="page-"]::before,
+body[data-ref-interface] [id^="page-"]::after{
+  content:none!important;
+  display:none!important;
+  background:none!important;
+  background-image:none!important;
+}
+
+/* Les enveloppes seulement deviennent transparentes.
+   Les cartes, widgets, tableaux et colonnes gardent leur structure. */
+body .main,
+body main,
+body .content,
+body .page,
+body .page-content,
+body #app,
+body .app-shell,
+body .dashboard,
+body .dashboard-grid,
+body .page-wrapper,
+body .view-container,
+body .tab-content,
+body [id^="page-"],
+body[data-ref-interface] .main,
+body[data-ref-interface] [id^="page-"]{
+  background:transparent!important;
+  background-color:transparent!important;
+  background-image:none!important;
+}
+
+/* Transparence légère réglable, sans toucher aux tailles ni positions. */
+body .sidebar{
+  background:color-mix(in srgb,var(--side) var(--elbot-panel-opacity),transparent)!important;
+  backdrop-filter:blur(15px) saturate(125%)!important;
+  -webkit-backdrop-filter:blur(15px) saturate(125%)!important;
+}
+body .elbot-topbar,
+body .panel,
+body .card,
+body .ref-kpi,
+body .ref-panel,
+body .settings-card,
+body .widget-card,
+body .config-card,
+body .table-wrap,
+body .form-section,
+body .block,
+body .box,
+body .modal-content,
+body .ref-status-card,
+body .ref-current-card,
+body .ref-logs-card,
+body .ref-live-viewers{
+  background:color-mix(in srgb,var(--card) var(--elbot-panel-opacity),transparent)!important;
+  backdrop-filter:blur(12px) saturate(118%)!important;
+  -webkit-backdrop-filter:blur(12px) saturate(118%)!important;
+}
+
+/* Mapping réel des images fournies. */
+body[data-ref-interface="control"]{
+  --elbot-final-wallpaper:url("/assets/themes/control.webp?v=25");
+  --elbot-final-overlay:rgba(2,8,20,calc((100 - var(--elbot-background-percent,100)) * .006));
+}
+body[data-ref-interface="dbd"]{
+  --elbot-final-wallpaper:url("/assets/themes/dbd.webp?v=25");
+  --elbot-final-overlay:rgba(0,0,0,calc((100 - var(--elbot-background-percent,100)) * .006));
+}
+body[data-ref-interface="obs"]{
+  --elbot-final-wallpaper:url("/assets/themes/obs.webp?v=25");
+  --elbot-final-overlay:rgba(4,7,9,calc((100 - var(--elbot-background-percent,100)) * .006));
+}
+body[data-ref-interface="vision"]{
+  --elbot-final-wallpaper:url("/assets/themes/vision.webp?v=25");
+  --elbot-final-overlay:rgba(225,235,248,calc((100 - var(--elbot-background-percent,100)) * .0025));
+}
+body[data-ref-interface="neon"]{
+  --elbot-final-wallpaper:url("/assets/themes/neon.webp?v=25");
+  --elbot-final-overlay:rgba(2,0,10,calc((100 - var(--elbot-background-percent,100)) * .004));
+}
+body[data-ref-interface="elite"]{
+  --elbot-final-wallpaper:url("/assets/themes/elite.webp?v=25");
+  --elbot-final-overlay:rgba(0,0,0,calc((100 - var(--elbot-background-percent,100)) * .006));
+}
+body[data-ref-interface="steam"]{
+  --elbot-final-wallpaper:url("/assets/themes/steam.webp?v=25");
+  --elbot-final-overlay:rgba(4,12,18,calc((100 - var(--elbot-background-percent,100)) * .005));
+}
+body[data-ref-interface="riot"]{
+  --elbot-final-wallpaper:url("/assets/themes/riot.webp?v=25");
+  --elbot-final-overlay:rgba(10,1,3,calc((100 - var(--elbot-background-percent,100)) * .005));
+}
+body[data-ref-interface="midnight"]{
+  --elbot-final-wallpaper:url("/assets/themes/midnight.webp?v=25");
+  --elbot-final-overlay:rgba(0,5,18,calc((100 - var(--elbot-background-percent,100)) * .004));
+}
+body[data-ref-interface="ocean"]{
+  --elbot-final-wallpaper:url("/assets/themes/ocean.webp?v=25");
+  --elbot-final-overlay:rgba(0,12,28,calc((100 - var(--elbot-background-percent,100)) * .0035));
+}
+body[data-ref-interface="sunset"]{
+  --elbot-final-wallpaper:url("/assets/themes/sunset.webp?v=25");
+  --elbot-final-overlay:rgba(38,8,12,calc((100 - var(--elbot-background-percent,100)) * .0035));
+}
+body[data-ref-interface="forest"]{
+  --elbot-final-wallpaper:url("/assets/themes/forest.webp?v=25");
+  --elbot-final-overlay:rgba(0,16,13,calc((100 - var(--elbot-background-percent,100)) * .0035));
+}
+body[data-ref-interface="minimal"]{
+  --elbot-final-wallpaper:url("/assets/themes/minimal.webp?v=25");
+  --elbot-final-overlay:rgba(245,247,251,calc((100 - var(--elbot-background-percent,100)) * .0015));
+}
+
+@media(max-width:900px){
+  body,
+  body[data-ref-interface]{
+    background-position:58% center!important;
+  }
+}
+</style>
+
 </body>
 </html>
