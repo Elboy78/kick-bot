@@ -436,6 +436,17 @@ app.get('/api/community', waitDB, async (req, res) => {
   }
 });
 
+app.post('/api/admin/community/kick-gifts-import', waitDB, requireAuth, async (req, res) => {
+  try {
+    const rows = Array.isArray(req.body?.rows) ? req.body.rows : [];
+    const imported = await db.importCommunityGiftLeaderboard(rows, req.streamer?.id);
+    res.json({ success: true, imported });
+  } catch (e) {
+    console.error('[COMMUNAUTÉ] Import leaderboard Kick impossible:', e.message);
+    res.status(500).json({ error: 'Import du classement Kick impossible' });
+  }
+});
+
 app.get('/api/public/streamer/:streamer', waitDB, async (req, res) => {
   const requestedSlug = tenant.normalizeSlug(req.params.streamer);
   if (!req.streamer || req.streamer.slug !== requestedSlug) {

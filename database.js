@@ -20,7 +20,7 @@ function scopedStreamerId() { return getTenantStreamerId() || 1; }
 // silencieusement deux panels. Les tables d'identité plateforme restent
 // globales et utilisent leurs fonctions V2 dédiées.
 const TENANT_TABLES = new Set([
-  'viewers','points_log','stream_sessions','custom_commands','community_events','objectives','duels',
+  'viewers','points_log','stream_sessions','custom_commands','community_events','community_support_snapshots','objectives','duels',
   'giveaways','lobby','panel_access','quotes','counters','timers','queue','polls',
   'shoutouts','announcements','banned_words','allowed_words','vod_moments',
   'chest_seasons','chests','moderation_logs','command_usage','chat_activity_daily',
@@ -200,6 +200,14 @@ async function initSchema() {
       source_key  TEXT NOT NULL,
       metadata    TEXT,
       UNIQUE(streamer_id, source_key)
+    )`,
+    `CREATE TABLE IF NOT EXISTS community_support_snapshots (
+      streamer_id INTEGER NOT NULL DEFAULT 1,
+      username    TEXT NOT NULL,
+      gifts_all_time INTEGER NOT NULL DEFAULT 0,
+      source      TEXT NOT NULL DEFAULT 'kick_leaderboard',
+      synced_at   TEXT NOT NULL DEFAULT (datetime('now')),
+      PRIMARY KEY(streamer_id, username)
     )`,
     `CREATE TABLE IF NOT EXISTS stream_sessions (
       id            INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -1555,6 +1563,23 @@ async function backfillCommunityHistory(streamerId = null) {
   }
 }
 
+async function importCommunityGiftLeaderboard(rows = [], streamerId = null) {
+  const sid = Number(streamerId || scopedStreamerId());
+  let imported = 0;
+  for (const item of Array.isArray(rows) ? rows.slice(0, 500) : []) {
+    const username = String(item.username || '').trim().toLowerCase();
+    const gifts = Math.max(0, parseInt(item.quantity ?? item.gifts ?? 0) || 0);
+    if (!username || !gifts) continue;
+    await run(`INSERT INTO community_support_snapshots (streamer_id,username,gifts_all_time,source,synced_at)
+      VALUES (?,?,?,'kick_leaderboard',datetime('now'))
+      ON CONFLICT(streamer_id,username) DO UPDATE SET
+        gifts_all_time = excluded.gifts_all_time, source = excluded.source, synced_at = excluded.synced_at`,
+      [sid, username, gifts]);
+    imported++;
+  }
+  return imported;
+}
+
 async function getCommunityData(limit = 100, streamerId = null) {
   const sid = Number(streamerId || scopedStreamerId());
   await backfillCommunityHistory(sid);
@@ -1584,6 +1609,8 @@ async function getCommunityData(limit = 100, streamerId = null) {
     FROM viewers
     WHERE COALESCE(streamer_id, 1) = ? AND COALESCE(subscribed_for, 0) > 0
     ORDER BY subscribed_for DESC LIMIT ?`, [sid, safeLimit]);
+  const historicalSupporters = await all(`SELECT username,gifts_all_time,source,synced_at
+    FROM community_support_snapshots WHERE streamer_id = ? ORDER BY gifts_all_time DESC LIMIT ?`, [sid, safeLimit]);
   const events = await all(`SELECT event_type AS type,username,gifter,amount AS count,months,occurred_at AS at,source
     FROM community_events WHERE streamer_id = ? ORDER BY occurred_at DESC LIMIT ?`, [sid, safeLimit]);
   const totals = await get(`SELECT
@@ -1591,7 +1618,7 @@ async function getCommunityData(limit = 100, streamerId = null) {
       SUM(CASE WHEN following_since IS NOT NULL AND following_since != 'NOT_FOLLOWING' THEN 1 ELSE 0 END) AS known_followers,
       SUM(CASE WHEN COALESCE(subscribed_for,0) > 0 THEN 1 ELSE 0 END) AS current_subscribers
     FROM viewers WHERE COALESCE(streamer_id,1) = ?`, [sid]);
-  return { totals: totals || {}, supporters, followers, currentSubscribers, events };
+  return { totals: totals || {}, supporters, historicalSupporters, followers, currentSubscribers, events };
 }
 async function toggleAnnouncement(id, enabled) { await run(`UPDATE announcements SET enabled = ? WHERE id = ?`, [enabled ? 1 : 0, id]); }
 async function deleteAnnouncement(id) { await run(`DELETE FROM announcements WHERE id = ?`, [id]); }
@@ -2016,7 +2043,7 @@ module.exports = {
   getDB,
   upsertViewer, addPoints, getViewer, getLeaderboard, getViewerRank,
   getGlobalStats, getRecentLogs, getActiveViewers, getViewersMissingFollow, clearAllPoints,
-  addCommunityEvent, backfillCommunityHistory, getCommunityData,
+  addCommunityEvent, backfillCommunityHistory, importCommunityGiftLeaderboard, getCommunityData,
   getLevel, getNextLevel, getLevels, getRankingEngine, addLevel, updateLevel, deleteLevel,
   getCustomCommands, getCustomCommand, setCustomCommand, deleteCustomCommand, toggleCustomCommand,
   getObjectives, createObjective, deleteObjective, achieveObjective,
