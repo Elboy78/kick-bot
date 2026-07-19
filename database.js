@@ -1991,6 +1991,20 @@ async function markBotIdentityConnected(identityId, user = {}) {
   return getBotIdentityById(identityId);
 }
 
+async function markBotIdentityAuthorizationRequired(provider) {
+  const safeProvider = String(provider || '').trim();
+  if (!safeProvider.startsWith('kick_bot:')) return;
+  await run(`UPDATE bot_identities SET status = 'authorization_required', updated_at = datetime('now')
+    WHERE oauth_provider = ?`, [safeProvider]);
+}
+
+async function enableStreamersForBotIdentity(identityId) {
+  const id = Number(identityId);
+  if (!id) return;
+  await run(`UPDATE streamers SET bot_enabled = 1, updated_at = datetime('now')
+    WHERE assigned_bot_identity_id = ?`, [id]);
+}
+
 async function upsertStreamer(data = {}) {
   const slug = normalizeStreamerSlug(data.slug || data.kick_username || data.kickUsername || data.display_name || data.displayName);
   const kickUsername = data.kick_username || data.kickUsername || slug;
@@ -2293,6 +2307,6 @@ module.exports = {
   setBotStatus, getBotStatus, getAllBotStatus,
   saveOAuthToken, getOAuthToken, deleteOAuthToken,
   ensureDefaultStreamer, getStreamerBySlug, getStreamerById, getStreamerByBroadcasterUserId, listStreamers, setStreamerPlan, upsertStreamer, updateStreamerKickMeta, getActiveStreamersForBot,
-  ensureBotIdentities, getBotIdentityById, getBotIdentityByKey, getAssignedBotIdentity, getBotAssignmentOptions, assignBotIdentity, connectCustomBotIdentity, markBotIdentityConnected,
+  ensureBotIdentities, getBotIdentityById, getBotIdentityByKey, getAssignedBotIdentity, getBotAssignmentOptions, assignBotIdentity, connectCustomBotIdentity, markBotIdentityConnected, markBotIdentityAuthorizationRequired, enableStreamersForBotIdentity,
   getStreamerSetting, setStreamerSetting, getOrCreateOverlayToken, regenerateOverlayToken, getOverlayTokenByValue, getOverlayTokensForStreamer, saveOAuthTokenForStreamer, getOAuthTokenForStreamer, deleteOAuthTokenForStreamer,
 };
