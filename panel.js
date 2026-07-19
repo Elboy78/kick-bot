@@ -2497,12 +2497,14 @@ app.get('/auth/callback', async (req, res) => {
         if (!identity || identity.bot_key !== 'elbot') throw new Error('Identité ElBot invalide.');
         await db.saveOAuthToken(identity.oauth_provider, token.accessToken, token.refreshToken, token.expiresAt);
         await db.markBotIdentityConnected(identity.id, kickUser);
+        await db.enableStreamersForBotIdentity(identity.id);
       } else if (botType === 'custom') {
         const options = await db.getBotAssignmentOptions(streamerId);
         if (!options.premium && !token.meta?.platformAdmin) throw new Error('Ce streamer ne possède pas l’offre Premium.');
         identity = await db.connectCustomBotIdentity(streamerId, kickUser);
         await db.saveOAuthToken(identity.oauth_provider, token.accessToken, token.refreshToken, token.expiresAt);
         await db.assignBotIdentity(streamerId, 'custom', { platformAdmin:Boolean(token.meta?.platformAdmin) });
+        await db.enableStreamersForBotIdentity(identity.id);
       } else {
         throw new Error('Type de bot OAuth invalide.');
       }

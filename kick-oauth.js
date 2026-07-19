@@ -127,7 +127,9 @@ async function exchangeCodeForToken(code, state) {
   const data = response.data || {};
   const expiresAt = Date.now() + ((data.expires_in || 3600) * 1000);
   if ((pkce.meta || {}).mode === 'bot_login') {
-    await db.saveOAuthToken(BOT_PROVIDER, data.access_token, data.refresh_token, expiresAt);
+    // Bot7uP utilise un provider unique. Dupliquer un refresh token sous deux
+    // providers provoquerait une rotation concurrente et des invalid_grant.
+    await db.saveOAuthToken('kick_bot:bot7up', data.access_token, data.refresh_token, expiresAt);
   }
 
   db.setBotStatus(`pkce_code_verifier_${state}`, '').catch(()=>{});
@@ -205,7 +207,10 @@ async function fetchChannelInfoForUser(accessToken, user = {}) {
 }
 
 async function getValidBotAccessToken() {
-  let stored = await db.getOAuthToken(BOT_PROVIDER);
+  // Compatibilité des appels globaux : ils utilisent la même identité Bot7uP
+  // que les réponses chat, jamais une copie séparée du refresh token.
+  let stored = await db.getOAuthToken('kick_bot:bot7up');
+  if (!stored) stored = await db.getOAuthToken(BOT_PROVIDER);
   if (!stored) return null;
   if (Date.now() < stored.expires_at - 60000) return stored.access_token;
   try {
@@ -221,10 +226,15 @@ async function getValidBotAccessToken() {
     );
     const data = response.data || {};
     const expiresAt = Date.now() + ((data.expires_in || 3600) * 1000);
-    await db.saveOAuthToken(BOT_PROVIDER, data.access_token, data.refresh_token || stored.refresh_token, expiresAt);
+    await db.saveOAuthToken('kick_bot:bot7up', data.access_token, data.refresh_token || stored.refresh_token, expiresAt);
     return data.access_token;
   } catch (err) {
     console.error('[OAUTH BOT] Échec du refresh:', err.response?.data || err.message);
+    if (String(err.response?.data?.error || '') === 'invalid_grant') {
+      await db.deleteOAuthToken('kick_bot:bot7up').catch(()=>{});
+      await db.deleteOAuthToken(BOT_PROVIDER).catch(()=>{});
+      await db.markBotIdentityAuthorizationRequired('kick_bot:bot7up').catch(()=>{});
+    }
     return null;
   }
 }
@@ -252,6 +262,10 @@ async function getValidBotIdentityAccessToken(provider) {
     return data.access_token;
   } catch (err) {
     console.error(`[OAUTH BOT:${safeProvider}] Échec du refresh:`, err.response?.data || err.message);
+    if (String(err.response?.data?.error || '') === 'invalid_grant') {
+      await db.deleteOAuthToken(safeProvider).catch(()=>{});
+      await db.markBotIdentityAuthorizationRequired(safeProvider).catch(()=>{});
+    }
     return null;
   }
 }
@@ -268,7 +282,7 @@ async function disconnectBotIdentity(provider) {
 }
 
 async function isBotConnected() {
-  return !!(await db.getOAuthToken(BOT_PROVIDER));
+  return !!(await db.getOAuthToken('kick_bot:bot7up')) || !!(await db.getOAuthToken(BOT_PROVIDER));
 }
 
 async function getValidAccessToken(streamerId = null) {
