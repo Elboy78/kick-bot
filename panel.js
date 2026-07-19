@@ -25,7 +25,7 @@ const server = http.createServer(app);
 const io     = new Server(server, { cors: { origin: '*' } });
 
 app.use(cors());
-app.use(express.json({ limit: '8mb' }));
+app.use(express.json({ limit: '22mb' }));
 app.use(express.static(path.join(__dirname, 'public'), { index: false }));
 app.use(loadSession(db));
 // Les pages/API publiques de classement doivent uniquement consulter un tenant
@@ -3359,7 +3359,8 @@ function normalizeMemeConfig(raw = {}) {
     cooldown: Math.max(0,Math.min(3600,Math.floor(Number(m.cooldown)||30))),
     allowText: m.allowText !== false, enabled: m.enabled !== false
   })).filter(m => m.id && m.mediaUrl);
-  return { enabled:raw.enabled===true, mode:['instant','trust','approval'].includes(raw.mode)?raw.mode:'trust', duration:Math.max(2,Math.min(20,Number(raw.duration)||6)), cost:Math.max(0,raw.cost===undefined||Number(raw.cost)===0?75:Number(raw.cost)||75), cooldown:Math.max(0,Math.min(3600,Number(raw.cooldown)||60)), size:Math.max(20,Math.min(100,Number(raw.size)||80)), position:['top','center','bottom'].includes(raw.position)?raw.position:'center', maxFileMb:Math.max(1,Math.min(5,Number(raw.maxFileMb)||5)), maxText:Math.max(0,Math.min(160,Number(raw.maxText)||100)), volume:0, items };
+  const positions=['top-left','top','top-right','left','center','right','bottom-left','bottom','bottom-right'];
+  return { enabled:raw.enabled===true, mode:['instant','trust','approval'].includes(raw.mode)?raw.mode:'trust', duration:Math.max(2,Math.min(20,Number(raw.duration)||6)), cost:Math.max(0,raw.cost===undefined||Number(raw.cost)===0?75:Number(raw.cost)||75), cooldown:Math.max(0,Math.min(3600,Number(raw.cooldown)||60)), size:Math.max(20,Math.min(100,Number(raw.size)||80)), position:positions.includes(raw.position)?raw.position:'center', maxFileMb:Math.max(1,Math.min(15,Number(raw.maxFileMb)||15)), maxText:Math.max(0,Math.min(160,Number(raw.maxText)||100)), volume:0, items };
 }
 async function getMemesConfig(tm) {
   try { return normalizeMemeConfig(JSON.parse(await tm.getSetting(MEMES_CONFIG_KEY, '{}'))); }
@@ -3403,7 +3404,7 @@ app.get('/api/admin/memes', requireAuth, requireTenant, async (req,res) => {
   } catch(e) { res.status(500).json({error:e.message}); }
 });
 app.put('/api/admin/memes', requireAuth, requireTenant, async (req,res) => {
-  try { const tm=createTenantManager({db,io,req}), config=normalizeMemeConfig(req.body||{}); await tm.setSetting(MEMES_CONFIG_KEY,JSON.stringify(config)); tm.emit('meme-overlay-settings',config); res.json({success:true,data:config}); }
+  try { const tm=createTenantManager({db,io,req}), config=normalizeMemeConfig(req.body||{}), serialized=JSON.stringify(config); await tm.setSetting(MEMES_CONFIG_KEY,serialized); const persisted=await db.getStreamerSetting(tm.streamerId,MEMES_CONFIG_KEY,''); if(persisted!==serialized)throw new Error('La sauvegarde SQLite du widget a échoué'); tm.emit('meme-overlay-settings',config); res.set('Cache-Control','no-store'); res.json({success:true,data:JSON.parse(persisted),streamerId:tm.streamerId}); }
   catch(e) { res.status(400).json({error:e.message}); }
 });
 app.post('/api/admin/memes/test', requireAuth, requireTenant, async (req,res) => {
