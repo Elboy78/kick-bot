@@ -167,13 +167,13 @@ async function init() {
   await db.initSystemCommandsState(SYSTEM_COMMANDS);
   // Enregistrer sendChat dans le module partagé pour que panel.js puisse l'utiliser
   shared.registerSendChat(sendChat);
-  await startAnnouncements();
+  if (process.env.BOT_MEME_ONLY !== 'true') await startAnnouncements();
   await syncPointsConfig();
   // V2 : synchronise régulièrement les chaînes ajoutées au bot.
   await syncActiveBotChannels();
   setInterval(syncActiveBotChannels, 30000);
   // Vérifier live + followers toutes les 2 minutes
-  setInterval(checkLiveStatus, 120000);
+  if (process.env.BOT_MEME_ONLY !== 'true') setInterval(checkLiveStatus, 120000);
   // Resynchroniser montant/intervalle de points toutes les 2 minutes (changements panel)
   setInterval(syncPointsConfig, 120000);
   console.log('[BOT] Base de données prête ✓');
@@ -287,6 +287,7 @@ async function forwardKickEventToPanel(event, payload, ctx = null) {
 
 function handleEvent(msg) {
   const { event, data, channel } = msg;
+  if (process.env.BOT_MEME_ONLY === 'true' && !['pusher:connection_established','pusher_internal:subscription_succeeded','App\\Events\\ChatMessageEvent','ChatMessageEvent'].includes(event)) return;
 
   switch(event) {
     case 'pusher:connection_established': console.log('[BOT] Handshake OK'); break;
@@ -540,6 +541,7 @@ async function handleChatMessageScoped(payload, ctx = null) {
 
   const parts = content.trim().split(' ');
   const cmd   = parts[0].toLowerCase();
+  if (process.env.BOT_MEME_ONLY === 'true' && cmd !== '!meme') return;
 
   // Memes interactifs — configuration et diffusion gérées par le panel du tenant.
   if (cmd === '!meme') {
