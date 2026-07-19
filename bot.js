@@ -17,8 +17,8 @@ const CONFIG = {
   token:        process.env.KICK_TOKEN         || '',
   botUsername:  process.env.BOT_USERNAME       || 'bot',
   broadcasterUserId: process.env.KICK_BROADCASTER_USER_ID || '',
-  pointsAmount: parseInt(process.env.POINTS_PER_INTERVAL || '10'),
-  intervalMs:   parseInt(process.env.POINTS_INTERVAL_MS  || '300000'),
+  pointsAmount: parseInt(process.env.POINTS_PER_INTERVAL || '5'),
+  intervalMs:   parseInt(process.env.POINTS_INTERVAL_MS  || '600000'),
   debug:        process.env.DEBUG === 'true',
   legacyChannelEnabled: process.env.KICK_LEGACY_CHANNEL === 'true',
 };
@@ -39,6 +39,7 @@ let announcementIntervals = {};
 let streamStartTime = null;
 let lastFollowerCount = 0;
 let followerCheckInterval = null;
+const memeCooldowns = new Map();
 
 
 // V2 Core : BotManager multi-chaînes.
@@ -166,13 +167,13 @@ async function init() {
   await db.initSystemCommandsState(SYSTEM_COMMANDS);
   // Enregistrer sendChat dans le module partagé pour que panel.js puisse l'utiliser
   shared.registerSendChat(sendChat);
-  await startAnnouncements();
+  if (process.env.BOT_MEME_ONLY !== 'true') await startAnnouncements();
   await syncPointsConfig();
   // V2 : synchronise régulièrement les chaînes ajoutées au bot.
   await syncActiveBotChannels();
   setInterval(syncActiveBotChannels, 30000);
   // Vérifier live + followers toutes les 2 minutes
-  setInterval(checkLiveStatus, 120000);
+  if (process.env.BOT_MEME_ONLY !== 'true') setInterval(checkLiveStatus, 120000);
   // Resynchroniser montant/intervalle de points toutes les 2 minutes (changements panel)
   setInterval(syncPointsConfig, 120000);
   console.log('[BOT] Base de données prête ✓');
@@ -286,6 +287,7 @@ async function forwardKickEventToPanel(event, payload, ctx = null) {
 
 function handleEvent(msg) {
   const { event, data, channel } = msg;
+  if (process.env.BOT_MEME_ONLY === 'true' && !['pusher:connection_established','pusher_internal:subscription_succeeded','App\\Events\\ChatMessageEvent','ChatMessageEvent'].includes(event)) return;
 
   switch(event) {
     case 'pusher:connection_established': console.log('[BOT] Handshake OK'); break;
@@ -539,6 +541,43 @@ async function handleChatMessageScoped(payload, ctx = null) {
 
   const parts = content.trim().split(' ');
   const cmd   = parts[0].toLowerCase();
+  if (process.env.BOT_MEME_ONLY === 'true' && cmd !== '!meme') return;
+
+  // Memes interactifs — configuration et diffusion gérées par le panel du tenant.
+  if (cmd === '!meme') {
+    const meme = String(parts[1] || '').trim();
+    const text = parts.slice(2).join(' ').trim();
+    if (!meme) {
+      const context=currentChatContext(), trusted=badges.some(b=>['subscriber','vip','moderator','broadcaster'].includes(String(b.type||'').toLowerCase()));
+      const token=await db.createMemeAccessToken(context.streamerId,username,trusted);
+      let base='https://panel.elbot.fr';try{base=new URL(String(process.env.PANEL_PUBLIC_URL||base)).origin}catch(_){}
+      return sendChat(`@${username} Envoie ton image/GIF et ton texte ici : ${base}/memes/${context.slug}?token=${token}`);
+    }
+    try {
+      const context = currentChatContext();
+      const raw = await db.getStreamerSetting(context?.streamerId, 'memes_config_v1', '{}');
+      let cfg={}; try { cfg=JSON.parse(raw||'{}'); } catch (_) {}
+      if (cfg.enabled !== true) return sendChat(`@${username} Les memes sont désactivés sur cette chaîne.`);
+      const key=String(meme).toLowerCase().replace(/[^a-z0-9_-]/g,'');
+      const item=(Array.isArray(cfg.items)?cfg.items:[]).find(x=>x.enabled!==false&&(String(x.id).toLowerCase()===key||String(x.name).toLowerCase()===String(meme).toLowerCase()));
+      if (!item) return sendChat(`@${username} Meme introuvable.`);
+      const cdKey=`${context?.streamerId}:${item.id}`, remaining=Math.ceil(((memeCooldowns.get(cdKey)||0)-Date.now())/1000);
+      if (remaining>0) return sendChat(`@${username} Ce meme revient dans ${remaining}s.`);
+      const cost=Math.max(0,Number(item.cost)||0);
+      if(cost){const viewer=await db.getViewer(username);if(!viewer||Number(viewer.points||0)<cost)return sendChat(`@${username} Il faut ${cost} points.`);await db.addPoints(username,-cost,`meme:${item.id}`)}
+      const cleanText=String(item.allowText===false?'':text).replace(/[<>\u0000-\u001f]/g,' ').replace(/\s+/g,' ').trim().slice(0,Math.max(0,Math.min(120,Number(cfg.maxText)||80)));
+      if(cleanText){const banned=await db.checkBannedWords(cleanText);if(banned)return sendChat(`@${username} Ce texte n'est pas autorisé.`)}
+      memeCooldowns.set(cdKey,Date.now()+Math.max(0,Number(item.cooldown)||30)*1000);
+      const payload={memeId:item.id,name:item.name,username:String(username).slice(0,60),text:cleanText,mediaUrl:item.mediaUrl,soundUrl:item.soundUrl||'',duration:Math.max(2,Math.min(20,Number(item.duration)||6)),volume:Math.max(0,Math.min(100,Number(cfg.volume)||70)),at:new Date().toISOString()};
+      await db.createMemeEvent(context.streamerId,payload);
+      const result = {ok:true};
+      if (result?.error) return sendChat(`@${username} ${result.error}`);
+      return;
+    } catch (e) {
+      console.error('[MEMES] Erreur commande:', e.message);
+      return sendChat(`@${username} Meme indisponible pour le moment.`);
+    }
+  }
 
   // Song Request V2 — scoping par streamer via le contexte chat courant.
   // Chaque chaîne a sa propre file d'attente et ses propres réglages.

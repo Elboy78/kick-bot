@@ -176,6 +176,21 @@ async function initSchema() {
       last_used_at TEXT,
       UNIQUE(streamer_id, widget)
     )`,
+    `CREATE TABLE IF NOT EXISTS meme_events (
+      id          INTEGER PRIMARY KEY AUTOINCREMENT,
+      streamer_id INTEGER NOT NULL,
+      payload     TEXT NOT NULL,
+      created_at  TEXT NOT NULL DEFAULT (datetime('now'))
+    )`,
+    `CREATE TABLE IF NOT EXISTS meme_submissions (
+      id INTEGER PRIMARY KEY AUTOINCREMENT, streamer_id INTEGER NOT NULL,
+      username TEXT NOT NULL, text TEXT, media_url TEXT NOT NULL,
+      status TEXT NOT NULL DEFAULT 'pending', created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    )`,
+    `CREATE TABLE IF NOT EXISTS meme_access_tokens (
+      token TEXT PRIMARY KEY, streamer_id INTEGER NOT NULL, username TEXT NOT NULL,
+      trusted INTEGER NOT NULL DEFAULT 0, expires_at INTEGER NOT NULL
+    )`,
     `CREATE TABLE IF NOT EXISTS viewers (
       id            INTEGER PRIMARY KEY AUTOINCREMENT,
       streamer_id   INTEGER NOT NULL DEFAULT 1,
@@ -183,6 +198,8 @@ async function initSchema() {
       kick_user_id  TEXT,
       following_since TEXT,
       subscribed_for INTEGER,
+      badges_json TEXT,
+      badges_synced_at TEXT,
       points        INTEGER NOT NULL DEFAULT 0,
       total_minutes INTEGER NOT NULL DEFAULT 0,
       sessions      INTEGER NOT NULL DEFAULT 0,
@@ -520,6 +537,8 @@ async function initSchema() {
     `ALTER TABLE vod_moments ADD COLUMN created_by TEXT DEFAULT ''`,
     `ALTER TABLE viewers ADD COLUMN following_since TEXT`,
     `ALTER TABLE viewers ADD COLUMN subscribed_for INTEGER`,
+    `ALTER TABLE viewers ADD COLUMN badges_json TEXT`,
+    `ALTER TABLE viewers ADD COLUMN badges_synced_at TEXT`,
     `ALTER TABLE chest_seasons ADD COLUMN ever_secured INTEGER NOT NULL DEFAULT 0`,
     `ALTER TABLE chest_seasons ADD COLUMN victory_pending INTEGER NOT NULL DEFAULT 0`,
     `ALTER TABLE chest_seasons ADD COLUMN protected_number INTEGER DEFAULT NULL`,
@@ -664,7 +683,9 @@ async function upsertViewer(username, kickUserId = null) {
   if (existing) {
     await run(`UPDATE viewers SET last_seen = datetime('now'), kick_user_id = COALESCE(?, kick_user_id), streamer_id = ? WHERE id = ?`, [kickUserId, sid, existing.id]);
   } else {
-    await run(`INSERT INTO viewers (username, kick_user_id, last_seen, streamer_id) VALUES (?, ?, datetime('now'), ?)`, [lower, kickUserId, sid]);
+    const cfg = await getPointsConfig().catch(() => ({}));
+    const startingPoints = Math.max(0, parseInt(cfg.starting_points ?? '100') || 0);
+    await run(`INSERT INTO viewers (username, kick_user_id, points, last_seen, streamer_id) VALUES (?, ?, ?, datetime('now'), ?)`, [lower, kickUserId, startingPoints, sid]);
   }
 }
 
@@ -1270,11 +1291,8 @@ async function getPointsConfig() {
   return result;
 }
 async function setPointsConfigValue(key, value) {
-  await run(
-    `INSERT INTO points_config (key, value, updated_at) VALUES (?, ?, datetime('now'))
-     ON CONFLICT(key) DO UPDATE SET value = ?, updated_at = datetime('now')`,
-    [key, String(value), String(value)]
-  );
+  await run(`INSERT OR REPLACE INTO points_config (streamer_id, key, value, updated_at) VALUES (?, ?, ?, CURRENT_TIMESTAMP)`,
+    [scopedStreamerId(), key, String(value)]);
 }
 async function setPointsConfigBulk(obj) {
   for (const [key, value] of Object.entries(obj)) {
@@ -1539,6 +1557,30 @@ async function getViewersMissingFollow(limit = 10) {
     WHERE COALESCE(streamer_id, 1) = ? AND (following_since IS NULL OR subscribed_for IS NULL)
     ORDER BY CASE WHEN last_seen IS NULL THEN 1 ELSE 0 END, last_seen DESC, first_seen ASC LIMIT ?`,
     [scopedStreamerId(), Math.max(1, Math.min(50, parseInt(limit) || 10))]);
+}
+
+async function getViewersForBadgeSync(limit = 10) {
+  return all(`SELECT username FROM viewers
+    WHERE COALESCE(streamer_id, 1) = ?
+    ORDER BY CASE WHEN badges_synced_at IS NULL THEN 0 ELSE 1 END,
+      badges_synced_at ASC, last_seen DESC, first_seen ASC LIMIT ?`,
+    [scopedStreamerId(), Math.max(1, Math.min(50, parseInt(limit) || 10))]);
+}
+
+async function setViewerKickProfile(username, profile = {}) {
+  const normalized = String(username || '').trim().replace(/^@+/, '').toLowerCase();
+  if (!normalized) return;
+  const badges = Array.isArray(profile.badges) ? profile.badges.slice(0, 20) : [];
+  await run(`UPDATE viewers SET
+      following_since = COALESCE(?, following_since),
+      subscribed_for = COALESCE(?, subscribed_for),
+      badges_json = ?, badges_synced_at = datetime('now')
+    WHERE username = ? AND COALESCE(streamer_id, 1) = ?`,
+    [profile.followingSince ?? null, profile.subscribedFor ?? null,
+      JSON.stringify(badges), normalized, scopedStreamerId()]);
+
+  const giftCount = Math.max(0, Math.min(100000000, parseInt(profile.giftCount, 10) || 0));
+  if (giftCount > 0) await upsertCommunityGiftBadge(normalized, giftCount, scopedStreamerId());
 }
 
 async function addCommunityEvent(event = {}, streamerId = null) {
@@ -1862,10 +1904,7 @@ async function ensureBotIdentities() {
   // Le nom visible du service reste ElBot, mais le compte Kick officiel utilisé
   // pour écrire dans les chats est ElBotApp (ElBot étant indisponible sur Kick).
   await run(`UPDATE bot_identities SET display_name = 'ElBot',
-    kick_username = CASE
-      WHEN status = 'connected' AND kick_username IS NOT NULL AND kick_username != '' THEN kick_username
-      ELSE 'ElBotApp'
-    END,
+    kick_username = 'ElBotApp',
     updated_at = datetime('now') WHERE bot_key = 'elbot'`);
   await run(`INSERT OR IGNORE INTO bot_identities
     (bot_key,display_name,kick_username,oauth_provider,kind,status)
@@ -2087,10 +2126,29 @@ async function setStreamerSetting(streamerId, key, value) {
     [streamerId, key, String(value ?? ''), String(value ?? '')]
   );
 }
+async function createMemeEvent(streamerId, payload) {
+  const result = await run(`INSERT INTO meme_events (streamer_id, payload, created_at) VALUES (?, ?, CURRENT_TIMESTAMP)`, [Number(streamerId), JSON.stringify(payload || {})]);
+  return { ...payload, id:Number(result?.lastInsertRowid || 0) };
+}
+async function getMemeEvents(streamerId, afterId = 0) {
+  const rows = await all(`SELECT id, payload, created_at FROM meme_events WHERE streamer_id = ? AND id > ? AND created_at >= datetime('now','-10 minutes') ORDER BY id ASC LIMIT 30`, [Number(streamerId), Math.max(0,Number(afterId)||0)]);
+  return rows.map(row => { try { return { ...JSON.parse(row.payload), id:row.id, createdAt:row.created_at }; } catch (_) { return null; } }).filter(Boolean);
+}
+async function createMemeSubmission(streamerId, username, text, mediaUrl, status='pending') {
+  const r=await run(`INSERT INTO meme_submissions (streamer_id,username,text,media_url,status) VALUES (?,?,?,?,?)`,[Number(streamerId),username,text,mediaUrl,status]);
+  return get(`SELECT * FROM meme_submissions WHERE id=?`,[Number(r.lastInsertRowid)]);
+}
+async function getMemeSubmissions(streamerId, status='pending') { return all(`SELECT * FROM meme_submissions WHERE streamer_id=? AND status=? ORDER BY id DESC LIMIT 100`,[Number(streamerId),status]); }
+async function getMemeSubmission(id, streamerId) { return get(`SELECT * FROM meme_submissions WHERE id=? AND streamer_id=?`,[Number(id),Number(streamerId)]); }
+async function setMemeSubmissionStatus(id, streamerId, status) { await run(`UPDATE meme_submissions SET status=? WHERE id=? AND streamer_id=?`,[status,Number(id),Number(streamerId)]); return getMemeSubmission(id,streamerId); }
+async function createMemeAccessToken(streamerId, username, trusted=false) { const token=require('crypto').randomBytes(18).toString('hex'),level=trusted===2?2:(trusted?1:0);await run(`INSERT INTO meme_access_tokens (token,streamer_id,username,trusted,expires_at) VALUES (?,?,?,?,?)`,[token,Number(streamerId),username,level,Date.now()+3600000]);return token; }
+async function getMemeAccessToken(token, streamerId) { return await get(`SELECT * FROM meme_access_tokens WHERE token=? AND streamer_id=? AND expires_at>?`,[String(token),Number(streamerId),Date.now()])||null; }
+async function deleteMemeAccessToken(token) { await run(`DELETE FROM meme_access_tokens WHERE token=?`,[String(token)]); }
+async function touchMemeAccessToken(token, streamerId) { const row=await getMemeAccessToken(token,streamerId);if(row)await run(`UPDATE meme_access_tokens SET expires_at=? WHERE token=?`,[Date.now()+3600000,String(token)]);return row; }
 
 function normalizeOverlayWidget(widget) {
   const w = String(widget || '').toLowerCase().replace(/\.html$/,'').replace(/[^a-z0-9_-]/g, '');
-  const allowed = new Set(['songrequest','chat','subgoal','alerts']);
+  const allowed = new Set(['songrequest','chat','subgoal','alerts','memes']);
   return allowed.has(w) ? w : '';
 }
 function createOverlayTokenValue() {
@@ -2134,7 +2192,7 @@ async function getOverlayTokenByValue(token) {
 }
 async function getOverlayTokensForStreamer(streamerId) {
   const sid = Number(streamerId || scopedStreamerId() || 1);
-  const widgets = ['songrequest','chat','subgoal','alerts'];
+  const widgets = ['songrequest','chat','subgoal','alerts','memes'];
   const out = {};
   for (const w of widgets) out[w] = await getOrCreateOverlayToken(sid, w);
   return out;
@@ -2188,6 +2246,8 @@ async function migrateViewersToScopedUnique(defaultStreamerId = 1) {
     kick_user_id    TEXT,
     following_since TEXT,
     subscribed_for  INTEGER,
+    badges_json     TEXT,
+    badges_synced_at TEXT,
     points          INTEGER NOT NULL DEFAULT 0,
     total_minutes   INTEGER NOT NULL DEFAULT 0,
     sessions        INTEGER NOT NULL DEFAULT 0,
@@ -2204,7 +2264,7 @@ async function migrateViewersToScopedUnique(defaultStreamerId = 1) {
   const hasStreamerId = cols.includes('streamer_id');
   const sidExpr = hasStreamerId ? 'COALESCE(streamer_id, ?)' : '?';
   await run(`INSERT OR IGNORE INTO viewers_v2_migration
-    (id, streamer_id, username, kick_user_id, following_since, subscribed_for, points, total_minutes, sessions, level, last_seen, first_seen, created_at)
+    (id, streamer_id, username, kick_user_id, following_since, subscribed_for, badges_json, badges_synced_at, points, total_minutes, sessions, level, last_seen, first_seen, created_at)
     SELECT
       MIN(id) AS id,
       ${sidExpr} AS streamer_id,
@@ -2212,6 +2272,8 @@ async function migrateViewersToScopedUnique(defaultStreamerId = 1) {
       MAX(kick_user_id) AS kick_user_id,
       MAX(following_since) AS following_since,
       MAX(subscribed_for) AS subscribed_for,
+      MAX(badges_json) AS badges_json,
+      MAX(badges_synced_at) AS badges_synced_at,
       MAX(points) AS points,
       MAX(total_minutes) AS total_minutes,
       MAX(sessions) AS sessions,
@@ -2274,7 +2336,7 @@ module.exports = {
   ensureInit,
   getDB,
   upsertViewer, addPoints, getViewer, getLeaderboard, getViewerRank,
-  getGlobalStats, getRecentLogs, getActiveViewers, getViewersMissingFollow, clearAllPoints,
+  getGlobalStats, getRecentLogs, getActiveViewers, getViewersMissingFollow, getViewersForBadgeSync, setViewerKickProfile, clearAllPoints,
   addCommunityEvent, backfillCommunityHistory, importCommunityGiftLeaderboard, upsertCommunityGiftBadge, getCommunityData,
   getLevel, getNextLevel, getLevels, getRankingEngine, addLevel, updateLevel, deleteLevel,
   getCustomCommands, getCustomCommand, setCustomCommand, deleteCustomCommand, toggleCustomCommand,
@@ -2312,4 +2374,7 @@ module.exports = {
   ensureDefaultStreamer, getStreamerBySlug, getStreamerById, getStreamerByBroadcasterUserId, listStreamers, setStreamerPlan, upsertStreamer, updateStreamerKickMeta, getActiveStreamersForBot,
   ensureBotIdentities, getBotIdentityById, getBotIdentityByKey, getAssignedBotIdentity, getBotAssignmentOptions, assignBotIdentity, connectCustomBotIdentity, markBotIdentityConnected, markBotIdentityAuthorizationRequired, enableStreamersForBotIdentity,
   getStreamerSetting, setStreamerSetting, getOrCreateOverlayToken, regenerateOverlayToken, getOverlayTokenByValue, getOverlayTokensForStreamer, saveOAuthTokenForStreamer, getOAuthTokenForStreamer, deleteOAuthTokenForStreamer,
+  createMemeEvent, getMemeEvents,
+  createMemeSubmission, getMemeSubmissions, getMemeSubmission, setMemeSubmissionStatus,
+  createMemeAccessToken, getMemeAccessToken, deleteMemeAccessToken, touchMemeAccessToken,
 };

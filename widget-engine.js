@@ -36,6 +36,11 @@ const WIDGETS = Object.freeze([
     description: 'Follow, sub, gift et raid avec profils, sons et animations.',
     settingsSection: 'alerts',
     enabledSetting: null
+  },
+  {
+    id: 'memes', name: 'Memes interactifs', icon: '😂', color: '#f59e0b',
+    description: 'Images et GIF envoyés par les viewers avec leur texte personnalisé.',
+    settingsSection: 'memes', enabledSetting: null
   }
 ]);
 

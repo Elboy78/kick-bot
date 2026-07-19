@@ -7,6 +7,7 @@ let _markVictory = null;
 let _kickEventHandler = null;
 let _songRequestAdder = null;
 let _chatOverlayEmitter = null;
+let _memeTrigger = null;
 
 module.exports = {
   registerSendChat(fn) { _sendChat = fn; },
@@ -33,6 +34,12 @@ module.exports = {
   emitChatOverlayMessage(message, ctx = null) {
     if (_chatOverlayEmitter) return _chatOverlayEmitter(message, ctx);
     return Promise.resolve(false);
+  },
+
+  registerMemeTrigger(fn) { _memeTrigger = fn; },
+  triggerMeme(username, meme, text = '', ctx = null) {
+    if (_memeTrigger) return _memeTrigger(username, meme, text, ctx);
+    return Promise.resolve({ error: 'Module Memes pas encore initialisé.' });
   },
 
   registerOpenChest(fn) { _openChest = fn; },
