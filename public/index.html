@@ -812,7 +812,8 @@ body.light .card,body.light .panel,body.light .widget-engine-card{background:lin
   <!-- ══ CLASSEMENT ══ -->
   <div class="page" id="page-classement">
     <div class="header"><div><h1>Classement</h1><p>Top viewers et niveaux</p></div><div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn" onclick="copyPublicLeaderboardLink()">🔗 Copier le lien public</button><button class="btn" onclick="refreshLeaderboard()">↻ Actualiser</button></div></div>
-    <div class="panel" style="margin-bottom:14px">
+    <div class="g2" style="align-items:start;margin-bottom:14px">
+    <div class="panel">
       <h3>🏆 Classement complet
         <span style="display:flex;gap:6px">
           <input type="text" class="inp inp-sm" id="lb-search" placeholder="Filtrer…" oninput="filterLB()" style="width:130px">
@@ -835,13 +836,12 @@ body.light .card,body.light .panel,body.light .widget-engine-card{background:lin
     <div class="panel" style="margin-bottom:14px">
       <h3>💜 Classement des soutiens <small style="color:var(--muted);font-weight:500">all time Kick + événements ElBot</small></h3>
       <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px"><input class="inp inp-sm" id="community-support-search" placeholder="Rechercher un pseudo…" oninput="communitySupportPage=1;renderCommunitySupporters()" style="max-width:240px"><select class="inp inp-sm" id="community-support-sort" onchange="communitySupportPage=1;renderCommunitySupporters()" style="max-width:220px"><option value="gifts">Plus de subs offerts</option><option value="channel-oldest">Plus ancien de la chaîne</option><option value="support">Plus de soutiens</option><option value="months">Plus ancien sub</option><option value="recent">Soutien le plus récent</option><option value="name">Pseudo A–Z</option></select><span id="community-kick-sync" style="align-self:center;color:var(--muted);font-size:11px"></span></div>
-      <div class="tw"><table><thead><tr><th>#</th><th>Viewer</th><th>Nouveaux subs</th><th>Renouvellements</th><th>Subs offerts</th><th>Ancienneté max</th><th>Follow depuis</th><th>Dernier soutien</th></tr></thead><tbody id="community-supporters"><tr><td colspan="8"><div class="empty"><p>Chargement…</p></div></td></tr></tbody></table></div>
+      <div class="tw"><table><thead><tr><th>#</th><th>Viewer</th><th>Subs offerts</th><th>Ancienneté</th><th>Follow depuis</th><th>Dernier soutien</th></tr></thead><tbody id="community-supporters"><tr><td colspan="6"><div class="empty"><p>Chargement…</p></div></td></tr></tbody></table></div>
       <div id="community-support-pagination" style="display:flex;justify-content:center;align-items:center;gap:8px;margin-top:12px"></div>
     </div>
-    <div class="g2">
-      <div class="panel"><h3>💚 Followers connus</h3><div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px"><input class="inp inp-sm" id="community-follow-search" placeholder="Rechercher un pseudo…" oninput="communityFollowPage=1;renderCommunityFollowers()"><select class="inp inp-sm" id="community-follow-sort" onchange="communityFollowPage=1;renderCommunityFollowers()"><option value="oldest">Plus anciens</option><option value="newest">Plus récents</option><option value="name">Pseudo A–Z</option></select></div><div class="tw"><table><thead><tr><th>Viewer</th><th>Follow depuis</th></tr></thead><tbody id="community-followers"></tbody></table></div><div id="community-follow-pagination" style="display:flex;justify-content:center;align-items:center;gap:8px;margin-top:12px"></div></div>
-      <div class="panel"><h3>🕘 Derniers événements</h3><div id="community-events" style="display:grid;gap:8px;max-height:520px;overflow:auto"></div></div>
+    <div class="panel"><h3>💚 Followers connus</h3><div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px"><input class="inp inp-sm" id="community-follow-search" placeholder="Rechercher un pseudo…" oninput="communityFollowPage=1;renderCommunityFollowers()"><select class="inp inp-sm" id="community-follow-sort" onchange="communityFollowPage=1;renderCommunityFollowers()"><option value="oldest">Plus anciens</option><option value="newest">Plus récents</option><option value="name">Pseudo A–Z</option></select></div><div class="tw"><table><thead><tr><th>Viewer</th><th>Follow depuis</th></tr></thead><tbody id="community-followers"></tbody></table></div><div id="community-follow-pagination" style="display:flex;justify-content:center;align-items:center;gap:8px;margin-top:12px"></div></div>
     </div>
+    <div class="panel"><h3>🕘 Derniers événements</h3><div id="community-events" style="display:grid;gap:8px;max-height:360px;overflow:auto"></div></div>
     <div class="panel" style="margin-top:14px;color:var(--muted);font-size:11px;line-height:1.6">Les données antérieures sont reconstruites depuis les informations déjà connues par ElBot. Une date inconnue n’est jamais inventée. Les nouveaux follows, subs, renouvellements et gifts sont enregistrés automatiquement et isolés pour cette chaîne.</div>
   </div>
 
@@ -5214,7 +5214,7 @@ async function loadCommunity() {
     eventsEl.innerHTML = (data.events || []).length ? data.events.map(item => `<div style="padding:10px 12px;border:1px solid var(--border);border-radius:10px;background:var(--surface2)"><div style="display:flex;justify-content:space-between;gap:8px"><strong>${labels[item.type] || esc(item.type)}</strong><small style="color:var(--muted)">${communityDate(item.at)}</small></div><div style="margin-top:4px;color:var(--text)">${esc(item.username || item.gifter || 'Anonyme')}${item.type==='gift' ? ` · ${Number(item.count||1)} gifts` : ''}${item.months ? ` · ${Number(item.months)} mois` : ''}</div><small style="color:var(--muted)">${item.source === 'legacy_subcounter' ? 'Historique récupéré' : 'Détecté par ElBot'}</small></div>`).join('') : '<div class="empty"><p>Aucun événement enregistré</p></div>';
     if (!communityKickSyncDone) await syncKickHistoricalGiftLeaderboard();
   } catch (e) {
-    if (supportersBody) supportersBody.innerHTML = '<tr><td colspan="8"><div class="empty"><p>Historique indisponible</p></div></td></tr>';
+    if (supportersBody) supportersBody.innerHTML = '<tr><td colspan="6"><div class="empty"><p>Historique indisponible</p></div></td></tr>';
   }
 }
 
@@ -5232,7 +5232,7 @@ function renderCommunitySupporters(){
   const score=x=>Number(x.gifts||0)+Number(x.renewals||0)+Number(x.new_subs||0);
   rows.sort((a,b)=>sort==='gifts'?Number(b.gifts||0)-Number(a.gifts||0):sort==='channel-oldest'?String(a.following_since||'9999').localeCompare(String(b.following_since||'9999')):sort==='support'?score(b)-score(a):sort==='months'?Number(b.max_months||0)-Number(a.max_months||0):sort==='recent'?String(b.last_support||'').localeCompare(String(a.last_support||'')):String(a.username||'').localeCompare(String(b.username||''),'fr'));
   const start=(communitySupportPage-1)*COMMUNITY_PAGE_SIZE, visible=rows.slice(start,start+COMMUNITY_PAGE_SIZE);
-  document.getElementById('community-supporters').innerHTML=visible.length?visible.map((x,i)=>`<tr><td><span class="rank-num">#${start+i+1}</span></td><td style="font-weight:700">${esc(x.username||'Anonyme')}${x.kickHistorical?' <small style="color:#22c55e">Kick</small>':''}</td><td>${Number(x.new_subs||0)}</td><td>${Number(x.renewals||0)}</td><td style="font-weight:800;color:var(--accent)">${Number(x.gifts||0)}</td><td>${Number(x.max_months||0)?Number(x.max_months)+' mois':'—'}</td><td style="color:#22c55e">${communityDate(x.following_since)}</td><td style="color:var(--muted)">${communityDate(x.last_support)}</td></tr>`).join(''):'<tr><td colspan="8"><div class="empty"><p>Aucun résultat</p></div></td></tr>';
+  document.getElementById('community-supporters').innerHTML=visible.length?visible.map((x,i)=>`<tr><td><span class="rank-num">#${start+i+1}</span></td><td style="font-weight:700">${esc(x.username||'Anonyme')}${x.kickHistorical?' <small style="color:#22c55e">Kick</small>':''}</td><td style="font-weight:800;color:var(--accent)">${Number(x.gifts||0)}</td><td>${Number(x.max_months||0)?Number(x.max_months)+' mois':'—'}</td><td style="color:#22c55e">${communityDate(x.following_since)}</td><td style="color:var(--muted)">${communityDate(x.last_support)}</td></tr>`).join(''):'<tr><td colspan="6"><div class="empty"><p>Aucun résultat</p></div></td></tr>';
   communityPager('community-support-pagination',communitySupportPage,rows.length,'setCommunitySupportPage');
 }
 function renderCommunityFollowers(){
