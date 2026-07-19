@@ -198,6 +198,8 @@ async function initSchema() {
       kick_user_id  TEXT,
       following_since TEXT,
       subscribed_for INTEGER,
+      badges_json TEXT,
+      badges_synced_at TEXT,
       points        INTEGER NOT NULL DEFAULT 0,
       total_minutes INTEGER NOT NULL DEFAULT 0,
       sessions      INTEGER NOT NULL DEFAULT 0,
@@ -535,6 +537,8 @@ async function initSchema() {
     `ALTER TABLE vod_moments ADD COLUMN created_by TEXT DEFAULT ''`,
     `ALTER TABLE viewers ADD COLUMN following_since TEXT`,
     `ALTER TABLE viewers ADD COLUMN subscribed_for INTEGER`,
+    `ALTER TABLE viewers ADD COLUMN badges_json TEXT`,
+    `ALTER TABLE viewers ADD COLUMN badges_synced_at TEXT`,
     `ALTER TABLE chest_seasons ADD COLUMN ever_secured INTEGER NOT NULL DEFAULT 0`,
     `ALTER TABLE chest_seasons ADD COLUMN victory_pending INTEGER NOT NULL DEFAULT 0`,
     `ALTER TABLE chest_seasons ADD COLUMN protected_number INTEGER DEFAULT NULL`,
@@ -1555,6 +1559,30 @@ async function getViewersMissingFollow(limit = 10) {
     [scopedStreamerId(), Math.max(1, Math.min(50, parseInt(limit) || 10))]);
 }
 
+async function getViewersForBadgeSync(limit = 10) {
+  return all(`SELECT username FROM viewers
+    WHERE COALESCE(streamer_id, 1) = ?
+    ORDER BY CASE WHEN badges_synced_at IS NULL THEN 0 ELSE 1 END,
+      badges_synced_at ASC, last_seen DESC, first_seen ASC LIMIT ?`,
+    [scopedStreamerId(), Math.max(1, Math.min(50, parseInt(limit) || 10))]);
+}
+
+async function setViewerKickProfile(username, profile = {}) {
+  const normalized = String(username || '').trim().replace(/^@+/, '').toLowerCase();
+  if (!normalized) return;
+  const badges = Array.isArray(profile.badges) ? profile.badges.slice(0, 20) : [];
+  await run(`UPDATE viewers SET
+      following_since = COALESCE(?, following_since),
+      subscribed_for = COALESCE(?, subscribed_for),
+      badges_json = ?, badges_synced_at = datetime('now')
+    WHERE username = ? AND COALESCE(streamer_id, 1) = ?`,
+    [profile.followingSince ?? null, profile.subscribedFor ?? null,
+      JSON.stringify(badges), normalized, scopedStreamerId()]);
+
+  const giftCount = Math.max(0, Math.min(100000000, parseInt(profile.giftCount, 10) || 0));
+  if (giftCount > 0) await upsertCommunityGiftBadge(normalized, giftCount, scopedStreamerId());
+}
+
 async function addCommunityEvent(event = {}, streamerId = null) {
   const sid = Number(streamerId || scopedStreamerId());
   const type = String(event.type || event.event_type || 'unknown').trim().toLowerCase();
@@ -2218,6 +2246,8 @@ async function migrateViewersToScopedUnique(defaultStreamerId = 1) {
     kick_user_id    TEXT,
     following_since TEXT,
     subscribed_for  INTEGER,
+    badges_json     TEXT,
+    badges_synced_at TEXT,
     points          INTEGER NOT NULL DEFAULT 0,
     total_minutes   INTEGER NOT NULL DEFAULT 0,
     sessions        INTEGER NOT NULL DEFAULT 0,
@@ -2234,7 +2264,7 @@ async function migrateViewersToScopedUnique(defaultStreamerId = 1) {
   const hasStreamerId = cols.includes('streamer_id');
   const sidExpr = hasStreamerId ? 'COALESCE(streamer_id, ?)' : '?';
   await run(`INSERT OR IGNORE INTO viewers_v2_migration
-    (id, streamer_id, username, kick_user_id, following_since, subscribed_for, points, total_minutes, sessions, level, last_seen, first_seen, created_at)
+    (id, streamer_id, username, kick_user_id, following_since, subscribed_for, badges_json, badges_synced_at, points, total_minutes, sessions, level, last_seen, first_seen, created_at)
     SELECT
       MIN(id) AS id,
       ${sidExpr} AS streamer_id,
@@ -2242,6 +2272,8 @@ async function migrateViewersToScopedUnique(defaultStreamerId = 1) {
       MAX(kick_user_id) AS kick_user_id,
       MAX(following_since) AS following_since,
       MAX(subscribed_for) AS subscribed_for,
+      MAX(badges_json) AS badges_json,
+      MAX(badges_synced_at) AS badges_synced_at,
       MAX(points) AS points,
       MAX(total_minutes) AS total_minutes,
       MAX(sessions) AS sessions,
@@ -2304,7 +2336,7 @@ module.exports = {
   ensureInit,
   getDB,
   upsertViewer, addPoints, getViewer, getLeaderboard, getViewerRank,
-  getGlobalStats, getRecentLogs, getActiveViewers, getViewersMissingFollow, clearAllPoints,
+  getGlobalStats, getRecentLogs, getActiveViewers, getViewersMissingFollow, getViewersForBadgeSync, setViewerKickProfile, clearAllPoints,
   addCommunityEvent, backfillCommunityHistory, importCommunityGiftLeaderboard, upsertCommunityGiftBadge, getCommunityData,
   getLevel, getNextLevel, getLevels, getRankingEngine, addLevel, updateLevel, deleteLevel,
   getCustomCommands, getCustomCommand, setCustomCommand, deleteCustomCommand, toggleCustomCommand,

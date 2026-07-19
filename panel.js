@@ -1012,6 +1012,20 @@ app.get('/api/viewers/missing-follow', async (req, res) => {
     res.json({ data: rows.map(r => r.username) });
   } catch(e) { res.json({ data: [] }); }
 });
+app.get('/api/viewers/badge-sync', requireAuth, requireTenant, async (req, res) => {
+  try {
+    const rows = await db.getViewersForBadgeSync(10);
+    res.json({ data: rows.map(r => r.username) });
+  } catch(e) { res.json({ data: [] }); }
+});
+app.post('/api/viewer/kick-profile', requireAuth, requireTenant, async (req, res) => {
+  try {
+    const { username, followingSince, subscribedFor, badges, giftCount } = req.body || {};
+    if (!username) return res.status(400).json({ error: 'username requis' });
+    await db.setViewerKickProfile(username, { followingSince, subscribedFor, badges, giftCount });
+    res.json({ success: true });
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
 app.get('/api/analytics/chat-week', async (req,res) => { try { res.json({data: await db.getChatActivityWeek()}); } catch(e) { res.json({data:[]}); }});
 app.get('/api/analytics/sessions-viewers', async (req,res) => { try { res.json({data: await db.getSessionsWithAvgViewers(14)}); } catch(e) { res.json({data:[]}); }});
 
