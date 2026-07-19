@@ -679,7 +679,9 @@ async function upsertViewer(username, kickUserId = null) {
   if (existing) {
     await run(`UPDATE viewers SET last_seen = datetime('now'), kick_user_id = COALESCE(?, kick_user_id), streamer_id = ? WHERE id = ?`, [kickUserId, sid, existing.id]);
   } else {
-    await run(`INSERT INTO viewers (username, kick_user_id, last_seen, streamer_id) VALUES (?, ?, datetime('now'), ?)`, [lower, kickUserId, sid]);
+    const cfg = await getPointsConfig().catch(() => ({}));
+    const startingPoints = Math.max(0, parseInt(cfg.starting_points ?? '100') || 0);
+    await run(`INSERT INTO viewers (username, kick_user_id, points, last_seen, streamer_id) VALUES (?, ?, ?, datetime('now'), ?)`, [lower, kickUserId, startingPoints, sid]);
   }
 }
 
@@ -1285,11 +1287,8 @@ async function getPointsConfig() {
   return result;
 }
 async function setPointsConfigValue(key, value) {
-  await run(
-    `INSERT INTO points_config (key, value, updated_at) VALUES (?, ?, datetime('now'))
-     ON CONFLICT(key) DO UPDATE SET value = ?, updated_at = datetime('now')`,
-    [key, String(value), String(value)]
-  );
+  await run(`INSERT OR REPLACE INTO points_config (streamer_id, key, value, updated_at) VALUES (?, ?, ?, CURRENT_TIMESTAMP)`,
+    [scopedStreamerId(), key, String(value)]);
 }
 async function setPointsConfigBulk(obj) {
   for (const [key, value] of Object.entries(obj)) {

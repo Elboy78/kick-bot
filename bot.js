@@ -17,8 +17,8 @@ const CONFIG = {
   token:        process.env.KICK_TOKEN         || '',
   botUsername:  process.env.BOT_USERNAME       || 'bot',
   broadcasterUserId: process.env.KICK_BROADCASTER_USER_ID || '',
-  pointsAmount: parseInt(process.env.POINTS_PER_INTERVAL || '10'),
-  intervalMs:   parseInt(process.env.POINTS_INTERVAL_MS  || '300000'),
+  pointsAmount: parseInt(process.env.POINTS_PER_INTERVAL || '5'),
+  intervalMs:   parseInt(process.env.POINTS_INTERVAL_MS  || '600000'),
   debug:        process.env.DEBUG === 'true',
   legacyChannelEnabled: process.env.KICK_LEGACY_CHANNEL === 'true',
 };

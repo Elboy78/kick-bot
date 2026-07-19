@@ -2719,8 +2719,9 @@ app.get('/api/v2/overlays', async (req, res) => {
 // ════════════════════════════════════════════════════════════════════
 
 const POINTS_DEFAULTS = {
-  points_amount:    process.env.POINTS_PER_INTERVAL || '10',
-  interval_minutes: process.env.POINTS_INTERVAL_MS ? String(parseInt(process.env.POINTS_INTERVAL_MS) / 60000) : '5',
+  points_amount:    '5',
+  interval_minutes: '10',
+  starting_points:  '100',
 };
 
 app.get('/api/points/config', async (req, res) => {
@@ -2730,13 +2731,14 @@ app.get('/api/points/config', async (req, res) => {
     res.json({
       pointsAmount: parseInt(merged.points_amount),
       intervalMinutes: parseInt(merged.interval_minutes),
+      startingPoints: parseInt(merged.starting_points),
     });
   } catch(e) { res.status(500).json({ error: e.message }); }
 });
 
 app.post('/api/admin/points/config', async (req, res) => {
   try {
-    const { pointsAmount, intervalMinutes } = req.body;
+    const { pointsAmount, intervalMinutes, startingPoints } = req.body;
     const updates = {};
     if (pointsAmount !== undefined && pointsAmount !== '') {
       const n = parseInt(pointsAmount);
@@ -2747,6 +2749,9 @@ app.post('/api/admin/points/config', async (req, res) => {
       const n = parseInt(intervalMinutes);
       if (isNaN(n) || n < 1) return res.status(400).json({ error: 'Intervalle invalide' });
       updates.interval_minutes = n;
+    }
+    if (startingPoints !== undefined && startingPoints !== '') {
+      const n=parseInt(startingPoints); if(isNaN(n)||n<0||n>1000000)return res.status(400).json({error:'Points de départ invalides'}); updates.starting_points=n;
     }
     await db.setPointsConfigBulk(updates);
     res.json({ success: true });
@@ -3354,7 +3359,7 @@ function normalizeMemeConfig(raw = {}) {
     cooldown: Math.max(0,Math.min(3600,Math.floor(Number(m.cooldown)||30))),
     allowText: m.allowText !== false, enabled: m.enabled !== false
   })).filter(m => m.id && m.mediaUrl);
-  return { enabled:raw.enabled===true, mode:['instant','trust','approval'].includes(raw.mode)?raw.mode:'trust', duration:Math.max(2,Math.min(20,Number(raw.duration)||6)), cost:Math.max(0,Number(raw.cost)||0), cooldown:Math.max(0,Math.min(3600,Number(raw.cooldown)||60)), size:Math.max(20,Math.min(100,Number(raw.size)||80)), position:['top','center','bottom'].includes(raw.position)?raw.position:'center', maxFileMb:Math.max(1,Math.min(5,Number(raw.maxFileMb)||5)), maxText:Math.max(0,Math.min(160,Number(raw.maxText)||100)), volume:0, items };
+  return { enabled:raw.enabled===true, mode:['instant','trust','approval'].includes(raw.mode)?raw.mode:'trust', duration:Math.max(2,Math.min(20,Number(raw.duration)||6)), cost:Math.max(0,raw.cost===undefined||Number(raw.cost)===0?75:Number(raw.cost)||75), cooldown:Math.max(0,Math.min(3600,Number(raw.cooldown)||60)), size:Math.max(20,Math.min(100,Number(raw.size)||80)), position:['top','center','bottom'].includes(raw.position)?raw.position:'center', maxFileMb:Math.max(1,Math.min(5,Number(raw.maxFileMb)||5)), maxText:Math.max(0,Math.min(160,Number(raw.maxText)||100)), volume:0, items };
 }
 async function getMemesConfig(tm) {
   try { return normalizeMemeConfig(JSON.parse(await tm.getSetting(MEMES_CONFIG_KEY, '{}'))); }
@@ -3412,7 +3417,7 @@ const memeTempDir=path.join(__dirname,'data','meme-temp');fs.mkdirSync(memeTempD
 const cleanupMemeFiles=()=>{for(const file of fs.readdirSync(memeTempDir)){const full=path.join(memeTempDir,file);try{if(Date.now()-fs.statSync(full).mtimeMs>86400000)fs.unlinkSync(full)}catch(_){}}};cleanupMemeFiles();setInterval(cleanupMemeFiles,3600000).unref();
 app.get('/meme-media/:file',(req,res)=>{const file=String(req.params.file||'').replace(/[^a-z0-9_.-]/gi,'');res.sendFile(path.join(memeTempDir,file))});
 app.get('/memes/:streamer',(req,res)=>res.sendFile(path.join(__dirname,'public','memes-submit.html')));
-app.get('/api/public/memes/:streamer/config',async(req,res)=>{const s=await db.getStreamerBySlug(tenant.normalizeSlug(req.params.streamer));if(!s)return res.status(404).json({error:'Chaîne inconnue'});const tm=createTenantManager({db,io,streamer:s,req});const c=await getMemesConfig(tm);res.json({data:{enabled:c.enabled,maxText:c.maxText,maxFileMb:c.maxFileMb,streamer:s.display_name||s.slug}})});
+app.get('/api/public/memes/:streamer/config',async(req,res)=>{res.set('Cache-Control','no-store, no-cache, must-revalidate');const s=await db.getStreamerBySlug(tenant.normalizeSlug(req.params.streamer));if(!s)return res.status(404).json({error:'Chaîne inconnue'});const tm=createTenantManager({db,io,streamer:s,req});const c=await getMemesConfig(tm);res.json({data:{enabled:c.enabled,maxText:c.maxText,maxFileMb:c.maxFileMb,cost:c.cost,streamer:s.display_name||s.slug}})});
 app.post('/api/public/memes/:streamer/submit',async(req,res)=>{try{const s=await db.getStreamerBySlug(tenant.normalizeSlug(req.params.streamer));if(!s)return res.status(404).json({error:'Chaîne inconnue'});const tm=createTenantManager({db,io,streamer:s,req}),cfg=await getMemesConfig(tm);if(!cfg.enabled)return res.status(403).json({error:'Widget désactivé'});const text=cleanMemeText(req.body?.text,cfg.maxText),data=String(req.body?.image||''),token=String(req.body?.token||'');const m=data.match(/^data:image\/(png|jpeg|gif|webp);base64,([A-Za-z0-9+/=]+)$/);if(!m)return res.status(400).json({error:'Image ou GIF invalide'});const bytes=Buffer.from(m[2],'base64');if(bytes.length>cfg.maxFileMb*1024*1024)return res.status(413).json({error:'Fichier trop volumineux'});if(text){const banned=await tenant.runWithStreamer(s,()=>db.checkBannedWords(text));if(banned)return res.status(400).json({error:'Texte refusé'})}const access=await db.consumeMemeAccessToken(token,s.id);if(!access)return res.status(401).json({error:'Lien expiré. Retape !meme dans le chat.'});const username=access.username,cooldownKey=`viewer:${s.id}:${username.toLowerCase()}`,remaining=Math.ceil(((memeCooldowns.get(cooldownKey)||0)-Date.now())/1000);if(remaining>0)return res.status(429).json({error:`Réessaie dans ${remaining}s`});const viewer=await tenant.runWithStreamer(s,()=>db.getViewer(username));if(cfg.cost>0&&(!viewer||Number(viewer.points||0)<cfg.cost))return res.status(400).json({error:`Il faut ${cfg.cost} points`});if(cfg.cost>0)await tenant.runWithStreamer(s,()=>db.addPoints(username,-cfg.cost,'meme_viewer'));const ext=m[1]==='jpeg'?'jpg':m[1],file=`${s.id}-${Date.now()}-${crypto.randomBytes(5).toString('hex')}.${ext}`;await fs.promises.writeFile(path.join(memeTempDir,file),bytes);const mediaUrl=`/meme-media/${file}`,trusted=!!access.trusted,instant=cfg.mode==='instant'||(cfg.mode==='trust'&&trusted),status=instant?'approved':'pending';const row=await db.createMemeSubmission(s.id,username,text,mediaUrl,status);memeCooldowns.set(cooldownKey,Date.now()+cfg.cooldown*1000);if(instant){await db.createMemeEvent(s.id,{username,text,mediaUrl,duration:cfg.duration,size:cfg.size,position:cfg.position,volume:0,at:new Date().toISOString()});tm.emit('meme-overlay-event',row)}res.json({success:true,status})}catch(e){res.status(500).json({error:e.message})}});
 app.get('/api/widgets/memes', async (req,res) => {
   try { if(req.overlayTokenInvalid || req.overlayTokenRow?.widget !== 'memes') return res.status(404).json({error:'overlay_invalid'}); const tm=createTenantManager({db,io,req}); res.json({data:await getMemesConfig(tm),events:await db.getMemeEvents(tm.streamerId,req.query.after||0)}); }

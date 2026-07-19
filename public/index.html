@@ -1714,7 +1714,7 @@ Option 3" rows="4"></textarea><div style="display:flex;gap:6px;margin-top:10px">
         <h3>Configuration</h3>
         <label class="co-toggle-line"><span class="co-switch"><input type="checkbox" id="meme-enabled"><span></span></span><b>Activer les envois viewers</b></label>
         <div class="form-row" style="margin-top:12px"><div><label class="lbl">Mode</label><select class="inp" id="meme-mode"><option value="trust">Confiance</option><option value="instant">Instantané</option><option value="approval">Validation</option></select></div><div><label class="lbl">Durée d’affichage</label><input class="inp" id="meme-duration" type="number" min="2" max="20" value="6"></div></div>
-        <div class="form-row" style="margin-top:12px"><div><label class="lbl">Coût en points</label><input class="inp" id="meme-cost" type="number" min="0" value="0"></div><div><label class="lbl">Cooldown viewer (secondes)</label><input class="inp" id="meme-cooldown" type="number" min="0" max="3600" value="60"></div></div>
+        <div class="form-row" style="margin-top:12px"><div><label class="lbl">Coût en points</label><input class="inp" id="meme-cost" type="number" min="0" value="75"></div><div><label class="lbl">Cooldown viewer (secondes)</label><input class="inp" id="meme-cooldown" type="number" min="0" max="3600" value="60"></div></div>
         <div class="form-row" style="margin-top:12px"><div><label class="lbl">Taille à l’écran (%)</label><input class="inp" id="meme-size" type="number" min="20" max="100" value="80"></div><div><label class="lbl">Position</label><select class="inp" id="meme-position"><option value="center">Centre</option><option value="top">Haut</option><option value="bottom">Bas</option></select></div></div>
         <div class="form-row" style="margin-top:12px"><div><label class="lbl">Texte maximum</label><input class="inp" id="meme-max-text" type="number" min="0" max="160" value="100"></div><div><label class="lbl">Fichier maximum (Mo)</label><input class="inp" id="meme-max-file" type="number" min="1" max="5" value="5"></div></div>
         <button class="btnx btn-green" style="width:100%;justify-content:center;margin-top:12px" onclick="saveMemes()">💾 Enregistrer</button>
@@ -4612,6 +4612,8 @@ body.ref-theme-transition *:after{
             <input type="number" class="inp" id="points-interval" placeholder="5" min="1" style="width:100px">
             <span style="font-size:11px;color:var(--muted)">minutes</span>
           </div>
+          <label class="lbl">Points offerts à un nouveau viewer</label>
+          <input type="number" class="inp" id="points-starting" placeholder="100" min="0">
           <button class="btnx btn-outline" style="width:100%;justify-content:center;margin-top:12px" onclick="savePointsConfig()">💾 Enregistrer</button>
           <div id="points-config-msg" style="margin-top:7px"></div>
         </div>
@@ -4933,7 +4935,7 @@ async function resetSubCounterSession() {
 }
 
 let memeState={enabled:false,volume:70,maxText:80,items:[]};
-async function loadMemes(){try{const r=await fetch('/api/admin/memes',{cache:'no-store'}),j=await r.json();if(!r.ok)throw new Error(j.error||'Erreur');memeState=j.data.config||memeState;const set=(id,v)=>{const e=document.getElementById(id);if(e)e.value=v};document.getElementById('meme-enabled').checked=!!memeState.enabled;set('meme-mode',memeState.mode||'trust');set('meme-duration',memeState.duration||6);set('meme-cost',memeState.cost||0);set('meme-cooldown',memeState.cooldown||60);set('meme-size',memeState.size||80);set('meme-position',memeState.position||'center');set('meme-max-text',memeState.maxText||100);set('meme-max-file',memeState.maxFileMb||5);document.getElementById('memes-obs-url').textContent=j.data.overlayUrl||'';document.getElementById('memes-viewer-url').textContent=j.data.viewerUrl||'';loadMemePending()}catch(e){toast(e.message,false)}}
+async function loadMemes(){try{const r=await fetch('/api/admin/memes',{cache:'no-store'}),j=await r.json();if(!r.ok)throw new Error(j.error||'Erreur');memeState=j.data.config||memeState;const set=(id,v)=>{const e=document.getElementById(id);if(e)e.value=v};document.getElementById('meme-enabled').checked=!!memeState.enabled;set('meme-mode',memeState.mode||'trust');set('meme-duration',memeState.duration||6);set('meme-cost',memeState.cost??75);set('meme-cooldown',memeState.cooldown||60);set('meme-size',memeState.size||80);set('meme-position',memeState.position||'center');set('meme-max-text',memeState.maxText||100);set('meme-max-file',memeState.maxFileMb||5);document.getElementById('memes-obs-url').textContent=j.data.overlayUrl||'';document.getElementById('memes-viewer-url').textContent=j.data.viewerUrl||'';loadMemePending()}catch(e){toast(e.message,false)}}
 function renderMemeRows(){const root=document.getElementById('meme-list');if(!root)return;if(!memeState.items.length){root.innerHTML='<div style="padding:25px;text-align:center;color:var(--muted)">Aucun meme. Ajoute le premier pour commencer.</div>';return}root.innerHTML=memeState.items.map((m,i)=>`<div class="card" style="padding:12px"><div class="form-row"><div><label class="lbl">Nom de commande</label><input class="inp" value="${esc(m.id)}" oninput="memeField(${i},'id',this.value)" placeholder="rire"></div><div><label class="lbl">Titre</label><input class="inp" value="${esc(m.name)}" oninput="memeField(${i},'name',this.value)"></div></div><label class="lbl" style="margin-top:8px">URL image, GIF ou vidéo</label><input class="inp" value="${esc(m.mediaUrl)}" oninput="memeField(${i},'mediaUrl',this.value)" placeholder="https://..."><label class="lbl" style="margin-top:8px">URL du son (facultatif)</label><input class="inp" value="${esc(m.soundUrl||'')}" oninput="memeField(${i},'soundUrl',this.value)" placeholder="https://...mp3"><div class="form-row" style="margin-top:8px"><div><label class="lbl">Durée (secondes)</label><input class="inp" type="number" min="2" max="20" value="${m.duration}" oninput="memeField(${i},'duration',this.value)"></div><div><label class="lbl">Coût en points</label><input class="inp" type="number" min="0" value="${m.cost}" oninput="memeField(${i},'cost',this.value)"></div><div><label class="lbl">Cooldown (secondes)</label><input class="inp" type="number" min="0" value="${m.cooldown}" oninput="memeField(${i},'cooldown',this.value)"></div></div><div style="display:flex;gap:8px;align-items:center;margin-top:10px"><label><input type="checkbox" ${m.allowText!==false?'checked':''} onchange="memeField(${i},'allowText',this.checked)"> Texte personnalisé</label><label><input type="checkbox" ${m.enabled!==false?'checked':''} onchange="memeField(${i},'enabled',this.checked)"> Actif</label><span style="flex:1"></span><button class="btnx btn-outline btn-sm" onclick="testMeme(${i})">▶ Tester</button><button class="btnx btn-red btn-sm" onclick="deleteMeme(${i})">Supprimer</button></div></div>`).join('')}
 function memeField(i,k,v){if(['duration','cost','cooldown'].includes(k))v=Number(v)||0;memeState.items[i][k]=v}
 function addMemeRow(){memeState.items.push({id:'nouveau',name:'Nouveau meme',mediaUrl:'',soundUrl:'',duration:6,cost:0,cooldown:30,allowText:true,enabled:true});renderMemeRows()}
@@ -9741,17 +9743,20 @@ async function loadPointsConfig() {
     const d = await r.json();
     const amountEl = document.getElementById('points-amount');
     const intervalEl = document.getElementById('points-interval');
-    if (amountEl) amountEl.value = d.pointsAmount || 10;
-    if (intervalEl) intervalEl.value = d.intervalMinutes || 5;
+    const startingEl = document.getElementById('points-starting');
+    if (amountEl) amountEl.value = d.pointsAmount || 5;
+    if (intervalEl) intervalEl.value = d.intervalMinutes || 10;
+    if (startingEl) startingEl.value = d.startingPoints ?? 100;
   } catch(e) {}
 }
 
 async function savePointsConfig() {
   const pointsAmount = document.getElementById('points-amount').value;
   const intervalMinutes = document.getElementById('points-interval').value;
+  const startingPoints = document.getElementById('points-starting').value;
   const r = await fetch('/api/admin/points/config', {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ pointsAmount, intervalMinutes })
+    body: JSON.stringify({ pointsAmount, intervalMinutes, startingPoints })
   });
   const json = await r.json();
   if (!r.ok) return showInline('points-config-msg', json.error || 'Erreur', false);
@@ -9770,8 +9775,8 @@ async function loadConfigPoints() {
     const d = await r.json();
     const amountEl = document.getElementById('cfg-points-amount');
     const intervalEl = document.getElementById('cfg-points-interval');
-    if (amountEl) amountEl.value = d.pointsAmount || 10;
-    if (intervalEl) intervalEl.value = d.intervalMinutes || 5;
+    if (amountEl) amountEl.value = d.pointsAmount || 5;
+    if (intervalEl) intervalEl.value = d.intervalMinutes || 10;
   } catch(e) {}
 }
 
