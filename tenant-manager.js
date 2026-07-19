@@ -51,7 +51,8 @@ class TenantManager {
       alerts: this.overlayUrl('widgets/alerts.html'),
       chat: this.overlayUrl('widgets/chat.html'),
       songrequest: this.overlayUrl('widgets/songrequest.html'),
-      subgoal: this.overlayUrl('widgets/subgoal.html')
+      subgoal: this.overlayUrl('widgets/subgoal.html'),
+      memes: this.overlayUrl('widgets/memes.html')
     };
   }
 

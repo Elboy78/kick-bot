@@ -176,6 +176,12 @@ async function initSchema() {
       last_used_at TEXT,
       UNIQUE(streamer_id, widget)
     )`,
+    `CREATE TABLE IF NOT EXISTS meme_events (
+      id          INTEGER PRIMARY KEY AUTOINCREMENT,
+      streamer_id INTEGER NOT NULL,
+      payload     TEXT NOT NULL,
+      created_at  TEXT NOT NULL DEFAULT (datetime('now'))
+    )`,
     `CREATE TABLE IF NOT EXISTS viewers (
       id            INTEGER PRIMARY KEY AUTOINCREMENT,
       streamer_id   INTEGER NOT NULL DEFAULT 1,
@@ -2087,10 +2093,18 @@ async function setStreamerSetting(streamerId, key, value) {
     [streamerId, key, String(value ?? ''), String(value ?? '')]
   );
 }
+async function createMemeEvent(streamerId, payload) {
+  const result = await run(`INSERT INTO meme_events (streamer_id, payload, created_at) VALUES (?, ?, CURRENT_TIMESTAMP)`, [Number(streamerId), JSON.stringify(payload || {})]);
+  return { ...payload, id:Number(result?.lastInsertRowid || 0) };
+}
+async function getMemeEvents(streamerId, afterId = 0) {
+  const rows = await all(`SELECT id, payload, created_at FROM meme_events WHERE streamer_id = ? AND id > ? AND created_at >= datetime('now','-10 minutes') ORDER BY id ASC LIMIT 30`, [Number(streamerId), Math.max(0,Number(afterId)||0)]);
+  return rows.map(row => { try { return { ...JSON.parse(row.payload), id:row.id, createdAt:row.created_at }; } catch (_) { return null; } }).filter(Boolean);
+}
 
 function normalizeOverlayWidget(widget) {
   const w = String(widget || '').toLowerCase().replace(/\.html$/,'').replace(/[^a-z0-9_-]/g, '');
-  const allowed = new Set(['songrequest','chat','subgoal','alerts']);
+  const allowed = new Set(['songrequest','chat','subgoal','alerts','memes']);
   return allowed.has(w) ? w : '';
 }
 function createOverlayTokenValue() {
@@ -2134,7 +2148,7 @@ async function getOverlayTokenByValue(token) {
 }
 async function getOverlayTokensForStreamer(streamerId) {
   const sid = Number(streamerId || scopedStreamerId() || 1);
-  const widgets = ['songrequest','chat','subgoal','alerts'];
+  const widgets = ['songrequest','chat','subgoal','alerts','memes'];
   const out = {};
   for (const w of widgets) out[w] = await getOrCreateOverlayToken(sid, w);
   return out;
@@ -2312,4 +2326,5 @@ module.exports = {
   ensureDefaultStreamer, getStreamerBySlug, getStreamerById, getStreamerByBroadcasterUserId, listStreamers, setStreamerPlan, upsertStreamer, updateStreamerKickMeta, getActiveStreamersForBot,
   ensureBotIdentities, getBotIdentityById, getBotIdentityByKey, getAssignedBotIdentity, getBotAssignmentOptions, assignBotIdentity, connectCustomBotIdentity, markBotIdentityConnected, markBotIdentityAuthorizationRequired, enableStreamersForBotIdentity,
   getStreamerSetting, setStreamerSetting, getOrCreateOverlayToken, regenerateOverlayToken, getOverlayTokenByValue, getOverlayTokensForStreamer, saveOAuthTokenForStreamer, getOAuthTokenForStreamer, deleteOAuthTokenForStreamer,
+  createMemeEvent, getMemeEvents,
 };

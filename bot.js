@@ -39,6 +39,7 @@ let announcementIntervals = {};
 let streamStartTime = null;
 let lastFollowerCount = 0;
 let followerCheckInterval = null;
+const memeCooldowns = new Map();
 
 
 // V2 Core : BotManager multi-chaînes.
@@ -539,6 +540,37 @@ async function handleChatMessageScoped(payload, ctx = null) {
 
   const parts = content.trim().split(' ');
   const cmd   = parts[0].toLowerCase();
+
+  // Memes interactifs — configuration et diffusion gérées par le panel du tenant.
+  if (cmd === '!meme') {
+    const meme = String(parts[1] || '').trim();
+    const text = parts.slice(2).join(' ').trim();
+    if (!meme) return sendChat(`@${username} Utilisation : !meme <nom> [texte]`);
+    try {
+      const context = currentChatContext();
+      const raw = await db.getStreamerSetting(context?.streamerId, 'memes_config_v1', '{}');
+      let cfg={}; try { cfg=JSON.parse(raw||'{}'); } catch (_) {}
+      if (cfg.enabled !== true) return sendChat(`@${username} Les memes sont désactivés sur cette chaîne.`);
+      const key=String(meme).toLowerCase().replace(/[^a-z0-9_-]/g,'');
+      const item=(Array.isArray(cfg.items)?cfg.items:[]).find(x=>x.enabled!==false&&(String(x.id).toLowerCase()===key||String(x.name).toLowerCase()===String(meme).toLowerCase()));
+      if (!item) return sendChat(`@${username} Meme introuvable.`);
+      const cdKey=`${context?.streamerId}:${item.id}`, remaining=Math.ceil(((memeCooldowns.get(cdKey)||0)-Date.now())/1000);
+      if (remaining>0) return sendChat(`@${username} Ce meme revient dans ${remaining}s.`);
+      const cost=Math.max(0,Number(item.cost)||0);
+      if(cost){const viewer=await db.getViewer(username);if(!viewer||Number(viewer.points||0)<cost)return sendChat(`@${username} Il faut ${cost} points.`);await db.addPoints(username,-cost,`meme:${item.id}`)}
+      const cleanText=String(item.allowText===false?'':text).replace(/[<>\u0000-\u001f]/g,' ').replace(/\s+/g,' ').trim().slice(0,Math.max(0,Math.min(120,Number(cfg.maxText)||80)));
+      if(cleanText){const banned=await db.checkBannedWords(cleanText);if(banned)return sendChat(`@${username} Ce texte n'est pas autorisé.`)}
+      memeCooldowns.set(cdKey,Date.now()+Math.max(0,Number(item.cooldown)||30)*1000);
+      const payload={memeId:item.id,name:item.name,username:String(username).slice(0,60),text:cleanText,mediaUrl:item.mediaUrl,soundUrl:item.soundUrl||'',duration:Math.max(2,Math.min(20,Number(item.duration)||6)),volume:Math.max(0,Math.min(100,Number(cfg.volume)||70)),at:new Date().toISOString()};
+      await db.createMemeEvent(context.streamerId,payload);
+      const result = {ok:true};
+      if (result?.error) return sendChat(`@${username} ${result.error}`);
+      return;
+    } catch (e) {
+      console.error('[MEMES] Erreur commande:', e.message);
+      return sendChat(`@${username} Meme indisponible pour le moment.`);
+    }
+  }
 
   // Song Request V2 — scoping par streamer via le contexte chat courant.
   // Chaque chaîne a sa propre file d'attente et ses propres réglages.
