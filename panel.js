@@ -2491,7 +2491,7 @@ app.get('/auth/callback', async (req, res) => {
       if (!streamer) throw new Error('Streamer de destination introuvable.');
       let identity;
       if (botType === 'elbot') {
-        if (tenant.normalizeSlug(username) !== 'elbot') throw new Error(`Le compte connecté est ${username}. Connecte obligatoirement le compte Kick ElBot.`);
+        if (tenant.normalizeSlug(username) !== 'eibotapp') throw new Error(`Le compte connecté est ${username}. Connecte obligatoirement le compte Kick EIBotApp.`);
         identity = await db.getBotIdentityById(token.meta?.identityId) || await db.getBotIdentityByKey('elbot');
         if (!identity || identity.bot_key !== 'elbot') throw new Error('Identité ElBot invalide.');
         await db.saveOAuthToken(identity.oauth_provider, token.accessToken, token.refreshToken, token.expiresAt);
