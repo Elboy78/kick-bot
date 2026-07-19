@@ -3360,7 +3360,7 @@ function normalizeMemeConfig(raw = {}) {
     allowText: m.allowText !== false, enabled: m.enabled !== false
   })).filter(m => m.id && m.mediaUrl);
   const positions=['top-left','top','top-right','left','center','right','bottom-left','bottom','bottom-right'];
-  return { enabled:raw.enabled===true, mode:['instant','trust','approval'].includes(raw.mode)?raw.mode:'trust', duration:Math.max(2,Math.min(20,Number(raw.duration)||6)), cost:Math.max(0,raw.cost===undefined||Number(raw.cost)===0?75:Number(raw.cost)||75), cooldown:Math.max(0,Math.min(3600,Number(raw.cooldown)||60)), size:Math.max(20,Math.min(100,Number(raw.size)||80)), position:positions.includes(raw.position)?raw.position:'center', maxFileMb:Math.max(1,Math.min(15,Number(raw.maxFileMb)||15)), maxText:Math.max(0,Math.min(160,Number(raw.maxText)||100)), volume:0, items };
+  return { enabled:raw.enabled===true, mode:['instant','trust','approval'].includes(raw.mode)?raw.mode:'trust', duration:Math.max(2,Math.min(20,Number(raw.duration)||6)), cost:Math.max(0,raw.cost===undefined?75:Number(raw.cost)||0), cooldown:Math.max(0,Math.min(3600,raw.cooldown===undefined?60:Number(raw.cooldown)||0)), size:Math.max(20,Math.min(100,Number(raw.size)||80)), position:positions.includes(raw.position)?raw.position:'center', maxFileMb:Math.max(1,Math.min(15,Number(raw.maxFileMb)||15)), maxText:Math.max(0,Math.min(160,raw.maxText===undefined?100:Number(raw.maxText)||0)), volume:0, items };
 }
 async function getMemesConfig(tm) {
   try { return normalizeMemeConfig(JSON.parse(await tm.getSetting(MEMES_CONFIG_KEY, '{}'))); }
