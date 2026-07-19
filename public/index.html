@@ -538,6 +538,7 @@ body.light .card,body.light .panel,body.light .widget-engine-card{background:lin
   <nav class="menu">
     <a class="active" onclick="showPage('dashboard')">🏠 Dashboard</a>
     <a onclick="showPage('classement')">🏆 Classement</a>
+    <a onclick="showPage('communaute')">🤝 Communauté</a>
     <a onclick="showPage('config-classement')">🎚️ Config Classement</a>
 
     <div class="menu-section">Outils</div>
@@ -811,7 +812,8 @@ body.light .card,body.light .panel,body.light .widget-engine-card{background:lin
   <!-- ══ CLASSEMENT ══ -->
   <div class="page" id="page-classement">
     <div class="header"><div><h1>Classement</h1><p>Top viewers et niveaux</p></div><div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn" onclick="copyPublicLeaderboardLink()">🔗 Copier le lien public</button><button class="btn" onclick="refreshLeaderboard()">↻ Actualiser</button></div></div>
-    <div class="panel" style="margin-bottom:14px">
+    <div class="g2" style="align-items:start;margin-bottom:14px">
+    <div class="panel">
       <h3>🏆 Classement complet
         <span style="display:flex;gap:6px">
           <input type="text" class="inp inp-sm" id="lb-search" placeholder="Filtrer…" oninput="filterLB()" style="width:130px">
@@ -821,6 +823,28 @@ body.light .card,body.light .panel,body.light .widget-engine-card{background:lin
       <div class="tw"><table><thead><tr><th>#</th><th>Viewer</th><th>Niveau</th><th>Points</th><th>Temps regardé</th><th>Vu il y a</th></tr></thead><tbody id="lb-body"><tr><td colspan="6"><div class="empty"><p>Chargement…</p></div></td></tr></tbody></table></div>
     </div>
     <div class="panel"><h3>⭐ Niveaux</h3><div class="g3" id="levels-grid"></div></div>
+  </div>
+  </div>
+
+  <!-- ══ COMMUNAUTÉ ══ -->
+  <div class="page" id="page-communaute">
+    <div class="header"><div><h1>Communauté</h1><p>Mémoire de la chaîne, soutiens et followers connus</p></div><button class="btn" onclick="loadCommunity()">↻ Actualiser</button></div>
+    <div class="g3" style="margin-bottom:14px">
+      <div class="panel"><h3>👥 Viewers connus</h3><div id="community-known-viewers" style="font-size:28px;font-weight:900;color:var(--accent)">—</div></div>
+      <div class="panel"><h3>💚 Follows datés</h3><div id="community-known-followers" style="font-size:28px;font-weight:900;color:#22c55e">—</div></div>
+      <div class="panel"><h3>⭐ Subs identifiés</h3><div id="community-current-subs" style="font-size:28px;font-weight:900;color:#f59e0b">—</div></div>
+    </div>
+    <div class="g2" style="align-items:start;margin-bottom:14px">
+    <div class="panel">
+      <h3>💜 Classement des soutiens <small style="color:var(--muted);font-weight:500">all time Kick + événements ElBot</small></h3>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px"><input class="inp inp-sm" id="community-support-search" placeholder="Rechercher un pseudo…" oninput="communitySupportPage=1;renderCommunitySupporters()" style="max-width:240px"><select class="inp inp-sm" id="community-support-sort" onchange="communitySupportPage=1;renderCommunitySupporters()" style="max-width:220px"><option value="gifts">Plus de subs offerts</option><option value="channel-oldest">Plus ancien de la chaîne</option><option value="support">Plus de soutiens</option><option value="months">Plus ancien sub</option><option value="recent">Soutien le plus récent</option><option value="name">Pseudo A–Z</option></select><button class="btnx btn-ghost btn-sm" id="community-deep-sync" onclick="syncKickFullGiftHistory()">Importer plus d’historique</button><span id="community-kick-sync" style="align-self:center;color:var(--muted);font-size:11px"></span></div>
+      <div class="tw"><table><thead><tr><th>#</th><th>Viewer</th><th>Subs offerts</th><th>Ancienneté</th><th>Follow depuis</th><th>Dernier soutien</th></tr></thead><tbody id="community-supporters"><tr><td colspan="6"><div class="empty"><p>Chargement…</p></div></td></tr></tbody></table></div>
+      <div id="community-support-pagination" style="display:flex;justify-content:center;align-items:center;gap:8px;margin-top:12px"></div>
+    </div>
+    <div class="panel"><h3>💚 Followers connus</h3><div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px"><input class="inp inp-sm" id="community-follow-search" placeholder="Rechercher un pseudo…" oninput="communityFollowPage=1;renderCommunityFollowers()"><select class="inp inp-sm" id="community-follow-sort" onchange="communityFollowPage=1;renderCommunityFollowers()"><option value="oldest">Plus anciens</option><option value="newest">Plus récents</option><option value="name">Pseudo A–Z</option></select></div><div class="tw"><table><thead><tr><th>Viewer</th><th>Follow depuis</th></tr></thead><tbody id="community-followers"></tbody></table></div><div id="community-follow-pagination" style="display:flex;justify-content:center;align-items:center;gap:8px;margin-top:12px"></div></div>
+    </div>
+    <div class="panel"><h3>🕘 Derniers événements</h3><div id="community-events" style="display:grid;gap:8px;max-height:360px;overflow:auto"></div></div>
+    <div class="panel" style="margin-top:14px;color:var(--muted);font-size:11px;line-height:1.6">Les données antérieures sont reconstruites depuis les informations déjà connues par ElBot. Une date inconnue n’est jamais inventée. Les nouveaux follows, subs, renouvellements et gifts sont enregistrés automatiquement et isolés pour cette chaîne.</div>
   </div>
 
   <!-- ══ CONFIG CLASSEMENT ══ -->
@@ -4681,7 +4705,7 @@ if (typeof window.io === 'function') {
 const MEDALS = ['🥇','🥈','🥉'];
 try { document.querySelectorAll('#settings-channel-name').forEach(el => el.textContent = CURRENT_STREAMER_SLUG || 'connecté'); } catch(e) {}
 let lbData = [], levels = [];
-const PAGE_TITLES = {dashboard:'Dashboard',classement:'Classement',lobby:'Lobby',jeux:'Jeux',objectifs:'Objectifs',dbd:'Dead by Daylight',moderation:'Modération',commands:'Commandes',historique:'Historique',admin:'Administration',settings:'Paramètres',outils:'Outils Chat',alertes:'Alertes'};
+const PAGE_TITLES = {dashboard:'Dashboard',classement:'Classement',communaute:'Communauté',lobby:'Lobby',jeux:'Jeux',objectifs:'Objectifs',dbd:'Dead by Daylight',moderation:'Modération',commands:'Commandes',historique:'Historique',admin:'Administration',settings:'Paramètres',outils:'Outils Chat',alertes:'Alertes'};
 let songRequestRefreshTimer = null;
 
 // ── Navigation ─────────────────────────────────────────────────────────────────
@@ -4888,6 +4912,7 @@ function showPage(name) {
     if(t.getAttribute('onclick') === "showPage('"+name+"')") t.classList.add('active');
   });
   if(name==='classement') loadLeaderboard();
+  if(name==='communaute') loadCommunity();
   if(name==='config-classement') loadConfigClassement();
   if(name==='jeux') { loadDuels(); loadGiveaways(); loadActiveGiveaway(); }
   if(name==='objectifs') loadObjectives();
@@ -5152,6 +5177,129 @@ async function loadLeaderboard() {
     lbData = await get('/api/leaderboard?limit='+limit) || [];
     renderLB(lbData);
   } catch(e){}
+}
+
+function communityDate(value, unknown = 'Date inconnue') {
+  if (!value || value === 'NOT_FOLLOWING') return unknown;
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? unknown : date.toLocaleDateString('fr-FR', { day:'2-digit', month:'2-digit', year:'numeric' });
+}
+
+async function loadCommunity() {
+  const supportersBody = document.getElementById('community-supporters');
+  try {
+    const data = await get('/api/community?limit=500') || {};
+    const totals = data.totals || {};
+    document.getElementById('community-known-viewers').textContent = Number(totals.known_viewers || 0).toLocaleString('fr-FR');
+    document.getElementById('community-known-followers').textContent = Number(totals.known_followers || 0).toLocaleString('fr-FR');
+    document.getElementById('community-current-subs').textContent = Number(totals.current_subscribers || 0).toLocaleString('fr-FR');
+
+    const supporterMap = new Map((data.supporters || []).map(item => [String(item.username || '').toLowerCase(), { ...item }]));
+    for (const historical of data.historicalSupporters || []) {
+      const key = String(historical.username || '').toLowerCase();
+      if (!supporterMap.has(key)) supporterMap.set(key, { username:historical.username, gifts:historical.gifts_all_time, renewals:0, new_subs:0, max_months:0, last_support:null, kickHistorical:true });
+      else { supporterMap.get(key).gifts = Math.max(Number(supporterMap.get(key).gifts || 0), Number(historical.gifts_all_time || 0)); supporterMap.get(key).kickHistorical = true; }
+    }
+    for (const current of data.currentSubscribers || []) {
+      const key = String(current.username || '').toLowerCase();
+      if (!supporterMap.has(key)) supporterMap.set(key, { username:current.username, gifts:0, renewals:0, new_subs:0, max_months:current.subscribed_for || 0, last_support:null, events:0, reconstructed:true });
+      else supporterMap.get(key).max_months = Math.max(Number(supporterMap.get(key).max_months || 0), Number(current.subscribed_for || 0));
+    }
+    communityFollowers = data.followers || [];
+    const followerDates = new Map(communityFollowers.map(item => [String(item.username || '').toLowerCase(), item.following_since]));
+    communitySupporters = [...supporterMap.values()].map(item => ({ ...item, following_since:followerDates.get(String(item.username || '').toLowerCase()) || null }));
+    renderCommunitySupporters();
+    renderCommunityFollowers();
+
+    const labels = { follow:'💚 Nouveau follow', new:'⭐ Nouveau sub', renewal:'🔄 Renouvellement', gift:'🎁 Subs offerts' };
+    const eventsEl = document.getElementById('community-events');
+    eventsEl.innerHTML = (data.events || []).length ? data.events.map(item => `<div style="padding:10px 12px;border:1px solid var(--border);border-radius:10px;background:var(--surface2)"><div style="display:flex;justify-content:space-between;gap:8px"><strong>${labels[item.type] || esc(item.type)}</strong><small style="color:var(--muted)">${communityDate(item.at)}</small></div><div style="margin-top:4px;color:var(--text)">${esc(item.username || item.gifter || 'Anonyme')}${item.type==='gift' ? ` · ${Number(item.count||1)} gifts` : ''}${item.months ? ` · ${Number(item.months)} mois` : ''}</div><small style="color:var(--muted)">${item.source === 'legacy_subcounter' ? 'Historique récupéré' : 'Détecté par ElBot'}</small></div>`).join('') : '<div class="empty"><p>Aucun événement enregistré</p></div>';
+    if (!communityKickSyncDone) await syncKickHistoricalGiftLeaderboard();
+  } catch (e) {
+    if (supportersBody) supportersBody.innerHTML = '<tr><td colspan="6"><div class="empty"><p>Historique indisponible</p></div></td></tr>';
+  }
+}
+
+let communitySupporters = [], communityFollowers = [], communitySupportPage = 1, communityFollowPage = 1, communityKickSyncDone = false;
+const COMMUNITY_PAGE_SIZE = 25;
+function communityPager(id, page, total, setter) {
+  const pages = Math.max(1, Math.ceil(total / COMMUNITY_PAGE_SIZE)); page = Math.min(page, pages);
+  document.getElementById(id).innerHTML = total > COMMUNITY_PAGE_SIZE ? `<button class="btnx btn-ghost btn-sm" ${page<=1?'disabled':''} onclick="${setter}(${page-1})">←</button><span style="color:var(--muted);font-size:11px">Page ${page} / ${pages} · ${total} résultats</span><button class="btnx btn-ghost btn-sm" ${page>=pages?'disabled':''} onclick="${setter}(${page+1})">→</button>` : `<span style="color:var(--muted);font-size:11px">${total} résultat${total>1?'s':''}</span>`;
+}
+function setCommunitySupportPage(page){ communitySupportPage=page; renderCommunitySupporters(); }
+function setCommunityFollowPage(page){ communityFollowPage=page; renderCommunityFollowers(); }
+function renderCommunitySupporters(){
+  const q=String(document.getElementById('community-support-search')?.value||'').trim().toLowerCase(), sort=document.getElementById('community-support-sort')?.value||'gifts';
+  let rows=communitySupporters.filter(x=>String(x.username||'').toLowerCase().includes(q));
+  const score=x=>Number(x.gifts||0)+Number(x.renewals||0)+Number(x.new_subs||0);
+  rows.sort((a,b)=>sort==='gifts'?Number(b.gifts||0)-Number(a.gifts||0):sort==='channel-oldest'?String(a.following_since||'9999').localeCompare(String(b.following_since||'9999')):sort==='support'?score(b)-score(a):sort==='months'?Number(b.max_months||0)-Number(a.max_months||0):sort==='recent'?String(b.last_support||'').localeCompare(String(a.last_support||'')):String(a.username||'').localeCompare(String(b.username||''),'fr'));
+  const start=(communitySupportPage-1)*COMMUNITY_PAGE_SIZE, visible=rows.slice(start,start+COMMUNITY_PAGE_SIZE);
+  document.getElementById('community-supporters').innerHTML=visible.length?visible.map((x,i)=>`<tr><td><span class="rank-num">#${start+i+1}</span></td><td style="font-weight:700">${esc(x.username||'Anonyme')}${x.kickHistorical?' <small style="color:#22c55e">Kick</small>':''}</td><td style="font-weight:800;color:var(--accent)">${Number(x.gifts||0)}</td><td>${Number(x.max_months||0)?Number(x.max_months)+' mois':'—'}</td><td style="color:#22c55e">${communityDate(x.following_since)}</td><td style="color:var(--muted)">${communityDate(x.last_support)}</td></tr>`).join(''):'<tr><td colspan="6"><div class="empty"><p>Aucun résultat</p></div></td></tr>';
+  communityPager('community-support-pagination',communitySupportPage,rows.length,'setCommunitySupportPage');
+}
+function renderCommunityFollowers(){
+  const q=String(document.getElementById('community-follow-search')?.value||'').trim().toLowerCase(), sort=document.getElementById('community-follow-sort')?.value||'oldest';
+  let rows=communityFollowers.filter(x=>String(x.username||'').toLowerCase().includes(q));
+  rows.sort((a,b)=>sort==='oldest'?String(a.following_since||'').localeCompare(String(b.following_since||'')):sort==='newest'?String(b.following_since||'').localeCompare(String(a.following_since||'')):String(a.username||'').localeCompare(String(b.username||''),'fr'));
+  const start=(communityFollowPage-1)*COMMUNITY_PAGE_SIZE, visible=rows.slice(start,start+COMMUNITY_PAGE_SIZE);
+  document.getElementById('community-followers').innerHTML=visible.length?visible.map(x=>`<tr><td style="font-weight:700">${esc(x.username)}</td><td style="color:#22c55e">${communityDate(x.following_since)}</td></tr>`).join(''):'<tr><td colspan="2"><div class="empty"><p>Aucun résultat</p></div></td></tr>';
+  communityPager('community-follow-pagination',communityFollowPage,rows.length,'setCommunityFollowPage');
+}
+async function syncKickHistoricalGiftLeaderboard(){
+  communityKickSyncDone=true; const status=document.getElementById('community-kick-sync');
+  const slug=String(activeKickChannel||CURRENT_STREAMER_SLUG||'').trim().toLowerCase(); if(!slug)return;
+  try{
+    if(status)status.textContent='Synchronisation all time Kick…';
+    const response=await fetch(`https://kick.com/api/v2/channels/${encodeURIComponent(slug)}/leaderboards`,{headers:{Accept:'application/json'},cache:'no-store'}); if(!response.ok)throw new Error('Kick '+response.status);
+    const payload=await response.json(); const candidates=[payload?.gifts,payload?.data?.gifts,payload?.gifted_subscriptions,payload?.data?.gifted_subscriptions,payload?.all_time,payload?.data?.all_time];
+    const raw=candidates.find(Array.isArray)||[]; const rows=raw.map(x=>({username:x?.username||x?.user?.username||x?.user?.name||x?.name,quantity:Number(x?.quantity??x?.count??x?.gifts??0)})).filter(x=>x.username&&x.quantity>0);
+    if(!rows.length)throw new Error('format Kick inconnu');
+    const saved=await fetch(API+'/api/admin/community/kick-gifts-import',{method:'POST',headers:{'Content-Type':'application/json','x-panel-key':getKey()},body:JSON.stringify({rows})}); if(!saved.ok)throw new Error('import refusé');
+    if(status)status.textContent=`✓ ${rows.length} gifters all time synchronisés`; setTimeout(loadCommunity,300);
+  }catch(e){if(status)status.textContent='Historique Kick conservé · synchronisation indisponible';}
+}
+
+function extractKickGiftEvents(payload, totals = new Map()) {
+  const visit = value => {
+    if (Array.isArray(value)) return value.forEach(visit);
+    if (!value || typeof value !== 'object') return;
+    const type = String(value.event_type || value.type || value.event || value.name || value.class || '').toLowerCase();
+    if (type.includes('gift') && (type.includes('sub') || value.gifter || value.gift_count || value.quantity)) {
+      const user = value.gifter || value.user || value.sender || value.data?.gifter || value.data?.user || {};
+      const username = String(user.username || user.name || value.gifter_username || value.username || '').trim().toLowerCase();
+      const count = Math.max(1, Number(value.quantity || value.gift_count || value.count || value.amount || value.data?.quantity || value.data?.gift_count || value.data?.count || 1) || 1);
+      if (username) { totals.set(username, (totals.get(username) || 0) + count); return; }
+    }
+    Object.values(value).forEach(visit);
+  };
+  visit(payload); return totals;
+}
+
+async function syncKickFullGiftHistory(){
+  const button=document.getElementById('community-deep-sync'),status=document.getElementById('community-kick-sync');
+  const slug=String(activeKickChannel||CURRENT_STREAMER_SLUG||'').trim().toLowerCase(); if(!slug)return;
+  if(button){button.disabled=true;button.textContent='Import en cours…';}
+  const totals=new Map(),seen=new Set(); let pages=0;
+  try{
+    for(let page=1;page<=100;page++){
+      if(status)status.textContent=`Lecture de l’historique Kick · page ${page}`;
+      const response=await fetch(`https://kick.com/api/internal/v1/channels/${encodeURIComponent(slug)}/events?page=${page}`,{headers:{Accept:'application/json'},cache:'no-store'});
+      if(!response.ok)break;
+      const payload=await response.json(),signature=JSON.stringify(payload).slice(0,600);
+      if(!signature||seen.has(signature))break; seen.add(signature); pages++;
+      const before=totals.size; extractKickGiftEvents(payload,totals);
+      const list=Array.isArray(payload)?payload:(payload.data||payload.events||payload.items||[]);
+      if(!Array.isArray(list)||!list.length)break;
+      if(page%5===0)await new Promise(resolve=>setTimeout(resolve,120));
+    }
+    const rows=[...totals].map(([username,quantity])=>({username,quantity}));
+    if(rows.length){
+      const saved=await fetch(API+'/api/admin/community/kick-gifts-import',{method:'POST',headers:{'Content-Type':'application/json','x-panel-key':getKey()},body:JSON.stringify({rows})});
+      if(!saved.ok)throw new Error('import refusé');
+      if(status)status.textContent=`✓ ${rows.length} gifters récupérés sur ${pages} pages`; setTimeout(loadCommunity,250);
+    }else if(status)status.textContent='Aucun gift supplémentaire accessible dans l’historique Kick';
+  }catch(e){if(status)status.textContent='Import approfondi interrompu · données déjà trouvées conservées';}
+  finally{if(button){button.disabled=false;button.textContent='Importer plus d’historique';}}
 }
 
 async function copyPublicLeaderboardLink(){
@@ -10090,7 +10238,7 @@ async function syncOwnKickChatroomForBot() {
   } catch(e) { console.warn('[V2 BOT] Sync chatroom impossible:', e.message); }
 }
 setTimeout(syncOwnKickChatroomForBot, 1200);
-setInterval(syncOwnKickChatroomForBot, 5 * 60 * 1000);
+setInterval(() => { if (!document.hidden) syncOwnKickChatroomForBot(); }, 5 * 60 * 1000);
 
 
 </script>
@@ -11146,7 +11294,7 @@ window.addEventListener('pageshow', loadReferenceAppearance);
 </script>
 
 <!-- ElBot Theme Engine V2 — chargé en dernier pour rester prioritaire -->
-<link rel="stylesheet" href="/themes/engine.css?v=32">
+<link rel="stylesheet" href="/themes/engine.css?v=33">
 <script src="/theme-engine.js?v=32"></script>
 </body>
 </html>
