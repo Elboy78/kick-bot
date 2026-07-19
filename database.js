@@ -1323,8 +1323,11 @@ async function deleteOAuthToken(provider) {
 // ─── Bot Status (état partagé entre bot.js et panel.js) ───────────────────────
 
 async function setBotStatus(key, value) {
-  await run(`INSERT INTO bot_status (key, value, updated_at) VALUES (?, ?, datetime('now')) ON CONFLICT(key) DO UPDATE SET value = ?, updated_at = datetime('now')`,
-    [key, String(value), String(value)]);
+  // Inclure explicitement le tenant évite la réécriture automatique de
+  // l'INSERT (et reste compatible avec les anciennes bases migrées).
+  await run(`INSERT OR REPLACE INTO bot_status (streamer_id, key, value, updated_at)
+    VALUES (?, ?, ?, CURRENT_TIMESTAMP)`,
+    [scopedStreamerId(), key, String(value)]);
 }
 async function getBotStatus(key) {
   const r = await get(`SELECT value, updated_at FROM bot_status WHERE key = ?`, [key]);
