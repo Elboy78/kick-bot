@@ -16,7 +16,7 @@ class TenantManager {
     this.io = io;
     this.req = req;
     this.streamer = streamer || req?.streamer || null;
-    this.streamerId = this.streamer?.id || req?.streamerId || tenant.getCurrentStreamerId() || null;
+    this.streamerId = this.streamer?.id || this.streamer?.streamerId || this.streamer?.streamer_id || req?.streamerId || tenant.getCurrentStreamerId() || null;
     this.slug = tenant.normalizeSlug(this.streamer?.slug || req?.streamerSlug || tenant.getCurrentStreamerSlug());
     this.room = tenant.roomName(this.slug);
   }

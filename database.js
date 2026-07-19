@@ -20,7 +20,7 @@ function scopedStreamerId() { return getTenantStreamerId() || 1; }
 // silencieusement deux panels. Les tables d'identité plateforme restent
 // globales et utilisent leurs fonctions V2 dédiées.
 const TENANT_TABLES = new Set([
-  'viewers','points_log','stream_sessions','custom_commands','objectives','duels',
+  'viewers','points_log','stream_sessions','custom_commands','community_events','objectives','duels',
   'giveaways','lobby','panel_access','quotes','counters','timers','queue','polls',
   'shoutouts','announcements','banned_words','allowed_words','vod_moments',
   'chest_seasons','chests','moderation_logs','command_usage','chat_activity_daily',
@@ -186,6 +186,20 @@ async function initSchema() {
       points      INTEGER NOT NULL,
       reason      TEXT    NOT NULL DEFAULT 'watch_time',
       created_at  TEXT    NOT NULL DEFAULT (datetime('now'))
+    )`,
+    `CREATE TABLE IF NOT EXISTS community_events (
+      id          INTEGER PRIMARY KEY AUTOINCREMENT,
+      streamer_id INTEGER NOT NULL DEFAULT 1,
+      event_type  TEXT NOT NULL,
+      username    TEXT NOT NULL,
+      gifter      TEXT,
+      amount      INTEGER NOT NULL DEFAULT 1,
+      months      INTEGER,
+      occurred_at TEXT NOT NULL DEFAULT (datetime('now')),
+      source      TEXT NOT NULL DEFAULT 'elbot',
+      source_key  TEXT NOT NULL,
+      metadata    TEXT,
+      UNIQUE(streamer_id, source_key)
     )`,
     `CREATE TABLE IF NOT EXISTS stream_sessions (
       id            INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -1493,6 +1507,92 @@ async function addAnnouncement(message, interval_ms) {
   const r = await run(`INSERT INTO announcements (message, interval_ms) VALUES (?, ?)`, [message, interval_ms]);
   return Number(r?.lastInsertRowid ?? r?.lastInsertRowID ?? r?.lastInsertId);
 }
+
+async function getViewersMissingFollow(limit = 10) {
+  return all(`SELECT username FROM viewers
+    WHERE COALESCE(streamer_id, 1) = ? AND (following_since IS NULL OR subscribed_for IS NULL)
+    ORDER BY CASE WHEN last_seen IS NULL THEN 1 ELSE 0 END, last_seen DESC, first_seen ASC LIMIT ?`,
+    [scopedStreamerId(), Math.max(1, Math.min(50, parseInt(limit) || 10))]);
+}
+
+async function addCommunityEvent(event = {}, streamerId = null) {
+  const sid = Number(streamerId || scopedStreamerId());
+  const type = String(event.type || event.event_type || 'unknown').trim().toLowerCase();
+  const username = String(event.username || event.gifter || 'Anonyme').trim();
+  const occurredAt = event.occurredAt || event.occurred_at || new Date().toISOString();
+  const sourceKey = String(event.sourceKey || event.source_key || `${type}:${username.toLowerCase()}:${occurredAt}`);
+  await run(
+    `INSERT OR IGNORE INTO community_events
+      (streamer_id,event_type,username,gifter,amount,months,occurred_at,source,source_key,metadata)
+     VALUES (?,?,?,?,?,?,?,?,?,?)`,
+    [sid, type, username, event.gifter || null, Math.max(1, parseInt(event.amount || event.count || 1) || 1),
+     event.months ? Math.max(1, parseInt(event.months) || 1) : null, occurredAt,
+     event.source || 'elbot', sourceKey, event.metadata ? JSON.stringify(event.metadata) : null]
+  );
+  if (type === 'follow') {
+    await run(`INSERT INTO viewers (streamer_id,username,following_since,last_seen)
+      VALUES (?,?,?,?)
+      ON CONFLICT(streamer_id,username) DO UPDATE SET
+        following_since = COALESCE(viewers.following_since, excluded.following_since),
+        last_seen = COALESCE(viewers.last_seen, excluded.last_seen)`,
+      [sid, username.toLowerCase(), occurredAt, occurredAt]);
+  }
+}
+
+async function backfillCommunityHistory(streamerId = null) {
+  const sid = Number(streamerId || scopedStreamerId());
+  const row = await get(`SELECT value FROM streamer_settings WHERE streamer_id = ? AND key = 'subcounter_latest'`, [sid]);
+  let latest = [];
+  try { latest = JSON.parse(row?.value || '[]'); } catch(e) {}
+  for (const event of Array.isArray(latest) ? latest : []) {
+    await addCommunityEvent({
+      ...event,
+      amount: event.count || 1,
+      occurredAt: event.at,
+      source: 'legacy_subcounter',
+      sourceKey: `legacy-subcounter:${event.type}:${String(event.username || event.gifter || '').toLowerCase()}:${event.at || ''}`
+    }, sid);
+  }
+}
+
+async function getCommunityData(limit = 100, streamerId = null) {
+  const sid = Number(streamerId || scopedStreamerId());
+  await backfillCommunityHistory(sid);
+  const safeLimit = Math.max(10, Math.min(500, parseInt(limit) || 100));
+  const supporters = await all(`
+    SELECT LOWER(username) AS username,
+      SUM(CASE WHEN event_type = 'gift' THEN amount ELSE 0 END) AS gifts,
+      SUM(CASE WHEN event_type = 'renewal' THEN amount ELSE 0 END) AS renewals,
+      SUM(CASE WHEN event_type = 'new' THEN amount ELSE 0 END) AS new_subs,
+      MAX(CASE WHEN months IS NOT NULL THEN months ELSE 0 END) AS max_months,
+      MAX(occurred_at) AS last_support,
+      COUNT(*) AS events
+    FROM community_events
+    WHERE streamer_id = ? AND event_type IN ('new','renewal','gift')
+    GROUP BY LOWER(username)
+    ORDER BY (SUM(CASE WHEN event_type = 'gift' THEN amount ELSE 0 END) + COUNT(*)) DESC, last_support DESC
+    LIMIT ?`, [sid, safeLimit]);
+  const followers = await all(`
+    SELECT username, following_since, first_seen, last_seen, points, total_minutes,
+      CASE WHEN following_since IS NOT NULL AND following_since != 'NOT_FOLLOWING' THEN 'confirmed' ELSE 'unknown' END AS history_status
+    FROM viewers
+    WHERE COALESCE(streamer_id, 1) = ? AND following_since IS NOT NULL AND following_since != 'NOT_FOLLOWING'
+    ORDER BY following_since ASC
+    LIMIT ?`, [sid, safeLimit]);
+  const currentSubscribers = await all(`
+    SELECT username, subscribed_for, following_since, first_seen
+    FROM viewers
+    WHERE COALESCE(streamer_id, 1) = ? AND COALESCE(subscribed_for, 0) > 0
+    ORDER BY subscribed_for DESC LIMIT ?`, [sid, safeLimit]);
+  const events = await all(`SELECT event_type AS type,username,gifter,amount AS count,months,occurred_at AS at,source
+    FROM community_events WHERE streamer_id = ? ORDER BY occurred_at DESC LIMIT ?`, [sid, safeLimit]);
+  const totals = await get(`SELECT
+      COUNT(*) AS known_viewers,
+      SUM(CASE WHEN following_since IS NOT NULL AND following_since != 'NOT_FOLLOWING' THEN 1 ELSE 0 END) AS known_followers,
+      SUM(CASE WHEN COALESCE(subscribed_for,0) > 0 THEN 1 ELSE 0 END) AS current_subscribers
+    FROM viewers WHERE COALESCE(streamer_id,1) = ?`, [sid]);
+  return { totals: totals || {}, supporters, followers, currentSubscribers, events };
+}
 async function toggleAnnouncement(id, enabled) { await run(`UPDATE announcements SET enabled = ? WHERE id = ?`, [enabled ? 1 : 0, id]); }
 async function deleteAnnouncement(id) { await run(`DELETE FROM announcements WHERE id = ?`, [id]); }
 async function updateAnnouncementSent(id) { await run(`UPDATE announcements SET last_sent = datetime('now') WHERE id = ?`, [id]); }
@@ -1880,6 +1980,8 @@ async function migrateCoreScopedTables(defaultStreamerId = 1) {
   await migrateViewersToScopedUnique(defaultStreamerId);
   await migratePointsLogToScoped(defaultStreamerId);
   try { await run(`CREATE INDEX IF NOT EXISTS idx_custom_commands_streamer_trigger ON custom_commands(streamer_id, trigger)`); } catch(e) {}
+  try { await run(`CREATE INDEX IF NOT EXISTS idx_community_events_streamer_date ON community_events(streamer_id, occurred_at DESC)`); } catch(e) {}
+  try { await run(`CREATE INDEX IF NOT EXISTS idx_community_events_streamer_user ON community_events(streamer_id, username)`); } catch(e) {}
   try { await run(`CREATE INDEX IF NOT EXISTS idx_stream_sessions_streamer_started ON stream_sessions(streamer_id, started_at DESC)`); } catch(e) {}
   try { await run(`CREATE INDEX IF NOT EXISTS idx_command_usage_streamer_created ON command_usage(streamer_id, created_at DESC)`); } catch(e) {}
   try { await run(`CREATE INDEX IF NOT EXISTS idx_system_commands_streamer_trigger ON system_commands_state(streamer_id, trigger)`); } catch(e) {}
@@ -1913,7 +2015,8 @@ module.exports = {
   ensureInit,
   getDB,
   upsertViewer, addPoints, getViewer, getLeaderboard, getViewerRank,
-  getGlobalStats, getRecentLogs, getActiveViewers, clearAllPoints,
+  getGlobalStats, getRecentLogs, getActiveViewers, getViewersMissingFollow, clearAllPoints,
+  addCommunityEvent, backfillCommunityHistory, getCommunityData,
   getLevel, getNextLevel, getLevels, getRankingEngine, addLevel, updateLevel, deleteLevel,
   getCustomCommands, getCustomCommand, setCustomCommand, deleteCustomCommand, toggleCustomCommand,
   getObjectives, createObjective, deleteObjective, achieveObjective,

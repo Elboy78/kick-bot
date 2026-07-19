@@ -425,6 +425,17 @@ app.get('/api/leaderboard',    waitDB,    async (req,res) => {
   } catch(e){res.json({data:[]}); }
 });
 
+app.get('/api/community', waitDB, async (req, res) => {
+  try {
+    const limit = Math.max(10, Math.min(500, parseInt(req.query.limit || '100') || 100));
+    const data = await db.getCommunityData(limit, req.streamer?.id);
+    res.json({ data: { streamer: req.streamer?.slug, ...data } });
+  } catch (e) {
+    console.error('[COMMUNAUTÉ] Lecture impossible:', e.message);
+    res.status(500).json({ error: 'Historique communauté indisponible' });
+  }
+});
+
 app.get('/api/public/streamer/:streamer', waitDB, async (req, res) => {
   const requestedSlug = tenant.normalizeSlug(req.params.streamer);
   if (!req.streamer || req.streamer.slug !== requestedSlug) {
@@ -631,6 +642,15 @@ async function recordSubEvent(type, payload = {}, source = null) {
     }
 
     state.latest = [event, ...state.latest].slice(0, 12);
+    await db.addCommunityEvent({
+      type,
+      username: event.username,
+      gifter: event.gifter,
+      amount,
+      months: event.months,
+      occurredAt: event.at,
+      source: 'kick_event'
+    }, tm.streamerId);
     await Promise.all([
       tm.setSetting('subcounter_total', String(state.total)),
       tm.setSetting('subcounter_session', String(state.session)),
@@ -742,6 +762,11 @@ async function processKickEvent(eventTypeRaw, payload = {}) {
       data?.user?.name, data?.follower?.name,
       payload?.user?.username, payload?.username
     ) || 'quelqu\'un';
+
+    await db.addCommunityEvent({
+      type: 'follow', username, occurredAt: data?.created_at || payload?.created_at || new Date().toISOString(),
+      source: 'kick_event', sourceKey: `follow:${username.toLowerCase()}:${data?.created_at || payload?.created_at || eventDedupeKey(eventType, payload)}`
+    }, tm.streamerId);
 
     const enabled = await db.getSetting('follow_announce_enabled');
     // Synchronise aussi l'ancien réglage utilisé par le tracker followers de bot.js
@@ -951,13 +976,12 @@ app.post('/api/viewer/following-since', async (req, res) => {
   } catch(e) { res.status(500).json({ error: e.message }); }
 });
 
-// Liste des viewers actifs sans date de follow connue — le navigateur les résout
+// Liste de tous les viewers connus sans date de follow : le navigateur les résout
+// progressivement, y compris pour reconstruire l'historique antérieur au bot.
 app.get('/api/viewers/missing-follow', async (req, res) => {
   try {
-    const rows = await db.getDB().execute(
-      `SELECT username FROM viewers WHERE (following_since IS NULL OR subscribed_for IS NULL) AND last_seen >= datetime('now', '-2 hours') ORDER BY last_seen DESC LIMIT 10`
-    );
-    res.json({ data: rows.rows.map(r => r.username) });
+    const rows = await db.getViewersMissingFollow(10);
+    res.json({ data: rows.map(r => r.username) });
   } catch(e) { res.json({ data: [] }); }
 });
 app.get('/api/analytics/chat-week', async (req,res) => { try { res.json({data: await db.getChatActivityWeek()}); } catch(e) { res.json({data:[]}); }});

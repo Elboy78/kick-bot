@@ -538,6 +538,7 @@ body.light .card,body.light .panel,body.light .widget-engine-card{background:lin
   <nav class="menu">
     <a class="active" onclick="showPage('dashboard')">🏠 Dashboard</a>
     <a onclick="showPage('classement')">🏆 Classement</a>
+    <a onclick="showPage('communaute')">🤝 Communauté</a>
     <a onclick="showPage('config-classement')">🎚️ Config Classement</a>
 
     <div class="menu-section">Outils</div>
@@ -821,6 +822,25 @@ body.light .card,body.light .panel,body.light .widget-engine-card{background:lin
       <div class="tw"><table><thead><tr><th>#</th><th>Viewer</th><th>Niveau</th><th>Points</th><th>Temps regardé</th><th>Vu il y a</th></tr></thead><tbody id="lb-body"><tr><td colspan="6"><div class="empty"><p>Chargement…</p></div></td></tr></tbody></table></div>
     </div>
     <div class="panel"><h3>⭐ Niveaux</h3><div class="g3" id="levels-grid"></div></div>
+  </div>
+
+  <!-- ══ COMMUNAUTÉ ══ -->
+  <div class="page" id="page-communaute">
+    <div class="header"><div><h1>Communauté</h1><p>Mémoire de la chaîne, soutiens et followers connus</p></div><button class="btn" onclick="loadCommunity()">↻ Actualiser</button></div>
+    <div class="g3" style="margin-bottom:14px">
+      <div class="panel"><h3>👥 Viewers connus</h3><div id="community-known-viewers" style="font-size:28px;font-weight:900;color:var(--accent)">—</div></div>
+      <div class="panel"><h3>💚 Follows datés</h3><div id="community-known-followers" style="font-size:28px;font-weight:900;color:#22c55e">—</div></div>
+      <div class="panel"><h3>⭐ Subs identifiés</h3><div id="community-current-subs" style="font-size:28px;font-weight:900;color:#f59e0b">—</div></div>
+    </div>
+    <div class="panel" style="margin-bottom:14px">
+      <h3>💜 Classement des soutiens <small style="color:var(--muted);font-weight:500">historique reconstruit et futurs événements</small></h3>
+      <div class="tw"><table><thead><tr><th>#</th><th>Viewer</th><th>Nouveaux subs</th><th>Renouvellements</th><th>Subs offerts</th><th>Ancienneté max</th><th>Dernier soutien</th></tr></thead><tbody id="community-supporters"><tr><td colspan="7"><div class="empty"><p>Chargement…</p></div></td></tr></tbody></table></div>
+    </div>
+    <div class="g2">
+      <div class="panel"><h3>💚 Followers connus <small style="color:var(--muted);font-weight:500">les plus anciens en premier</small></h3><div class="tw" style="max-height:520px;overflow:auto"><table><thead><tr><th>Viewer</th><th>Follow depuis</th><th>Première activité</th></tr></thead><tbody id="community-followers"></tbody></table></div></div>
+      <div class="panel"><h3>🕘 Derniers événements</h3><div id="community-events" style="display:grid;gap:8px;max-height:520px;overflow:auto"></div></div>
+    </div>
+    <div class="panel" style="margin-top:14px;color:var(--muted);font-size:11px;line-height:1.6">Les données antérieures sont reconstruites depuis les informations déjà connues par ElBot. Une date inconnue n’est jamais inventée. Les nouveaux follows, subs, renouvellements et gifts sont enregistrés automatiquement et isolés pour cette chaîne.</div>
   </div>
 
   <!-- ══ CONFIG CLASSEMENT ══ -->
@@ -4681,7 +4701,7 @@ if (typeof window.io === 'function') {
 const MEDALS = ['🥇','🥈','🥉'];
 try { document.querySelectorAll('#settings-channel-name').forEach(el => el.textContent = CURRENT_STREAMER_SLUG || 'connecté'); } catch(e) {}
 let lbData = [], levels = [];
-const PAGE_TITLES = {dashboard:'Dashboard',classement:'Classement',lobby:'Lobby',jeux:'Jeux',objectifs:'Objectifs',dbd:'Dead by Daylight',moderation:'Modération',commands:'Commandes',historique:'Historique',admin:'Administration',settings:'Paramètres',outils:'Outils Chat',alertes:'Alertes'};
+const PAGE_TITLES = {dashboard:'Dashboard',classement:'Classement',communaute:'Communauté',lobby:'Lobby',jeux:'Jeux',objectifs:'Objectifs',dbd:'Dead by Daylight',moderation:'Modération',commands:'Commandes',historique:'Historique',admin:'Administration',settings:'Paramètres',outils:'Outils Chat',alertes:'Alertes'};
 let songRequestRefreshTimer = null;
 
 // ── Navigation ─────────────────────────────────────────────────────────────────
@@ -4888,6 +4908,7 @@ function showPage(name) {
     if(t.getAttribute('onclick') === "showPage('"+name+"')") t.classList.add('active');
   });
   if(name==='classement') loadLeaderboard();
+  if(name==='communaute') loadCommunity();
   if(name==='config-classement') loadConfigClassement();
   if(name==='jeux') { loadDuels(); loadGiveaways(); loadActiveGiveaway(); }
   if(name==='objectifs') loadObjectives();
@@ -5152,6 +5173,41 @@ async function loadLeaderboard() {
     lbData = await get('/api/leaderboard?limit='+limit) || [];
     renderLB(lbData);
   } catch(e){}
+}
+
+function communityDate(value, unknown = 'Date inconnue') {
+  if (!value || value === 'NOT_FOLLOWING') return unknown;
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? unknown : date.toLocaleDateString('fr-FR', { day:'2-digit', month:'2-digit', year:'numeric' });
+}
+
+async function loadCommunity() {
+  const supportersBody = document.getElementById('community-supporters');
+  try {
+    const data = await get('/api/community?limit=500') || {};
+    const totals = data.totals || {};
+    document.getElementById('community-known-viewers').textContent = Number(totals.known_viewers || 0).toLocaleString('fr-FR');
+    document.getElementById('community-known-followers').textContent = Number(totals.known_followers || 0).toLocaleString('fr-FR');
+    document.getElementById('community-current-subs').textContent = Number(totals.current_subscribers || 0).toLocaleString('fr-FR');
+
+    const supporterMap = new Map((data.supporters || []).map(item => [String(item.username || '').toLowerCase(), { ...item }]));
+    for (const current of data.currentSubscribers || []) {
+      const key = String(current.username || '').toLowerCase();
+      if (!supporterMap.has(key)) supporterMap.set(key, { username:current.username, gifts:0, renewals:0, new_subs:0, max_months:current.subscribed_for || 0, last_support:null, events:0, reconstructed:true });
+      else supporterMap.get(key).max_months = Math.max(Number(supporterMap.get(key).max_months || 0), Number(current.subscribed_for || 0));
+    }
+    const supporters = [...supporterMap.values()].sort((a,b) => (Number(b.gifts||0)+Number(b.renewals||0)+Number(b.new_subs||0))-(Number(a.gifts||0)+Number(a.renewals||0)+Number(a.new_subs||0)));
+    supportersBody.innerHTML = supporters.length ? supporters.map((item, index) => `<tr><td><span class="rank-num">#${index+1}</span></td><td style="font-weight:700">${esc(item.username || 'Anonyme')}</td><td>${Number(item.new_subs||0)}</td><td>${Number(item.renewals||0)}</td><td>${Number(item.gifts||0)}</td><td>${Number(item.max_months||0) ? Number(item.max_months)+' mois' : '—'}</td><td style="color:var(--muted)">${communityDate(item.last_support)}</td></tr>`).join('') : '<tr><td colspan="7"><div class="empty"><p>Aucun soutien historique connu</p></div></td></tr>';
+
+    const followersBody = document.getElementById('community-followers');
+    followersBody.innerHTML = (data.followers || []).length ? data.followers.map(item => `<tr><td style="font-weight:700">${esc(item.username)}</td><td style="color:#22c55e">${communityDate(item.following_since)}</td><td style="color:var(--muted)">${communityDate(item.first_seen)}</td></tr>`).join('') : '<tr><td colspan="3"><div class="empty"><p>Aucun follow daté</p></div></td></tr>';
+
+    const labels = { follow:'💚 Nouveau follow', new:'⭐ Nouveau sub', renewal:'🔄 Renouvellement', gift:'🎁 Subs offerts' };
+    const eventsEl = document.getElementById('community-events');
+    eventsEl.innerHTML = (data.events || []).length ? data.events.map(item => `<div style="padding:10px 12px;border:1px solid var(--border);border-radius:10px;background:var(--surface2)"><div style="display:flex;justify-content:space-between;gap:8px"><strong>${labels[item.type] || esc(item.type)}</strong><small style="color:var(--muted)">${communityDate(item.at)}</small></div><div style="margin-top:4px;color:var(--text)">${esc(item.username || item.gifter || 'Anonyme')}${item.type==='gift' ? ` · ${Number(item.count||1)} gifts` : ''}${item.months ? ` · ${Number(item.months)} mois` : ''}</div><small style="color:var(--muted)">${item.source === 'legacy_subcounter' ? 'Historique récupéré' : 'Détecté par ElBot'}</small></div>`).join('') : '<div class="empty"><p>Aucun événement enregistré</p></div>';
+  } catch (e) {
+    if (supportersBody) supportersBody.innerHTML = '<tr><td colspan="7"><div class="empty"><p>Historique indisponible</p></div></td></tr>';
+  }
 }
 
 async function copyPublicLeaderboardLink(){
