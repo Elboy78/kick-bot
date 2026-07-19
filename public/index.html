@@ -549,7 +549,6 @@ body.light .card,body.light .panel,body.light .widget-engine-card{background:lin
     <a onclick="showPage('outils')">🛠️ Outils Chat</a>
     <a onclick="showPage('vods')">🎬 VODs &amp; Clips</a>
     <a onclick="showPage('widgets')">🧩 Widgets</a>
-    <a onclick="showPage('memes')">😂 Memes</a>
     <a onclick="showPage('alertes')">🚨 Alertes</a>
     <a onclick="showPage('chests')">🩸 Defis</a>
     <a onclick="showPage('logs')">📋 Logs</a>
@@ -1708,17 +1707,22 @@ Option 3" rows="4"></textarea><div style="display:flex;gap:6px;margin-top:10px">
 
   <!-- ══ ALERTES OBS ══ -->
   <div class="page" id="page-memes">
-    <div class="header"><div><h1>😂 Memes interactifs</h1><p>Déclenche une image, un GIF ou une vidéo avec son depuis le chat</p></div></div>
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px"><button class="dark-btn" onclick="showPage('widgets')">← Retour aux widgets</button><b>Widget actif : Memes</b></div>
+    <div class="header"><div><h1>😂 Memes interactifs</h1><p>Images et GIF libres envoyés par les viewers avec leur texte</p></div></div>
     <div class="grid2">
       <div class="panel">
         <h3>Configuration</h3>
-        <label class="co-toggle-line"><span class="co-switch"><input type="checkbox" id="meme-enabled"><span></span></span><b>Activer la commande !meme</b></label>
-        <div class="form-row" style="margin-top:12px"><div><label class="lbl">Volume global</label><input class="inp" id="meme-volume" type="number" min="0" max="100" value="70"></div><div><label class="lbl">Texte maximum</label><input class="inp" id="meme-max-text" type="number" min="0" max="120" value="80"></div></div>
+        <label class="co-toggle-line"><span class="co-switch"><input type="checkbox" id="meme-enabled"><span></span></span><b>Activer les envois viewers</b></label>
+        <div class="form-row" style="margin-top:12px"><div><label class="lbl">Mode</label><select class="inp" id="meme-mode"><option value="trust">Confiance</option><option value="instant">Instantané</option><option value="approval">Validation</option></select></div><div><label class="lbl">Durée d’affichage</label><input class="inp" id="meme-duration" type="number" min="2" max="20" value="6"></div></div>
+        <div class="form-row" style="margin-top:12px"><div><label class="lbl">Coût en points</label><input class="inp" id="meme-cost" type="number" min="0" value="0"></div><div><label class="lbl">Cooldown viewer (secondes)</label><input class="inp" id="meme-cooldown" type="number" min="0" max="3600" value="60"></div></div>
+        <div class="form-row" style="margin-top:12px"><div><label class="lbl">Taille à l’écran (%)</label><input class="inp" id="meme-size" type="number" min="20" max="100" value="80"></div><div><label class="lbl">Position</label><select class="inp" id="meme-position"><option value="center">Centre</option><option value="top">Haut</option><option value="bottom">Bas</option></select></div></div>
+        <div class="form-row" style="margin-top:12px"><div><label class="lbl">Texte maximum</label><input class="inp" id="meme-max-text" type="number" min="0" max="160" value="100"></div><div><label class="lbl">Fichier maximum (Mo)</label><input class="inp" id="meme-max-file" type="number" min="1" max="5" value="5"></div></div>
         <button class="btnx btn-green" style="width:100%;justify-content:center;margin-top:12px" onclick="saveMemes()">💾 Enregistrer</button>
       </div>
       <div class="panel"><h3>Source OBS privée</h3><div class="obs-link-row"><code class="obs-link-code" id="memes-obs-url">Chargement…</code></div><div style="display:flex;gap:8px;margin-top:10px"><button class="btnx btn-outline btn-sm" onclick="copyMemeObs()">Copier</button><button class="btnx btn-red btn-sm" onclick="stopMemes()">⏹ Arrêt d’urgence</button></div><p style="font-size:10px;color:var(--muted);margin-top:10px">Ajoute cette URL comme source navigateur OBS, en 1920×1080.</p></div>
     </div>
-    <div class="panel" style="margin-top:14px"><div style="display:flex;justify-content:space-between;align-items:center;gap:10px"><div><h3 style="margin:0">Bibliothèque</h3><p style="font-size:10px;color:var(--muted);margin:4px 0 0">Commande : !meme nom texte personnalisé</p></div><button class="btnx btn-green btn-sm" onclick="addMemeRow()">＋ Ajouter</button></div><div id="meme-list" style="display:grid;gap:10px;margin-top:14px"></div></div>
+    <div class="panel" style="margin-top:14px"><h3>🔗 Portail viewers</h3><div class="obs-link-row"><code class="obs-link-code" id="memes-viewer-url">Chargement…</code></div><button class="btnx btn-outline btn-sm" style="margin-top:10px" onclick="copyMemeViewer()">Copier le lien viewer</button><p style="color:var(--muted);font-size:10px">Le viewer choisit son image ou GIF, écrit son texte et l’envoie. En mode Confiance, les viewers reconnus comme subs passent immédiatement ; les autres attendent une validation.</p></div>
+    <div class="panel" style="margin-top:14px"><h3>File de validation</h3><div id="meme-pending">Aucun envoi en attente.</div></div>
   </div>
 
   <div class="page" id="page-alertes">
@@ -4929,16 +4933,18 @@ async function resetSubCounterSession() {
 }
 
 let memeState={enabled:false,volume:70,maxText:80,items:[]};
-async function loadMemes(){
-  try{const r=await fetch('/api/admin/memes',{cache:'no-store'}),j=await r.json();if(!r.ok)throw new Error(j.error||'Erreur');memeState=j.data.config||memeState;document.getElementById('meme-enabled').checked=!!memeState.enabled;document.getElementById('meme-volume').value=memeState.volume??70;document.getElementById('meme-max-text').value=memeState.maxText??80;document.getElementById('memes-obs-url').textContent=j.data.overlayUrl||'';renderMemeRows()}catch(e){toast(e.message,false)}}
+async function loadMemes(){try{const r=await fetch('/api/admin/memes',{cache:'no-store'}),j=await r.json();if(!r.ok)throw new Error(j.error||'Erreur');memeState=j.data.config||memeState;const set=(id,v)=>{const e=document.getElementById(id);if(e)e.value=v};document.getElementById('meme-enabled').checked=!!memeState.enabled;set('meme-mode',memeState.mode||'trust');set('meme-duration',memeState.duration||6);set('meme-cost',memeState.cost||0);set('meme-cooldown',memeState.cooldown||60);set('meme-size',memeState.size||80);set('meme-position',memeState.position||'center');set('meme-max-text',memeState.maxText||100);set('meme-max-file',memeState.maxFileMb||5);document.getElementById('memes-obs-url').textContent=j.data.overlayUrl||'';document.getElementById('memes-viewer-url').textContent=j.data.viewerUrl||'';loadMemePending()}catch(e){toast(e.message,false)}}
 function renderMemeRows(){const root=document.getElementById('meme-list');if(!root)return;if(!memeState.items.length){root.innerHTML='<div style="padding:25px;text-align:center;color:var(--muted)">Aucun meme. Ajoute le premier pour commencer.</div>';return}root.innerHTML=memeState.items.map((m,i)=>`<div class="card" style="padding:12px"><div class="form-row"><div><label class="lbl">Nom de commande</label><input class="inp" value="${esc(m.id)}" oninput="memeField(${i},'id',this.value)" placeholder="rire"></div><div><label class="lbl">Titre</label><input class="inp" value="${esc(m.name)}" oninput="memeField(${i},'name',this.value)"></div></div><label class="lbl" style="margin-top:8px">URL image, GIF ou vidéo</label><input class="inp" value="${esc(m.mediaUrl)}" oninput="memeField(${i},'mediaUrl',this.value)" placeholder="https://..."><label class="lbl" style="margin-top:8px">URL du son (facultatif)</label><input class="inp" value="${esc(m.soundUrl||'')}" oninput="memeField(${i},'soundUrl',this.value)" placeholder="https://...mp3"><div class="form-row" style="margin-top:8px"><div><label class="lbl">Durée (secondes)</label><input class="inp" type="number" min="2" max="20" value="${m.duration}" oninput="memeField(${i},'duration',this.value)"></div><div><label class="lbl">Coût en points</label><input class="inp" type="number" min="0" value="${m.cost}" oninput="memeField(${i},'cost',this.value)"></div><div><label class="lbl">Cooldown (secondes)</label><input class="inp" type="number" min="0" value="${m.cooldown}" oninput="memeField(${i},'cooldown',this.value)"></div></div><div style="display:flex;gap:8px;align-items:center;margin-top:10px"><label><input type="checkbox" ${m.allowText!==false?'checked':''} onchange="memeField(${i},'allowText',this.checked)"> Texte personnalisé</label><label><input type="checkbox" ${m.enabled!==false?'checked':''} onchange="memeField(${i},'enabled',this.checked)"> Actif</label><span style="flex:1"></span><button class="btnx btn-outline btn-sm" onclick="testMeme(${i})">▶ Tester</button><button class="btnx btn-red btn-sm" onclick="deleteMeme(${i})">Supprimer</button></div></div>`).join('')}
 function memeField(i,k,v){if(['duration','cost','cooldown'].includes(k))v=Number(v)||0;memeState.items[i][k]=v}
 function addMemeRow(){memeState.items.push({id:'nouveau',name:'Nouveau meme',mediaUrl:'',soundUrl:'',duration:6,cost:0,cooldown:30,allowText:true,enabled:true});renderMemeRows()}
 function deleteMeme(i){if(confirm('Supprimer ce meme ?')){memeState.items.splice(i,1);renderMemeRows()}}
-async function saveMemes(){memeState.enabled=document.getElementById('meme-enabled').checked;memeState.volume=Number(document.getElementById('meme-volume').value)||0;memeState.maxText=Number(document.getElementById('meme-max-text').value)||0;const r=await fetch('/api/admin/memes',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(memeState)}),j=await r.json();if(!r.ok)return toast(j.error||'Erreur',false);memeState=j.data;renderMemeRows();toast('Memes enregistrés')}
+async function saveMemes(){memeState={...memeState,enabled:document.getElementById('meme-enabled').checked,mode:document.getElementById('meme-mode').value,duration:Number(document.getElementById('meme-duration').value),cost:Number(document.getElementById('meme-cost').value),cooldown:Number(document.getElementById('meme-cooldown').value),size:Number(document.getElementById('meme-size').value),position:document.getElementById('meme-position').value,maxText:Number(document.getElementById('meme-max-text').value),maxFileMb:Number(document.getElementById('meme-max-file').value)};const r=await fetch('/api/admin/memes',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(memeState)}),j=await r.json();if(!r.ok)return toast(j.error||'Erreur',false);memeState=j.data;toast('Paramètres enregistrés')}
 async function testMeme(i){await saveMemes();const r=await fetch('/api/admin/memes/test',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:memeState.items[i]?.id,text:'Ceci est un test !'})}),j=await r.json();toast(r.ok?'Test envoyé':(j.error||'Erreur'),r.ok)}
 async function stopMemes(){await fetch('/api/admin/memes/stop',{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'});toast('Overlay arrêté')}
 function copyMemeObs(){const v=document.getElementById('memes-obs-url').textContent;navigator.clipboard.writeText(v);toast('Lien OBS copié')}
+function copyMemeViewer(){navigator.clipboard.writeText(document.getElementById('memes-viewer-url').textContent);toast('Lien viewer copié')}
+async function loadMemePending(){const r=await fetch('/api/admin/memes/submissions'),j=await r.json();const root=document.getElementById('meme-pending'),rows=j.data||[];root.innerHTML=rows.length?rows.map(x=>`<div class="card" style="padding:10px;margin:8px 0"><b>${esc(x.username)}</b> — ${esc(x.text||'Sans texte')}<div style="display:flex;gap:6px;margin-top:7px"><button class="btnx btn-green btn-sm" onclick="reviewMeme(${x.id},'approve')">Accepter</button><button class="btnx btn-red btn-sm" onclick="reviewMeme(${x.id},'reject')">Refuser</button></div></div>`).join(''):'Aucun envoi en attente.'}
+async function reviewMeme(id,action){await fetch(`/api/admin/memes/submissions/${id}/${action}`,{method:'POST'});loadMemePending()}
 
 function showPage(name) {
   hydrateAllObsLinks();
@@ -8642,6 +8648,7 @@ function getEngineWidget(id) {
 }
 function configureEngineWidget(id) {
   if (id === 'alerts') return showPage('alerts');
+  if (id === 'memes') return showPage('memes');
   openWidgetSettings(id);
 }
 async function copyEngineWidget(id) {

@@ -182,6 +182,15 @@ async function initSchema() {
       payload     TEXT NOT NULL,
       created_at  TEXT NOT NULL DEFAULT (datetime('now'))
     )`,
+    `CREATE TABLE IF NOT EXISTS meme_submissions (
+      id INTEGER PRIMARY KEY AUTOINCREMENT, streamer_id INTEGER NOT NULL,
+      username TEXT NOT NULL, text TEXT, media_url TEXT NOT NULL,
+      status TEXT NOT NULL DEFAULT 'pending', created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    )`,
+    `CREATE TABLE IF NOT EXISTS meme_access_tokens (
+      token TEXT PRIMARY KEY, streamer_id INTEGER NOT NULL, username TEXT NOT NULL,
+      trusted INTEGER NOT NULL DEFAULT 0, expires_at INTEGER NOT NULL
+    )`,
     `CREATE TABLE IF NOT EXISTS viewers (
       id            INTEGER PRIMARY KEY AUTOINCREMENT,
       streamer_id   INTEGER NOT NULL DEFAULT 1,
@@ -2101,6 +2110,15 @@ async function getMemeEvents(streamerId, afterId = 0) {
   const rows = await all(`SELECT id, payload, created_at FROM meme_events WHERE streamer_id = ? AND id > ? AND created_at >= datetime('now','-10 minutes') ORDER BY id ASC LIMIT 30`, [Number(streamerId), Math.max(0,Number(afterId)||0)]);
   return rows.map(row => { try { return { ...JSON.parse(row.payload), id:row.id, createdAt:row.created_at }; } catch (_) { return null; } }).filter(Boolean);
 }
+async function createMemeSubmission(streamerId, username, text, mediaUrl, status='pending') {
+  const r=await run(`INSERT INTO meme_submissions (streamer_id,username,text,media_url,status) VALUES (?,?,?,?,?)`,[Number(streamerId),username,text,mediaUrl,status]);
+  return get(`SELECT * FROM meme_submissions WHERE id=?`,[Number(r.lastInsertRowid)]);
+}
+async function getMemeSubmissions(streamerId, status='pending') { return all(`SELECT * FROM meme_submissions WHERE streamer_id=? AND status=? ORDER BY id DESC LIMIT 100`,[Number(streamerId),status]); }
+async function getMemeSubmission(id, streamerId) { return get(`SELECT * FROM meme_submissions WHERE id=? AND streamer_id=?`,[Number(id),Number(streamerId)]); }
+async function setMemeSubmissionStatus(id, streamerId, status) { await run(`UPDATE meme_submissions SET status=? WHERE id=? AND streamer_id=?`,[status,Number(id),Number(streamerId)]); return getMemeSubmission(id,streamerId); }
+async function createMemeAccessToken(streamerId, username, trusted=false) { const token=require('crypto').randomBytes(18).toString('hex');await run(`INSERT INTO meme_access_tokens (token,streamer_id,username,trusted,expires_at) VALUES (?,?,?,?,?)`,[token,Number(streamerId),username,trusted?1:0,Date.now()+600000]);return token; }
+async function consumeMemeAccessToken(token, streamerId) { const row=await get(`SELECT * FROM meme_access_tokens WHERE token=? AND streamer_id=? AND expires_at>?`,[String(token),Number(streamerId),Date.now()]);if(row)await run(`DELETE FROM meme_access_tokens WHERE token=?`,[String(token)]);return row||null; }
 
 function normalizeOverlayWidget(widget) {
   const w = String(widget || '').toLowerCase().replace(/\.html$/,'').replace(/[^a-z0-9_-]/g, '');
@@ -2327,4 +2345,6 @@ module.exports = {
   ensureBotIdentities, getBotIdentityById, getBotIdentityByKey, getAssignedBotIdentity, getBotAssignmentOptions, assignBotIdentity, connectCustomBotIdentity, markBotIdentityConnected, markBotIdentityAuthorizationRequired, enableStreamersForBotIdentity,
   getStreamerSetting, setStreamerSetting, getOrCreateOverlayToken, regenerateOverlayToken, getOverlayTokenByValue, getOverlayTokensForStreamer, saveOAuthTokenForStreamer, getOAuthTokenForStreamer, deleteOAuthTokenForStreamer,
   createMemeEvent, getMemeEvents,
+  createMemeSubmission, getMemeSubmissions, getMemeSubmission, setMemeSubmissionStatus,
+  createMemeAccessToken, consumeMemeAccessToken,
 };
