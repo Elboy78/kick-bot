@@ -1855,10 +1855,10 @@ async function ensureBotIdentities() {
   if (botIdentitiesEnsured) return;
   await run(`INSERT OR IGNORE INTO bot_identities
     (bot_key,display_name,kick_username,oauth_provider,kind,status)
-    VALUES ('elbot','ElBot','EIBotApp','kick_bot:elbot','default','authorization_required')`);
+    VALUES ('elbot','ElBot','ElBotApp','kick_bot:elbot','default','authorization_required')`);
   // Le nom visible du service reste ElBot, mais le compte Kick officiel utilisé
-  // pour écrire dans les chats est EIBotApp (ElBot étant indisponible sur Kick).
-  await run(`UPDATE bot_identities SET display_name = 'ElBot', kick_username = 'EIBotApp',
+  // pour écrire dans les chats est ElBotApp (ElBot étant indisponible sur Kick).
+  await run(`UPDATE bot_identities SET display_name = 'ElBot', kick_username = 'ElBotApp',
     updated_at = datetime('now') WHERE bot_key = 'elbot'`);
   await run(`INSERT OR IGNORE INTO bot_identities
     (bot_key,display_name,kick_username,oauth_provider,kind,status)
