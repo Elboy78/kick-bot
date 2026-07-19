@@ -1,0 +1,14 @@
+:root{
+  --theme-bg:#050505;
+  --theme-wallpaper:url("/assets/themes/dbd.webp?v=20");
+  --theme-overlay:linear-gradient(90deg,rgba(0,0,0,.38),rgba(0,0,0,.08) 62%,rgba(16,0,0,.22));
+  --theme-panel:linear-gradient(145deg,rgba(21,16,15,.55),rgba(5,5,5,.72));
+  --theme-border:rgba(196,52,42,.34);
+  --theme-soft:rgba(105,24,20,.18);
+  --theme-soft-border:rgba(188,48,40,.28);
+  --theme-text:#f5ece8;
+  --theme-muted:#b09a93;
+  --theme-radius:9px;
+  --theme-accent:#df493d;
+  --theme-accent2:#7a1712;
+}

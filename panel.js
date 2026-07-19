@@ -617,14 +617,15 @@ async function recordSubEvent(type, payload = {}, source = null) {
       at: new Date().toISOString()
     };
 
-    // Le total représente le nombre actif suivi par le bot : nouveau sub et gifts l'augmentent.
-    // Un renouvellement ne l'augmente pas, mais compte dans la session.
+    // Chaque soutien reçu pendant le live fait progresser l'objectif : nouveau sub,
+    // renouvellement et gifts. Les compteurs détaillés restent disponibles séparément.
     if (type === 'new' || type === 'gift') {
       state.total += amount;
       state.session += amount;
     }
     if (type === 'gift') state.gifts += amount;
     if (type === 'renewal') {
+      state.total += amount;
       state.session += amount;
       state.renewals += amount;
     }
@@ -814,8 +815,17 @@ shared.registerKickEventHandler(processKickEvent);
 // URL à renseigner : https://TON-LIEN-RENDER/webhook/kick
 app.post('/webhook/kick', async (req, res) => {
   try {
-    const event = req.body || {};
+    let event = req.body || {};
     const eventType = req.headers['kick-event-type'] || event?.event || event?.type || '';
+    const broadcasterId = req.headers['kick-event-broadcaster-id']
+      || event?.broadcaster_user_id || event?.broadcaster?.user_id || event?.broadcaster?.id
+      || event?.data?.broadcaster_user_id || event?.data?.broadcaster?.user_id || event?.data?.broadcaster?.id;
+    const webhookStreamer = await db.getStreamerByBroadcasterUserId(broadcasterId);
+    if (!webhookStreamer) {
+      console.warn('[WEBHOOK KICK] Streamer introuvable pour broadcaster_user_id:', broadcasterId || 'absent');
+      return res.status(202).json({ ok: true, ignored: true, reason: 'unknown_streamer' });
+    }
+    event = { ...event, __streamerContext: { id: webhookStreamer.id, slug: webhookStreamer.slug } };
     console.log('[WEBHOOK KICK]', eventType, JSON.stringify(event).slice(0, 300));
     const result = await processKickEvent(eventType, event);
     res.json(result);
@@ -2410,6 +2420,16 @@ app.get('/auth/callback', async (req, res) => {
     });
 
     await db.saveOAuthToken(kickOAuth.providerForStreamer(streamer.id), token.accessToken, token.refreshToken, token.expiresAt);
+    try {
+      await kickOAuth.subscribeStreamerEvents(token.accessToken, streamer.broadcaster_user_id || kickUser.id);
+      await db.setStreamerSetting(streamer.id, 'kick_event_subscription_status', 'active');
+      await db.setStreamerSetting(streamer.id, 'kick_event_subscription_error', '');
+      console.log(`[OAUTH CALLBACK V2] ✅ Webhooks Kick enregistrés pour ${slug}`);
+    } catch (subscriptionError) {
+      await db.setStreamerSetting(streamer.id, 'kick_event_subscription_status', 'error').catch(()=>{});
+      await db.setStreamerSetting(streamer.id, 'kick_event_subscription_error', String(subscriptionError.response?.data?.message || subscriptionError.message || '').slice(0, 300)).catch(()=>{});
+      console.error(`[OAUTH CALLBACK V2] Webhooks Kick non enregistrés pour ${slug}:`, subscriptionError.response?.data || subscriptionError.message);
+    }
     // Compatibilité V1 : si c'est le streamer par défaut, on garde aussi le provider global kick.
     if (slug === tenant.DEFAULT_STREAMER_SLUG) {
       await db.saveOAuthToken('kick', token.accessToken, token.refreshToken, token.expiresAt);

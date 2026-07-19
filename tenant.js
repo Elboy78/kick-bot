@@ -38,7 +38,7 @@ function getDefaultStreamerSeed() {
     slug,
     kickUsername: process.env.KICK_CHANNEL || slug,
     displayName: process.env.PANEL_OWNER || process.env.KICK_CHANNEL || slug,
-    role: 'owner'
+    role: 'streamer'
   };
 }
 
@@ -93,9 +93,17 @@ async function ensureRequestedStreamer(db, slug, options = {}) {
 
 
 async function attachTenant(db, req, res, next) {
+  let context;
   try {
-    const slug = readRequestedSlug(req);
-    const streamer = await ensureRequestedStreamer(db, slug, { createIfMissing: !req.publicTenantLookupOnly });
+    // Une session connectée est toujours la source de vérité. Un paramètre
+    // ?streamer=, un Referer ou un ancien cookie ne doit jamais permettre de
+    // lire les données d'un autre compte. Seul l'administrateur plateforme
+    // peut utiliser la cible d'impersonation déjà vérifiée par loadSession.
+    const sessionStreamer = req.platformAdmin && req.adminTargetStreamer
+      ? req.adminTargetStreamer
+      : req.authStreamer;
+    const slug = sessionStreamer?.slug || readRequestedSlug(req);
+    const streamer = sessionStreamer || await ensureRequestedStreamer(db, slug, { createIfMissing: !req.publicTenantLookupOnly });
     req.streamer = streamer || null;
     req.streamerSlug = streamer?.slug || normalizeSlug(slug);
   } catch (e) {
@@ -113,7 +121,7 @@ async function attachTenant(db, req, res, next) {
       }
     }
   }
-  const context = {
+  context = {
     streamerId: req.streamer?.id || null,
     streamerSlug: req.streamer?.slug || DEFAULT_STREAMER_SLUG,
     streamer: req.streamer || null

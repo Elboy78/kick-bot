@@ -1,0 +1,14 @@
+:root{
+  --theme-bg:#031612;
+  --theme-wallpaper:url("/assets/themes/forest.webp?v=20");
+  --theme-overlay:linear-gradient(90deg,rgba(1,18,15,.32),rgba(1,18,15,.05) 60%,rgba(1,18,15,.18));
+  --theme-panel:linear-gradient(145deg,rgba(4,53,46,.46),rgba(1,24,21,.62));
+  --theme-border:rgba(66,215,184,.26);
+  --theme-soft:rgba(41,158,131,.12);
+  --theme-soft-border:rgba(70,203,174,.22);
+  --theme-text:#effffb;
+  --theme-muted:#9cc5b9;
+  --theme-radius:16px;
+  --theme-accent:#37d1ad;
+  --theme-accent2:#16765f;
+}

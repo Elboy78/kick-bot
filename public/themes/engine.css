@@ -1,0 +1,483 @@
+/* ==========================================================================
+   ELBOT THEME ENGINE V3 — PERSONNALISATION PREMIUM
+   Fond unique, couleurs libres, sidebar configurable et Liquid Glass.
+   ========================================================================== */
+
+:root{
+  --panel-wallpaper:url("/assets/themes/control.webp");
+  --panel-overlay-rgb:2 8 20;
+  --panel-overlay-alpha:.10;
+  --panel-surface-opacity:92%;
+
+  --elbot-primary:#28ff66;
+  --elbot-primary-rgb:40 255 102;
+  --elbot-secondary:#1874ff;
+  --elbot-secondary-rgb:24 116 255;
+
+  --elbot-glass-blur:16px;
+  --elbot-reflection-opacity:.45;
+  --elbot-sidebar-opacity:92%;
+  --elbot-sidebar-overlay:linear-gradient(180deg,rgba(7,9,26,.92),rgba(4,8,20,.94));
+
+  /* Synchronisation avec les variables historiques du panel. */
+  --accent:var(--elbot-primary);
+  --accent-l:color-mix(in srgb,var(--elbot-primary) 72%,white);
+  --accent-bg:rgb(var(--elbot-primary-rgb) / .11);
+  --accent-brd:rgb(var(--elbot-primary-rgb) / .34);
+  --accent-grad1:var(--elbot-primary);
+  --accent-grad2:var(--elbot-secondary);
+}
+
+body::before,
+body::after,
+.main::before,
+.main::after,
+body[data-ref-interface]::before,
+body[data-ref-interface]::after,
+body[data-ref-wallpaper]::before,
+body[data-ref-wallpaper]::after{
+  content:none!important;
+  display:none!important;
+  background:none!important;
+  background-image:none!important;
+}
+
+/* Wallpaper principal. */
+body .main{
+  background-color:#020817!important;
+  background-image:
+    linear-gradient(
+      rgb(var(--panel-overlay-rgb) / var(--panel-overlay-alpha)),
+      rgb(var(--panel-overlay-rgb) / var(--panel-overlay-alpha))
+    ),
+    var(--panel-wallpaper)!important;
+  background-repeat:no-repeat!important;
+  background-size:cover!important;
+  background-position:center center!important;
+  background-attachment:fixed!important;
+  min-height:100vh!important;
+}
+
+body .page,
+body .page.active,
+body .page-content,
+body .content,
+body .dashboard,
+body .dashboard-grid,
+body .page-wrapper,
+body .view-container,
+body .tab-content,
+body [id^="page-"]{
+  background-color:transparent!important;
+  background-image:none!important;
+}
+
+/* Fond continu : la sidebar reprend exactement le wallpaper global. */
+html[data-sidebar-wallpaper="true"] body{
+  background-color:#020817!important;
+  background-image:
+    linear-gradient(
+      rgb(var(--panel-overlay-rgb) / var(--panel-overlay-alpha)),
+      rgb(var(--panel-overlay-rgb) / var(--panel-overlay-alpha))
+    ),
+    var(--panel-wallpaper)!important;
+  background-repeat:no-repeat!important;
+  background-size:cover!important;
+  background-position:center center!important;
+  background-attachment:fixed!important;
+}
+
+html[data-sidebar-wallpaper="true"] body .main{
+  background-color:transparent!important;
+}
+
+/* Sidebar : quatre comportements indépendants. */
+body .sidebar{
+  transition:background .22s ease,border-color .22s ease,backdrop-filter .22s ease!important;
+}
+
+html[data-sidebar-mode="solid"] body .sidebar{
+  background:var(--side)!important;
+  backdrop-filter:none!important;
+  -webkit-backdrop-filter:none!important;
+}
+
+html[data-sidebar-mode="theme"] body .sidebar{
+  background:
+    linear-gradient(
+      rgb(var(--panel-overlay-rgb) / .52),
+      rgb(var(--panel-overlay-rgb) / .72)
+    ),
+    var(--panel-wallpaper) center/cover fixed!important;
+  backdrop-filter:none!important;
+  -webkit-backdrop-filter:none!important;
+}
+
+html[data-sidebar-mode="transparent"] body .sidebar{
+  background:transparent!important;
+  backdrop-filter:none!important;
+  -webkit-backdrop-filter:none!important;
+  border-right-color:rgb(var(--elbot-primary-rgb) / .18)!important;
+}
+
+html[data-sidebar-mode="glass"] body .sidebar{
+  background:
+    linear-gradient(
+      145deg,
+      rgba(255,255,255,calc(var(--elbot-reflection-opacity) * .12)),
+      rgba(255,255,255,0) 42%
+    ),
+    color-mix(in srgb,var(--side) var(--elbot-sidebar-opacity),transparent)!important;
+  backdrop-filter:blur(var(--elbot-glass-blur)) saturate(135%)!important;
+  -webkit-backdrop-filter:blur(var(--elbot-glass-blur)) saturate(135%)!important;
+  border-right-color:rgb(var(--elbot-primary-rgb) / .25)!important;
+  box-shadow:inset -1px 0 rgba(255,255,255,calc(var(--elbot-reflection-opacity) * .12));
+}
+
+/* Bas de sidebar continu : aucune ancienne couche noire ne doit couper le
+   wallpaper ou la couleur du thème sélectionné. */
+body .sidebar .ref-sidebar-bottom{
+  position:relative!important;
+  background:transparent!important;
+  background-image:none!important;
+  border-top:1px solid rgb(var(--elbot-primary-rgb) / .16)!important;
+  box-shadow:none!important;
+  backdrop-filter:none!important;
+  -webkit-backdrop-filter:none!important;
+}
+
+body .sidebar .ref-sidebar-tools{
+  border-top:0!important;
+}
+
+body .sidebar .ref-sidebar-tool,
+body .sidebar .sb-profile{
+  background:
+    linear-gradient(
+      145deg,
+      rgba(255,255,255,calc(var(--elbot-reflection-opacity) * .10)),
+      rgba(255,255,255,0) 46%
+    ),
+    color-mix(in srgb,var(--side) 46%,transparent)!important;
+  border-color:rgb(var(--elbot-primary-rgb) / .20)!important;
+  color:var(--text)!important;
+  box-shadow:inset 0 1px rgba(255,255,255,.035)!important;
+  backdrop-filter:blur(var(--elbot-glass-blur)) saturate(125%)!important;
+  -webkit-backdrop-filter:blur(var(--elbot-glass-blur)) saturate(125%)!important;
+}
+
+body .sidebar .ref-sidebar-tool:hover,
+body .sidebar .sb-profile:hover{
+  background:
+    linear-gradient(145deg,rgb(var(--elbot-primary-rgb) / .13),transparent 55%),
+    color-mix(in srgb,var(--side) 52%,transparent)!important;
+  border-color:rgb(var(--elbot-primary-rgb) / .42)!important;
+}
+
+body .sidebar .ref-sidebar-tool-icon{
+  background:rgb(var(--elbot-primary-rgb) / .10)!important;
+  border-color:rgb(var(--elbot-primary-rgb) / .18)!important;
+}
+
+body .sidebar .ref-sidebar-tool small,
+body .sidebar .sb-prof-role,
+body .sidebar .sb-upd{
+  color:var(--muted)!important;
+}
+
+html[data-sidebar-mode="solid"] body .sidebar .ref-sidebar-tool,
+html[data-sidebar-mode="solid"] body .sidebar .sb-profile{
+  background:color-mix(in srgb,var(--side) 88%,var(--elbot-primary) 12%)!important;
+}
+
+html[data-sidebar-mode="transparent"] body .sidebar .ref-sidebar-tool,
+html[data-sidebar-mode="transparent"] body .sidebar .sb-profile{
+  background:rgb(var(--panel-overlay-rgb) / .24)!important;
+}
+
+/* Topbar configurable. */
+html[data-topbar-transparent="true"] body .elbot-topbar{
+  background:
+    linear-gradient(
+      145deg,
+      rgba(255,255,255,calc(var(--elbot-reflection-opacity) * .10)),
+      rgba(255,255,255,0) 46%
+    ),
+    color-mix(in srgb,var(--card) 42%,transparent)!important;
+  backdrop-filter:blur(var(--elbot-glass-blur)) saturate(130%)!important;
+  -webkit-backdrop-filter:blur(var(--elbot-glass-blur)) saturate(130%)!important;
+}
+
+/* Surfaces de contenu avec opacité et reflet réglables. */
+body .panel,
+body .card,
+body .ref-kpi,
+body .ref-panel,
+body .settings-card,
+body .widget-card,
+body .config-card,
+body .table-wrap,
+body .form-section,
+body .block,
+body .box,
+body .modal-content,
+body .ref-status-card,
+body .ref-current-card,
+body .ref-logs-card,
+body .ref-live-viewers{
+  background:
+    linear-gradient(
+      145deg,
+      rgba(255,255,255,calc(var(--elbot-reflection-opacity) * .085)),
+      rgba(255,255,255,0) 38%
+    ),
+    color-mix(in srgb,var(--card) var(--panel-surface-opacity),transparent)!important;
+  backdrop-filter:blur(var(--elbot-glass-blur)) saturate(118%);
+  -webkit-backdrop-filter:blur(var(--elbot-glass-blur)) saturate(118%);
+}
+
+/* Toute la couleur bleue historique devient personnalisable. */
+body .menu a.active,
+body .menu a:hover,
+body .btn-primary,
+body .icon.ic-purple,
+body .ref-primary-action,
+body .ref-action-primary{
+  background:linear-gradient(135deg,var(--elbot-primary),var(--elbot-secondary))!important;
+}
+
+body .menu a.active,
+body .menu a:hover,
+body .btn-primary{
+  color:#fff!important;
+}
+
+body a,
+body .green,
+body .online,
+body .panel h3 .see-all,
+body .commands li span:first-child,
+body .cpill,
+body .obs-link-code,
+body .ref-accent-text{
+  color:var(--elbot-primary)!important;
+}
+
+body .bar span,
+body .objbar-fill,
+body input[type="range"]::-webkit-slider-thumb{
+  background:linear-gradient(90deg,var(--elbot-primary),var(--elbot-secondary))!important;
+}
+
+body .inp:focus,
+body input:focus,
+body textarea:focus,
+body select:focus{
+  border-color:var(--elbot-primary)!important;
+  box-shadow:0 0 0 3px rgb(var(--elbot-primary-rgb) / .13)!important;
+}
+
+body .btn-connected,
+body .btn-outline,
+body .obs-copy-btn,
+body .ref-active,
+body [aria-selected="true"]{
+  color:var(--elbot-primary)!important;
+  border-color:rgb(var(--elbot-primary-rgb) / .38)!important;
+  background:rgb(var(--elbot-primary-rgb) / .12)!important;
+}
+
+/* Glow général, basé sur les deux couleurs choisies. */
+html[data-elbot-glow="true"] body .panel:hover,
+html[data-elbot-glow="true"] body .card:hover,
+html[data-elbot-glow="true"] body .ref-kpi:hover,
+html[data-elbot-glow="true"] body .ref-panel:hover{
+  border-color:rgb(var(--elbot-primary-rgb) / .44)!important;
+  box-shadow:
+    0 12px 34px rgb(var(--elbot-primary-rgb) / .10),
+    0 0 24px rgb(var(--elbot-secondary-rgb) / .08)!important;
+}
+
+/* Interface de personnalisation. */
+.ref-drawer-backdrop{
+  position:fixed!important;
+  inset:0!important;
+  display:none!important;
+  justify-content:flex-end!important;
+  align-items:stretch!important;
+  z-index:99999!important;
+}
+.ref-drawer-backdrop.open{display:flex!important}
+
+.ref-customizer-drawer{
+  flex:0 0 min(440px,94vw)!important;
+  width:min(440px,94vw)!important;
+  max-width:94vw!important;
+  height:100vh!important;
+  margin:0!important;
+  overflow-x:hidden!important;
+  overflow-y:auto!important;
+}
+
+.premium-theme-gallery{grid-template-columns:1fr!important}
+.premium-theme-preview{
+  background-size:cover!important;
+  background-position:center!important;
+}
+
+.ref-bg-intensity{
+  display:grid;
+  grid-template-columns:1fr auto;
+  align-items:center;
+  gap:8px;
+  margin-top:12px;
+}
+.ref-bg-intensity label{font-size:8px;font-weight:800}
+.ref-bg-intensity output{
+  min-width:42px;
+  font-size:8px;
+  font-weight:900;
+  text-align:right;
+}
+.ref-bg-intensity input{
+  grid-column:1/3;
+  width:100%;
+  accent-color:var(--elbot-primary);
+}
+
+.elbot-color-pickers{
+  display:grid;
+  gap:9px;
+}
+.elbot-color-pickers>label{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+  padding:11px 12px;
+  border:1px solid rgba(105,151,213,.16);
+  border-radius:11px;
+  background:rgba(20,48,88,.12);
+}
+.elbot-color-pickers label>b,
+.elbot-color-pickers label span>b{
+  display:block;
+  font-size:9px;
+}
+.elbot-color-pickers label small{
+  display:block;
+  margin-top:3px;
+  color:#8095af;
+  font-size:7px;
+}
+.elbot-color-control{
+  display:flex;
+  align-items:center;
+  gap:8px;
+  flex-shrink:0;
+}
+.elbot-color-control input[type="color"]{
+  width:38px;
+  height:30px;
+  padding:2px;
+  border:1px solid rgba(255,255,255,.18);
+  border-radius:8px;
+  background:transparent;
+  cursor:pointer;
+}
+.elbot-color-control code{
+  min-width:64px;
+  padding:6px 7px;
+  border-radius:7px;
+  background:rgba(0,0,0,.22);
+  color:#dce9fa;
+  font:700 8px monospace;
+  text-align:center;
+}
+
+.elbot-color-presets{
+  display:grid;
+  grid-template-columns:repeat(3,1fr);
+  gap:7px;
+  margin-top:10px;
+}
+.elbot-color-presets button{
+  display:flex;
+  align-items:center;
+  gap:7px;
+  min-height:34px;
+  padding:7px 8px;
+  border:1px solid rgba(105,151,213,.15);
+  border-radius:9px;
+  background:rgba(17,45,82,.12);
+  color:#a8bdd6;
+  font:700 8px Inter;
+  cursor:pointer;
+}
+.elbot-color-presets button:hover,
+.elbot-color-presets button.active{
+  border-color:rgb(var(--elbot-primary-rgb) / .45);
+  background:rgb(var(--elbot-primary-rgb) / .10);
+  color:#fff;
+}
+.elbot-color-presets i{
+  width:16px;
+  height:16px;
+  border-radius:50%;
+  box-shadow:inset 0 0 0 1px rgba(255,255,255,.22);
+}
+[data-color-preset="kick"] i{background:linear-gradient(135deg,#53fc18,#168cff)}
+[data-color-preset="ocean"] i{background:linear-gradient(135deg,#00d4ff,#0066ff)}
+[data-color-preset="violet"] i{background:linear-gradient(135deg,#a855f7,#ec4899)}
+[data-color-preset="dbd"] i{background:linear-gradient(135deg,#ef1b32,#ff7a18)}
+[data-color-preset="sunset"] i{background:linear-gradient(135deg,#ff7a18,#ff2d95)}
+[data-color-preset="gold"] i{background:linear-gradient(135deg,#f7c948,#fff1a8)}
+
+.elbot-segmented{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:7px;
+  margin-bottom:10px;
+}
+.elbot-segmented button{
+  min-height:34px;
+  padding:8px;
+  border:1px solid rgba(105,151,213,.15);
+  border-radius:9px;
+  background:rgba(17,45,82,.12);
+  color:#91a7c1;
+  font:700 8px Inter;
+  cursor:pointer;
+}
+.elbot-segmented button:hover,
+.elbot-segmented button.active{
+  color:#fff;
+  border-color:rgb(var(--elbot-primary-rgb) / .45);
+  background:linear-gradient(
+    135deg,
+    rgb(var(--elbot-primary-rgb) / .18),
+    rgb(var(--elbot-secondary-rgb) / .13)
+  );
+}
+
+/* Mapping des 13 wallpapers. */
+html[data-panel-theme="control"]{--panel-wallpaper:url("/assets/themes/control.webp");--panel-overlay-rgb:2 8 20}
+html[data-panel-theme="dbd"]{--panel-wallpaper:url("/assets/themes/dbd.webp");--panel-overlay-rgb:0 0 0}
+html[data-panel-theme="obs"]{--panel-wallpaper:url("/assets/themes/obs.webp");--panel-overlay-rgb:4 7 9}
+html[data-panel-theme="vision"]{--panel-wallpaper:url("/assets/themes/vision.webp");--panel-overlay-rgb:225 235 248}
+html[data-panel-theme="neon"]{--panel-wallpaper:url("/assets/themes/neon.webp");--panel-overlay-rgb:2 0 10}
+html[data-panel-theme="elite"]{--panel-wallpaper:url("/assets/themes/elite.webp");--panel-overlay-rgb:0 0 0}
+html[data-panel-theme="steam"]{--panel-wallpaper:url("/assets/themes/steam.webp");--panel-overlay-rgb:4 12 18}
+html[data-panel-theme="riot"]{--panel-wallpaper:url("/assets/themes/riot.webp");--panel-overlay-rgb:10 1 3}
+html[data-panel-theme="midnight"]{--panel-wallpaper:url("/assets/themes/midnight.webp");--panel-overlay-rgb:0 5 18}
+html[data-panel-theme="ocean"]{--panel-wallpaper:url("/assets/themes/ocean.webp");--panel-overlay-rgb:0 12 28}
+html[data-panel-theme="sunset"]{--panel-wallpaper:url("/assets/themes/sunset.webp");--panel-overlay-rgb:38 8 12}
+html[data-panel-theme="forest"]{--panel-wallpaper:url("/assets/themes/forest.webp");--panel-overlay-rgb:0 16 13}
+html[data-panel-theme="minimal"]{--panel-wallpaper:url("/assets/themes/minimal.webp");--panel-overlay-rgb:245 247 251}
+
+@media(max-width:900px){
+  body .main,
+  html[data-sidebar-wallpaper="true"] body{
+    background-position:58% center!important;
+  }
+}
