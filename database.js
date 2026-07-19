@@ -1876,10 +1876,7 @@ async function ensureBotIdentities() {
   // Le nom visible du service reste ElBot, mais le compte Kick officiel utilisé
   // pour écrire dans les chats est ElBotApp (ElBot étant indisponible sur Kick).
   await run(`UPDATE bot_identities SET display_name = 'ElBot',
-    kick_username = CASE
-      WHEN status = 'connected' AND kick_username IS NOT NULL AND kick_username != '' THEN kick_username
-      ELSE 'ElBotApp'
-    END,
+    kick_username = 'ElBotApp',
     updated_at = datetime('now') WHERE bot_key = 'elbot'`);
   await run(`INSERT OR IGNORE INTO bot_identities
     (bot_key,display_name,kick_username,oauth_provider,kind,status)
@@ -2116,9 +2113,10 @@ async function createMemeSubmission(streamerId, username, text, mediaUrl, status
 async function getMemeSubmissions(streamerId, status='pending') { return all(`SELECT * FROM meme_submissions WHERE streamer_id=? AND status=? ORDER BY id DESC LIMIT 100`,[Number(streamerId),status]); }
 async function getMemeSubmission(id, streamerId) { return get(`SELECT * FROM meme_submissions WHERE id=? AND streamer_id=?`,[Number(id),Number(streamerId)]); }
 async function setMemeSubmissionStatus(id, streamerId, status) { await run(`UPDATE meme_submissions SET status=? WHERE id=? AND streamer_id=?`,[status,Number(id),Number(streamerId)]); return getMemeSubmission(id,streamerId); }
-async function createMemeAccessToken(streamerId, username, trusted=false) { const token=require('crypto').randomBytes(18).toString('hex'),level=trusted===2?2:(trusted?1:0);await run(`INSERT INTO meme_access_tokens (token,streamer_id,username,trusted,expires_at) VALUES (?,?,?,?,?)`,[token,Number(streamerId),username,level,Date.now()+600000]);return token; }
+async function createMemeAccessToken(streamerId, username, trusted=false) { const token=require('crypto').randomBytes(18).toString('hex'),level=trusted===2?2:(trusted?1:0);await run(`INSERT INTO meme_access_tokens (token,streamer_id,username,trusted,expires_at) VALUES (?,?,?,?,?)`,[token,Number(streamerId),username,level,Date.now()+3600000]);return token; }
 async function getMemeAccessToken(token, streamerId) { return await get(`SELECT * FROM meme_access_tokens WHERE token=? AND streamer_id=? AND expires_at>?`,[String(token),Number(streamerId),Date.now()])||null; }
 async function deleteMemeAccessToken(token) { await run(`DELETE FROM meme_access_tokens WHERE token=?`,[String(token)]); }
+async function touchMemeAccessToken(token, streamerId) { const row=await getMemeAccessToken(token,streamerId);if(row)await run(`UPDATE meme_access_tokens SET expires_at=? WHERE token=?`,[Date.now()+3600000,String(token)]);return row; }
 
 function normalizeOverlayWidget(widget) {
   const w = String(widget || '').toLowerCase().replace(/\.html$/,'').replace(/[^a-z0-9_-]/g, '');
@@ -2346,5 +2344,5 @@ module.exports = {
   getStreamerSetting, setStreamerSetting, getOrCreateOverlayToken, regenerateOverlayToken, getOverlayTokenByValue, getOverlayTokensForStreamer, saveOAuthTokenForStreamer, getOAuthTokenForStreamer, deleteOAuthTokenForStreamer,
   createMemeEvent, getMemeEvents,
   createMemeSubmission, getMemeSubmissions, getMemeSubmission, setMemeSubmissionStatus,
-  createMemeAccessToken, getMemeAccessToken, deleteMemeAccessToken,
+  createMemeAccessToken, getMemeAccessToken, deleteMemeAccessToken, touchMemeAccessToken,
 };

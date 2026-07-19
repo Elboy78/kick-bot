@@ -550,7 +550,7 @@ async function handleChatMessageScoped(payload, ctx = null) {
     if (!meme) {
       const context=currentChatContext(), trusted=badges.some(b=>['subscriber','vip','moderator','broadcaster'].includes(String(b.type||'').toLowerCase()));
       const token=await db.createMemeAccessToken(context.streamerId,username,trusted);
-      const base=String(process.env.PANEL_PUBLIC_URL||'https://panel.elbot.fr').replace(/\/$/,'');
+      let base='https://panel.elbot.fr';try{base=new URL(String(process.env.PANEL_PUBLIC_URL||base)).origin}catch(_){}
       return sendChat(`@${username} Envoie ton image/GIF et ton texte ici : ${base}/memes/${context.slug}?token=${token}`);
     }
     try {
