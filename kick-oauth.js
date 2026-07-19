@@ -70,6 +70,9 @@ function getAuthorizationUrl(scopes, options = {}) {
     mode: options.mode || options.purpose || 'streamer_login',
     returnTo: options.returnTo || '',
     streamerId: options.streamerId || options.streamer_id || null,
+    identityId: options.identityId || options.identity_id || null,
+    botType: options.botType || options.bot_type || '',
+    platformAdmin: Boolean(options.platformAdmin),
     createdAt: Date.now()
   };
   pendingPKCE = { codeVerifier, state, meta, createdAt: Date.now() };
@@ -226,6 +229,44 @@ async function getValidBotAccessToken() {
   }
 }
 
+async function getValidBotIdentityAccessToken(provider) {
+  const safeProvider = String(provider || '').trim();
+  if (!safeProvider.startsWith('kick_bot:')) return null;
+  let stored = await db.getOAuthToken(safeProvider);
+  if (!stored) return null;
+  if (Date.now() < stored.expires_at - 60000) return stored.access_token;
+  try {
+    const response = await axios.post(
+      `${KICK_AUTH_BASE}/oauth/token`,
+      new URLSearchParams({
+        grant_type: 'refresh_token',
+        refresh_token: stored.refresh_token,
+        client_id: CLIENT_ID,
+        client_secret: CLIENT_SECRET,
+      }).toString(),
+      { headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, timeout: 12000 }
+    );
+    const data = response.data || {};
+    const expiresAt = Date.now() + ((data.expires_in || 3600) * 1000);
+    await db.saveOAuthToken(safeProvider, data.access_token, data.refresh_token || stored.refresh_token, expiresAt);
+    return data.access_token;
+  } catch (err) {
+    console.error(`[OAUTH BOT:${safeProvider}] Échec du refresh:`, err.response?.data || err.message);
+    return null;
+  }
+}
+
+async function isBotIdentityConnected(provider) {
+  const safeProvider = String(provider || '').trim();
+  return safeProvider.startsWith('kick_bot:') && !!(await db.getOAuthToken(safeProvider));
+}
+
+async function disconnectBotIdentity(provider) {
+  const safeProvider = String(provider || '').trim();
+  if (!safeProvider.startsWith('kick_bot:')) throw new Error('Provider bot invalide');
+  await db.deleteOAuthToken(safeProvider);
+}
+
 async function isBotConnected() {
   return !!(await db.getOAuthToken(BOT_PROVIDER));
 }
@@ -279,5 +320,8 @@ module.exports = {
   fetchChannelInfoForUser,
   getValidBotAccessToken,
   isBotConnected,
+  getValidBotIdentityAccessToken,
+  isBotIdentityConnected,
+  disconnectBotIdentity,
   subscribeStreamerEvents,
 };

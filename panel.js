@@ -93,7 +93,9 @@ app.get('/api/platform-admin/streamers', requireAuth, requirePlatformAdmin, wait
       slug: row.slug,
       displayName: row.display_name || row.displayName || row.kick_username || row.slug,
       avatarUrl: row.avatar_url || row.avatarUrl || '',
-      status: row.status || 'active'
+      status: row.status || 'active',
+      plan: row.plan || 'standard',
+      assignedBotIdentityId: row.assigned_bot_identity_id || null
     })) });
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -423,6 +425,18 @@ app.get('/api/leaderboard',    waitDB,    async (req,res) => {
       .map((v, i) => ({ ...v, original_rank: v.rank, rank: i + 1 }));
     res.json({data});
   } catch(e){res.json({data:[]}); }
+});
+
+app.post('/api/platform-admin/streamers/:id/plan', requireAuth, requirePlatformAdmin, waitDB, async (req, res) => {
+  try {
+    const streamerId = Number(req.params.id);
+    const plan = String(req.body?.plan || '').trim().toLowerCase();
+    if (!streamerId || !['standard','premium'].includes(plan)) return res.status(400).json({ error: 'Offre invalide' });
+    const streamer = await db.getStreamerById(streamerId);
+    if (!streamer) return res.status(404).json({ error: 'Streamer introuvable' });
+    await db.setStreamerPlan(streamerId, plan);
+    res.json({ success:true, plan });
+  } catch (error) { res.status(500).json({ error:error.message }); }
 });
 
 app.get('/api/community', waitDB, async (req, res) => {
@@ -2401,6 +2415,35 @@ app.get('/auth/bot/login', (req, res) => {
   res.redirect(url);
 });
 
+// Connexion d'une identité de bot. Le streamer reste connecté avec son propre
+// compte dans le panel ; cette autorisation OAuth concerne uniquement le compte
+// qui écrira dans le chat.
+app.get('/auth/bot-identity/login', requireAuth, requireTenant, waitDB, async (req, res) => {
+  try {
+    if (!kickOAuth.isConfigured()) return res.status(400).send('OAuth Kick non configuré sur le serveur.');
+    const choice = String(req.query.choice || '').trim().toLowerCase();
+    const options = await db.getBotAssignmentOptions(req.streamer.id);
+    let identityId = null;
+    if (choice === 'elbot') {
+      if (!req.platformAdmin) return res.status(403).send('Seul l’administrateur ElBot peut autoriser le compte global ElBot.');
+      identityId = options.elbot?.id;
+    } else if (choice === 'custom') {
+      if (!options.premium && !req.platformAdmin) return res.status(403).send('Le bot personnalisé est réservé aux comptes Premium.');
+    } else {
+      return res.status(400).send('Identité de bot invalide.');
+    }
+    const url = kickOAuth.getAuthorizationUrl(null, {
+      mode: 'bot_identity_login',
+      returnTo: `/s/${encodeURIComponent(req.streamer.slug)}/dashboard`,
+      streamerId: req.streamer.id,
+      identityId,
+      botType: choice,
+      platformAdmin: Boolean(req.platformAdmin)
+    });
+    res.redirect(url);
+  } catch (e) { res.status(500).send(e.message); }
+});
+
 // ════════════════════════════════════════════════════════════════════
 // OAuth Kick officiel (id.kick.com) — refresh automatique du token
 // ════════════════════════════════════════════════════════════════════
@@ -2431,10 +2474,39 @@ app.get('/auth/callback', async (req, res) => {
     const kickUser = await kickOAuth.fetchCurrentUser(token.accessToken);
     const username = kickUser.username || kickUser.displayName || kickUser.id;
     if (mode === 'bot_login') {
+      const bot7up = await db.getBotIdentityByKey('bot7up');
+      if (bot7up) {
+        await db.saveOAuthToken(bot7up.oauth_provider, token.accessToken, token.refreshToken, token.expiresAt);
+        await db.markBotIdentityConnected(bot7up.id, kickUser);
+      }
       await db.setBotStatus('bot_oauth_username', username || 'bot');
       await db.setBotStatus('bot_oauth_connected_at', Date.now().toString());
       console.log(`[OAUTH BOT] ✅ Compte bot connecté: ${username}`);
       return res.redirect('/api/v2/core/status');
+    }
+    if (mode === 'bot_identity_login') {
+      const streamerId = Number(token.meta?.streamerId);
+      const botType = String(token.meta?.botType || '').toLowerCase();
+      const streamer = await db.getStreamerById(streamerId);
+      if (!streamer) throw new Error('Streamer de destination introuvable.');
+      let identity;
+      if (botType === 'elbot') {
+        if (tenant.normalizeSlug(username) !== 'elbot') throw new Error(`Le compte connecté est ${username}. Connecte obligatoirement le compte Kick ElBot.`);
+        identity = await db.getBotIdentityById(token.meta?.identityId) || await db.getBotIdentityByKey('elbot');
+        if (!identity || identity.bot_key !== 'elbot') throw new Error('Identité ElBot invalide.');
+        await db.saveOAuthToken(identity.oauth_provider, token.accessToken, token.refreshToken, token.expiresAt);
+        await db.markBotIdentityConnected(identity.id, kickUser);
+      } else if (botType === 'custom') {
+        const options = await db.getBotAssignmentOptions(streamerId);
+        if (!options.premium && !token.meta?.platformAdmin) throw new Error('Ce streamer ne possède pas l’offre Premium.');
+        identity = await db.connectCustomBotIdentity(streamerId, kickUser);
+        await db.saveOAuthToken(identity.oauth_provider, token.accessToken, token.refreshToken, token.expiresAt);
+        await db.assignBotIdentity(streamerId, 'custom', { platformAdmin:Boolean(token.meta?.platformAdmin) });
+      } else {
+        throw new Error('Type de bot OAuth invalide.');
+      }
+      console.log(`[OAUTH BOT V3] ✅ ${identity.display_name} connecté pour ${streamer.slug}`);
+      return res.redirect(`/s/${encodeURIComponent(streamer.slug)}/dashboard?bot_connected=1`);
     }
     if (!username) throw new Error('Kick n’a pas renvoyé de pseudo exploitable.');
     const slug = tenant.normalizeSlug(username);
@@ -2551,6 +2623,37 @@ app.post('/api/admin/oauth/disconnect', requireAuth, requireTenant, async (req, 
     clearStreamerCookie(res);
     res.json({ success: true });
   } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.get('/api/bot-identity', requireAuth, requireTenant, waitDB, async (req, res) => {
+  try {
+    const options = await db.getBotAssignmentOptions(req.streamer.id);
+    res.set('Cache-Control', 'no-store');
+    const clean = identity => identity ? {
+      id: identity.id,
+      key: identity.bot_key,
+      displayName: identity.display_name,
+      kickUsername: identity.kick_username,
+      kind: identity.kind,
+      status: identity.status
+    } : null;
+    res.json({ data: {
+      streamer: { id:req.streamer.id, slug:req.streamer.slug, plan:req.streamer.plan || 'standard' },
+      assigned: clean(options.assigned),
+      elbot: clean(options.elbot),
+      custom: clean(options.custom),
+      premium: options.premium,
+      platformAdmin: Boolean(req.platformAdmin),
+      lockedToBot7up: options.lockedToBot7up
+    }});
+  } catch (e) { res.status(500).json({ error:e.message }); }
+});
+
+app.post('/api/bot-identity/assign', requireAuth, requireTenant, waitDB, async (req, res) => {
+  try {
+    const identity = await db.assignBotIdentity(req.streamer.id, req.body?.choice, { platformAdmin:Boolean(req.platformAdmin) });
+    res.json({ success:true, assigned:{ id:identity.id, key:identity.bot_key, displayName:identity.display_name, status:identity.status } });
+  } catch (e) { res.status(400).json({ error:e.message }); }
 });
 
 app.get('/api/v2/dashboard-summary', requireAuth, requireTenant, async (req, res) => {
