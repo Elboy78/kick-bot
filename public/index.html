@@ -824,6 +824,7 @@ body.light .card,body.light .panel,body.light .widget-engine-card{background:lin
     </div>
     <div class="panel"><h3>⭐ Niveaux</h3><div class="g3" id="levels-grid"></div></div>
   </div>
+  </div>
 
   <!-- ══ COMMUNAUTÉ ══ -->
   <div class="page" id="page-communaute">
@@ -833,9 +834,10 @@ body.light .card,body.light .panel,body.light .widget-engine-card{background:lin
       <div class="panel"><h3>💚 Follows datés</h3><div id="community-known-followers" style="font-size:28px;font-weight:900;color:#22c55e">—</div></div>
       <div class="panel"><h3>⭐ Subs identifiés</h3><div id="community-current-subs" style="font-size:28px;font-weight:900;color:#f59e0b">—</div></div>
     </div>
-    <div class="panel" style="margin-bottom:14px">
+    <div class="g2" style="align-items:start;margin-bottom:14px">
+    <div class="panel">
       <h3>💜 Classement des soutiens <small style="color:var(--muted);font-weight:500">all time Kick + événements ElBot</small></h3>
-      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px"><input class="inp inp-sm" id="community-support-search" placeholder="Rechercher un pseudo…" oninput="communitySupportPage=1;renderCommunitySupporters()" style="max-width:240px"><select class="inp inp-sm" id="community-support-sort" onchange="communitySupportPage=1;renderCommunitySupporters()" style="max-width:220px"><option value="gifts">Plus de subs offerts</option><option value="channel-oldest">Plus ancien de la chaîne</option><option value="support">Plus de soutiens</option><option value="months">Plus ancien sub</option><option value="recent">Soutien le plus récent</option><option value="name">Pseudo A–Z</option></select><span id="community-kick-sync" style="align-self:center;color:var(--muted);font-size:11px"></span></div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px"><input class="inp inp-sm" id="community-support-search" placeholder="Rechercher un pseudo…" oninput="communitySupportPage=1;renderCommunitySupporters()" style="max-width:240px"><select class="inp inp-sm" id="community-support-sort" onchange="communitySupportPage=1;renderCommunitySupporters()" style="max-width:220px"><option value="gifts">Plus de subs offerts</option><option value="channel-oldest">Plus ancien de la chaîne</option><option value="support">Plus de soutiens</option><option value="months">Plus ancien sub</option><option value="recent">Soutien le plus récent</option><option value="name">Pseudo A–Z</option></select><button class="btnx btn-ghost btn-sm" id="community-deep-sync" onclick="syncKickFullGiftHistory()">Importer plus d’historique</button><span id="community-kick-sync" style="align-self:center;color:var(--muted);font-size:11px"></span></div>
       <div class="tw"><table><thead><tr><th>#</th><th>Viewer</th><th>Subs offerts</th><th>Ancienneté</th><th>Follow depuis</th><th>Dernier soutien</th></tr></thead><tbody id="community-supporters"><tr><td colspan="6"><div class="empty"><p>Chargement…</p></div></td></tr></tbody></table></div>
       <div id="community-support-pagination" style="display:flex;justify-content:center;align-items:center;gap:8px;margin-top:12px"></div>
     </div>
@@ -5255,6 +5257,49 @@ async function syncKickHistoricalGiftLeaderboard(){
     const saved=await fetch(API+'/api/admin/community/kick-gifts-import',{method:'POST',headers:{'Content-Type':'application/json','x-panel-key':getKey()},body:JSON.stringify({rows})}); if(!saved.ok)throw new Error('import refusé');
     if(status)status.textContent=`✓ ${rows.length} gifters all time synchronisés`; setTimeout(loadCommunity,300);
   }catch(e){if(status)status.textContent='Historique Kick conservé · synchronisation indisponible';}
+}
+
+function extractKickGiftEvents(payload, totals = new Map()) {
+  const visit = value => {
+    if (Array.isArray(value)) return value.forEach(visit);
+    if (!value || typeof value !== 'object') return;
+    const type = String(value.event_type || value.type || value.event || value.name || value.class || '').toLowerCase();
+    if (type.includes('gift') && (type.includes('sub') || value.gifter || value.gift_count || value.quantity)) {
+      const user = value.gifter || value.user || value.sender || value.data?.gifter || value.data?.user || {};
+      const username = String(user.username || user.name || value.gifter_username || value.username || '').trim().toLowerCase();
+      const count = Math.max(1, Number(value.quantity || value.gift_count || value.count || value.amount || value.data?.quantity || value.data?.gift_count || value.data?.count || 1) || 1);
+      if (username) { totals.set(username, (totals.get(username) || 0) + count); return; }
+    }
+    Object.values(value).forEach(visit);
+  };
+  visit(payload); return totals;
+}
+
+async function syncKickFullGiftHistory(){
+  const button=document.getElementById('community-deep-sync'),status=document.getElementById('community-kick-sync');
+  const slug=String(activeKickChannel||CURRENT_STREAMER_SLUG||'').trim().toLowerCase(); if(!slug)return;
+  if(button){button.disabled=true;button.textContent='Import en cours…';}
+  const totals=new Map(),seen=new Set(); let pages=0;
+  try{
+    for(let page=1;page<=100;page++){
+      if(status)status.textContent=`Lecture de l’historique Kick · page ${page}`;
+      const response=await fetch(`https://kick.com/api/internal/v1/channels/${encodeURIComponent(slug)}/events?page=${page}`,{headers:{Accept:'application/json'},cache:'no-store'});
+      if(!response.ok)break;
+      const payload=await response.json(),signature=JSON.stringify(payload).slice(0,600);
+      if(!signature||seen.has(signature))break; seen.add(signature); pages++;
+      const before=totals.size; extractKickGiftEvents(payload,totals);
+      const list=Array.isArray(payload)?payload:(payload.data||payload.events||payload.items||[]);
+      if(!Array.isArray(list)||!list.length)break;
+      if(page%5===0)await new Promise(resolve=>setTimeout(resolve,120));
+    }
+    const rows=[...totals].map(([username,quantity])=>({username,quantity}));
+    if(rows.length){
+      const saved=await fetch(API+'/api/admin/community/kick-gifts-import',{method:'POST',headers:{'Content-Type':'application/json','x-panel-key':getKey()},body:JSON.stringify({rows})});
+      if(!saved.ok)throw new Error('import refusé');
+      if(status)status.textContent=`✓ ${rows.length} gifters récupérés sur ${pages} pages`; setTimeout(loadCommunity,250);
+    }else if(status)status.textContent='Aucun gift supplémentaire accessible dans l’historique Kick';
+  }catch(e){if(status)status.textContent='Import approfondi interrompu · données déjà trouvées conservées';}
+  finally{if(button){button.disabled=false;button.textContent='Importer plus d’historique';}}
 }
 
 async function copyPublicLeaderboardLink(){
@@ -10193,7 +10238,7 @@ async function syncOwnKickChatroomForBot() {
   } catch(e) { console.warn('[V2 BOT] Sync chatroom impossible:', e.message); }
 }
 setTimeout(syncOwnKickChatroomForBot, 1200);
-setInterval(syncOwnKickChatroomForBot, 5 * 60 * 1000);
+setInterval(() => { if (!document.hidden) syncOwnKickChatroomForBot(); }, 5 * 60 * 1000);
 
 
 </script>
@@ -11249,7 +11294,7 @@ window.addEventListener('pageshow', loadReferenceAppearance);
 </script>
 
 <!-- ElBot Theme Engine V2 — chargé en dernier pour rester prioritaire -->
-<link rel="stylesheet" href="/themes/engine.css?v=32">
+<link rel="stylesheet" href="/themes/engine.css?v=33">
 <script src="/theme-engine.js?v=32"></script>
 </body>
 </html>

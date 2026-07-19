@@ -1573,7 +1573,8 @@ async function importCommunityGiftLeaderboard(rows = [], streamerId = null) {
     await run(`INSERT INTO community_support_snapshots (streamer_id,username,gifts_all_time,source,synced_at)
       VALUES (?,?,?,'kick_leaderboard',datetime('now'))
       ON CONFLICT(streamer_id,username) DO UPDATE SET
-        gifts_all_time = excluded.gifts_all_time, source = excluded.source, synced_at = excluded.synced_at`,
+        gifts_all_time = CASE WHEN excluded.gifts_all_time > community_support_snapshots.gifts_all_time THEN excluded.gifts_all_time ELSE community_support_snapshots.gifts_all_time END,
+        source = excluded.source, synced_at = excluded.synced_at`,
       [sid, username, gifts]);
     imported++;
   }

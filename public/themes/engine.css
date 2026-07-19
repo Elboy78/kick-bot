@@ -54,7 +54,7 @@ body .main{
   background-repeat:no-repeat!important;
   background-size:cover!important;
   background-position:center center!important;
-  background-attachment:fixed!important;
+  background-attachment:scroll!important;
   min-height:100vh!important;
 }
 
@@ -84,7 +84,7 @@ html[data-sidebar-wallpaper="true"] body{
   background-repeat:no-repeat!important;
   background-size:cover!important;
   background-position:center center!important;
-  background-attachment:fixed!important;
+  background-attachment:scroll!important;
 }
 
 html[data-sidebar-wallpaper="true"] body .main{
@@ -234,6 +234,38 @@ body .ref-live-viewers{
     color-mix(in srgb,var(--card) var(--panel-surface-opacity),transparent)!important;
   backdrop-filter:blur(var(--elbot-glass-blur)) saturate(118%);
   -webkit-backdrop-filter:blur(var(--elbot-glass-blur)) saturate(118%);
+}
+
+/* Mode fluide par défaut : les grands flous plein écran forçaient le GPU à
+   recalculer le wallpaper à chaque scroll et sur chaque carte. La transparence
+   et les couleurs restent identiques, sans le coût du backdrop blur. */
+body .sidebar,
+body .elbot-topbar,
+body .panel,
+body .card,
+body .ref-kpi,
+body .ref-panel,
+body .settings-card,
+body .widget-card,
+body .config-card,
+body .table-wrap,
+body .form-section,
+body .block,
+body .box,
+body .ref-status-card,
+body .ref-current-card,
+body .ref-logs-card,
+body .ref-live-viewers,
+body .sidebar .ref-sidebar-tool,
+body .sidebar .sb-profile{
+  backdrop-filter:none!important;
+  -webkit-backdrop-filter:none!important;
+}
+
+body .page.active > .panel,
+body .page.active > .g2 > .panel{
+  content-visibility:auto;
+  contain-intrinsic-size:auto 420px;
 }
 
 /* Toute la couleur bleue historique devient personnalisable. */
