@@ -57,6 +57,14 @@ const chatContextStore = new AsyncLocalStorage();
 function normalizeSlug(value) {
   return String(value || '').trim().toLowerCase().replace(/^@+/, '').replace(/[^a-z0-9_-]/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '');
 }
+function configuredBotStreamerAllowlist() {
+  return new Set(
+    String(process.env.BOT_STREAMER_ALLOWLIST || '')
+      .split(',')
+      .map(normalizeSlug)
+      .filter(Boolean)
+  );
+}
 function pusherChatroomChannel(chatroomId) { return `chatrooms.${chatroomId}.v2`; }
 function contextFromPusherChannel(channelName, payload = {}) {
   const id = String(channelName || '').match(/chatrooms\.(\d+)\.v2/)?.[1]
@@ -66,9 +74,13 @@ function contextFromPusherChannel(channelName, payload = {}) {
 async function loadActiveBotChannels() {
   try {
     const rows = await db.getActiveStreamersForBot();
+    const allowlist = configuredBotStreamerAllowlist();
+    const selectedRows = allowlist.size
+      ? (rows || []).filter(streamer => allowlist.has(normalizeSlug(streamer.slug)))
+      : (rows || []);
     const usable = [];
     const nextChatrooms = new Map();
-    for (const s of rows || []) {
+    for (const s of selectedRows) {
       const chatroomId = String(s.chatroom_id || '').trim();
       if (!chatroomId) {
         console.log(`[BOT V2] ${s.slug}: ignoré — chatroom_id manquant. Reconnecte ce streamer via Kick pour enregistrer son chatroom_id.`);
@@ -92,6 +104,9 @@ async function loadActiveBotChannels() {
       nextChatrooms.set(chatroomId, ctx);
     }
     botChannelState.chatrooms = nextChatrooms;
+    if (allowlist.size) {
+      console.log(`[BOT V3] Allowlist worker: ${[...allowlist].join(', ')} — autres chaînes interdites`);
+    }
     console.log(`[BOT V3] Assignations actives: ${usable.map(x => `${x.slug}→${x.botDisplayName}#${x.chatroomId}`).join(', ') || 'aucune'}`);
     return usable;
   } catch(e) {
