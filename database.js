@@ -1980,7 +1980,11 @@ async function connectCustomBotIdentity(streamerId, user = {}) {
 }
 
 async function markBotIdentityConnected(identityId, user = {}) {
-  await run(`UPDATE bot_identities SET display_name = COALESCE(?,display_name),
+  await run(`UPDATE bot_identities SET
+    display_name = CASE
+      WHEN kind IN ('default','reserved') THEN display_name
+      ELSE COALESCE(?,display_name)
+    END,
     kick_username = COALESCE(?,kick_username), kick_user_id = COALESCE(?,kick_user_id),
     status = 'connected', updated_at = datetime('now') WHERE id = ?`,
     [user.displayName || user.username || null, user.username || null, user.id || null, Number(identityId)]);

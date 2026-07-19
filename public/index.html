@@ -7793,7 +7793,7 @@ async function loadBotIdentity() {
     const connected = assigned?.status === 'connected';
     planBadge.textContent = d.premium ? 'PREMIUM' : 'STANDARD';
     planBadge.style.color = d.premium ? '#fbbf24' : 'var(--accent)';
-    current.innerHTML = `<div style="display:flex;align-items:center;justify-content:space-between;gap:10px"><div><b style="font-size:13px">${esc(assigned?.displayName || 'Aucun bot')}</b><div style="color:var(--muted);margin-top:3px">${d.lockedToBot7up ? 'Identité réservée à cette chaîne' : 'Bot autorisé à écrire sur cette chaîne'}</div></div><span style="font-weight:800;color:${connected?'#22c55e':'#f59e0b'}">${connected?'● ACTIF':'● AUTORISATION REQUISE'}</span></div>`;
+    current.innerHTML = `<div style="display:flex;align-items:center;justify-content:space-between;gap:10px"><div><b style="font-size:13px">${esc(assigned?.displayName || 'Aucun bot')}</b><div style="color:var(--muted);margin-top:3px">${assigned?.kickUsername ? `Compte Kick : @${esc(assigned.kickUsername)} · ` : ''}${d.lockedToBot7up ? 'Identité réservée à cette chaîne' : 'Seul bot autorisé à écrire sur cette chaîne'}</div></div><span style="font-weight:800;color:${connected?'#22c55e':'#f59e0b'}">${connected?'● ACTIF':'● AUTORISATION REQUISE'}</span></div>`;
 
     if (d.lockedToBot7up) {
       optionsEl.innerHTML = '<div style="font-size:10px;color:var(--muted);line-height:1.6">🔒 Bot7uP est exclusivement assigné à Fack7uP. Aucune autre identité ne peut écrire sur cette chaîne.</div>';
