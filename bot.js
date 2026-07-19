@@ -176,6 +176,11 @@ async function init() {
   if (process.env.BOT_MEME_ONLY !== 'true') setInterval(checkLiveStatus, 120000);
   // Resynchroniser montant/intervalle de points toutes les 2 minutes (changements panel)
   setInterval(syncPointsConfig, 120000);
+  // Portefeuille mèmes séparé : vérification légère chaque minute.
+  if (process.env.BOT_MEME_ONLY !== 'true') {
+    setTimeout(distributeMemePoints, 60000);
+    setInterval(distributeMemePoints, 60000);
+  }
   console.log('[BOT] Base de données prête ✓');
 
   const oauthConfigured = kickOAuth.isConfigured();
@@ -564,7 +569,7 @@ async function handleChatMessageScoped(payload, ctx = null) {
       const cdKey=`${context?.streamerId}:${item.id}`, remaining=Math.ceil(((memeCooldowns.get(cdKey)||0)-Date.now())/1000);
       if (remaining>0) return sendChat(`@${username} Ce meme revient dans ${remaining}s.`);
       const cost=Math.max(0,Number(item.cost)||0);
-      if(cost){const viewer=await db.getViewer(username);if(!viewer||Number(viewer.points||0)<cost)return sendChat(`@${username} Il faut ${cost} points.`);await db.addPoints(username,-cost,`meme:${item.id}`)}
+      if(cost){const viewer=await db.getViewer(username);if(!viewer||Number(viewer.meme_points||0)<cost)return sendChat(`@${username} Il faut ${cost} points mèmes.`);await db.addMemePoints(username,-cost)}
       const cleanText=String(item.allowText===false?'':text).replace(/[<>\u0000-\u001f]/g,' ').replace(/\s+/g,' ').trim().slice(0,Math.max(0,Math.min(120,Number(cfg.maxText)||80)));
       if(cleanText){const banned=await db.checkBannedWords(cleanText);if(banned)return sendChat(`@${username} Ce texte n'est pas autorisé.`)}
       memeCooldowns.set(cdKey,Date.now()+Math.max(0,Number(item.cooldown)||30)*1000);
@@ -1978,6 +1983,29 @@ async function distributePoints() {
     // Erreur réseau temporaire (ex: Turso 502) — on absorbe sans planter le bot.
     // Le prochain cycle de distribution se fera normalement dans ${CONFIG.intervalMs/60000} minutes.
     console.error('[POINTS] Erreur temporaire (ignorée, prochaine tentative au prochain cycle):', e.message);
+  }
+}
+
+async function distributeMemePoints() {
+  if (!isLive) return;
+  const contexts = [...new Map([...botChannelState.chatrooms.values()].map(ctx => [ctx.streamerId, ctx])).values()];
+  for (const ctx of contexts) {
+    await withChatContext(ctx, async () => {
+      try {
+        const cfg = await db.getPointsConfig();
+        const amount = Math.max(0, parseInt(cfg.meme_points_amount ?? '5') || 0);
+        const interval = Math.max(1, parseInt(cfg.meme_interval_minutes ?? '10') || 10);
+        if (!amount) return;
+        const viewers = await db.getActiveViewers(interval + 1);
+        let granted = 0;
+        for (const viewer of viewers) {
+          if (await db.grantMemePointsIfDue(viewer.username, amount, interval)) granted++;
+        }
+        if (granted) console.log(`[POINTS MEMES:${ctx.slug}] +${amount} → ${granted} viewer(s)`);
+      } catch (e) {
+        console.error(`[POINTS MEMES:${ctx.slug}] Erreur ignorée:`, e.message);
+      }
+    });
   }
 }
 

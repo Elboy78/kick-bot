@@ -200,6 +200,8 @@ async function initSchema() {
       subscribed_for INTEGER,
       badges_json TEXT,
       badges_synced_at TEXT,
+      meme_points INTEGER NOT NULL DEFAULT 100,
+      meme_points_updated_at TEXT,
       points        INTEGER NOT NULL DEFAULT 0,
       total_minutes INTEGER NOT NULL DEFAULT 0,
       sessions      INTEGER NOT NULL DEFAULT 0,
@@ -539,6 +541,8 @@ async function initSchema() {
     `ALTER TABLE viewers ADD COLUMN subscribed_for INTEGER`,
     `ALTER TABLE viewers ADD COLUMN badges_json TEXT`,
     `ALTER TABLE viewers ADD COLUMN badges_synced_at TEXT`,
+    `ALTER TABLE viewers ADD COLUMN meme_points INTEGER NOT NULL DEFAULT 100`,
+    `ALTER TABLE viewers ADD COLUMN meme_points_updated_at TEXT`,
     `ALTER TABLE chest_seasons ADD COLUMN ever_secured INTEGER NOT NULL DEFAULT 0`,
     `ALTER TABLE chest_seasons ADD COLUMN victory_pending INTEGER NOT NULL DEFAULT 0`,
     `ALTER TABLE chest_seasons ADD COLUMN protected_number INTEGER DEFAULT NULL`,
@@ -685,7 +689,8 @@ async function upsertViewer(username, kickUserId = null) {
   } else {
     const cfg = await getPointsConfig().catch(() => ({}));
     const startingPoints = Math.max(0, parseInt(cfg.starting_points ?? '100') || 0);
-    await run(`INSERT INTO viewers (username, kick_user_id, points, last_seen, streamer_id) VALUES (?, ?, ?, datetime('now'), ?)`, [lower, kickUserId, startingPoints, sid]);
+    const startingMemePoints = Math.max(0, parseInt(cfg.meme_starting_points ?? '100') || 0);
+    await run(`INSERT INTO viewers (username, kick_user_id, points, meme_points, last_seen, streamer_id) VALUES (?, ?, ?, ?, datetime('now'), ?)`, [lower, kickUserId, startingPoints, startingMemePoints, sid]);
   }
 }
 
@@ -716,6 +721,35 @@ async function getViewer(username) {
   const viewer = await get(`SELECT * FROM viewers WHERE username = ? AND COALESCE(streamer_id, 1) = ?`, [String(username || '').toLowerCase(), scopedStreamerId()]);
   const engine = await getRankingEngine();
   return engine.apply(viewer);
+}
+
+async function addMemePoints(username, points) {
+  const sid = scopedStreamerId();
+  const lower = String(username || '').trim().toLowerCase();
+  if (!lower) return null;
+  await upsertViewer(lower);
+  await run(`UPDATE viewers SET meme_points = MAX(0, meme_points + ?),
+      meme_points_updated_at = datetime('now'), last_seen = datetime('now')
+    WHERE username = ? AND COALESCE(streamer_id, 1) = ?`, [Number(points) || 0, lower, sid]);
+  return get(`SELECT username, meme_points FROM viewers WHERE username = ? AND COALESCE(streamer_id, 1) = ?`, [lower, sid]);
+}
+
+async function grantMemePointsIfDue(username, amount, intervalMinutes) {
+  const sid = scopedStreamerId();
+  const lower = String(username || '').trim().toLowerCase();
+  if (!lower) return false;
+  await upsertViewer(lower);
+  const result = await run(`UPDATE viewers SET meme_points = MAX(0, meme_points + ?), meme_points_updated_at = datetime('now')
+    WHERE username = ? AND COALESCE(streamer_id, 1) = ?
+      AND (meme_points_updated_at IS NULL OR meme_points_updated_at <= datetime('now', ?))`,
+    [Math.max(0, Number(amount) || 0), lower, sid, `-${Math.max(1, parseInt(intervalMinutes) || 10)} minutes`]);
+  return Number(result?.changes || 0) > 0;
+}
+
+async function getMemeLeaderboard(limit = 10) {
+  return all(`SELECT username, meme_points AS points FROM viewers
+    WHERE COALESCE(streamer_id, 1) = ? ORDER BY meme_points DESC, last_seen DESC LIMIT ?`,
+    [scopedStreamerId(), Math.max(1, Math.min(100, parseInt(limit) || 10))]);
 }
 
 async function getLeaderboard(limit = 10) {
@@ -2248,6 +2282,8 @@ async function migrateViewersToScopedUnique(defaultStreamerId = 1) {
     subscribed_for  INTEGER,
     badges_json     TEXT,
     badges_synced_at TEXT,
+    meme_points     INTEGER NOT NULL DEFAULT 100,
+    meme_points_updated_at TEXT,
     points          INTEGER NOT NULL DEFAULT 0,
     total_minutes   INTEGER NOT NULL DEFAULT 0,
     sessions        INTEGER NOT NULL DEFAULT 0,
@@ -2264,7 +2300,7 @@ async function migrateViewersToScopedUnique(defaultStreamerId = 1) {
   const hasStreamerId = cols.includes('streamer_id');
   const sidExpr = hasStreamerId ? 'COALESCE(streamer_id, ?)' : '?';
   await run(`INSERT OR IGNORE INTO viewers_v2_migration
-    (id, streamer_id, username, kick_user_id, following_since, subscribed_for, badges_json, badges_synced_at, points, total_minutes, sessions, level, last_seen, first_seen, created_at)
+    (id, streamer_id, username, kick_user_id, following_since, subscribed_for, badges_json, badges_synced_at, meme_points, meme_points_updated_at, points, total_minutes, sessions, level, last_seen, first_seen, created_at)
     SELECT
       MIN(id) AS id,
       ${sidExpr} AS streamer_id,
@@ -2274,6 +2310,8 @@ async function migrateViewersToScopedUnique(defaultStreamerId = 1) {
       MAX(subscribed_for) AS subscribed_for,
       MAX(badges_json) AS badges_json,
       MAX(badges_synced_at) AS badges_synced_at,
+      MAX(meme_points) AS meme_points,
+      MAX(meme_points_updated_at) AS meme_points_updated_at,
       MAX(points) AS points,
       MAX(total_minutes) AS total_minutes,
       MAX(sessions) AS sessions,
@@ -2335,7 +2373,7 @@ async function ensureInit() {
 module.exports = {
   ensureInit,
   getDB,
-  upsertViewer, addPoints, getViewer, getLeaderboard, getViewerRank,
+  upsertViewer, addPoints, addMemePoints, grantMemePointsIfDue, getMemeLeaderboard, getViewer, getLeaderboard, getViewerRank,
   getGlobalStats, getRecentLogs, getActiveViewers, getViewersMissingFollow, getViewersForBadgeSync, setViewerKickProfile, clearAllPoints,
   addCommunityEvent, backfillCommunityHistory, importCommunityGiftLeaderboard, upsertCommunityGiftBadge, getCommunityData,
   getLevel, getNextLevel, getLevels, getRankingEngine, addLevel, updateLevel, deleteLevel,
