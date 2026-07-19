@@ -429,6 +429,21 @@ async function handleChatMessage(payload, ctx = null) {
   return handleChatMessageScoped(payload, ctx);
 }
 
+function getSubGifterBadgeCount(badges) {
+  for (const badge of Array.isArray(badges) ? badges : []) {
+    const type = String(badge?.type || badge?.slug || badge?.name || '')
+      .trim().toLowerCase().replace(/[\s-]+/g, '_');
+    if (!['sub_gifter', 'subgifter', 'subscription_gifter', 'gift_sub_gifter'].includes(type)) continue;
+
+    // Forme actuelle Kick : { type: 'sub_gifter', text: 'Sub Gifter', count: 42 }.
+    // Les autres clés servent de filet de sécurité si Kick renomme le champ.
+    const rawCount = badge?.count ?? badge?.gift_count ?? badge?.gifts ?? badge?.quantity ?? badge?.value;
+    const count = Number.parseInt(String(rawCount ?? '').replace(/[^0-9]/g, ''), 10);
+    if (Number.isSafeInteger(count) && count > 0) return Math.min(count, 100000000);
+  }
+  return 0;
+}
+
 async function handleChatMessageScoped(payload, ctx = null) {
   const username = payload?.sender?.username || payload?.user?.username || payload?.username;
   const content  = payload?.content || payload?.message || '';
@@ -440,6 +455,17 @@ async function handleChatMessageScoped(payload, ctx = null) {
   const isModOrBroadcaster = badges.some(b => b.type === 'moderator' || b.type === 'broadcaster');
 
   await db.upsertViewer(username, kickId);
+  const subGifterCount = getSubGifterBadgeCount(badges);
+  if (subGifterCount > 0) {
+    try {
+      const saved = await db.upsertCommunityGiftBadge(username, subGifterCount, ctx?.streamerId);
+      if (saved?.changed) {
+        console.log(`[COMMUNAUTÉ${ctx?.slug ? `:${ctx.slug}` : ''}] Badge sub gifter: ${username} = ${saved.gifts}`);
+      }
+    } catch (e) {
+      console.error(`[COMMUNAUTÉ] Badge sub gifter ignoré pour ${username}:`, e.message);
+    }
+  }
   // Mettre à jour le cache des derniers messages pour retrouver le contexte des bans
   recentMessages.set(username.toLowerCase(), { content, kickId });
   if (recentMessages.size > 500) recentMessages.delete(recentMessages.keys().next().value);

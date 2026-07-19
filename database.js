@@ -1581,6 +1581,43 @@ async function importCommunityGiftLeaderboard(rows = [], streamerId = null) {
   return imported;
 }
 
+// Le badge `sub_gifter` présent sur les messages Kick contient le total all-time
+// affiché publiquement pour ce viewer. Il s'agit d'un compteur absolu : on garde
+// donc toujours la valeur la plus haute au lieu de l'additionner à chaque message.
+async function upsertCommunityGiftBadge(username, giftCount, streamerId = null) {
+  const sid = Number(streamerId || scopedStreamerId());
+  const normalizedUsername = String(username || '').trim().replace(/^@+/, '').toLowerCase();
+  const normalizedCount = Math.max(0, Math.min(100000000, parseInt(giftCount, 10) || 0));
+  if (!normalizedUsername || !normalizedCount) return { changed: false, gifts: 0 };
+
+  const previous = await get(`SELECT gifts_all_time FROM community_support_snapshots
+    WHERE streamer_id = ? AND username = ?`, [sid, normalizedUsername]);
+  const previousCount = Math.max(0, Number(previous?.gifts_all_time || 0));
+
+  await run(`INSERT INTO community_support_snapshots
+      (streamer_id,username,gifts_all_time,source,synced_at)
+    VALUES (?,?,?,'kick_chat_badge',datetime('now'))
+    ON CONFLICT(streamer_id,username) DO UPDATE SET
+      gifts_all_time = CASE
+        WHEN excluded.gifts_all_time > community_support_snapshots.gifts_all_time
+          THEN excluded.gifts_all_time
+        ELSE community_support_snapshots.gifts_all_time
+      END,
+      source = CASE
+        WHEN excluded.gifts_all_time > community_support_snapshots.gifts_all_time
+          THEN excluded.source
+        ELSE community_support_snapshots.source
+      END,
+      synced_at = excluded.synced_at`,
+    [sid, normalizedUsername, normalizedCount]);
+
+  return {
+    changed: normalizedCount > previousCount,
+    gifts: Math.max(previousCount, normalizedCount),
+    previous: previousCount
+  };
+}
+
 async function getCommunityData(limit = 100, streamerId = null) {
   const sid = Number(streamerId || scopedStreamerId());
   await backfillCommunityHistory(sid);
@@ -2044,7 +2081,7 @@ module.exports = {
   getDB,
   upsertViewer, addPoints, getViewer, getLeaderboard, getViewerRank,
   getGlobalStats, getRecentLogs, getActiveViewers, getViewersMissingFollow, clearAllPoints,
-  addCommunityEvent, backfillCommunityHistory, importCommunityGiftLeaderboard, getCommunityData,
+  addCommunityEvent, backfillCommunityHistory, importCommunityGiftLeaderboard, upsertCommunityGiftBadge, getCommunityData,
   getLevel, getNextLevel, getLevels, getRankingEngine, addLevel, updateLevel, deleteLevel,
   getCustomCommands, getCustomCommand, setCustomCommand, deleteCustomCommand, toggleCustomCommand,
   getObjectives, createObjective, deleteObjective, achieveObjective,
