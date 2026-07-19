@@ -145,6 +145,19 @@ async function initSchema() {
       created_at  TEXT NOT NULL DEFAULT (datetime('now')),
       UNIQUE(streamer_id, username)
     )`,
+    `CREATE TABLE IF NOT EXISTS bot_identities (
+      id                INTEGER PRIMARY KEY AUTOINCREMENT,
+      bot_key           TEXT NOT NULL UNIQUE,
+      display_name      TEXT NOT NULL,
+      kick_username     TEXT,
+      kick_user_id      TEXT,
+      oauth_provider    TEXT NOT NULL UNIQUE,
+      kind              TEXT NOT NULL DEFAULT 'default',
+      owner_streamer_id INTEGER,
+      status            TEXT NOT NULL DEFAULT 'authorization_required',
+      created_at        TEXT NOT NULL DEFAULT (datetime('now')),
+      updated_at        TEXT NOT NULL DEFAULT (datetime('now'))
+    )`,
     `CREATE TABLE IF NOT EXISTS streamer_settings (
       streamer_id INTEGER NOT NULL,
       key         TEXT NOT NULL,
@@ -528,6 +541,8 @@ async function initSchema() {
     `ALTER TABLE streamers ADD COLUMN broadcaster_user_id TEXT`,
     `ALTER TABLE streamers ADD COLUMN bot_enabled INTEGER NOT NULL DEFAULT 1`,
     `ALTER TABLE streamers ADD COLUMN last_bot_sync_at TEXT`,
+    `ALTER TABLE streamers ADD COLUMN plan TEXT NOT NULL DEFAULT 'standard'`,
+    `ALTER TABLE streamers ADD COLUMN assigned_bot_identity_id INTEGER`,
   ];
   for (const sql of migrations) {
     try {
@@ -1827,6 +1842,155 @@ async function listStreamers() {
   return all(`SELECT * FROM streamers ORDER BY created_at ASC`);
 }
 
+async function setStreamerPlan(streamerId, plan) {
+  const sid = Number(streamerId);
+  const normalizedPlan = String(plan || '').trim().toLowerCase();
+  if (!sid || !['standard','premium'].includes(normalizedPlan)) throw new Error('Offre invalide');
+  await run(`UPDATE streamers SET plan = ?, updated_at = datetime('now') WHERE id = ?`, [normalizedPlan, sid]);
+  return getStreamerById(sid);
+}
+
+let botIdentitiesEnsured = false;
+async function ensureBotIdentities() {
+  if (botIdentitiesEnsured) return;
+  await run(`INSERT OR IGNORE INTO bot_identities
+    (bot_key,display_name,kick_username,oauth_provider,kind,status)
+    VALUES ('elbot','ElBot','ElBotApp','kick_bot:elbot','default','authorization_required')`);
+  // Le nom visible du service reste ElBot, mais le compte Kick officiel utilisé
+  // pour écrire dans les chats est ElBotApp (ElBot étant indisponible sur Kick).
+  await run(`UPDATE bot_identities SET display_name = 'ElBot',
+    kick_username = CASE
+      WHEN status = 'connected' AND kick_username IS NOT NULL AND kick_username != '' THEN kick_username
+      ELSE 'ElBotApp'
+    END,
+    updated_at = datetime('now') WHERE bot_key = 'elbot'`);
+  await run(`INSERT OR IGNORE INTO bot_identities
+    (bot_key,display_name,kick_username,oauth_provider,kind,status)
+    VALUES ('bot7up','Bot7uP','Bot7uP','kick_bot:bot7up','reserved','authorization_required')`);
+
+  // Le token historique `kick_bot` appartient à Bot7uP. On le conserve et on
+  // le copie vers son provider dédié pour que la migration soit transparente.
+  await run(`INSERT OR IGNORE INTO oauth_tokens (provider,access_token,refresh_token,expires_at,updated_at)
+    SELECT 'kick_bot:bot7up',access_token,refresh_token,expires_at,updated_at
+    FROM oauth_tokens WHERE provider = 'kick_bot'`);
+  await run(`UPDATE bot_identities SET status = 'connected', updated_at = datetime('now')
+    WHERE bot_key = 'bot7up' AND EXISTS (SELECT 1 FROM oauth_tokens WHERE provider = 'kick_bot:bot7up')`);
+  await run(`UPDATE bot_identities SET status = 'connected', updated_at = datetime('now')
+    WHERE bot_key = 'elbot' AND EXISTS (SELECT 1 FROM oauth_tokens WHERE provider = 'kick_bot:elbot')`);
+
+  const bot7up = await get(`SELECT id FROM bot_identities WHERE bot_key = 'bot7up'`);
+  const elbot = await get(`SELECT id FROM bot_identities WHERE bot_key = 'elbot'`);
+  if (bot7up?.id) {
+    await run(`UPDATE streamers SET assigned_bot_identity_id = ?, updated_at = datetime('now')
+      WHERE slug = 'fack7up' AND (assigned_bot_identity_id IS NULL OR assigned_bot_identity_id != ?)`, [bot7up.id, bot7up.id]);
+  }
+  if (elbot?.id) {
+    await run(`UPDATE streamers SET assigned_bot_identity_id = ?, updated_at = datetime('now')
+      WHERE slug != 'fack7up' AND assigned_bot_identity_id IS NULL`, [elbot.id]);
+  }
+  botIdentitiesEnsured = true;
+}
+
+async function getBotIdentityById(id) {
+  if (!id) return null;
+  return get(`SELECT * FROM bot_identities WHERE id = ?`, [Number(id)]);
+}
+
+async function getBotIdentityByKey(key) {
+  return get(`SELECT * FROM bot_identities WHERE bot_key = ?`, [String(key || '').trim().toLowerCase()]);
+}
+
+async function getAssignedBotIdentity(streamerId) {
+  const sid = Number(streamerId || scopedStreamerId());
+  await ensureBotIdentities();
+  return get(`SELECT bi.*, s.slug AS streamer_slug, COALESCE(s.plan,'standard') AS streamer_plan
+    FROM streamers s LEFT JOIN bot_identities bi ON bi.id = s.assigned_bot_identity_id
+    WHERE s.id = ?`, [sid]);
+}
+
+async function getBotAssignmentOptions(streamerId) {
+  const sid = Number(streamerId || scopedStreamerId());
+  await ensureBotIdentities();
+  const streamer = await getStreamerById(sid);
+  const assigned = await getAssignedBotIdentity(sid);
+  const elbot = await getBotIdentityByKey('elbot');
+  const custom = await get(`SELECT * FROM bot_identities WHERE owner_streamer_id = ? AND kind = 'custom'`, [sid]);
+  return {
+    streamer,
+    assigned,
+    elbot,
+    custom,
+    lockedToBot7up: normalizeStreamerSlug(streamer?.slug) === 'fack7up',
+    premium: String(streamer?.plan || 'standard').toLowerCase() === 'premium'
+  };
+}
+
+async function assignBotIdentity(streamerId, choice, options = {}) {
+  const sid = Number(streamerId || scopedStreamerId());
+  await ensureBotIdentities();
+  const streamer = await getStreamerById(sid);
+  if (!streamer) throw new Error('Streamer introuvable');
+  const slug = normalizeStreamerSlug(streamer.slug);
+  if (slug === 'fack7up') {
+    const reserved = await getBotIdentityByKey('bot7up');
+    await run(`UPDATE streamers SET assigned_bot_identity_id = ?, updated_at = datetime('now') WHERE id = ?`, [reserved.id, sid]);
+    return reserved;
+  }
+
+  const normalizedChoice = String(choice || 'elbot').trim().toLowerCase();
+  let identity = null;
+  if (normalizedChoice === 'elbot') {
+    identity = await getBotIdentityByKey('elbot');
+  } else if (normalizedChoice === 'custom') {
+    const premium = String(streamer.plan || 'standard').toLowerCase() === 'premium';
+    if (!premium && !options.platformAdmin) throw new Error('Le bot personnalisé est réservé aux comptes Premium');
+    identity = await get(`SELECT * FROM bot_identities WHERE owner_streamer_id = ? AND kind = 'custom'`, [sid]);
+    if (!identity || identity.status !== 'connected') throw new Error('Connecte d’abord le compte Kick de ton bot personnalisé');
+  } else {
+    throw new Error('Choix de bot invalide');
+  }
+  if (!identity) throw new Error('Identité de bot introuvable');
+  await run(`UPDATE streamers SET assigned_bot_identity_id = ?, updated_at = datetime('now') WHERE id = ?`, [identity.id, sid]);
+  return identity;
+}
+
+async function connectCustomBotIdentity(streamerId, user = {}) {
+  const sid = Number(streamerId || scopedStreamerId());
+  const username = String(user.username || user.displayName || '').trim();
+  const kickUserId = String(user.id || '').trim();
+  if (!username) throw new Error('Kick n’a pas retourné le pseudo du bot');
+  const normalizedUsername = normalizeStreamerSlug(username);
+  if (['elbot','bot7up'].includes(normalizedUsername)) throw new Error('Cette identité est réservée et ne peut pas devenir un bot personnalisé');
+  if (kickUserId) {
+    const used = await get(`SELECT owner_streamer_id FROM bot_identities
+      WHERE kick_user_id = ? AND kind = 'custom' AND owner_streamer_id != ?`, [kickUserId, sid]);
+    if (used) throw new Error('Ce compte bot Kick est déjà rattaché à un autre streamer');
+  }
+  const provider = `kick_bot:custom:${sid}`;
+  const key = `custom-${sid}`;
+  await run(`INSERT INTO bot_identities
+      (bot_key,display_name,kick_username,kick_user_id,oauth_provider,kind,owner_streamer_id,status,updated_at)
+    VALUES (?,?,?,?,?,'custom',?,'connected',datetime('now'))
+    ON CONFLICT(bot_key) DO UPDATE SET
+      display_name=excluded.display_name,kick_username=excluded.kick_username,
+      kick_user_id=excluded.kick_user_id,oauth_provider=excluded.oauth_provider,
+      owner_streamer_id=excluded.owner_streamer_id,status='connected',updated_at=datetime('now')`,
+    [key, username, username, kickUserId || null, provider, sid]);
+  return getBotIdentityByKey(key);
+}
+
+async function markBotIdentityConnected(identityId, user = {}) {
+  await run(`UPDATE bot_identities SET
+    display_name = CASE
+      WHEN kind IN ('default','reserved') THEN display_name
+      ELSE COALESCE(?,display_name)
+    END,
+    kick_username = COALESCE(?,kick_username), kick_user_id = COALESCE(?,kick_user_id),
+    status = 'connected', updated_at = datetime('now') WHERE id = ?`,
+    [user.displayName || user.username || null, user.username || null, user.id || null, Number(identityId)]);
+  return getBotIdentityById(identityId);
+}
+
 async function upsertStreamer(data = {}) {
   const slug = normalizeStreamerSlug(data.slug || data.kick_username || data.kickUsername || data.display_name || data.displayName);
   const kickUsername = data.kick_username || data.kickUsername || slug;
@@ -1852,6 +2016,13 @@ async function upsertStreamer(data = {}) {
      data.kick_user_id || data.kickUserId || null, kickUsername, displayName, data.avatar_url || data.avatarUrl || null, role, data.status || null,
      data.channel_id || data.channelId || null, data.chatroom_id || data.chatroomId || null, data.broadcaster_user_id || data.broadcasterUserId || null, data.bot_enabled ?? data.botEnabled ?? null]
   );
+  await ensureBotIdentities();
+  const identity = await getBotIdentityByKey(slug === 'fack7up' ? 'bot7up' : 'elbot');
+  if (identity?.id) {
+    await run(`UPDATE streamers SET assigned_bot_identity_id = ?, updated_at = datetime('now')
+      WHERE slug = ? AND (assigned_bot_identity_id IS NULL OR (? = 'fack7up' AND assigned_bot_identity_id != ?))`,
+      [identity.id, slug, slug, identity.id]);
+  }
   return getStreamerBySlug(slug);
 }
 
@@ -1879,7 +2050,12 @@ async function updateStreamerKickMeta(streamerId, meta = {}) {
 }
 
 async function getActiveStreamersForBot() {
-  return all(`SELECT * FROM streamers WHERE status = 'active' AND COALESCE(bot_enabled, 1) = 1 ORDER BY id ASC`);
+  await ensureBotIdentities();
+  return all(`SELECT s.*, bi.bot_key, bi.display_name AS bot_display_name,
+      bi.kick_username AS bot_kick_username, bi.oauth_provider AS bot_oauth_provider,
+      bi.status AS bot_identity_status
+    FROM streamers s JOIN bot_identities bi ON bi.id = s.assigned_bot_identity_id
+    WHERE s.status = 'active' AND COALESCE(s.bot_enabled, 1) = 1 ORDER BY s.id ASC`);
 }
 
 async function getStreamerSetting(streamerId, key, defaultVal = '') {
@@ -2067,6 +2243,7 @@ async function ensureInit() {
       await initSchema();
       const defaultStreamer = await ensureDefaultStreamer();
       await reconcileStreamerRoles();
+      await ensureBotIdentities();
       await migrateCoreScopedTables(defaultStreamer?.id || 1);
       await migrateLegacyRowsToDefaultStreamer(defaultStreamer?.id || 1);
     } catch(e) {
@@ -2115,6 +2292,7 @@ module.exports = {
   getPointsConfig, setPointsConfigValue, setPointsConfigBulk,
   setBotStatus, getBotStatus, getAllBotStatus,
   saveOAuthToken, getOAuthToken, deleteOAuthToken,
-  ensureDefaultStreamer, getStreamerBySlug, getStreamerById, getStreamerByBroadcasterUserId, listStreamers, upsertStreamer, updateStreamerKickMeta, getActiveStreamersForBot,
+  ensureDefaultStreamer, getStreamerBySlug, getStreamerById, getStreamerByBroadcasterUserId, listStreamers, setStreamerPlan, upsertStreamer, updateStreamerKickMeta, getActiveStreamersForBot,
+  ensureBotIdentities, getBotIdentityById, getBotIdentityByKey, getAssignedBotIdentity, getBotAssignmentOptions, assignBotIdentity, connectCustomBotIdentity, markBotIdentityConnected,
   getStreamerSetting, setStreamerSetting, getOrCreateOverlayToken, regenerateOverlayToken, getOverlayTokenByValue, getOverlayTokensForStreamer, saveOAuthTokenForStreamer, getOAuthTokenForStreamer, deleteOAuthTokenForStreamer,
 };

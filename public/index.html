@@ -4560,8 +4560,12 @@ body.ref-theme-transition *:after{
           <div id="platform-admin-active" style="font-size:11px;color:var(--muted2);margin-bottom:10px"></div>
           <label class="lbl">Panel à ouvrir</label>
           <div style="display:flex;gap:8px;align-items:center">
-            <select class="inp" id="platform-admin-streamer" style="flex:1"></select>
+            <select class="inp" id="platform-admin-streamer" style="flex:1" onchange="syncPlatformPlanSelect()"></select>
             <button class="btnx btn-primary" onclick="switchPlatformPanel()">Ouvrir</button>
+          </div>
+          <div style="display:flex;gap:8px;align-items:center;margin-top:8px">
+            <select class="inp" id="platform-admin-plan" style="flex:1"><option value="standard">Standard · ElBot</option><option value="premium">Premium · bot personnalisé</option></select>
+            <button class="btnx btn-outline" onclick="savePlatformStreamerPlan()">Enregistrer l’offre</button>
           </div>
           <button class="btnx btn-ghost" id="platform-admin-exit" style="width:100%;justify-content:center;margin-top:8px;display:none" onclick="exitPlatformPanel()">↩ Revenir à mon panel</button>
         </div></div>
@@ -4603,6 +4607,13 @@ body.ref-theme-transition *:after{
       </div>
       <div>
         <div class="panel" style="margin-bottom:14px"><h3>🌍 Langue</h3><label class="lbl">Langue de l'interface</label><select class="inp" onchange="setLanguage(this.value)" id="lang-select"><option value="fr">🇫🇷 Français</option><option value="en">🇬🇧 English</option><option value="es">🇪🇸 Español</option></select></div>
+
+        <div class="panel" style="margin-bottom:14px" id="bot-identity-card">
+          <h3>🤖 Identité du bot <span id="bot-plan-badge" style="font-size:9px;font-weight:800;padding:3px 8px;border-radius:999px;background:var(--accent-bg);color:var(--accent)">STANDARD</span></h3>
+          <div id="bot-identity-current" style="padding:11px 12px;border:1px solid var(--brd);border-radius:10px;background:var(--surface2);margin-bottom:10px;font-size:11px">Chargement…</div>
+          <div id="bot-identity-options" style="display:grid;gap:8px"></div>
+          <div id="bot-identity-message" style="margin-top:9px"></div>
+        </div>
 
         <div class="panel" style="margin-bottom:14px" id="token-card">
           <h3>🔑 Connexion Kick <span id="token-status-badge" style="font-size:9px;font-weight:700;padding:3px 9px;border-radius:20px"></span></h3>
@@ -7768,6 +7779,66 @@ async function disconnectOAuth() {
   loadOAuthStatus();
 }
 
+async function loadBotIdentity() {
+  const current = document.getElementById('bot-identity-current');
+  const optionsEl = document.getElementById('bot-identity-options');
+  const planBadge = document.getElementById('bot-plan-badge');
+  if (!current || !optionsEl) return;
+  try {
+    const r = await fetch('/api/bot-identity', { cache:'no-store' });
+    const payload = await r.json();
+    if (!r.ok) throw new Error(payload.error || 'Identité indisponible');
+    const d = payload.data || {};
+    const assigned = d.assigned;
+    const connected = assigned?.status === 'connected';
+    planBadge.textContent = d.premium ? 'PREMIUM' : 'STANDARD';
+    planBadge.style.color = d.premium ? '#fbbf24' : 'var(--accent)';
+    current.innerHTML = `<div style="display:flex;align-items:center;justify-content:space-between;gap:10px"><div><b style="font-size:13px">${esc(assigned?.displayName || 'Aucun bot')}</b><div style="color:var(--muted);margin-top:3px">${assigned?.kickUsername ? `Compte Kick : @${esc(assigned.kickUsername)} · ` : ''}${d.lockedToBot7up ? 'Identité réservée à cette chaîne' : 'Seul bot autorisé à écrire sur cette chaîne'}</div></div><span style="font-weight:800;color:${connected?'#22c55e':'#f59e0b'}">${connected?'● ACTIF':'● AUTORISATION REQUISE'}</span></div>`;
+
+    if (d.lockedToBot7up) {
+      optionsEl.innerHTML = '<div style="font-size:10px;color:var(--muted);line-height:1.6">🔒 Bot7uP est exclusivement assigné à Fack7uP. Aucune autre identité ne peut écrire sur cette chaîne.</div>';
+      return;
+    }
+
+    const elbotActive = assigned?.key === 'elbot';
+    const customActive = assigned?.kind === 'custom';
+    const elbotConnect = d.platformAdmin && d.elbot?.status !== 'connected'
+      ? `<button class="btnx btn-outline btn-sm" onclick="connectBotIdentity('elbot')">Autoriser ElBot</button>` : '';
+    const customAction = d.custom?.status === 'connected'
+      ? `<button class="btnx ${customActive?'btn-green':'btn-outline'} btn-sm" ${customActive?'disabled':''} onclick="assignBotIdentity('custom')">${customActive?'Actif':'Utiliser ce bot'}</button>`
+      : `<button class="btnx btn-outline btn-sm" onclick="connectBotIdentity('custom')">Connecter mon bot</button>`;
+    const premiumAllowed = d.premium || d.platformAdmin;
+
+    optionsEl.innerHTML = `
+      <div style="padding:11px;border:1px solid ${elbotActive?'var(--accent)':'var(--brd)'};border-radius:10px;display:flex;align-items:center;justify-content:space-between;gap:10px">
+        <div><b>⚡ ElBot</b><div style="font-size:9px;color:var(--muted);margin-top:3px">Bot officiel partagé · inclus pour tous</div></div>
+        <div style="display:flex;gap:6px">${elbotConnect}<button class="btnx ${elbotActive?'btn-green':'btn-outline'} btn-sm" ${elbotActive?'disabled':''} onclick="assignBotIdentity('elbot')">${elbotActive?'Assigné':'Choisir'}</button></div>
+      </div>
+      <div style="padding:11px;border:1px solid ${customActive?'#fbbf24':'var(--brd)'};border-radius:10px;display:flex;align-items:center;justify-content:space-between;gap:10px;${premiumAllowed?'':'opacity:.58'}">
+        <div><b>👑 Mon bot personnalisé</b><div style="font-size:9px;color:var(--muted);margin-top:3px">${d.custom?.displayName ? `Compte connecté : ${esc(d.custom.displayName)}` : 'Ton propre compte et nom Kick · Premium'}</div></div>
+        ${premiumAllowed ? customAction : '<button class="btnx btn-ghost btn-sm" disabled>🔒 Premium</button>'}
+      </div>`;
+  } catch (e) {
+    current.textContent = e.message;
+    optionsEl.innerHTML = '';
+  }
+}
+
+async function assignBotIdentity(choice) {
+  if (!confirm(`Confirmer le changement vers ${choice === 'elbot' ? 'ElBot' : 'ton bot personnalisé'} ? L’autre bot ne pourra plus écrire sur la chaîne.`)) return;
+  const r = await fetch('/api/bot-identity/assign', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ choice }) });
+  const d = await r.json();
+  if (!r.ok) return showInline('bot-identity-message', d.error || 'Changement impossible', false);
+  toast(`${d.assigned.displayName} est maintenant le seul bot autorisé`);
+  loadBotIdentity();
+}
+
+function connectBotIdentity(choice) {
+  const label = choice === 'elbot' ? 'ElBot' : 'le compte Kick de ton bot personnalisé';
+  if (!confirm(`Tu vas être redirigé vers Kick. Vérifie que tu te connectes bien avec ${label}, et non avec le compte streamer.`)) return;
+  window.location.href = `/auth/bot-identity/login?choice=${encodeURIComponent(choice)}`;
+}
+
 async function detectKickToken() {
   const btn = event?.target;
   const resultBox = document.getElementById('token-detect-result');
@@ -9593,6 +9664,7 @@ function initSettings() {
   applyAccent(currentAccent, false);
   loadBotFeatures();
   loadOAuthStatus();
+  loadBotIdentity();
   loadPointsConfig();
 }
 
@@ -10101,6 +10173,7 @@ async function checkPanelAuth() {
   }
 }
 
+let platformAdminStreamers = [];
 async function loadPlatformAdmin() {
   const panel = document.getElementById('platform-admin-panel');
   if (!panel) return;
@@ -10126,14 +10199,38 @@ async function loadPlatformAdmin() {
     if (!listResponse.ok) throw new Error('streamers_unavailable');
     const listPayload = await listResponse.json();
     const streamers = listPayload?.data || [];
+    platformAdminStreamers = streamers;
     const select = document.getElementById('platform-admin-streamer');
     select.innerHTML = streamers
       .filter(streamer => streamer.status !== 'disabled')
-      .map(streamer => `<option value="${esc(streamer.slug)}" ${streamer.slug === status.activeStreamer?.slug ? 'selected' : ''}>${esc(streamer.displayName || streamer.slug)} — ${esc(streamer.slug)}</option>`)
+      .map(streamer => `<option value="${esc(streamer.slug)}" ${streamer.slug === status.activeStreamer?.slug ? 'selected' : ''}>${esc(streamer.displayName || streamer.slug)} — ${String(streamer.plan||'standard').toUpperCase()}</option>`)
       .join('');
+    syncPlatformPlanSelect();
   } catch (error) {
     panel.style.display = 'none';
   }
+}
+
+function syncPlatformPlanSelect() {
+  const slug = document.getElementById('platform-admin-streamer')?.value;
+  const streamer = platformAdminStreamers.find(item => item.slug === slug);
+  const select = document.getElementById('platform-admin-plan');
+  if (select) select.value = streamer?.plan === 'premium' ? 'premium' : 'standard';
+}
+
+async function savePlatformStreamerPlan() {
+  const slug = document.getElementById('platform-admin-streamer')?.value;
+  const streamer = platformAdminStreamers.find(item => item.slug === slug);
+  const plan = document.getElementById('platform-admin-plan')?.value;
+  if (!streamer) return toast('Choisis un streamer', false);
+  const response = await fetch(`/api/platform-admin/streamers/${streamer.id}/plan`, {
+    method:'POST', credentials:'same-origin', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ plan })
+  });
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) return toast(payload.error || 'Modification impossible', false);
+  streamer.plan = plan;
+  toast(`Offre ${plan === 'premium' ? 'Premium' : 'Standard'} activée pour ${streamer.displayName || streamer.slug}`);
+  loadPlatformAdmin();
 }
 
 async function switchPlatformPanel() {

@@ -57,6 +57,14 @@ const chatContextStore = new AsyncLocalStorage();
 function normalizeSlug(value) {
   return String(value || '').trim().toLowerCase().replace(/^@+/, '').replace(/[^a-z0-9_-]/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '');
 }
+function configuredBotStreamerAllowlist() {
+  return new Set(
+    String(process.env.BOT_STREAMER_ALLOWLIST || '')
+      .split(',')
+      .map(normalizeSlug)
+      .filter(Boolean)
+  );
+}
 function pusherChatroomChannel(chatroomId) { return `chatrooms.${chatroomId}.v2`; }
 function contextFromPusherChannel(channelName, payload = {}) {
   const id = String(channelName || '').match(/chatrooms\.(\d+)\.v2/)?.[1]
@@ -66,8 +74,13 @@ function contextFromPusherChannel(channelName, payload = {}) {
 async function loadActiveBotChannels() {
   try {
     const rows = await db.getActiveStreamersForBot();
+    const allowlist = configuredBotStreamerAllowlist();
+    const selectedRows = allowlist.size
+      ? (rows || []).filter(streamer => allowlist.has(normalizeSlug(streamer.slug)))
+      : (rows || []);
     const usable = [];
-    for (const s of rows || []) {
+    const nextChatrooms = new Map();
+    for (const s of selectedRows) {
       const chatroomId = String(s.chatroom_id || '').trim();
       if (!chatroomId) {
         console.log(`[BOT V2] ${s.slug}: ignoré — chatroom_id manquant. Reconnecte ce streamer via Kick pour enregistrer son chatroom_id.`);
@@ -80,11 +93,21 @@ async function loadActiveBotChannels() {
         channelId: s.channel_id || '',
         chatroomId,
         broadcasterUserId: String(s.broadcaster_user_id || s.kick_user_id || '').trim(),
+        botIdentityId: s.assigned_bot_identity_id || null,
+        botKey: String(s.bot_key || '').trim().toLowerCase(),
+        botDisplayName: s.bot_display_name || s.bot_kick_username || 'Bot',
+        botUsername: s.bot_kick_username || s.bot_display_name || '',
+        botOAuthProvider: s.bot_oauth_provider || '',
+        botIdentityStatus: s.bot_identity_status || 'authorization_required',
       };
       usable.push(ctx);
-      botChannelState.chatrooms.set(chatroomId, ctx);
+      nextChatrooms.set(chatroomId, ctx);
     }
-    console.log(`[BOT V2] Channels actifs via DB: ${usable.map(x => `${x.slug}#${x.chatroomId}`).join(', ') || 'aucun'}`);
+    botChannelState.chatrooms = nextChatrooms;
+    if (allowlist.size) {
+      console.log(`[BOT V3] Allowlist worker: ${[...allowlist].join(', ')} — autres chaînes interdites`);
+    }
+    console.log(`[BOT V3] Assignations actives: ${usable.map(x => `${x.slug}→${x.botDisplayName}#${x.chatroomId}`).join(', ') || 'aucune'}`);
     return usable;
   } catch(e) {
     console.warn('[BOT V2] Sync channels impossible:', e.message);
@@ -124,7 +147,16 @@ function withChatContext(ctx, fn) {
   });
 }
 function currentChatContext() {
-  return chatContextStore.getStore() || botChannelState.currentContext || null;
+  const direct = chatContextStore.getStore() || botChannelState.currentContext || null;
+  if (direct) return direct;
+  // Les actions lancées depuis le panel (annonce, coffre, test...) utilisent le
+  // contexte tenant, pas le contexte du WebSocket. On le convertit ici afin que
+  // ces messages respectent exactement la même assignation de bot.
+  const tenantStreamerId = tenant?.getCurrentStreamerId?.();
+  if (tenantStreamerId) {
+    return [...botChannelState.chatrooms.values()].find(item => Number(item.streamerId) === Number(tenantStreamerId)) || null;
+  }
+  return null;
 }
 
 // ─── Init ─────────────────────────────────────────────────────────────────────
@@ -391,7 +423,8 @@ async function handleRewardRedeemed(payload) {
       sendChat(`@${redeemerUsername} Impossible de TO le streamer !`);
       return;
     }
-    if (target.toLowerCase() === CONFIG.botUsername.toLowerCase()) {
+    const assignedBotUsername = currentChatContext()?.botUsername || CONFIG.botUsername;
+    if (target.toLowerCase() === String(assignedBotUsername).toLowerCase()) {
       sendChat(`@${redeemerUsername} Impossible de TO le bot !`);
       return;
     }
@@ -1437,13 +1470,29 @@ async function moderateUser(username, kickId, action, duration, word) {
 // ─── Token actif (OAuth officiel en priorité, sinon token manuel legacy) ──────
 
 async function getActiveToken() {
-  if (kickOAuth.isConfigured()) {
-    // IMPORTANT V2 : le chat est toujours envoyé avec le compte BOT unique (BOT7UP),
-    // jamais avec le token OAuth du streamer connecté au panel.
-    const botToken = await kickOAuth.getValidBotAccessToken().catch(() => null);
-    if (botToken) return { token: botToken, official: true };
+  const ctx = currentChatContext();
+  if (ctx?.streamerId) {
+    const identity = await db.getAssignedBotIdentity(ctx.streamerId).catch(() => null);
+    if (!identity?.oauth_provider) {
+      return { token: '', official: true, identity: null, blockedReason: 'aucun bot assigné' };
+    }
+    if (identity.status !== 'connected') {
+      return { token: '', official: true, identity, blockedReason: `${identity.display_name || 'bot'} non connecté` };
+    }
+    const token = await kickOAuth.getValidBotIdentityAccessToken(identity.oauth_provider).catch(() => null);
+    return {
+      token: token || '',
+      official: true,
+      identity,
+      blockedReason: token ? '' : `autorisation ${identity.display_name || 'bot'} absente ou expirée`
+    };
   }
-  return { token: CONFIG.token, official: false };
+  if (kickOAuth.isConfigured()) {
+    // Compatibilité des tâches globales sans contexte streamer.
+    const botToken = await kickOAuth.getValidBotAccessToken().catch(() => null);
+    if (botToken) return { token: botToken, official: true, identity: null, blockedReason: '' };
+  }
+  return { token: CONFIG.token, official: false, identity: null, blockedReason: '' };
 }
 
 // ─── Envoi messages ───────────────────────────────────────────────────────────
@@ -1452,8 +1501,20 @@ async function sendChat(message) {
   const text = normalizeKickChatMessage(message);
   const ctx = currentChatContext();
   if (ctx?.slug) console.log(`[BOT V2] Réponse ciblée → ${ctx.slug}#${ctx.chatroomId || '?'} : ${text.slice(0, 80)}`);
-  const { token, official } = await getActiveToken();
-  if (!token) { console.log(`[BOT → CHAT] ${text}`); return false; }
+  if (!ctx && botChannelState.chatrooms.size > 0) {
+    console.warn(`[BOT V3] Envoi global bloqué : aucune chaîne cible — ${text.slice(0, 80)}`);
+    return false;
+  }
+  const { token, official, identity, blockedReason } = await getActiveToken();
+  if (!token) {
+    console.warn(`[BOT V3] Envoi bloqué${ctx?.slug ? ` pour ${ctx.slug}` : ''}: ${blockedReason || 'token absent'} — ${text.slice(0, 80)}`);
+    return false;
+  }
+  if (ctx?.streamerId && Number(identity?.id) !== Number(ctx.botIdentityId || identity?.id)) {
+    console.warn(`[BOT V3] Envoi bloqué pour ${ctx.slug}: l’assignation a changé pendant le traitement`);
+    return false;
+  }
+  console.log(`[BOT V3] Identité autorisée: ${identity?.display_name || 'legacy'} → ${ctx?.slug || CONFIG.channel}`);
   return sendChatVia(text, token, official, false);
 }
 
