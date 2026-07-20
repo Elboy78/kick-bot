@@ -2345,16 +2345,43 @@ async function migratePointsLogToScoped(defaultStreamerId = 1) {
   try { await run(`CREATE INDEX IF NOT EXISTS idx_points_log_streamer_created ON points_log(streamer_id, created_at DESC)`); } catch(e) {}
 }
 
+async function migrateChatActivityToScopedPrimaryKey(defaultStreamerId = 1) {
+  const sql = await tableCreateSql('chat_activity_daily');
+  if (!sql) return;
+  const alreadyScoped = /PRIMARY\s+KEY\s*\(\s*streamer_id\s*,\s*date\s*\)/i.test(sql);
+  if (alreadyScoped) return;
+
+  console.log('[DB V2] Migration chat_activity_daily: PRIMARY KEY(date) → PRIMARY KEY(streamer_id, date)');
+  const cols = await tableColumns('chat_activity_daily');
+  const sidExpr = cols.includes('streamer_id') ? 'COALESCE(streamer_id, ?)' : '?';
+  await run(`DROP TABLE IF EXISTS chat_activity_daily_v2_migration`);
+  await run(`CREATE TABLE chat_activity_daily_v2_migration (
+    streamer_id     INTEGER NOT NULL DEFAULT 1,
+    date            TEXT NOT NULL,
+    message_count   INTEGER NOT NULL DEFAULT 0,
+    unique_chatters TEXT NOT NULL DEFAULT '[]',
+    PRIMARY KEY(streamer_id, date)
+  )`);
+  await run(`INSERT OR REPLACE INTO chat_activity_daily_v2_migration
+    (streamer_id, date, message_count, unique_chatters)
+    SELECT ${sidExpr}, date, SUM(COALESCE(message_count, 0)), COALESCE(MAX(unique_chatters), '[]')
+    FROM chat_activity_daily
+    GROUP BY ${sidExpr}, date`, [defaultStreamerId, defaultStreamerId]);
+  await run(`DROP TABLE chat_activity_daily`);
+  await run(`ALTER TABLE chat_activity_daily_v2_migration RENAME TO chat_activity_daily`);
+}
+
 async function migrateCoreScopedTables(defaultStreamerId = 1) {
   await migrateViewersToScopedUnique(defaultStreamerId);
   await migratePointsLogToScoped(defaultStreamerId);
+  await migrateChatActivityToScopedPrimaryKey(defaultStreamerId);
   try { await run(`CREATE INDEX IF NOT EXISTS idx_custom_commands_streamer_trigger ON custom_commands(streamer_id, trigger)`); } catch(e) {}
   try { await run(`CREATE INDEX IF NOT EXISTS idx_community_events_streamer_date ON community_events(streamer_id, occurred_at DESC)`); } catch(e) {}
   try { await run(`CREATE INDEX IF NOT EXISTS idx_community_events_streamer_user ON community_events(streamer_id, username)`); } catch(e) {}
   try { await run(`CREATE INDEX IF NOT EXISTS idx_stream_sessions_streamer_started ON stream_sessions(streamer_id, started_at DESC)`); } catch(e) {}
   try { await run(`CREATE INDEX IF NOT EXISTS idx_command_usage_streamer_created ON command_usage(streamer_id, created_at DESC)`); } catch(e) {}
   try { await run(`CREATE INDEX IF NOT EXISTS idx_system_commands_streamer_trigger ON system_commands_state(streamer_id, trigger)`); } catch(e) {}
-  try { await run(`CREATE INDEX IF NOT EXISTS idx_chat_activity_streamer_day ON chat_activity_daily(streamer_id, day)`); } catch(e) {}
+  try { await run(`CREATE INDEX IF NOT EXISTS idx_chat_activity_streamer_date ON chat_activity_daily(streamer_id, date)`); } catch(e) {}
 }
 
 async function migrateLegacyRowsToDefaultStreamer(defaultStreamerId = 1) {
