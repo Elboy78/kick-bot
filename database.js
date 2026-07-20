@@ -731,9 +731,14 @@ async function addMemePoints(username, points) {
   const sid = scopedStreamerId();
   const lower = String(username || '').trim().toLowerCase();
   if (!lower) return null;
-  await upsertViewer(lower);
+  const existing = await get(`SELECT id FROM viewers WHERE username = ? AND COALESCE(streamer_id, 1) = ?`, [lower, sid]);
+  if (!existing) {
+    const cfg = await getPointsConfig().catch(() => ({}));
+    const starting = Math.max(0, parseInt(cfg.meme_starting_points ?? '100') || 0);
+    await run(`INSERT INTO viewers (streamer_id,username,points,meme_points) VALUES (?,?,0,?)`, [sid, lower, starting]);
+  }
   await run(`UPDATE viewers SET meme_points = MAX(0, meme_points + ?),
-      meme_points_updated_at = datetime('now'), last_seen = datetime('now')
+      meme_points_updated_at = datetime('now')
     WHERE username = ? AND COALESCE(streamer_id, 1) = ?`, [Number(points) || 0, lower, sid]);
   return get(`SELECT username, meme_points FROM viewers WHERE username = ? AND COALESCE(streamer_id, 1) = ?`, [lower, sid]);
 }

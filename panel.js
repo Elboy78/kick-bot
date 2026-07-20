@@ -328,6 +328,7 @@ app.get('/o/:token/:file', waitDB, async (req, res) => {
     res.cookie('kb_streamer', streamer.slug, { path: '/', sameSite: 'Lax', maxAge: 1000 * 60 * 60 * 24 * 365 });
     res.setHeader('X-Streamer-Slug', streamer.slug);
     res.setHeader('X-Overlay-Widget', widget);
+    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate');
     res.sendFile(path.join(__dirname, 'public', 'widgets', file));
   } catch(e) {
     console.error('[OVERLAY TOKEN] Erreur:', e.message);
@@ -2243,6 +2244,20 @@ async function generateTTSAudio(text) {
   }
 }
 
+async function generateFallbackTTSAudio(text) {
+  try {
+    const r = await axios.get('https://translate.google.com/translate_tts', {
+      params: { ie:'UTF-8', client:'tw-ob', tl:'fr', q:String(text || '').slice(0, 160) },
+      headers: { 'User-Agent':'Mozilla/5.0', Accept:'audio/mpeg,*/*' },
+      responseType:'arraybuffer', timeout:15000
+    });
+    return Buffer.from(r.data).toString('base64');
+  } catch(e) {
+    console.error('[TTS MEMES] Voix de secours indisponible:', e.response?.status || e.message);
+    return null;
+  }
+}
+
 // Webhook appelé par la plateforme de dons (StreamElements, Tipeee, etc.)
 app.post('/webhook/donation', async (req, res) => {
   try {
@@ -3427,6 +3442,7 @@ app.post('/api/admin/memes/test', requireAuth, requireTenant, async (req,res) =>
   catch(e) { res.status(500).json({error:e.message}); }
 });
 app.post('/api/admin/memes/stop', requireAuth, requireTenant, async (req,res) => { const tm=createTenantManager({db,io,req}); tm.emit('meme-overlay-stop',{at:new Date().toISOString()}); res.json({success:true}); });
+app.post('/api/admin/memes/points',requireAuth,requireTenant,async(req,res)=>{try{const username=String(req.body?.username||'').trim().replace(/^@+/,''),amount=Number(req.body?.amount);if(!username||!Number.isFinite(amount)||amount===0)return res.status(400).json({error:'Pseudo et montant requis'});if(Math.abs(amount)>1000000)return res.status(400).json({error:'Montant trop élevé'});await db.addMemePoints(username,Math.trunc(amount));const viewer=await db.getViewer(username);res.json({success:true,data:{username:viewer?.username||username,points:Number(viewer?.meme_points||0)}})}catch(e){res.status(500).json({error:e.message})}});
 app.get('/api/admin/memes/submissions',requireAuth,requireTenant,async(req,res)=>{const tm=createTenantManager({db,io,req});res.json({data:await db.getMemeSubmissions(tm.streamerId,'pending')})});
 app.post('/api/admin/memes/submissions/:id/:action',requireAuth,requireTenant,async(req,res)=>{const tm=createTenantManager({db,io,req}),row=await db.getMemeSubmission(req.params.id,tm.streamerId);if(!row)return res.status(404).json({error:'Introuvable'});if(req.params.action==='approve'){const cfg=await getMemesConfig(tm),payload={username:row.username,text:row.text,mediaUrl:row.media_url,mediaType:row.media_type,ttsUrl:row.tts_url,speakText:row.tts_requested&&!row.tts_url?row.text:'',duration:cfg.duration,size:cfg.size,position:cfg.position,launchSound:cfg.launchSound,launchSoundType:cfg.launchSoundType,launchSoundVolume:cfg.launchSoundVolume,volume:0,at:new Date().toISOString()};await db.createMemeEvent(tm.streamerId,payload);tm.emit('meme-overlay-event',payload)}await db.setMemeSubmissionStatus(row.id,tm.streamerId,req.params.action==='approve'?'approved':'rejected');res.json({success:true})});
 
@@ -3449,7 +3465,7 @@ app.post('/api/public/memes/:streamer/submit',async(req,res)=>{try{
   const viewer=await tenant.runWithStreamer(s,()=>db.getViewer(username));if(access.trusted!==2&&cfg.cost>0&&(!viewer||Number(viewer.meme_points||0)<cfg.cost))return res.status(400).json({error:`Il faut ${cfg.cost} points mèmes`});
   if(wantsTts&&(!cfg.viewerTts||!text))return res.status(400).json({error:'Lecture IA indisponible ou texte vide'});
   const subtype=m[2]||m[3],ext=subtype==='jpeg'?'jpg':subtype,file=`${s.id}-${Date.now()}-${crypto.randomBytes(5).toString('hex')}.${ext}`;await fs.promises.writeFile(path.join(memeTempDir,file),bytes);const mediaUrl=`/meme-media/${file}`;
-  let ttsUrl=null;if(wantsTts){const audio=await tenant.runWithStreamer(s,()=>generateTTSAudio(text));if(audio){const audioFile=`${s.id}-${Date.now()}-${crypto.randomBytes(5).toString('hex')}.mp3`;await fs.promises.writeFile(path.join(memeTempDir,audioFile),Buffer.from(audio,'base64'));ttsUrl=`/meme-media/${audioFile}`}}
+  let ttsUrl=null;if(wantsTts){const audio=await tenant.runWithStreamer(s,async()=>await generateTTSAudio(text)||await generateFallbackTTSAudio(text));if(audio){const audioFile=`${s.id}-${Date.now()}-${crypto.randomBytes(5).toString('hex')}.mp3`;await fs.promises.writeFile(path.join(memeTempDir,audioFile),Buffer.from(audio,'base64'));ttsUrl=`/meme-media/${audioFile}`}}
   if(access.trusted!==2&&cfg.cost>0)await tenant.runWithStreamer(s,()=>db.addMemePoints(username,-cfg.cost));
   const trusted=!!access.trusted,instant=cfg.mode==='instant'||(cfg.mode==='trust'&&trusted),status=instant?'approved':'pending';
   const row=await db.createMemeSubmission(s.id,username,text,mediaUrl,status,{mediaType,ttsUrl,ttsRequested:wantsTts});memeCooldowns.set(cooldownKey,Date.now()+cfg.cooldown*1000);
