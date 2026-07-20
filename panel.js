@@ -328,6 +328,7 @@ app.get('/o/:token/:file', waitDB, async (req, res) => {
     res.cookie('kb_streamer', streamer.slug, { path: '/', sameSite: 'Lax', maxAge: 1000 * 60 * 60 * 24 * 365 });
     res.setHeader('X-Streamer-Slug', streamer.slug);
     res.setHeader('X-Overlay-Widget', widget);
+    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate');
     res.sendFile(path.join(__dirname, 'public', 'widgets', file));
   } catch(e) {
     console.error('[OVERLAY TOKEN] Erreur:', e.message);
@@ -2243,6 +2244,20 @@ async function generateTTSAudio(text) {
   }
 }
 
+async function generateFallbackTTSAudio(text) {
+  try {
+    const r = await axios.get('https://translate.google.com/translate_tts', {
+      params: { ie:'UTF-8', client:'tw-ob', tl:'fr', q:String(text || '').slice(0, 160) },
+      headers: { 'User-Agent':'Mozilla/5.0', Accept:'audio/mpeg,*/*' },
+      responseType:'arraybuffer', timeout:15000
+    });
+    return Buffer.from(r.data).toString('base64');
+  } catch(e) {
+    console.error('[TTS MEMES] Voix de secours indisponible:', e.response?.status || e.message);
+    return null;
+  }
+}
+
 // Webhook appelé par la plateforme de dons (StreamElements, Tipeee, etc.)
 app.post('/webhook/donation', async (req, res) => {
   try {
@@ -3374,7 +3389,8 @@ function normalizeMemeConfig(raw = {}) {
     allowText: m.allowText !== false, enabled: m.enabled !== false
   })).filter(m => m.id && m.mediaUrl);
   const positions=['top-left','top','top-right','left','center','right','bottom-left','bottom','bottom-right'];
-  return { enabled:raw.enabled===true, mode:['instant','trust','approval'].includes(raw.mode)?raw.mode:'trust', duration:Math.max(2,Math.min(20,Number(raw.duration)||6)), cost:Math.max(0,raw.cost===undefined?75:Number(raw.cost)||0), cooldown:Math.max(0,Math.min(3600,raw.cooldown===undefined?60:Number(raw.cooldown)||0)), size:Math.max(20,Math.min(100,Number(raw.size)||80)), position:positions.includes(raw.position)?raw.position:'center', maxFileMb:Math.max(1,Math.min(15,Number(raw.maxFileMb)||15)), maxText:Math.max(0,Math.min(160,raw.maxText===undefined?100:Number(raw.maxText)||0)), volume:0, items };
+  const launchSoundTypes=['pop','chime','bell','digital'];
+  return { enabled:raw.enabled===true, mode:['instant','trust','approval'].includes(raw.mode)?raw.mode:'trust', duration:Math.max(2,Math.min(20,Number(raw.duration)||6)), cost:Math.max(0,raw.cost===undefined?75:Number(raw.cost)||0), cooldown:Math.max(0,Math.min(3600,raw.cooldown===undefined?60:Number(raw.cooldown)||0)), size:Math.max(20,Math.min(100,Number(raw.size)||80)), position:positions.includes(raw.position)?raw.position:'center', maxFileMb:Math.max(1,Math.min(25,Number(raw.maxFileMb)||15)), maxText:Math.max(0,Math.min(160,raw.maxText===undefined?100:Number(raw.maxText)||0)), maxVideoDuration:Math.max(10,Math.min(20,Number(raw.maxVideoDuration)||20)), launchSound:raw.launchSound!==false, launchSoundType:launchSoundTypes.includes(raw.launchSoundType)?raw.launchSoundType:'pop', launchSoundVolume:Math.max(0,Math.min(100,Number(raw.launchSoundVolume??55))), viewerTts:raw.viewerTts===true, volume:0, items };
 }
 async function getMemesConfig(tm) {
   try { return normalizeMemeConfig(JSON.parse(await tm.getSetting(MEMES_CONFIG_KEY, '{}'))); }
@@ -3397,7 +3413,7 @@ async function executeMeme(username, memeKey, customText, tm, testMode = false) 
     await db.addMemePoints(username, -item.cost);
   }
   if (!testMode) memeCooldowns.set(cooldownKey, Date.now() + item.cooldown*1000);
-  const payload = { id:`${Date.now()}_${Math.random().toString(36).slice(2,7)}`, memeId:item.id, name:item.name, username:String(username||'Viewer').slice(0,60), text:item.allowText?cleanMemeText(customText,cfg.maxText):'', mediaUrl:item.mediaUrl, soundUrl:item.soundUrl, duration:item.duration, volume:cfg.volume, at:new Date().toISOString() };
+  const payload = { id:`${Date.now()}_${Math.random().toString(36).slice(2,7)}`, memeId:item.id, name:item.name, username:String(username||'Viewer').slice(0,60), text:item.allowText?cleanMemeText(customText,cfg.maxText):'', mediaUrl:item.mediaUrl, soundUrl:item.soundUrl, duration:item.duration, launchSound:cfg.launchSound, launchSoundType:cfg.launchSoundType, launchSoundVolume:cfg.launchSoundVolume, volume:cfg.volume, at:new Date().toISOString() };
   await db.createMemeEvent(tm.streamerId, payload);
   tm.emit('meme-overlay-event', payload);
   return { ok:true, payload };
@@ -3426,15 +3442,36 @@ app.post('/api/admin/memes/test', requireAuth, requireTenant, async (req,res) =>
   catch(e) { res.status(500).json({error:e.message}); }
 });
 app.post('/api/admin/memes/stop', requireAuth, requireTenant, async (req,res) => { const tm=createTenantManager({db,io,req}); tm.emit('meme-overlay-stop',{at:new Date().toISOString()}); res.json({success:true}); });
+app.post('/api/admin/memes/points',requireAuth,requireTenant,async(req,res)=>{try{const username=String(req.body?.username||'').trim().replace(/^@+/,''),amount=Number(req.body?.amount);if(!username||!Number.isFinite(amount)||amount===0)return res.status(400).json({error:'Pseudo et montant requis'});if(Math.abs(amount)>1000000)return res.status(400).json({error:'Montant trop élevé'});await db.addMemePoints(username,Math.trunc(amount));const viewer=await db.getViewer(username);res.json({success:true,data:{username:viewer?.username||username,points:Number(viewer?.meme_points||0)}})}catch(e){res.status(500).json({error:e.message})}});
 app.get('/api/admin/memes/submissions',requireAuth,requireTenant,async(req,res)=>{const tm=createTenantManager({db,io,req});res.json({data:await db.getMemeSubmissions(tm.streamerId,'pending')})});
-app.post('/api/admin/memes/submissions/:id/:action',requireAuth,requireTenant,async(req,res)=>{const tm=createTenantManager({db,io,req}),row=await db.getMemeSubmission(req.params.id,tm.streamerId);if(!row)return res.status(404).json({error:'Introuvable'});if(req.params.action==='approve'){await db.createMemeEvent(tm.streamerId,{username:row.username,text:row.text,mediaUrl:row.media_url,duration:(await getMemesConfig(tm)).duration,volume:0,at:new Date().toISOString()});tm.emit('meme-overlay-event',row)}await db.setMemeSubmissionStatus(row.id,tm.streamerId,req.params.action==='approve'?'approved':'rejected');res.json({success:true})});
+app.post('/api/admin/memes/submissions/:id/:action',requireAuth,requireTenant,async(req,res)=>{const tm=createTenantManager({db,io,req}),row=await db.getMemeSubmission(req.params.id,tm.streamerId);if(!row)return res.status(404).json({error:'Introuvable'});if(req.params.action==='approve'){const cfg=await getMemesConfig(tm),payload={username:row.username,text:row.text,mediaUrl:row.media_url,mediaType:row.media_type,ttsUrl:row.tts_url,speakText:row.tts_requested&&!row.tts_url?row.text:'',duration:cfg.duration,size:cfg.size,position:cfg.position,launchSound:cfg.launchSound,launchSoundType:cfg.launchSoundType,launchSoundVolume:cfg.launchSoundVolume,volume:0,at:new Date().toISOString()};await db.createMemeEvent(tm.streamerId,payload);tm.emit('meme-overlay-event',payload)}await db.setMemeSubmissionStatus(row.id,tm.streamerId,req.params.action==='approve'?'approved':'rejected');res.json({success:true})});
 
 const memeTempDir=path.join(__dirname,'data','meme-temp');fs.mkdirSync(memeTempDir,{recursive:true});
 const cleanupMemeFiles=()=>{for(const file of fs.readdirSync(memeTempDir)){const full=path.join(memeTempDir,file);try{if(Date.now()-fs.statSync(full).mtimeMs>86400000)fs.unlinkSync(full)}catch(_){}}};cleanupMemeFiles();setInterval(cleanupMemeFiles,3600000).unref();
 app.get('/meme-media/:file',(req,res)=>{const file=String(req.params.file||'').replace(/[^a-z0-9_.-]/gi,'');res.sendFile(path.join(memeTempDir,file))});
 app.get('/memes/:streamer',(req,res)=>res.sendFile(path.join(__dirname,'public','memes-submit.html')));
-app.get('/api/public/memes/:streamer/config',async(req,res)=>{res.set('Cache-Control','no-store, no-cache, must-revalidate');const s=await db.getStreamerBySlug(tenant.normalizeSlug(req.params.streamer));if(!s)return res.status(404).json({error:'Chaîne inconnue'});const tm=createTenantManager({db,io,streamer:s,req});const c=await getMemesConfig(tm);if(req.query.token)await db.touchMemeAccessToken(String(req.query.token),s.id);res.json({data:{enabled:c.enabled,maxText:c.maxText,maxFileMb:c.maxFileMb,cost:c.cost,streamer:s.display_name||s.slug}})});
-app.post('/api/public/memes/:streamer/submit',async(req,res)=>{try{const s=await db.getStreamerBySlug(tenant.normalizeSlug(req.params.streamer));if(!s)return res.status(404).json({error:'Chaîne inconnue'});const tm=createTenantManager({db,io,streamer:s,req}),cfg=await getMemesConfig(tm);if(!cfg.enabled)return res.status(403).json({error:'Widget désactivé'});const text=cleanMemeText(req.body?.text,cfg.maxText),data=String(req.body?.image||''),token=String(req.body?.token||'');const m=data.match(/^data:image\/(png|jpeg|gif|webp);base64,([A-Za-z0-9+/=]+)$/);if(!m)return res.status(400).json({error:'Image ou GIF invalide'});const bytes=Buffer.from(m[2],'base64');if(bytes.length>cfg.maxFileMb*1024*1024)return res.status(413).json({error:'Fichier trop volumineux'});if(text){const banned=await tenant.runWithStreamer(s,()=>db.checkBannedWords(text));if(banned)return res.status(400).json({error:'Texte refusé'})}const access=await db.getMemeAccessToken(token,s.id);if(!access)return res.status(401).json({error:'Lien expiré. Retape !meme dans le chat.'});const username=access.username,cooldownKey=`viewer:${s.id}:${username.toLowerCase()}`,remaining=Math.ceil(((memeCooldowns.get(cooldownKey)||0)-Date.now())/1000);if(remaining>0)return res.status(429).json({error:`Réessaie dans ${remaining}s`});const viewer=await tenant.runWithStreamer(s,()=>db.getViewer(username));if(access.trusted!==2&&cfg.cost>0&&(!viewer||Number(viewer.meme_points||0)<cfg.cost))return res.status(400).json({error:`Il faut ${cfg.cost} points mèmes`});if(access.trusted!==2&&cfg.cost>0)await tenant.runWithStreamer(s,()=>db.addMemePoints(username,-cfg.cost));const ext=m[1]==='jpeg'?'jpg':m[1],file=`${s.id}-${Date.now()}-${crypto.randomBytes(5).toString('hex')}.${ext}`;await fs.promises.writeFile(path.join(memeTempDir,file),bytes);const mediaUrl=`/meme-media/${file}`,trusted=!!access.trusted,instant=cfg.mode==='instant'||(cfg.mode==='trust'&&trusted),status=instant?'approved':'pending';const row=await db.createMemeSubmission(s.id,username,text,mediaUrl,status);memeCooldowns.set(cooldownKey,Date.now()+cfg.cooldown*1000);if(instant){await db.createMemeEvent(s.id,{username,text,mediaUrl,duration:cfg.duration,size:cfg.size,position:cfg.position,volume:0,at:new Date().toISOString()});tm.emit('meme-overlay-event',row)}await db.touchMemeAccessToken(token,s.id);res.json({success:true,status})}catch(e){res.status(500).json({error:e.message})}});
+app.get('/api/public/memes/:streamer/config',async(req,res)=>{res.set('Cache-Control','no-store, no-cache, must-revalidate');const s=await db.getStreamerBySlug(tenant.normalizeSlug(req.params.streamer));if(!s)return res.status(404).json({error:'Chaîne inconnue'});const tm=createTenantManager({db,io,streamer:s,req});const c=await getMemesConfig(tm);if(req.query.token)await db.touchMemeAccessToken(String(req.query.token),s.id);res.json({data:{enabled:c.enabled,maxText:c.maxText,maxFileMb:c.maxFileMb,maxVideoDuration:c.maxVideoDuration,viewerTts:c.viewerTts,cost:c.cost,streamer:s.display_name||s.slug}})});
+app.post('/api/public/memes/:streamer/submit',async(req,res)=>{try{
+  const s=await db.getStreamerBySlug(tenant.normalizeSlug(req.params.streamer));if(!s)return res.status(404).json({error:'Chaîne inconnue'});
+  const tm=createTenantManager({db,io,streamer:s,req}),cfg=await getMemesConfig(tm);if(!cfg.enabled)return res.status(403).json({error:'Widget désactivé'});
+  const text=cleanMemeText(req.body?.text,cfg.maxText),data=String(req.body?.image||''),token=String(req.body?.token||''),wantsTts=req.body?.readText===true;
+  const m=data.match(/^data:(image\/(png|jpeg|gif|webp)|video\/(mp4|webm));base64,([A-Za-z0-9+/=]+)$/);if(!m)return res.status(400).json({error:'Image, GIF ou vidéo MP4/WebM invalide'});
+  const mediaType=m[1].startsWith('video/')?'video':'image',videoDuration=Number(req.body?.videoDuration||0);
+  if(mediaType==='video'&&(!videoDuration||videoDuration>cfg.maxVideoDuration+.25))return res.status(400).json({error:`La vidéo doit durer ${cfg.maxVideoDuration} secondes maximum`});
+  const bytes=Buffer.from(m[4],'base64');if(bytes.length>cfg.maxFileMb*1024*1024)return res.status(413).json({error:'Fichier trop volumineux'});
+  if(text){const banned=await tenant.runWithStreamer(s,()=>db.checkBannedWords(text));if(banned)return res.status(400).json({error:'Texte refusé'})}
+  const access=await db.getMemeAccessToken(token,s.id);if(!access)return res.status(401).json({error:'Lien expiré. Retape !meme dans le chat.'});
+  const username=access.username,cooldownKey=`viewer:${s.id}:${username.toLowerCase()}`,remaining=Math.ceil(((memeCooldowns.get(cooldownKey)||0)-Date.now())/1000);if(remaining>0)return res.status(429).json({error:`Réessaie dans ${remaining}s`});
+  const viewer=await tenant.runWithStreamer(s,()=>db.getViewer(username));if(access.trusted!==2&&cfg.cost>0&&(!viewer||Number(viewer.meme_points||0)<cfg.cost))return res.status(400).json({error:`Il faut ${cfg.cost} points mèmes`});
+  if(wantsTts&&(!cfg.viewerTts||!text))return res.status(400).json({error:'Lecture IA indisponible ou texte vide'});
+  const subtype=m[2]||m[3],ext=subtype==='jpeg'?'jpg':subtype,file=`${s.id}-${Date.now()}-${crypto.randomBytes(5).toString('hex')}.${ext}`;await fs.promises.writeFile(path.join(memeTempDir,file),bytes);const mediaUrl=`/meme-media/${file}`;
+  let ttsUrl=null;if(wantsTts){const audio=await tenant.runWithStreamer(s,async()=>await generateTTSAudio(text)||await generateFallbackTTSAudio(text));if(audio){const audioFile=`${s.id}-${Date.now()}-${crypto.randomBytes(5).toString('hex')}.mp3`;await fs.promises.writeFile(path.join(memeTempDir,audioFile),Buffer.from(audio,'base64'));ttsUrl=`/meme-media/${audioFile}`}}
+  if(access.trusted!==2&&cfg.cost>0)await tenant.runWithStreamer(s,()=>db.addMemePoints(username,-cfg.cost));
+  const trusted=!!access.trusted,instant=cfg.mode==='instant'||(cfg.mode==='trust'&&trusted),status=instant?'approved':'pending';
+  const row=await db.createMemeSubmission(s.id,username,text,mediaUrl,status,{mediaType,ttsUrl,ttsRequested:wantsTts});memeCooldowns.set(cooldownKey,Date.now()+cfg.cooldown*1000);
+  if(instant){const payload={username,text,mediaUrl,mediaType,ttsUrl,speakText:wantsTts&&!ttsUrl?text:'',duration:mediaType==='video'?Math.min(cfg.maxVideoDuration,videoDuration):cfg.duration,size:cfg.size,position:cfg.position,launchSound:cfg.launchSound,launchSoundType:cfg.launchSoundType,launchSoundVolume:cfg.launchSoundVolume,volume:0,at:new Date().toISOString()};await db.createMemeEvent(s.id,payload);tm.emit('meme-overlay-event',payload)}
+  await db.touchMemeAccessToken(token,s.id);res.json({success:true,status})
+}catch(e){res.status(500).json({error:e.message})}});
 app.get('/api/widgets/memes', async (req,res) => {
   try { if(req.overlayTokenInvalid || req.overlayTokenRow?.widget !== 'memes') return res.status(404).json({error:'overlay_invalid'}); const tm=createTenantManager({db,io,req}); res.json({data:await getMemesConfig(tm),events:await db.getMemeEvents(tm.streamerId,req.query.after||0)}); }
   catch(e) { res.status(500).json({error:e.message}); }
