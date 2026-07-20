@@ -2392,8 +2392,12 @@ async function migrateLegacyRowsToDefaultStreamer(defaultStreamerId = 1) {
 }
 
 let initialized = false;
+let initializationPromise = null;
 async function ensureInit() {
-  if (!initialized) {
+  if (initialized) return;
+  if (initializationPromise) return initializationPromise;
+
+  initializationPromise = (async () => {
     try {
       await initSchema();
       const defaultStreamer = await ensureDefaultStreamer();
@@ -2401,11 +2405,16 @@ async function ensureInit() {
       await ensureBotIdentities();
       await migrateCoreScopedTables(defaultStreamer?.id || 1);
       await migrateLegacyRowsToDefaultStreamer(defaultStreamer?.id || 1);
+      initialized = true;
     } catch(e) {
       console.error('[DB] Erreur init schema:', e.message);
+      throw e;
+    } finally {
+      initializationPromise = null;
     }
-    initialized = true;
-  }
+  })();
+
+  return initializationPromise;
 }
 
 module.exports = {
