@@ -756,7 +756,7 @@ body.light .card,body.light .panel,body.light .widget-engine-card{background:lin
           </article>
 
           <article class="ref-panel ref-alert-card">
-            <header><div><span class="ref-title-icon">♢</span><strong>Alertes récentes</strong></div><button type="button" onclick="showPage('alerts')">Tout voir</button></header>
+            <header><div><span class="ref-title-icon">♢</span><strong>Alertes récentes</strong></div><button type="button" onclick="showPage('alertes')">Tout voir</button></header>
             <ul id="dash-events" class="ref-alert-list">
               <li class="ref-empty-line">Aucune activité récente</li>
             </ul>
@@ -4960,6 +4960,7 @@ async function loadMemePending(){const r=await fetch('/api/admin/memes/submissio
 async function reviewMeme(id,action){await fetch(`/api/admin/memes/submissions/${id}/${action}`,{method:'POST'});loadMemePending()}
 
 function showPage(name) {
+  if(name==='alerts') name='alertes';
   hydrateAllObsLinks();
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
   document.querySelectorAll('.menu a').forEach(t => t.classList.remove('active'));
@@ -8708,7 +8709,7 @@ function getEngineWidget(id) {
   return WIDGET_ENGINE_CACHE?.widgets?.find(w => w.id === id) || null;
 }
 function configureEngineWidget(id) {
-  if (id === 'alerts') return showPage('alerts');
+  if (id === 'alerts') return showPage('alertes');
   if (id === 'memes') return showPage('memes');
   openWidgetSettings(id);
 }
