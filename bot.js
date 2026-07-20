@@ -24,7 +24,7 @@ const CONFIG = {
 };
 
 const PUSHER_URL = 'wss://ws-us2.pusher.com/app/32cbd69e4b950bf97679?protocol=7&client=js&version=7.4.0&flash=false';
-const SYSTEM_COMMANDS = ['!points','!top','!rang','!niveau','!aide','!duel','!accepter','!refuser','!participer','!giveaway','!lobby','!quote','!addquote','!mort','!death','!score','!compteur','!queue','!join','!leave','!pos','!vote','!sondage','!so','!uptime','!fc','!followage','!sc','!coffre','!victoire','!to','!dice','!des','!rps','!pfc','!clip','!addcmd','!delcmd','!addword','!delword','!allowword','!disallowword'];
+const SYSTEM_COMMANDS = ['!points','!top','!rang','!niveau','!aide','!duel','!accepter','!refuser','!participer','!giveaway','!lobby','!quote','!addquote','!mort','!death','!score','!compteur','!queue','!join','!leave','!pos','!vote','!sondage','!so','!uptime','!fc','!followage','!sc','!coffre','!victoire','!dice','!des','!rps','!pfc','!clip','!addcmd','!delcmd','!addword','!delword','!allowword','!disallowword'];
 
 let ws             = null;
 let reconnectDelay = 5000;
@@ -372,17 +372,6 @@ function handleEvent(msg) {
       break;
     }
 
-    // Récompense de points de chaîne rachetée — nom d'événement non confirmé sur ce bot,
-    // on tente plusieurs variantes plausibles en plus du logger générique ci-dessous.
-    case 'App\\Events\\RewardRedeemedEvent':
-    case 'RewardRedeemedEvent':
-    case 'reward-redeemed':
-    case 'RewardRedeemed': {
-      let p; try { p = typeof data === 'string' ? JSON.parse(data) : data; } catch { break; }
-      handleRewardRedeemed(p);
-      break;
-    }
-
     default: {
       // Logger générique + auto-détection : capture tout événement Kick pas encore géré.
       // Si l'event ressemble à un sub/follow/raid, on le transmet aussi au panel.
@@ -398,69 +387,9 @@ function handleEvent(msg) {
   }
 }
 
-// ─── Rachat de récompense (points de chaîne Kick natifs) ─────────────────────
-
-async function handleRewardRedeemed(payload) {
-  try {
-    console.log('[REWARD] Payload brut reçu:', JSON.stringify(payload).slice(0, 1500));
-
-    // Chemins possibles selon la forme réelle du payload (à ajuster une fois confirmée en logs)
-    const redemption = payload?.redemption || payload;
-    const rewardTitle = redemption?.reward?.title || payload?.reward?.title || '';
-    const redeemerUsername = redemption?.user?.login || redemption?.user?.username || payload?.user?.username || payload?.username || '';
-    const userInput = redemption?.user_input || redemption?.input || payload?.user_input || payload?.input || '';
-
-    if (!rewardTitle || !redeemerUsername) {
-      console.log('[REWARD] Champs manquants — impossible de traiter (voir payload brut ci-dessus).');
-      return;
-    }
-
-    const toRewardName = await db.getSettingStr('to_reward_title', 'TO Quelqu\'un de ton choix');
-    if (!rewardTitle.toLowerCase().includes(toRewardName.toLowerCase().slice(0, 10))) {
-      console.log(`[REWARD] "${rewardTitle}" ne correspond pas à la récompense TO configurée ("${toRewardName}") — ignoré.`);
-      return;
-    }
-
-    const target = (userInput || '').replace('@', '').trim();
-    if (!target) {
-      sendChat(`@${redeemerUsername} Ta récompense TO a été rachetée mais aucun pseudo n'a été fourni !`);
-      return;
-    }
-    if (target.toLowerCase() === CONFIG.channel.toLowerCase()) {
-      sendChat(`@${redeemerUsername} Impossible de TO le streamer !`);
-      return;
-    }
-    const assignedBotUsername = currentChatContext()?.botUsername || CONFIG.botUsername;
-    if (target.toLowerCase() === String(assignedBotUsername).toLowerCase()) {
-      sendChat(`@${redeemerUsername} Impossible de TO le bot !`);
-      return;
-    }
-
-    const duration = parseInt(await db.getSettingStr('to_command_duration', '60')) || 60;
-    const targetViewer = await db.getViewer(target);
-    const ok = await moderateUser(target, targetViewer?.kick_user_id || null, 'timeout', duration, `TO (points de chaîne) acheté par ${redeemerUsername}`);
-
-    if (ok) {
-      sendChat(`⏱️ @${redeemerUsername} a racheté TO ${target} pendant ${duration}s avec ses points de chaîne ! 🩸`);
-    } else {
-      sendChat(`@${redeemerUsername} Le TO sur @${target} a échoué côté Kick.`);
-    }
-  } catch(e) {
-    console.error('[REWARD] Erreur traitement rachat:', e.message);
-  }
-}
-
 // ─── Messages chat ────────────────────────────────────────────────────────────
 
 async function handleChatMessage(payload, ctx = null) {
-  // Filet de sécurité : Kick annonce parfois un rachat de récompense comme un message de chat
-  // "spécial" plutôt qu'un événement dédié — on le détecte ici avant le traitement normal.
-  if (payload?.type === 'reward_redeemed' || payload?.metadata?.reward || payload?.reward) {
-    console.log('[REWARD] Détecté via message de chat spécial:', JSON.stringify(payload).slice(0, 1500));
-    handleRewardRedeemed(payload);
-    return;
-  }
-
   const username = payload?.sender?.username || payload?.user?.username || payload?.username;
   const content  = payload?.content || payload?.message || '';
   const kickId   = payload?.sender?.id?.toString() || null;
@@ -573,7 +502,7 @@ async function handleChatMessageScoped(payload, ctx = null) {
       const cleanText=String(item.allowText===false?'':text).replace(/[<>\u0000-\u001f]/g,' ').replace(/\s+/g,' ').trim().slice(0,Math.max(0,Math.min(120,Number(cfg.maxText)||80)));
       if(cleanText){const banned=await db.checkBannedWords(cleanText);if(banned)return sendChat(`@${username} Ce texte n'est pas autorisé.`)}
       memeCooldowns.set(cdKey,Date.now()+Math.max(0,Number(item.cooldown)||30)*1000);
-      const payload={memeId:item.id,name:item.name,username:String(username).slice(0,60),text:cleanText,mediaUrl:item.mediaUrl,soundUrl:item.soundUrl||'',duration:Math.max(2,Math.min(20,Number(item.duration)||6)),volume:Math.max(0,Math.min(100,Number(cfg.volume)||70)),at:new Date().toISOString()};
+      const payload={memeId:item.id,name:item.name,username:String(username).slice(0,60),text:cleanText,mediaUrl:item.mediaUrl,soundUrl:item.soundUrl||'',duration:Math.max(2,Math.min(20,Number(item.duration)||6)),launchSound:cfg.launchSound!==false,launchSoundVolume:Math.max(0,Math.min(100,Number(cfg.launchSoundVolume??35))),volume:Math.max(0,Math.min(100,Number(cfg.volume)||70)),at:new Date().toISOString()};
       await db.createMemeEvent(context.streamerId,payload);
       const result = {ok:true};
       if (result?.error) return sendChat(`@${username} ${result.error}`);
@@ -646,7 +575,6 @@ async function handleChatMessageScoped(payload, ctx = null) {
       case '!sc':        return cmdSubCheck(username, parts);
       case '!coffre':    return cmdOpenChest(username, parts, isModOrBroadcaster, badges);
       case '!victoire':  return cmdMarkVictory(username, isModOrBroadcaster);
-      case '!to':        return cmdTimeoutBuy(username, parts);
       case '!clip':      return (await db.getSetting('clip_enabled')) ? cmdClip(username, parts) : null;
       case '!addcmd':    return cmdAddCommand(username, parts, isModOrBroadcaster);
       case '!delcmd':    return cmdDelCommand(username, parts, isModOrBroadcaster);
@@ -1130,42 +1058,6 @@ async function cmdMarkVictory(username, isModOrBroadcaster) {
   } catch(e) {
     console.error('[VICTOIRE] Erreur:', e.message);
     sendChat(`@${username} Erreur lors du marquage de la victoire.`);
-  }
-}
-
-async function cmdTimeoutBuy(username, parts) {
-  const target = (parts[1] || '').replace('@', '').trim();
-  if (!target) return sendChat(`@${username} Utilisation : !to <pseudo> — TO le pseudo de ton choix avec tes points !`);
-  if (target.toLowerCase() === username.toLowerCase())
-    return sendChat(`@${username} Tu ne peux pas te TO toi-même !`);
-  if (target.toLowerCase() === CONFIG.channel.toLowerCase())
-    return sendChat(`@${username} Impossible de TO le streamer !`);
-  if (target.toLowerCase() === CONFIG.botUsername.toLowerCase())
-    return sendChat(`@${username} Impossible de TO le bot !`);
-
-  const cost     = parseInt(await db.getSettingStr('to_command_cost', '500')) || 500;
-  const duration = parseInt(await db.getSettingStr('to_command_duration', '60')) || 60;
-
-  const buyer = await db.getViewer(username);
-  if (!buyer || buyer.points < cost)
-    return sendChat(`@${username} Il te faut ${cost} pts pour un TO (tu as ${buyer?.points || 0} pts).`);
-
-  const targetViewer = await db.getViewer(target);
-
-  await db.addPoints(username, -cost, 'to_purchase');
-
-  try {
-    const ok = await moderateUser(target, targetViewer?.kick_user_id || null, 'timeout', duration, `TO acheté par ${username}`);
-    if (ok) {
-      sendChat(`⏱️ @${username} a TO @${target} pendant ${duration}s pour ${cost} pts ! 🩸`);
-    } else {
-      await db.addPoints(username, cost, 'to_refund');
-      sendChat(`@${username} Le TO sur @${target} a échoué côté Kick — points remboursés.`);
-    }
-  } catch(e) {
-    console.error('[TO] Erreur:', e.message);
-    await db.addPoints(username, cost, 'to_refund');
-    sendChat(`@${username} Erreur lors du TO — points remboursés.`);
   }
 }
 
