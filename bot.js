@@ -516,6 +516,13 @@ async function handleChatMessageScoped(payload, ctx = null) {
   // Song Request V2 — scoping par streamer via le contexte chat courant.
   // Chaque chaîne a sa propre file d'attente et ses propres réglages.
   try {
+    if (cmd === '!skip') {
+      const result = await shared.voteSongRequestSkip(username, currentChatContext());
+      if (result?.error) return sendChat(`@${username} ${result.error}`);
+      if (result?.skipped) return sendChat(`⏭️ Vote validé (${result.votes}/${result.required}) : musique suivante !`);
+      if (result?.duplicate) return sendChat(`@${username} Tu as déjà voté (${result.votes}/${result.required}).`);
+      return sendChat(`⏭️ @${username} vote pour passer la musique (${result.votes}/${result.required}).`);
+    }
     const srEnabled = await db.getSetting('songrequest_enabled');
     const srCommand = String(await db.getSettingStr('songrequest_command', '!sr') || '!sr').toLowerCase();
     const srAliases = new Set([srCommand, '!sr', '!songrequest']);

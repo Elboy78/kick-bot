@@ -6,6 +6,7 @@ let _openChest = null;
 let _markVictory = null;
 let _kickEventHandler = null;
 let _songRequestAdder = null;
+let _songRequestSkipVoter = null;
 let _chatOverlayEmitter = null;
 let _memeTrigger = null;
 
@@ -28,6 +29,12 @@ module.exports = {
   addSongRequest(username, song, ctx = null) {
     if (_songRequestAdder) return _songRequestAdder(username, song, ctx);
     return Promise.resolve({ error: 'Song Request pas encore initialisé.' });
+  },
+
+  registerSongRequestSkipVoter(fn) { _songRequestSkipVoter = fn; },
+  voteSongRequestSkip(username, ctx = null) {
+    if (_songRequestSkipVoter) return _songRequestSkipVoter(username, ctx);
+    return Promise.resolve({ error: 'Vote skip pas encore initialisé.' });
   },
 
   registerChatOverlayEmitter(fn) { _chatOverlayEmitter = fn; },

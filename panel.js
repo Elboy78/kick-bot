@@ -1531,6 +1531,12 @@ async function getSongRequestState(reqOrTm = null) {
   if (currentItem && ['playing','paused','stopped'].includes(desired || '')) {
     player.status = desired;
   }
+  const skipEnabled = await tm.getBool('songrequest_skip_vote_enabled', true);
+  const skipRequired = Math.min(50, Math.max(1, parseInt(await tm.getSetting('songrequest_skip_vote_required', '3')) || 3));
+  const storedVotes = await tm.getJson('songrequest_skip_votes', {});
+  const skipVoters = currentItem && String(storedVotes?.itemId || '') === String(currentItem.id)
+    ? [...new Set((Array.isArray(storedVotes.voters) ? storedVotes.voters : []).map(v => String(v).toLowerCase()))]
+    : [];
   return {
     streamer: songRequestSlug(tm),
     enabled: await tm.getBool('songrequest_enabled', true),
@@ -1538,6 +1544,9 @@ async function getSongRequestState(reqOrTm = null) {
     confirmMessage: await tm.getSetting('songrequest_confirm', '🎵 @{username}, ta musique a été ajoutée à la file !'),
     chatConfirmEnabled: (await tm.getSetting('songrequest_chat_confirm_enabled', '0')) === '1',
     maxQueue: parseInt(await tm.getSetting('songrequest_max_queue', '30')) || 30,
+    skipVoteEnabled: skipEnabled,
+    skipVoteRequired: skipRequired,
+    skipVotes: { count:skipVoters.length, voters:skipVoters },
     queue,
     player,
     control: await getSongRequestControl(tm)
@@ -1553,6 +1562,45 @@ async function saveSongRequestQueue(queue, reqOrTm = null) {
   }
   tm.emit('songrequest-update', { streamer: songRequestSlug(tm), queue: clean });
   return clean;
+}
+
+const songRequestSkipLocks = new Map();
+async function voteSongRequestSkipUnlocked(username, reqOrTm = null) {
+  const tm = getSongRequestTM(reqOrTm);
+  const state = await getSongRequestState(tm);
+  if (!state.enabled) return { error:'Le Song Request est désactivé.' };
+  if (!state.skipVoteEnabled) return { error:'Le vote !skip est désactivé sur cette chaîne.' };
+  const current = state.queue[0];
+  if (!current) return { error:'Aucune musique n’est en lecture.' };
+  const voter = String(username || '').trim().toLowerCase();
+  if (!voter) return { error:'Pseudo invalide.' };
+  const required = state.skipVoteRequired;
+  const voters = Array.isArray(state.skipVotes?.voters) ? state.skipVotes.voters.slice() : [];
+  if (voters.includes(voter)) return { success:true, duplicate:true, votes:voters.length, required };
+  voters.push(voter);
+  await tm.setJson('songrequest_skip_votes', { itemId:current.id, voters, updatedAt:new Date().toISOString() });
+  tm.emit('songrequest-skip-votes', { itemId:current.id, count:voters.length, required });
+  if (voters.length < required) return { success:true, votes:voters.length, required };
+
+  state.queue.shift();
+  await saveSongRequestQueue(state.queue, tm);
+  await tm.setJson('songrequest_skip_votes', {});
+  const next = state.queue[0] || null;
+  setSongRequestDesiredStatus(tm, next ? 'playing' : 'stopped');
+  await saveSongRequestPlayerState({ itemId:next?.id || '', status:next ? 'playing' : 'stopped', currentTime:0, duration:next?.duration || 0 }, true, tm);
+  await issueSongRequestControl('next', {}, tm);
+  return { success:true, skipped:true, votes:voters.length, required, next:next?.title || '' };
+}
+
+async function voteSongRequestSkip(username, reqOrTm = null) {
+  const tm=getSongRequestTM(reqOrTm), key=String(tm.streamerId||tm.slug||'default');
+  const previous=songRequestSkipLocks.get(key)||Promise.resolve();
+  let release;
+  const current=new Promise(resolve=>{release=resolve});
+  songRequestSkipLocks.set(key,current);
+  await previous.catch(()=>{});
+  try{return await voteSongRequestSkipUnlocked(username,tm)}
+  finally{release();if(songRequestSkipLocks.get(key)===current)songRequestSkipLocks.delete(key)}
 }
 
 async function addSongRequest(username, song, reqOrTm = null) {
@@ -1594,6 +1642,14 @@ try {
     }
     return run();
   });
+  shared.registerSongRequestSkipVoter(async (username, ctx = null) => {
+    const run = async () => {
+      const tm = createTenantManager({ db, io, streamer: ctx?.streamer || (ctx?.streamerId ? { id:ctx.streamerId, slug:ctx.slug } : null) });
+      return voteSongRequestSkip(username, tm);
+    };
+    if (ctx?.streamerId && tenant?.runWithStreamer) return tenant.runWithStreamer({ id:ctx.streamerId, slug:ctx.slug }, run);
+    return run();
+  });
   console.log('[SONGREQUEST] Pont panel/bot V2 enregistré ✓');
 } catch(e) {
   console.warn("[SONGREQUEST] Impossible d'enregistrer le pont panel/bot:", e.message);
@@ -1620,6 +1676,8 @@ app.post('/api/admin/widgets/songrequest/settings', requireAuth, async (req, res
     if (typeof req.body.confirmMessage === 'string') await tm.setSetting('songrequest_confirm', req.body.confirmMessage.trim().slice(0,180));
     if (typeof req.body.chatConfirmEnabled === 'boolean') await tm.setSetting('songrequest_chat_confirm_enabled', req.body.chatConfirmEnabled ? '1' : '0');
     if (req.body.maxQueue !== undefined) await tm.setSetting('songrequest_max_queue', String(Math.min(100, Math.max(1, parseInt(req.body.maxQueue) || 30))));
+    if (typeof req.body.skipVoteEnabled === 'boolean') await tm.setBool('songrequest_skip_vote_enabled', req.body.skipVoteEnabled);
+    if (req.body.skipVoteRequired !== undefined) await tm.setSetting('songrequest_skip_vote_required', String(Math.min(50, Math.max(1, parseInt(req.body.skipVoteRequired) || 3))));
     const state = await getSongRequestState(tm);
     tm.emit('songrequest-settings-update', state);
     res.json({ success:true, ...state });
@@ -2832,6 +2890,8 @@ function normalizeAlertCfg(type, raw={}) {
   const animations = ['fade','pop','zoom','bounce','shake','flip','glitch','slide_left','slide_right','slide_up','slide_down'];
   const legacyAnimation = String(raw.animation || '');
   const media = String(raw.media ?? raw.image ?? d.media).slice(0, 7_000_000);
+  const volumeValue = Number(raw.volume ?? d.volume);
+  const durationValue = Number(raw.duration ?? d.duration);
   return {
     enabled: raw.enabled !== undefined ? !!raw.enabled : !!d.enabled,
     title: String(raw.title ?? d.title).slice(0, 120),
@@ -2840,8 +2900,8 @@ function normalizeAlertCfg(type, raw={}) {
     image: media,
     mediaType: ['image','video'].includes(String(raw.mediaType ?? d.mediaType)) ? String(raw.mediaType ?? d.mediaType) : 'image',
     sound: String(raw.sound ?? d.sound).slice(0, 7_000_000),
-    volume: Math.min(100, Math.max(0, Number(raw.volume ?? d.volume) || d.volume)),
-    duration: Math.min(60, Math.max(1, Number(raw.duration ?? d.duration) || d.duration)),
+    volume: Math.min(100, Math.max(0, Number.isFinite(volumeValue) ? volumeValue : d.volume)),
+    duration: Math.min(60, Math.max(1, Number.isFinite(durationValue) ? durationValue : d.duration)),
     enterAnimation: animations.includes(String(raw.enterAnimation || legacyAnimation || d.enterAnimation)) ? String(raw.enterAnimation || legacyAnimation || d.enterAnimation) : d.enterAnimation,
     exitAnimation: animations.includes(String(raw.exitAnimation || d.exitAnimation)) ? String(raw.exitAnimation || d.exitAnimation) : d.exitAnimation,
     animation: animations.includes(String(raw.enterAnimation || legacyAnimation || d.enterAnimation)) ? String(raw.enterAnimation || legacyAnimation || d.enterAnimation) : d.enterAnimation,
@@ -2907,7 +2967,9 @@ async function pushObsAlert(type, vars={}, force=false, reqOrTm=null) {
     vars, cfg, createdAt: new Date().toISOString()
   };
   tm.emit('alert-overlay-event', payload);
-  await appendAlertHistory(tm, { id:payload.id, profile, type, label:payload.label, title:payload.title, message:payload.message, createdAt:payload.createdAt }).catch(()=>{});
+  // Le payload complet permet à l'overlay de récupérer une alerte manquée après
+  // une brève coupure Socket.IO, avec exactement le média et le son d'origine.
+  await appendAlertHistory(tm, payload).catch(()=>{});
   console.log(`[ALERT OBS:${tm.slug}]`, type, payload.message);
   return { success:true, alert:payload };
 }
@@ -2929,6 +2991,19 @@ app.get('/api/widgets/alerts', async (req, res) => {
 app.get('/api/widgets/alerts/history', async (req,res)=>{
   try { const tm=getAlertTM(req); res.json({ streamer:tm.slug, data:await tm.getJson('alert_history',[]) }); }
   catch(e){ res.status(500).json({error:e.message}); }
+});
+app.get('/api/widgets/alerts/events', async (req,res)=>{
+  try {
+    if (req.overlayTokenInvalid) return res.status(410).json({error:'Lien OBS expiré',invalidOverlay:true});
+    const tm=getAlertTM(req), history=await tm.getJson('alert_history',[]);
+    const sinceMs=Date.parse(String(req.query.since||''))||0;
+    const data=(Array.isArray(history)?history:[])
+      .filter(item=>item?.cfg&&Date.parse(String(item.createdAt||''))>sinceMs)
+      .sort((a,b)=>Date.parse(a.createdAt||0)-Date.parse(b.createdAt||0))
+      .slice(-30);
+    res.set('Cache-Control','no-store');
+    res.json({streamer:tm.slug,data,serverTime:new Date().toISOString()});
+  } catch(e){res.status(500).json({error:e.message});}
 });
 app.post('/api/admin/widgets/alerts/profiles', requireAuth, async (req,res)=>{
   try {

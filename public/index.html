@@ -1361,6 +1361,10 @@ Option 3" rows="4"></textarea><div style="display:flex;gap:6px;margin-top:10px">
         <label class="sr-toggle-line"><span class="sr-switch"><input type="checkbox" id="sr-chat-confirm"><span></span></span><b>Envoyer le message de confirmation dans le chat</b></label>
         <label class="lbl">Nombre maximum dans la file</label>
         <input type="number" class="inp" id="sr-max" min="1" max="100" placeholder="30" style="margin-bottom:12px">
+        <label class="sr-toggle-line"><span class="sr-switch"><input type="checkbox" id="sr-skip-vote-enabled"><span></span></span><b>Autoriser le vote viewers avec !skip</b></label>
+        <label class="lbl">Votes de viewers différents nécessaires</label>
+        <input type="number" class="inp" id="sr-skip-vote-required" min="1" max="50" value="3" style="margin-bottom:6px">
+        <div id="sr-skip-vote-status" style="font-size:10px;color:var(--muted);margin-bottom:12px">0 vote sur 3 pour la musique actuelle</div>
         <button class="dark-btn" onclick="saveSongRequestSettings()" style="width:100%;justify-content:center">ENREGISTRER</button>
         <div class="obs-link-box">
           <div class="obs-link-head"><b>🔗 Lien overlay OBS Song Request</b><span><button class="obs-copy-btn" onclick="copyObsUrl('songrequest-obs-url')">Copier</button><button class="obs-regenerate-btn" onclick="regenerateObsToken('songrequest')">Régénérer</button></span></div>
@@ -7673,22 +7677,30 @@ const SEARCH_PAGES = [
 
 let searchIdx = 0;
 let searchViewers = [];
+let searchCommands = [];
 let searchResultActions = [];
+const normalizeSearchText=value=>String(value||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();
 
 function openSearch() {
   const overlay = document.getElementById('search-overlay');
   const input   = document.getElementById('search-input');
   if (!overlay || !input) return;
   overlay.classList.add('open');
+  overlay.style.display = 'flex';
   input.value = '';
   input.focus();
   runSearch();
   // Pré-charger les viewers pour la recherche
-  get('/api/leaderboard?limit=200').then(d => { searchViewers = d || []; }).catch(()=>{});
+  Promise.all([
+    get('/api/leaderboard?limit=200').then(d=>{searchViewers=d||[]}),
+    get('/api/commands').then(d=>{searchCommands=d||[]})
+  ]).then(()=>runSearch()).catch(()=>{});
 }
 
 function closeSearch() {
-  document.getElementById('search-overlay')?.classList.remove('open');
+  const overlay=document.getElementById('search-overlay');
+  overlay?.classList.remove('open');
+  if(overlay) overlay.style.display='none';
 }
 
 function handleSearchKey(e) {
@@ -7706,7 +7718,7 @@ function highlightSearch() {
 }
 
 async function runSearch() {
-  const q = (document.getElementById('search-input')?.value || '').toLowerCase().trim();
+  const q = normalizeSearchText(document.getElementById('search-input')?.value).trim();
   const el = document.getElementById('search-results');
   if (!el) return;
   searchIdx = 0;
@@ -7715,7 +7727,7 @@ async function runSearch() {
 
   // Pages correspondantes
   const matchPages = SEARCH_PAGES.filter(p =>
-    p.label.toLowerCase().includes(q) || p.page.includes(q) || String(p.tags||'').includes(q)
+    normalizeSearchText(p.label).includes(q) || normalizeSearchText(p.page).includes(q) || normalizeSearchText(p.tags).includes(q)
   );
   results.push(...matchPages.map(p => ({
     icon: p.icon, label: p.label, sub: p.widget ? 'Widget' : 'Page', action: () => { closeSearch(); showPage(p.page); if(p.widget)setTimeout(()=>openWidgetSettings(p.widget),50); }
@@ -7740,6 +7752,11 @@ async function runSearch() {
         }, 300);
       }
     })));
+  }
+
+  if (q.length >= 1 && searchCommands.length) {
+    const matches=searchCommands.filter(c=>normalizeSearchText(`${c.trigger||''} ${c.response||''}`).includes(q)).slice(0,6);
+    results.push(...matches.map(c=>({icon:'⚡',label:c.trigger||'Commande',sub:'Commande personnalisée',action:()=>{closeSearch();showPage('commands');setTimeout(()=>document.getElementById('cmd-page-list')?.scrollIntoView({behavior:'smooth',block:'start'}),250)}})));
   }
 
   if (!results.length && q.length > 0) {
@@ -8044,6 +8061,10 @@ async function loadSongRequest(silent = false) {
     srSetVal('sr-confirm', d.confirmMessage || '🎵 @{username}, ta musique a été ajoutée à la file !');
     srSetChecked('sr-chat-confirm', d.chatConfirmEnabled === true);
     srSetVal('sr-max', d.maxQueue || 30);
+    srSetChecked('sr-skip-vote-enabled', d.skipVoteEnabled !== false);
+    srSetVal('sr-skip-vote-required', d.skipVoteRequired || 3);
+    const skipStatus=document.getElementById('sr-skip-vote-status');
+    if(skipStatus) skipStatus.textContent=`${Number(d.skipVotes?.count||0)} vote${Number(d.skipVotes?.count||0)>1?'s':''} sur ${Number(d.skipVoteRequired||3)} pour la musique actuelle`;
     const vol = document.getElementById('sr-volume');
     if (vol && d.player?.volume !== undefined) vol.value = d.player.volume;
     hydrateAllObsLinks();
@@ -8342,7 +8363,9 @@ async function saveSongRequestSettings() {
     command: (document.getElementById('sr-command')?.value || '!sr').trim(),
     confirmMessage: (document.getElementById('sr-confirm')?.value || '').trim(),
     chatConfirmEnabled: document.getElementById('sr-chat-confirm')?.checked === true,
-    maxQueue: parseInt(document.getElementById('sr-max')?.value || '30') || 30
+    maxQueue: parseInt(document.getElementById('sr-max')?.value || '30') || 30,
+    skipVoteEnabled: document.getElementById('sr-skip-vote-enabled')?.checked === true,
+    skipVoteRequired: parseInt(document.getElementById('sr-skip-vote-required')?.value || '3') || 3
   };
   const r = await fetch(API + '/api/admin/widgets/songrequest/settings', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body) });
   const d = await r.json().catch(()=>null);
@@ -8800,6 +8823,18 @@ try {
       if (!srLastQueue.length) srPlayer = Object.assign(srPlayer, { status:'stopped', currentTime:0, duration:0, itemId:'' });
       if (prevItemId !== srPlayer.itemId || prevStatus !== srPlayer.status || Math.abs(incomingTime - localTime) > 1.25) srSyncClockFromPlayer(srPlayer);
       renderSongRequestPlayer(srLastQueue, srPlayer);
+    });
+    srSocket.on('songrequest-skip-votes', data=>{
+      const status=document.getElementById('sr-skip-vote-status');
+      if(status)status.textContent=`${Number(data?.count||0)} vote${Number(data?.count||0)>1?'s':''} sur ${Number(data?.required||3)} pour la musique actuelle`;
+    });
+    let alertHistoryTimer=null;
+    srSocket.on('alert-overlay-event',()=>{
+      clearTimeout(alertHistoryTimer);
+      alertHistoryTimer=setTimeout(()=>{if(document.getElementById('page-alertes')?.classList.contains('active'))loadAlertHistory()},150);
+    });
+    srSocket.on('alert-overlay-settings',data=>{
+      if(data?.configs){alertsConfigs=data.configs;if(document.getElementById('page-alertes')?.classList.contains('active'))selectAlertType(currentAlertType)}
     });
   }
 } catch(e) {}
@@ -11039,12 +11074,13 @@ function openSearchFromTop(value = '') {
   const input = document.getElementById('search-input');
   if (!overlay || !input) return;
   overlay.classList.add('open');
+  overlay.style.display = 'flex';
   input.value = value || '';
   input.focus();
   if (typeof runSearch === 'function') runSearch();
   if (typeof get === 'function') {
-    get('/api/leaderboard?limit=200')
-      .then(data => { searchViewers = data || []; if (typeof runSearch === 'function') runSearch(); })
+    Promise.all([get('/api/leaderboard?limit=200'),get('/api/commands')])
+      .then(([viewers,commands]) => { searchViewers=viewers||[];searchCommands=commands||[];if(typeof runSearch==='function')runSearch(); })
       .catch(() => {});
   }
 }
