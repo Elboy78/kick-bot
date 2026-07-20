@@ -185,7 +185,7 @@ async function initSchema() {
     `CREATE TABLE IF NOT EXISTS meme_submissions (
       id INTEGER PRIMARY KEY AUTOINCREMENT, streamer_id INTEGER NOT NULL,
       username TEXT NOT NULL, text TEXT, media_url TEXT NOT NULL,
-      media_type TEXT NOT NULL DEFAULT 'image', tts_url TEXT,
+      media_type TEXT NOT NULL DEFAULT 'image', tts_url TEXT, tts_requested INTEGER NOT NULL DEFAULT 0,
       status TEXT NOT NULL DEFAULT 'pending', created_at TEXT NOT NULL DEFAULT (datetime('now'))
     )`,
     `CREATE TABLE IF NOT EXISTS meme_access_tokens (
@@ -546,6 +546,7 @@ async function initSchema() {
     `ALTER TABLE viewers ADD COLUMN meme_points_updated_at TEXT`,
     `ALTER TABLE meme_submissions ADD COLUMN media_type TEXT NOT NULL DEFAULT 'image'`,
     `ALTER TABLE meme_submissions ADD COLUMN tts_url TEXT`,
+    `ALTER TABLE meme_submissions ADD COLUMN tts_requested INTEGER NOT NULL DEFAULT 0`,
     `ALTER TABLE chest_seasons ADD COLUMN ever_secured INTEGER NOT NULL DEFAULT 0`,
     `ALTER TABLE chest_seasons ADD COLUMN victory_pending INTEGER NOT NULL DEFAULT 0`,
     `ALTER TABLE chest_seasons ADD COLUMN protected_number INTEGER DEFAULT NULL`,
@@ -1608,6 +1609,8 @@ async function setViewerKickProfile(username, profile = {}) {
   const normalized = String(username || '').trim().replace(/^@+/, '').toLowerCase();
   if (!normalized) return;
   const badges = Array.isArray(profile.badges) ? profile.badges.slice(0, 20) : [];
+  await run(`INSERT OR IGNORE INTO viewers (streamer_id,username,points,meme_points)
+    VALUES (?,?,0,0)`, [scopedStreamerId(), normalized]);
   await run(`UPDATE viewers SET
       following_since = COALESCE(?, following_since),
       subscribed_for = COALESCE(?, subscribed_for),
@@ -2172,7 +2175,7 @@ async function getMemeEvents(streamerId, afterId = 0) {
   return rows.map(row => { try { return { ...JSON.parse(row.payload), id:row.id, createdAt:row.created_at }; } catch (_) { return null; } }).filter(Boolean);
 }
 async function createMemeSubmission(streamerId, username, text, mediaUrl, status='pending', options={}) {
-  const r=await run(`INSERT INTO meme_submissions (streamer_id,username,text,media_url,media_type,tts_url,status) VALUES (?,?,?,?,?,?,?)`,[Number(streamerId),username,text,mediaUrl,options.mediaType||'image',options.ttsUrl||null,status]);
+  const r=await run(`INSERT INTO meme_submissions (streamer_id,username,text,media_url,media_type,tts_url,tts_requested,status) VALUES (?,?,?,?,?,?,?,?)`,[Number(streamerId),username,text,mediaUrl,options.mediaType||'image',options.ttsUrl||null,options.ttsRequested?1:0,status]);
   return get(`SELECT * FROM meme_submissions WHERE id=?`,[Number(r.lastInsertRowid)]);
 }
 async function getMemeSubmissions(streamerId, status='pending') { return all(`SELECT * FROM meme_submissions WHERE streamer_id=? AND status=? ORDER BY id DESC LIMIT 100`,[Number(streamerId),status]); }

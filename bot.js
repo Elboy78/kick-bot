@@ -502,7 +502,7 @@ async function handleChatMessageScoped(payload, ctx = null) {
       const cleanText=String(item.allowText===false?'':text).replace(/[<>\u0000-\u001f]/g,' ').replace(/\s+/g,' ').trim().slice(0,Math.max(0,Math.min(120,Number(cfg.maxText)||80)));
       if(cleanText){const banned=await db.checkBannedWords(cleanText);if(banned)return sendChat(`@${username} Ce texte n'est pas autorisé.`)}
       memeCooldowns.set(cdKey,Date.now()+Math.max(0,Number(item.cooldown)||30)*1000);
-      const payload={memeId:item.id,name:item.name,username:String(username).slice(0,60),text:cleanText,mediaUrl:item.mediaUrl,soundUrl:item.soundUrl||'',duration:Math.max(2,Math.min(20,Number(item.duration)||6)),launchSound:cfg.launchSound!==false,launchSoundVolume:Math.max(0,Math.min(100,Number(cfg.launchSoundVolume??35))),volume:Math.max(0,Math.min(100,Number(cfg.volume)||70)),at:new Date().toISOString()};
+      const payload={memeId:item.id,name:item.name,username:String(username).slice(0,60),text:cleanText,mediaUrl:item.mediaUrl,soundUrl:item.soundUrl||'',duration:Math.max(2,Math.min(20,Number(item.duration)||6)),launchSound:cfg.launchSound!==false,launchSoundType:['pop','chime','bell','digital'].includes(cfg.launchSoundType)?cfg.launchSoundType:'pop',launchSoundVolume:Math.max(0,Math.min(100,Number(cfg.launchSoundVolume??55))),volume:Math.max(0,Math.min(100,Number(cfg.volume)||70)),at:new Date().toISOString()};
       await db.createMemeEvent(context.streamerId,payload);
       const result = {ok:true};
       if (result?.error) return sendChat(`@${username} ${result.error}`);
