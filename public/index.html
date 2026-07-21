@@ -419,7 +419,7 @@ body.light .card,body.light .panel,body.light .widget-engine-card{background:lin
 .elbot-topbar{position:sticky;top:10px;z-index:90;height:52px;margin:0 0 17px;display:flex;align-items:center;gap:12px;padding:7px 10px 7px 14px;border:1px solid rgba(125,187,255,.14);border-radius:16px;background:linear-gradient(110deg,rgba(7,23,52,.72),rgba(5,17,39,.50))}
 .elbot-search{display:flex;align-items:center;gap:9px;width:min(330px,32vw);height:36px;padding:0 11px;border:1px solid rgba(131,190,255,.13);border-radius:11px;background:rgba(4,16,38,.46);color:var(--muted);cursor:pointer}
 .elbot-search span{font-size:12px}.elbot-search b{margin-left:auto;padding:3px 6px;border-radius:5px;background:rgba(112,164,224,.10);font-size:8px;color:#91a4c0;font-weight:600}
-.elbot-top-actions{margin-left:auto;display:flex;align-items:center;gap:5px}.top-icon{width:34px;height:34px;border:0;background:transparent;color:#dce8f8;border-radius:10px;cursor:pointer;font-size:15px}.top-icon:hover{background:rgba(45,139,255,.13)}
+.elbot-top-actions{margin-left:auto;display:flex;align-items:center;gap:5px}.top-icon{width:34px;height:34px;border:0;background:transparent;color:#cfe3fa;border-radius:10px;cursor:pointer;display:grid;place-items:center}.top-icon svg{width:17px;height:17px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}.top-icon:hover{color:#fff;background:rgba(45,139,255,.16);box-shadow:inset 0 0 0 1px rgba(110,186,255,.14)}
 .top-profile{height:38px;min-width:160px;display:flex;align-items:center;gap:9px;padding:4px 10px 4px 5px;border:1px solid rgba(120,182,255,.13);border-radius:13px;background:rgba(6,21,48,.46)}
 .top-profile-avatar{width:28px;height:28px;border-radius:50%;display:grid;place-items:center;background:linear-gradient(145deg,#1b93ff,#073cb4);font-weight:800;font-size:10px;box-shadow:0 0 15px rgba(31,147,255,.25)}
 .top-profile strong{font-size:10px}.top-profile small{display:block;color:var(--muted);font-size:8px;margin-top:1px}
@@ -603,10 +603,10 @@ body.light .card,body.light .panel,body.light .widget-engine-card{background:lin
       <b>Ctrl + K</b>
     </div>
     <div class="elbot-top-actions">
-      <button class="top-icon" type="button" onclick="setTheme(document.body.classList.contains('light')?'dark':'light')" title="Changer de thème">☾</button>
-      <button class="top-icon" type="button" onclick="showPage('widgets')" title="Widgets">⊞</button>
-      <button class="top-icon" type="button" onclick="showPage('alertes')" title="Alertes">♧</button>
-      <button class="top-icon" type="button" onclick="showPage('settings')" title="Aide et paramètres">?</button>
+      <button class="top-icon" type="button" onclick="setTheme(document.body.classList.contains('light')?'dark':'light')" title="Changer de thème" aria-label="Changer de thème"><svg viewBox="0 0 24 24"><path d="M20.5 14.4A8.5 8.5 0 0 1 9.6 3.5 8.5 8.5 0 1 0 20.5 14.4Z"/></svg></button>
+      <button class="top-icon" type="button" onclick="showPage('widgets')" title="Widgets" aria-label="Widgets"><svg viewBox="0 0 24 24"><rect x="4" y="4" width="6" height="6" rx="1"/><rect x="14" y="4" width="6" height="6" rx="1"/><rect x="4" y="14" width="6" height="6" rx="1"/><rect x="14" y="14" width="6" height="6" rx="1"/></svg></button>
+      <button class="top-icon" type="button" onclick="showPage('alertes')" title="Alertes" aria-label="Alertes"><svg viewBox="0 0 24 24"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9"/><path d="M10 21h4"/></svg></button>
+      <button class="top-icon" type="button" onclick="openHelpSupport()" title="Support ElBot" aria-label="Support ElBot"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M9.8 9a2.4 2.4 0 1 1 3.2 2.3c-.8.3-1 1-1 1.7"/><path d="M12 17h.01"/></svg></button>
       <button class="top-profile" type="button" onclick="showPage('settings')">
         <span class="top-profile-avatar" id="top-prof-avatar">E</span>
         <span><strong id="top-prof-name">ElBot</strong><small id="top-prof-role">Streamer</small></span>
@@ -969,12 +969,13 @@ body.light .card,body.light .panel,body.light .widget-engine-card{background:lin
 
   <!-- ══ DBD ══ -->
   <div class="page" id="page-dbd">
-    <div class="header"><div><h1>Dead by Daylight</h1><p>Générateur de builds aléatoires</p></div></div>
-    <div class="g2-eq">
-      <div class="panel"><h3>🏃 Perks Survivant <button class="btnx btn-outline btn-sm" onclick="spinDBD('survivor')">🎲 Lancer</button></h3><div style="font-size:10px;color:#a1a1aa;margin-bottom:10px">4 perks aléatoires</div><div id="dbd-survivor-result" style="display:grid;grid-template-columns:1fr 1fr;gap:7px"><div class="empty" style="grid-column:1/-1"><div class="ei">🎴</div><p>Clique sur Lancer</p></div></div><div id="dbd-survivor-spin" style="text-align:center;font-size:10px;color:#a1a1aa;margin-top:10px;min-height:16px"></div></div>
-      <div class="panel"><h3>🔪 Perks Tueur <button class="btnx btn-red btn-sm" onclick="spinDBD('killer')">🎲 Lancer</button></h3><div style="font-size:10px;color:#a1a1aa;margin-bottom:10px">4 perks aléatoires</div><div id="dbd-killer-result" style="display:grid;grid-template-columns:1fr 1fr;gap:7px"><div class="empty" style="grid-column:1/-1"><div class="ei">🎴</div><p>Clique sur Lancer</p></div></div><div id="dbd-killer-spin" style="text-align:center;font-size:10px;color:#a1a1aa;margin-top:10px;min-height:16px"></div></div>
+    <div class="header"><div><h1>Roulette Dead by Daylight</h1><p>Une vraie machine à perks : clique sur un slot pour lancer · Maj + clic pour relancer uniquement ce slot</p></div></div>
+    <div class="dbd-roulette">
+      <div class="dbd-roulette-head"><div class="dbd-role-tabs"><button id="dbd-tab-survivor" class="active" onclick="setDBDSide('survivor')">Survivant</button><button id="dbd-tab-killer" onclick="setDBDSide('killer')">Tueur</button></div><label class="dbd-color-toggle"><input type="checkbox" id="dbd-colored" checked onchange="renderDBDSlots()"><span>Perks colorés</span></label></div>
+      <div class="dbd-machine"><div class="dbd-machine-title"><span>ELBOT</span><strong id="dbd-machine-role">SURVIVOR PERK ROULETTE</strong><small id="dbd-machine-status">Clique sur un slot pour commencer</small></div><div class="dbd-reels" id="dbd-reels"></div><button class="dbd-spin-button" id="dbd-spin-main" onclick="spinDBD()"><span>⟳</span> LANCER LES 4 PERKS</button></div>
+      <div class="dbd-build-actions"><button class="btnx btn-ghost" onclick="toggleAllDBDLocks()">🔒 Verrouiller / déverrouiller</button><button class="btnx btn-outline" onclick="copyDBDBuild()">Copier le build</button><button class="btnx btn-red" onclick="clearDBDHistory()">Effacer l’historique</button></div>
     </div>
-    <div class="panel" style="margin-top:14px"><h3>📋 Historique des builds <button class="btnx btn-ghost btn-sm" onclick="clearDBDHistory()">Effacer</button></h3><div id="dbd-history" style="max-height:160px;overflow-y:auto"><div class="empty"><p>Aucun build</p></div></div></div>
+    <div class="panel dbd-history-panel" style="margin-top:14px"><h3>Derniers builds</h3><div id="dbd-history"><div class="empty"><p>Aucun build</p></div></div></div>
   </div>
 
   <!-- ══ MODÉRATION ══ -->
@@ -1028,7 +1029,6 @@ Option 3" rows="4"></textarea><div style="display:flex;gap:6px;margin-top:10px">
       <div>
         <div class="panel" style="margin-bottom:14px"><h3>📋 File d'attente (<span id="queue-count">0</span>) <button class="btnx btn-red btn-sm" onclick="clearQueue()">Vider</button></h3><div id="queue-list"><div class="empty"><div class="ei">📋</div><p>File vide</p></div></div></div>
         <div class="panel" style="margin-bottom:14px"><h3>📢 Annonces auto</h3><div id="ann-list"><div class="empty"><div class="ei">📢</div><p>Aucune annonce</p></div></div><hr class="div"><label class="lbl">Message</label><textarea class="inp" id="ann-message" placeholder="Ex: Rejoins notre Discord !" rows="2"></textarea><label class="lbl">Intervalle</label><div style="display:flex;gap:5px;margin-bottom:8px"><button class="btnx btn-ghost btn-sm" onclick="setAnnInterval(300000)">5 min</button><button class="btnx btn-ghost btn-sm" onclick="setAnnInterval(600000)">10 min</button><button class="btnx btn-ghost btn-sm" onclick="setAnnInterval(1800000)">30 min</button><button class="btnx btn-ghost btn-sm" onclick="setAnnInterval(3600000)">1h</button></div><input type="hidden" id="ann-interval" value="600000"><button class="btnx btn-outline" style="width:100%;justify-content:center" onclick="addAnnouncement()">➕ Ajouter</button><div id="ann-msg" style="margin-top:7px"></div></div>
-        <div class="panel"><h3>⏱ Timers</h3><div id="timers-list"><div class="empty"><div class="ei">⏱</div><p>Aucun timer</p></div></div><hr class="div"><label class="lbl">Nom</label><input class="inp" id="timer-name" placeholder="Ex: recap"><label class="lbl">Message</label><input class="inp" id="timer-message" placeholder="Ex: N'oublie pas de follow !"><label class="lbl">Intervalle</label><div style="display:flex;gap:5px;margin-bottom:6px"><button class="btnx btn-ghost btn-sm" onclick="setTimerInterval(300000)">5 min</button><button class="btnx btn-ghost btn-sm" onclick="setTimerInterval(600000)">10 min</button><button class="btnx btn-ghost btn-sm" onclick="setTimerInterval(1800000)">30 min</button></div><input type="hidden" id="timer-interval" value="300000"><button class="btnx btn-outline" style="width:100%;justify-content:center;margin-top:4px" onclick="addTimer()">➕ Ajouter</button><div id="timer-msg" style="margin-top:7px"></div></div>
       </div>
     </div>
   </div>
@@ -6350,56 +6350,19 @@ const DBD_KILLER_PERKS = [
   "Vicieux"
 ];
 
-let dbdHistory = [];
-let dbdSpinning = { survivor: false, killer: false };
-
-function initDBD() {
-  renderDBDHistory();
-}
-
-function spinDBD(side) {
-  if (dbdSpinning[side]) return;
-  dbdSpinning[side] = true;
-
-  const perks = side === 'survivor' ? DBD_SURVIVOR_PERKS : DBD_KILLER_PERKS;
-  const resultEl = document.getElementById(`dbd-${side}-result`);
-  const spinEl   = document.getElementById(`dbd-${side}-spin`);
-  const color    = side === 'survivor' ? 'var(--accent)' : 'var(--red)';
-  const emoji    = side === 'survivor' ? '🏃' : '🔪';
-
-  // Animation de slot machine
-  let ticks = 0;
-  const maxTicks = 20;
-  const interval = setInterval(() => {
-    ticks++;
-    // Afficher 4 perks aléatoires pendant l'animation
-    const tmp = [...perks].sort(() => Math.random() - 0.5).slice(0, 4);
-    resultEl.innerHTML = tmp.map(p => `
-      <div style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:10px 12px;text-align:center;font-size:12px;font-weight:500;opacity:.6">
-        ${emoji} ${p}
-      </div>`).join('');
-    spinEl.textContent = '🎰 Tirage en cours…';
-
-    if (ticks >= maxTicks) {
-      clearInterval(interval);
-      // Résultat final
-      const chosen = [...perks].sort(() => Math.random() - 0.5).slice(0, 4);
-      resultEl.innerHTML = chosen.map((p, i) => `
-        <div style="background:var(--surface2);border:1px solid ${color}44;border-radius:8px;padding:14px 12px;text-align:center;animation:fadeIn .3s ease ${i*0.1}s both">
-          <div style="font-size:20px;margin-bottom:6px">${emoji}</div>
-          <div style="font-size:13px;font-weight:700;color:var(--text)">${p}</div>
-          <div style="font-size:10px;color:var(--muted);margin-top:4px">${side === 'survivor' ? 'Survivant' : 'Tueur'}</div>
-        </div>`).join('');
-      spinEl.textContent = '✅ Build généré !';
-      dbdSpinning[side] = false;
-
-      // Ajouter à l'historique
-      dbdHistory.unshift({ side, perks: chosen, time: new Date().toLocaleTimeString('fr-FR') });
-      if (dbdHistory.length > 10) dbdHistory.pop();
-      renderDBDHistory();
-    }
-  }, 80);
-}
+let dbdHistory=[],dbdSide='survivor',dbdRunning=false;
+let dbdSlots=Array.from({length:4},()=>({perk:'',locked:false,spinning:false}));
+function dbdPool(){return dbdSide==='survivor'?DBD_SURVIVOR_PERKS:DBD_KILLER_PERKS}
+function dbdPick(excluded=[]){const pool=dbdPool().filter(p=>!excluded.includes(p));return pool[Math.floor(Math.random()*pool.length)]||dbdPool()[0]}
+function dbdRune(name){return String(name||'?').split(/\s+/).slice(0,2).map(x=>x[0]).join('').toUpperCase()}
+function initDBD(){if(!dbdSlots.some(s=>s.perk)){const used=[];dbdSlots.forEach(s=>{s.perk=dbdPick(used);used.push(s.perk)})}renderDBDSlots();renderDBDHistory()}
+function setDBDSide(side){if(dbdRunning)return;dbdSide=side==='killer'?'killer':'survivor';dbdSlots=Array.from({length:4},()=>({perk:'',locked:false,spinning:false}));document.getElementById('dbd-tab-survivor')?.classList.toggle('active',dbdSide==='survivor');document.getElementById('dbd-tab-killer')?.classList.toggle('active',dbdSide==='killer');document.getElementById('dbd-machine-role').textContent=(dbdSide==='survivor'?'SURVIVOR':'KILLER')+' PERK ROULETTE';initDBD()}
+function renderDBDSlots(){const root=document.getElementById('dbd-reels');if(!root)return;const colored=document.getElementById('dbd-colored')?.checked!==false;root.innerHTML=dbdSlots.map((slot,i)=>`<div class="dbd-reel ${slot.locked?'locked':''} ${slot.spinning?'spinning':''}" onclick="handleDBDSlot(event,${i})"><button class="dbd-reel-lock" onclick="event.stopPropagation();toggleDBDLock(${i})" title="Verrouiller">${slot.locked?'🔒':'○'}</button><div class="dbd-reel-window"><div class="dbd-perk-diamond ${dbdSide==='killer'?'killer':''} ${colored?'':'mono'}"><span class="dbd-perk-rune">${esc(dbdRune(slot.perk))}</span></div></div><div class="dbd-perk-name">${esc(slot.perk||'PERK')}</div></div>`).join('')}
+function handleDBDSlot(event,index){if(event.shiftKey)return spinDBD(index);spinDBD()}
+function toggleDBDLock(index){if(dbdRunning)return;dbdSlots[index].locked=!dbdSlots[index].locked;renderDBDSlots()}
+function toggleAllDBDLocks(){if(dbdRunning)return;const lock=!dbdSlots.every(s=>s.locked);dbdSlots.forEach(s=>s.locked=lock);renderDBDSlots()}
+function spinDBD(singleIndex=null){if(dbdRunning)return;const targets=dbdSlots.map((s,i)=>({s,i})).filter(x=>(singleIndex===null?!x.s.locked:x.i===singleIndex&&!x.s.locked));if(!targets.length)return toast('Déverrouille au moins un slot');dbdRunning=true;document.getElementById('dbd-machine-status').textContent='La machine choisit ton destin...';targets.forEach(x=>x.s.spinning=true);renderDBDSlots();let tick=0;const max=22+(singleIndex===null?8:0),timer=setInterval(()=>{tick++;const fixed=dbdSlots.filter((_,i)=>!targets.some(x=>x.i===i)).map(s=>s.perk);const used=[...fixed];targets.forEach(({s})=>{s.perk=dbdPick(used);used.push(s.perk)});renderDBDSlots();if(tick>=max){clearInterval(timer);targets.forEach(x=>x.s.spinning=false);dbdRunning=false;document.getElementById('dbd-machine-status').textContent=singleIndex===null?'Build généré · verrouille les perks à conserver':'Slot relancé';renderDBDSlots();dbdHistory.unshift({side:dbdSide,perks:dbdSlots.map(s=>s.perk),time:new Date().toLocaleTimeString('fr-FR')});dbdHistory=dbdHistory.slice(0,12);renderDBDHistory()}},70)}
+async function copyDBDBuild(){const text=`${dbdSide==='survivor'?'Survivant':'Tueur'} : ${dbdSlots.map(s=>s.perk).join(' · ')}`;try{await navigator.clipboard.writeText(text);toast('Build copié ✓')}catch(_){toast(text)}}
 
 function renderDBDHistory() {
   const el = document.getElementById('dbd-history');
@@ -6408,12 +6371,7 @@ function renderDBDHistory() {
     el.innerHTML = '<div class="empty"><p>Aucun build généré</p></div>';
     return;
   }
-  el.innerHTML = dbdHistory.map(h => `
-    <div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border);font-size:12px">
-      <span style="font-size:16px">${h.side==='survivor'?'🏃':'🔪'}</span>
-      <span style="color:var(--muted);min-width:45px">${h.time}</span>
-      <span style="flex:1;color:var(--text)">${h.perks.join(' · ')}</span>
-    </div>`).join('');
+  el.innerHTML=dbdHistory.map(h=>`<div class="dbd-history-row"><b>${h.side==='survivor'?'Survivant':'Tueur'}</b><span>${h.perks.map(esc).join(' · ')}</span><time>${h.time}</time></div>`).join('');
 }
 
 function clearDBDHistory() {
@@ -6424,10 +6382,9 @@ function clearDBDHistory() {
 // ── Outils Chat ───────────────────────────────────────────────────────────────
 
 let annInterval = 600000;
-let timerInterval = 300000;
 
 async function loadOutils() {
-  await Promise.all([loadQuotes(), loadCounters(), loadQueue(), loadPolls(), loadAnnouncements(), loadTimers()]);
+  await Promise.all([loadQuotes(), loadCounters(), loadQueue(), loadPolls(), loadAnnouncements()]);
 }
 
 // Citations
@@ -6610,52 +6567,6 @@ async function toggleAnn(id, enabled) {
 async function deleteAnn(id) {
   await fetch('/api/admin/announcements/' + id, { method: 'DELETE' });
   loadAnnouncements();
-}
-
-// Timers
-async function loadTimers() {
-  try {
-    const data = await get('/api/timers') || [];
-    const el = document.getElementById('timers-list');
-    if (!data.length) { el.innerHTML = '<div class="empty"><p>Aucun timer</p></div>'; return; }
-    el.innerHTML = data.map(t => `
-      <div style="display:flex;align-items:center;gap:8px;padding:8px 10px;background:var(--card2);border:1px solid var(--brd);border-radius:8px;margin-bottom:5px;opacity:${t.enabled?1:.5}">
-        <label class="toggle"><input type="checkbox" ${t.enabled?'checked':''} onchange="toggleTimer('${esc(t.name)}',this.checked)"><span class="tsl"></span></label>
-        <span class="cpill">${esc(t.name)}</span>
-        <span style="font-size:10px;color:var(--muted);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(t.message)}</span>
-        <span style="font-size:9px;color:var(--muted2)">${fmtMin(t.interval_ms/60000)}</span>
-        <button class="btnx btn-red btn-xs" onclick="deleteTimer('${esc(t.name)}')">✕</button>
-      </div>`).join('');
-  } catch(e) {}
-}
-
-function setTimerInterval(ms) {
-  timerInterval = ms;
-  document.getElementById('timer-interval').value = ms;
-  toast('Intervalle timer : ' + fmtMin(ms/60000));
-}
-
-async function addTimer() {
-  const name = document.getElementById('timer-name').value.trim();
-  const message = document.getElementById('timer-message').value.trim();
-  const interval_ms = parseInt(document.getElementById('timer-interval').value) || 300000;
-  if (!name || !message) return showInline('timer-msg', 'Nom et message requis', false);
-  const r = await fetch('/api/admin/timers', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({name, message, interval_ms}) });
-  if (!r.ok) return showInline('timer-msg', 'Erreur', false);
-  toast('Timer ' + name + ' créé ✓');
-  document.getElementById('timer-name').value = '';
-  document.getElementById('timer-message').value = '';
-  loadTimers();
-}
-
-async function toggleTimer(name, enabled) {
-  await fetch('/api/admin/timers/toggle', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({name, enabled}) });
-  loadTimers();
-}
-
-async function deleteTimer(name) {
-  await fetch('/api/admin/timers/' + encodeURIComponent(name), { method: 'DELETE' });
-  loadTimers();
 }
 
 // ── VODs & Clips ─────────────────────────────────────────────────────────────
@@ -10945,16 +10856,17 @@ setInterval(() => {
       <div><span>❓</span><div><strong id="ref-help-title">Aide &amp; Support</strong><small>Tout ce qu'il faut pour utiliser ElBot</small></div></div>
       <button type="button" onclick="closeReferenceDrawers()">✕</button>
     </header>
-    <section class="ref-help-list">
-      <button type="button" onclick="showPage('settings');closeReferenceDrawers()"><span>⚙️</span><div><b>Paramètres du bot</b><small>Connexion, chaîne et configuration générale</small></div><em>›</em></button>
-      <button type="button" onclick="showPage('logs');closeReferenceDrawers()"><span>📋</span><div><b>Diagnostic &amp; logs</b><small>Vérifier le fonctionnement des modules</small></div><em>›</em></button>
-      <button type="button" onclick="showPage('widgets');closeReferenceDrawers()"><span>🧩</span><div><b>Aide sur les widgets</b><small>Configurer les overlays et Song Request</small></div><em>›</em></button>
-      <button type="button" onclick="showPage('commands');closeReferenceDrawers()"><span>💬</span><div><b>Commandes</b><small>Créer et gérer les commandes du chat</small></div><em>›</em></button>
+    <section class="elbot-support">
+      <div class="support-tabs"><button class="active" id="support-tab-new" onclick="showSupportTab('new')">Nouveau ticket</button><button id="support-tab-list" onclick="showSupportTab('list')">Mes demandes</button></div>
+      <div id="support-new">
+        <label class="lbl">Sujet</label><input class="inp" id="support-subject" maxlength="120" placeholder="Ex : Mon Sub Goal ne se met plus à jour">
+        <div class="form-row"><div><label class="lbl">Catégorie</label><select class="inp" id="support-category"><option value="bug">Bug</option><option value="question">Question</option><option value="account">Compte / bot</option><option value="suggestion">Suggestion</option></select></div><div><label class="lbl">Priorité</label><select class="inp" id="support-priority"><option value="normal">Normale</option><option value="low">Faible</option><option value="high">Haute</option><option value="urgent">Urgente</option></select></div></div>
+        <label class="lbl">Décris précisément la demande</label><textarea class="inp" id="support-message" rows="7" maxlength="4000" placeholder="Ce qui se passe, ce que tu attendais et depuis quand..."></textarea>
+        <button class="btnx btn-primary" style="width:100%;justify-content:center;margin-top:10px" onclick="createSupportTicket()">Envoyer au support ElBot</button><div id="support-form-msg" style="margin-top:8px"></div>
+      </div>
+      <div id="support-list-view" style="display:none"><div id="support-discord-state" class="support-discord-state"></div><div id="support-ticket-list"><div class="empty"><p>Chargement…</p></div></div></div>
+      <div id="support-detail" style="display:none"><button class="btnx btn-ghost btn-sm" onclick="showSupportTab('list')">← Retour</button><div id="support-detail-head"></div><div id="support-thread"></div><textarea class="inp" id="support-reply" rows="4" maxlength="4000" placeholder="Écrire une réponse..."></textarea><button class="btnx btn-outline" style="width:100%;justify-content:center;margin-top:8px" onclick="replySupportTicket()">Envoyer la réponse</button><div id="support-admin-actions" style="margin-top:8px"></div></div>
     </section>
-    <div class="ref-support-card">
-      <span>💙</span>
-      <div><strong>Besoin d'aide supplémentaire ?</strong><small>Consulte les logs puis contacte le support ElBot avec le message affiché.</small></div>
-    </div>
   </aside>
 </div>
 
@@ -11034,7 +10946,14 @@ function openReferenceDrawer(id) {
   document.body.style.overflow = 'hidden';
 }
 function openInterfaceCustomizer() { openReferenceDrawer('ref-customizer-drawer'); }
-function openHelpSupport() { openReferenceDrawer('ref-help-drawer'); }
+let supportTickets=[],supportActiveTicket=null,supportIsAdmin=false;
+function openHelpSupport(){openReferenceDrawer('ref-help-drawer');showSupportTab('new');loadSupportTickets()}
+function showSupportTab(tab){const isNew=tab==='new',isDetail=tab==='detail';document.getElementById('support-new').style.display=isNew?'block':'none';document.getElementById('support-list-view').style.display=tab==='list'?'block':'none';document.getElementById('support-detail').style.display=isDetail?'block':'none';document.getElementById('support-tab-new').classList.toggle('active',isNew);document.getElementById('support-tab-list').classList.toggle('active',!isNew);if(tab==='list')loadSupportTickets()}
+async function createSupportTicket(){const subject=document.getElementById('support-subject').value.trim(),message=document.getElementById('support-message').value.trim(),category=document.getElementById('support-category').value,priority=document.getElementById('support-priority').value,msg=document.getElementById('support-form-msg');if(!subject||!message){msg.innerHTML='<span style="color:#ff6680">Sujet et message requis.</span>';return}try{const r=await fetch('/api/support/tickets',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({subject,message,category,priority})}),j=await r.json();if(!r.ok)throw new Error(j.error||'Envoi impossible');document.getElementById('support-subject').value='';document.getElementById('support-message').value='';msg.innerHTML='<span style="color:#36e28c">Ticket créé et transmis au support ✓</span>';await loadSupportTickets();setTimeout(()=>showSupportTab('list'),500)}catch(e){msg.innerHTML='<span style="color:#ff6680">'+esc(e.message)+'</span>'}}
+async function loadSupportTickets(){try{const r=await fetch('/api/support/tickets',{cache:'no-store'}),j=await r.json();if(!r.ok)throw new Error(j.error||'Erreur');supportTickets=Array.isArray(j.data)?j.data:[];supportIsAdmin=!!j.admin;const state=document.getElementById('support-discord-state');if(state)state.textContent=j.discordConfigured?'Discord connecté : un salon est créé pour chaque demande.':'Tickets ElBot actifs · liaison Discord à configurer sur le serveur.';const root=document.getElementById('support-ticket-list');root.innerHTML=supportTickets.length?supportTickets.map(t=>`<div class="support-ticket" onclick="openSupportTicket(${Number(t.id)})"><div class="support-ticket-top"><strong>#${Number(t.id)} · ${esc(t.subject)}</strong><span class="support-pill ${t.status==='closed'?'closed':''}">${esc(t.status)}</span></div><small>${supportIsAdmin?'@'+esc(t.streamer_slug)+' · ':''}${esc(t.category)} · ${esc(t.priority)} · ${Number(t.message_count||0)} message(s)</small></div>`).join(''):'<div class="empty"><p>Aucune demande de support</p></div>'}catch(e){document.getElementById('support-ticket-list').innerHTML='<div class="empty"><p>Support indisponible</p></div>'}}
+async function openSupportTicket(id){try{const r=await fetch('/api/support/tickets/'+id+'/messages',{cache:'no-store'}),j=await r.json();if(!r.ok)throw new Error(j.error||'Ticket introuvable');supportActiveTicket=j.data.ticket;const t=supportActiveTicket;document.getElementById('support-detail-head').innerHTML=`<div class="support-detail-card"><h3>#${t.id} · ${esc(t.subject)}</h3><small>${supportIsAdmin?'@'+esc(t.streamer_slug)+' · ':''}${esc(t.category)} · priorité ${esc(t.priority)} · ${esc(t.status)}</small></div>`;const messages=Array.isArray(j.data.messages)?j.data.messages:[];const thread=document.getElementById('support-thread');thread.className='support-thread';thread.innerHTML=messages.map(m=>`<div class="support-message ${m.author_role==='admin'?'admin':''}"><b>${m.author_role==='admin'?'Support ElBot':'@'+esc(m.author_slug)}</b>${esc(m.message).replace(/\n/g,'<br>')}<time>${new Date(String(m.created_at).replace(' ','T')+'Z').toLocaleString('fr-FR')}</time></div>`).join('');document.getElementById('support-admin-actions').innerHTML=supportIsAdmin?`<button class="btnx btn-ghost btn-sm" onclick="setSupportStatus('open')">Ouvert</button> <button class="btnx btn-outline btn-sm" onclick="setSupportStatus('waiting')">En attente</button> <button class="btnx btn-red btn-sm" onclick="setSupportStatus('closed')">Fermer</button>`:'';showSupportTab('detail');thread.scrollTop=thread.scrollHeight}catch(e){toast(e.message,false)}}
+async function replySupportTicket(){if(!supportActiveTicket)return;const input=document.getElementById('support-reply'),message=input.value.trim();if(!message)return;const r=await fetch('/api/support/tickets/'+supportActiveTicket.id+'/messages',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({message})}),j=await r.json();if(!r.ok)return toast(j.error||'Réponse impossible',false);input.value='';await openSupportTicket(supportActiveTicket.id)}
+async function setSupportStatus(status){if(!supportActiveTicket)return;const r=await fetch('/api/support/tickets/'+supportActiveTicket.id,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({status})});if(r.ok)await openSupportTicket(supportActiveTicket.id)}
 function closeReferenceDrawers(event) {
   if (event && event.target !== event.currentTarget) return;
   document.getElementById('ref-drawer-backdrop')?.classList.remove('open');
@@ -11610,6 +11529,8 @@ body[data-ref-interface="aurora"] .ref-panel{
 }
 .page:not(.active),.widget-settings[style*="display: none"]{animation:none!important}
 @media(prefers-reduced-motion:reduce){.ref-wave,.lpd.blink{animation:none!important}}
+.elbot-support{display:block!important}.support-tabs{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:14px}.support-tabs button{border:1px solid var(--theme-soft-border,var(--brd));background:var(--theme-soft-bg,var(--surface2));color:var(--theme-muted,var(--muted));padding:9px;border-radius:9px;font:700 10px inherit;cursor:pointer}.support-tabs button.active{background:var(--accent);border-color:var(--accent);color:#06101f}.support-discord-state{font-size:9px;color:var(--muted);margin-bottom:9px}.support-ticket{padding:11px;margin-bottom:7px;border:1px solid var(--theme-soft-border,var(--brd));border-radius:10px;background:var(--theme-soft-bg,var(--surface2));cursor:pointer}.support-ticket:hover{border-color:var(--accent)}.support-ticket-top{display:flex;gap:7px;align-items:center}.support-ticket-top strong{font-size:11px;flex:1}.support-pill{font-size:7px;font-weight:900;text-transform:uppercase;padding:3px 6px;border-radius:999px;background:rgba(38,143,255,.15);color:#71c7ff}.support-pill.closed{background:rgba(111,124,145,.15);color:#9ca8b8}.support-ticket small{display:block;color:var(--muted);font-size:8px;margin-top:5px}.support-detail-card{padding:12px 0}.support-detail-card h3{font-size:14px;margin:8px 0 4px}.support-message{padding:9px 10px;margin:7px 0;border-radius:10px;background:rgba(27,105,210,.12);border:1px solid rgba(82,157,255,.15);font-size:10px;line-height:1.5}.support-message.admin{background:rgba(37,211,131,.10);border-color:rgba(37,211,131,.18)}.support-message b{display:block;font-size:8px;color:var(--accent);margin-bottom:4px}.support-message time{display:block;font-size:7px;color:var(--muted);margin-top:5px}.support-thread{max-height:310px;overflow:auto;margin:8px 0 10px}
+.dbd-roulette{--dbd-red:#a91419;position:relative;overflow:hidden;border:1px solid rgba(255,255,255,.11);border-radius:18px;padding:18px;background:radial-gradient(circle at 50% -20%,rgba(166,16,24,.24),transparent 42%),linear-gradient(160deg,rgba(19,20,22,.97),rgba(5,6,7,.98));box-shadow:0 28px 80px rgba(0,0,0,.4)}.dbd-roulette:before{content:"";position:absolute;inset:0;pointer-events:none;opacity:.22;background:repeating-linear-gradient(105deg,transparent 0 90px,rgba(255,255,255,.025) 92px,transparent 94px)}.dbd-roulette-head{position:relative;display:flex;justify-content:space-between;align-items:center;margin-bottom:15px}.dbd-role-tabs{display:flex;gap:5px}.dbd-role-tabs button{padding:8px 18px;border:1px solid rgba(255,255,255,.12);background:#111315;color:#87909a;border-radius:7px;font:900 10px inherit;text-transform:uppercase;letter-spacing:.7px;cursor:pointer}.dbd-role-tabs button.active{color:#fff;border-color:#ba252a;background:linear-gradient(#a7191e,#681014);box-shadow:0 0 18px rgba(202,26,34,.28)}.dbd-color-toggle{display:flex;gap:7px;align-items:center;color:#aeb5bc;font-size:9px}.dbd-machine{position:relative;border:1px solid #3b3d3f;border-radius:12px;padding:20px;background:linear-gradient(180deg,#1a1c1e,#090a0b);box-shadow:inset 0 1px rgba(255,255,255,.07),inset 0 -30px 60px rgba(0,0,0,.55)}.dbd-machine-title{text-align:center;margin-bottom:18px}.dbd-machine-title span{display:block;color:#c3252b;font-size:9px;font-weight:950;letter-spacing:5px}.dbd-machine-title strong{display:block;color:#f0f1f1;font-size:20px;letter-spacing:2px;margin-top:5px;text-shadow:0 2px 12px #000}.dbd-machine-title small{display:block;color:#7e858b;font-size:9px;margin-top:6px}.dbd-reels{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}.dbd-reel{position:relative;min-height:245px;border:1px solid #44484c;border-radius:9px;overflow:hidden;background:linear-gradient(180deg,#060708,#17191b 50%,#060708);cursor:pointer;box-shadow:inset 0 0 30px #000,0 9px 24px rgba(0,0,0,.38)}.dbd-reel:before,.dbd-reel:after{content:"";position:absolute;z-index:4;left:0;right:0;height:54px;pointer-events:none}.dbd-reel:before{top:0;background:linear-gradient(#050607,transparent)}.dbd-reel:after{bottom:0;background:linear-gradient(transparent,#050607)}.dbd-reel-window{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;padding:16px}.dbd-perk-diamond{width:130px;height:130px;display:grid;place-items:center;transform:rotate(45deg);border:3px solid #d4d4d4;background:linear-gradient(135deg,#53276c,#1d0c28);box-shadow:0 0 0 4px #17191b,0 0 28px rgba(152,55,192,.35);transition:.16s}.dbd-perk-diamond.killer{background:linear-gradient(135deg,#761c22,#25080a);box-shadow:0 0 0 4px #17191b,0 0 28px rgba(207,37,45,.34)}.dbd-perk-diamond.mono{filter:grayscale(1);background:#303236}.dbd-perk-rune{transform:rotate(-45deg);font-size:30px;font-weight:950;color:#fff;text-shadow:0 2px 8px #000;letter-spacing:-2px}.dbd-perk-name{position:absolute;z-index:6;left:8px;right:8px;bottom:14px;text-align:center;color:#f4f4f4;font-size:10px;font-weight:900;text-transform:uppercase;text-shadow:0 2px 5px #000}.dbd-reel-lock{position:absolute;z-index:7;right:7px;top:7px;width:25px;height:25px;border-radius:50%;border:1px solid rgba(255,255,255,.15);background:#111;color:#8e969e;display:grid;place-items:center}.dbd-reel.locked{border-color:#d5a448}.dbd-reel.locked .dbd-reel-lock{color:#ffd36b;border-color:#d5a448}.dbd-reel.spinning .dbd-perk-diamond{animation:dbdSlot .11s linear infinite;filter:blur(1px)}@keyframes dbdSlot{0%{transform:translateY(-22px) rotate(45deg);opacity:.25}50%{transform:translateY(0) rotate(45deg);opacity:1}100%{transform:translateY(22px) rotate(45deg);opacity:.25}}.dbd-spin-button{display:flex;align-items:center;justify-content:center;gap:10px;width:min(420px,90%);margin:19px auto 0;padding:12px;border:1px solid #e04147;border-radius:7px;background:linear-gradient(#b51e24,#681014);color:#fff;font:950 11px inherit;letter-spacing:1px;cursor:pointer;box-shadow:0 8px 24px rgba(160,16,23,.28)}.dbd-spin-button:hover{filter:brightness(1.18)}.dbd-spin-button span{font-size:18px}.dbd-build-actions{position:relative;display:flex;justify-content:center;gap:7px;margin-top:13px}.dbd-history-panel #dbd-history{display:grid;gap:6px;max-height:180px;overflow:auto}.dbd-history-row{display:grid;grid-template-columns:70px 1fr auto;gap:10px;align-items:center;padding:8px 10px;border-bottom:1px solid rgba(255,255,255,.07);font-size:9px}.dbd-history-row b{color:#d64a50;text-transform:uppercase}.dbd-history-row span{color:#d9dde1}.dbd-history-row time{color:#737c84}@media(max-width:900px){.dbd-reels{grid-template-columns:repeat(2,1fr)}.dbd-reel{min-height:210px}.dbd-perk-diamond{width:105px;height:105px}}
 </style>
 </body>
 </html>
