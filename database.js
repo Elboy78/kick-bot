@@ -186,7 +186,7 @@ async function initSchema() {
       id INTEGER PRIMARY KEY AUTOINCREMENT, streamer_id INTEGER NOT NULL,
       username TEXT NOT NULL, text TEXT, media_url TEXT NOT NULL,
       media_type TEXT NOT NULL DEFAULT 'image', tts_url TEXT, tts_requested INTEGER NOT NULL DEFAULT 0,
-      kick_user_id TEXT,
+      kick_user_id TEXT, tts_voice TEXT,
       status TEXT NOT NULL DEFAULT 'pending', created_at TEXT NOT NULL DEFAULT (datetime('now'))
     )`,
     `CREATE TABLE IF NOT EXISTS meme_access_tokens (
@@ -556,6 +556,7 @@ async function initSchema() {
     `ALTER TABLE meme_submissions ADD COLUMN tts_url TEXT`,
     `ALTER TABLE meme_submissions ADD COLUMN tts_requested INTEGER NOT NULL DEFAULT 0`,
     `ALTER TABLE meme_submissions ADD COLUMN kick_user_id TEXT`,
+    `ALTER TABLE meme_submissions ADD COLUMN tts_voice TEXT`,
     `ALTER TABLE meme_access_tokens ADD COLUMN kick_user_id TEXT`,
     `ALTER TABLE meme_access_tokens ADD COLUMN auth_session TEXT`,
     `ALTER TABLE meme_access_tokens ADD COLUMN authenticated_at TEXT`,
@@ -2200,7 +2201,7 @@ async function getMemeEvents(streamerId, afterId = 0) {
 }
 async function createMemeSubmission(streamerId, username, text, mediaUrl, status='pending', options={}) {
   await run(`DELETE FROM meme_submissions WHERE streamer_id=? AND created_at < datetime('now','-1 day')`,[Number(streamerId)]);
-  const r=await run(`INSERT INTO meme_submissions (streamer_id,username,text,media_url,media_type,tts_url,tts_requested,kick_user_id,status) VALUES (?,?,?,?,?,?,?,?,?)`,[Number(streamerId),username,text,mediaUrl,options.mediaType||'image',options.ttsUrl||null,options.ttsRequested?1:0,options.kickUserId||null,status]);
+  const r=await run(`INSERT INTO meme_submissions (streamer_id,username,text,media_url,media_type,tts_url,tts_requested,kick_user_id,tts_voice,status) VALUES (?,?,?,?,?,?,?,?,?,?)`,[Number(streamerId),username,text,mediaUrl,options.mediaType||'image',options.ttsUrl||null,options.ttsRequested?1:0,options.kickUserId||null,options.ttsVoice||null,status]);
   return get(`SELECT * FROM meme_submissions WHERE id=?`,[Number(r.lastInsertRowid)]);
 }
 async function getMemeSubmissions(streamerId, status='all') {
