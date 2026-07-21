@@ -440,6 +440,11 @@ async function handleChatMessageScoped(payload, ctx = null) {
   const isModOrBroadcaster = badges.some(b => b.type === 'moderator' || b.type === 'broadcaster');
 
   await db.upsertViewer(username, kickId);
+  // Enregistre immédiatement le badge MOD réellement reçu dans le chat Kick.
+  if (isModOrBroadcaster) {
+    await db.setViewerKickProfile(username, { badges }).catch(e =>
+      console.warn(`[MEME MOD${ctx?.slug ? `:${ctx.slug}` : ''}] Cache badge impossible pour ${username}: ${e.message}`));
+  }
   const subGifterCount = getSubGifterBadgeCount(badges);
   if (subGifterCount > 0) {
     try {

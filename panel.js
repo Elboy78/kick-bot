@@ -2687,7 +2687,7 @@ app.get('/auth/callback', async (req, res) => {
     if(mode==='meme_moderator_login'){
       const streamerId=Number(token.meta?.streamerId),streamer=await db.getStreamerById(streamerId);
       if(!streamer)throw new Error('Chaîne inconnue.');
-      if(!await verifyMemeModerator(streamer,username))throw new Error(`@${username} n’est pas modérateur de la chaîne ${streamer.slug}.`);
+      if(!await verifyMemeModerator(streamer,username,kickUser.id||''))throw new Error(`@${username} n’est pas modérateur de la chaîne ${streamer.slug}.`);
       const identity=await db.createMemeAuthSession(streamerId,kickUser.id||'',username,'moderator');
       res.cookie(MEME_AUTH_COOKIE,identity.session_token,memeAuthCookieOptions(req));
       return res.redirect(`/memes-moderation/${encodeURIComponent(streamer.slug)}`);
@@ -3677,14 +3677,65 @@ function profileSaysModerator(payload){
   const visit=value=>{if(allowed||!value||typeof value!=='object')return;for(const [rawKey,rawValue] of Object.entries(value)){const key=String(rawKey).toLowerCase().replace(/[\s-]+/g,'_'),text=String(rawValue||'').toLowerCase();if((key==='is_moderator'||key==='moderator'||key==='is_broadcaster'||key==='broadcaster')&&(rawValue===true||rawValue===1||text==='true'||text==='1')){allowed=true;return}if(['role','channel_role','user_role'].includes(key)&&['moderator','mod','broadcaster','owner'].includes(text)){allowed=true;return}if(rawValue&&typeof rawValue==='object')visit(rawValue)}};
   visit(payload);return allowed;
 }
-async function verifyMemeModerator(streamer,username){
-  const normalized=tenant.normalizeSlug(username);if(normalized===tenant.normalizeSlug(streamer.slug)||normalized===tenant.normalizeSlug(streamer.kick_username))return true;
-  const cachedModerator=async()=>{const viewer=await tenant.runWithStreamer(streamer,()=>db.getViewer(normalized));let badges=[];try{badges=JSON.parse(viewer?.badges_json||'[]')}catch(_e){}const checkedAt=viewer?.badges_synced_at?new Date(String(viewer.badges_synced_at).replace(' ','T')+'Z').getTime():0;return !!checkedAt&&Date.now()-checkedAt<86400000&&badges.some(isModeratorBadge)};
+function profileContainsUsername(payload,username){
+  const expected=tenant.normalizeSlug(username);let found=false;
+  const visit=value=>{
+    if(found||!value||typeof value!=='object')return;
+    if(Array.isArray(value)){value.forEach(visit);return}
+    const candidate=tenant.normalizeSlug(value.username||value.name||value.slug||value.user?.username||value.user?.name||'');
+    if(candidate&&candidate===expected){found=true;return}
+    Object.values(value).forEach(visit);
+  };
+  visit(payload);return found;
+}
+async function verifyMemeModerator(streamer,username,kickUserId=''){
+  const normalized=tenant.normalizeSlug(username);
+  if(normalized===tenant.normalizeSlug(streamer.slug)||normalized===tenant.normalizeSlug(streamer.kick_username))return true;
+
+  const cachedModerator=async()=>{
+    const viewer=await tenant.runWithStreamer(streamer,()=>db.getViewer(normalized));
+    let badges=[];
+    try{badges=JSON.parse(viewer?.badges_json||'[]')}catch(_e){}
+    const checkedAt=viewer?.badges_synced_at?new Date(String(viewer.badges_synced_at).replace(' ','T')+'Z').getTime():0;
+    return !!checkedAt&&Date.now()-checkedAt<86400000&&badges.some(isModeratorBadge);
+  };
+
   const wasCachedModerator=await cachedModerator();
+  const headers={Accept:'application/json','User-Agent':'Mozilla/5.0'};
+
+  if(kickUserId){
+    try{
+      const identity=await axios.get(`https://kick.com/api/internal/v1/channels/${encodeURIComponent(streamer.slug)}/chatroom/users/${encodeURIComponent(String(kickUserId))}/identity`,{headers,timeout:8000});
+      const badges=profileBadges(identity.data);
+      const verified=profileSaysModerator(identity.data)||badges.some(isModeratorBadge);
+      if(badges.length)await tenant.runWithStreamer(streamer,()=>db.setViewerKickProfile(normalized,{badges}));
+      if(verified){
+        console.log(`[MEME MOD:${streamer.slug}] @${normalized} confirmé par identité chat`);
+        return true;
+      }
+    }catch(e){
+      console.warn(`[MEME MOD:${streamer.slug}] Identité chat indisponible pour @${normalized}: ${e.response?.status||e.message}`);
+    }
+  }
+
   try{
-    const response=await axios.get(`https://kick.com/api/v2/channels/${encodeURIComponent(streamer.slug)}/users/${encodeURIComponent(normalized)}`,{headers:{Accept:'application/json','User-Agent':'Mozilla/5.0'},timeout:8000});
-    const badges=profileBadges(response.data),verified=profileSaysModerator(response.data)||badges.some(isModeratorBadge);if(badges.length)await tenant.runWithStreamer(streamer,()=>db.setViewerKickProfile(normalized,{badges}));return verified||wasCachedModerator;
-  }catch(_){
+    const moderators=await axios.get(`https://kick.com/api/internal/v1/channels/${encodeURIComponent(streamer.slug)}/community/moderators`,{headers,timeout:8000});
+    if(profileContainsUsername(moderators.data,normalized)){
+      console.log(`[MEME MOD:${streamer.slug}] @${normalized} confirmé par liste modérateurs`);
+      return true;
+    }
+  }catch(e){
+    console.warn(`[MEME MOD:${streamer.slug}] Liste modérateurs indisponible: ${e.response?.status||e.message}`);
+  }
+
+  try{
+    const response=await axios.get(`https://kick.com/api/v2/channels/${encodeURIComponent(streamer.slug)}/users/${encodeURIComponent(normalized)}`,{headers,timeout:8000});
+    const badges=profileBadges(response.data);
+    const verified=profileSaysModerator(response.data)||badges.some(isModeratorBadge);
+    if(badges.length)await tenant.runWithStreamer(streamer,()=>db.setViewerKickProfile(normalized,{badges}));
+    return verified||wasCachedModerator;
+  }catch(e){
+    console.warn(`[MEME MOD:${streamer.slug}] Fiche Kick indisponible pour @${normalized}: ${e.response?.status||e.message}`);
     return wasCachedModerator;
   }
 }
@@ -3695,7 +3746,7 @@ app.get('/memes-moderation/:streamer',(req,res)=>res.sendFile(path.join(__dirnam
 async function requireMemeModerator(req,res){
   const streamer=await db.getStreamerBySlug(tenant.normalizeSlug(req.params.streamer));if(!streamer){res.status(404).json({error:'Chaîne inconnue'});return null}
   const identity=await getMemeIdentity(req,streamer.id);if(!identity||identity.role!=='moderator'){res.status(401).json({error:'Connexion modérateur requise',authUrl:`/auth/meme/moderator?streamer=${encodeURIComponent(streamer.slug)}`});return null}
-  const verifiedAt=new Date(String(identity.verified_at||'').replace(' ','T')+'Z').getTime();if(!verifiedAt||Date.now()-verifiedAt>10*60*1000){if(!await verifyMemeModerator(streamer,identity.username)){await db.deleteMemeAuthSession(identity.session_token);res.status(403).json({error:'Tu n’es plus modérateur de cette chaîne.'});return null}await db.refreshMemeAuthSession(identity.session_token,streamer.id)}
+  const verifiedAt=new Date(String(identity.verified_at||'').replace(' ','T')+'Z').getTime();if(!verifiedAt||Date.now()-verifiedAt>10*60*1000){if(!await verifyMemeModerator(streamer,identity.username,identity.kick_user_id)){await db.deleteMemeAuthSession(identity.session_token);res.status(403).json({error:'Tu n’es plus modérateur de cette chaîne.'});return null}await db.refreshMemeAuthSession(identity.session_token,streamer.id)}
   return {streamer,identity,tm:createTenantManager({db,io,streamer,req})};
 }
 app.get('/api/public/memes-moderation/:streamer',async(req,res)=>{const auth=await requireMemeModerator(req,res);if(!auth)return;res.set('Cache-Control','no-store');res.json({data:{username:auth.identity.username,streamer:auth.streamer.display_name||auth.streamer.slug,mode:(await getMemesConfig(auth.tm)).mode,submissions:await db.getMemeSubmissions(auth.streamer.id,'all')}})});
