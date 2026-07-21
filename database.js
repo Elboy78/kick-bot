@@ -186,11 +186,13 @@ async function initSchema() {
       id INTEGER PRIMARY KEY AUTOINCREMENT, streamer_id INTEGER NOT NULL,
       username TEXT NOT NULL, text TEXT, media_url TEXT NOT NULL,
       media_type TEXT NOT NULL DEFAULT 'image', tts_url TEXT, tts_requested INTEGER NOT NULL DEFAULT 0,
+      kick_user_id TEXT,
       status TEXT NOT NULL DEFAULT 'pending', created_at TEXT NOT NULL DEFAULT (datetime('now'))
     )`,
     `CREATE TABLE IF NOT EXISTS meme_access_tokens (
       token TEXT PRIMARY KEY, streamer_id INTEGER NOT NULL, username TEXT NOT NULL,
-      trusted INTEGER NOT NULL DEFAULT 0, expires_at INTEGER NOT NULL
+      trusted INTEGER NOT NULL DEFAULT 0, kick_user_id TEXT, auth_session TEXT,
+      authenticated_at TEXT, used_at TEXT, expires_at INTEGER NOT NULL
     )`,
     `CREATE TABLE IF NOT EXISTS viewers (
       id            INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -547,6 +549,11 @@ async function initSchema() {
     `ALTER TABLE meme_submissions ADD COLUMN media_type TEXT NOT NULL DEFAULT 'image'`,
     `ALTER TABLE meme_submissions ADD COLUMN tts_url TEXT`,
     `ALTER TABLE meme_submissions ADD COLUMN tts_requested INTEGER NOT NULL DEFAULT 0`,
+    `ALTER TABLE meme_submissions ADD COLUMN kick_user_id TEXT`,
+    `ALTER TABLE meme_access_tokens ADD COLUMN kick_user_id TEXT`,
+    `ALTER TABLE meme_access_tokens ADD COLUMN auth_session TEXT`,
+    `ALTER TABLE meme_access_tokens ADD COLUMN authenticated_at TEXT`,
+    `ALTER TABLE meme_access_tokens ADD COLUMN used_at TEXT`,
     `ALTER TABLE chest_seasons ADD COLUMN ever_secured INTEGER NOT NULL DEFAULT 0`,
     `ALTER TABLE chest_seasons ADD COLUMN victory_pending INTEGER NOT NULL DEFAULT 0`,
     `ALTER TABLE chest_seasons ADD COLUMN protected_number INTEGER DEFAULT NULL`,
@@ -1687,8 +1694,9 @@ async function importCommunityGiftLeaderboard(rows = [], streamerId = null) {
 }
 
 // Le badge `sub_gifter` présent sur les messages Kick contient le total all-time
-// affiché publiquement pour ce viewer. Il s'agit d'un compteur absolu : on garde
-// donc toujours la valeur la plus haute au lieu de l'additionner à chaque message.
+// affiché publiquement pour ce viewer. Il s'agit d'un compteur absolu et
+// autoritaire : il remplace le total précédent, même lorsqu'il corrige une
+// ancienne valeur trop haute provenant d'un événement reçu deux fois.
 async function upsertCommunityGiftBadge(username, giftCount, streamerId = null) {
   const sid = Number(streamerId || scopedStreamerId());
   const normalizedUsername = String(username || '').trim().replace(/^@+/, '').toLowerCase();
@@ -1703,29 +1711,34 @@ async function upsertCommunityGiftBadge(username, giftCount, streamerId = null) 
       (streamer_id,username,gifts_all_time,source,synced_at)
     VALUES (?,?,?,'kick_chat_badge',datetime('now'))
     ON CONFLICT(streamer_id,username) DO UPDATE SET
-      gifts_all_time = CASE
-        WHEN excluded.gifts_all_time > community_support_snapshots.gifts_all_time
-          THEN excluded.gifts_all_time
-        ELSE community_support_snapshots.gifts_all_time
-      END,
-      source = CASE
-        WHEN excluded.gifts_all_time > community_support_snapshots.gifts_all_time
-          THEN excluded.source
-        ELSE community_support_snapshots.source
-      END,
+      gifts_all_time = excluded.gifts_all_time,
+      source = excluded.source,
       synced_at = excluded.synced_at`,
     [sid, normalizedUsername, normalizedCount]);
 
   return {
-    changed: normalizedCount > previousCount,
-    gifts: Math.max(previousCount, normalizedCount),
+    changed: normalizedCount !== previousCount,
+    gifts: normalizedCount,
     previous: previousCount
   };
+}
+
+async function reconcileStoredCommunityGiftBadges(streamerId = null) {
+  const sid=Number(streamerId||scopedStreamerId());
+  const rows=await all(`SELECT username,badges_json FROM viewers WHERE COALESCE(streamer_id,1)=? AND badges_json IS NOT NULL AND badges_json!=''`,[sid]);
+  for(const row of rows){
+    let badges=[];try{badges=JSON.parse(row.badges_json||'[]')}catch(_){continue}
+    const badge=(Array.isArray(badges)?badges:[]).find(item=>['sub_gifter','subgifter','subscription_gifter','gift_sub_gifter'].includes(String(item?.type||item?.slug||item?.name||'').toLowerCase().replace(/[\s-]+/g,'_')));
+    if(!badge)continue;
+    const count=parseInt(String(badge.count??badge.gift_count??badge.gifts??badge.quantity??badge.value??'').replace(/[^0-9]/g,''),10);
+    if(Number.isSafeInteger(count)&&count>0)await upsertCommunityGiftBadge(row.username,count,sid);
+  }
 }
 
 async function getCommunityData(limit = 100, streamerId = null) {
   const sid = Number(streamerId || scopedStreamerId());
   await backfillCommunityHistory(sid);
+  await reconcileStoredCommunityGiftBadges(sid);
   const safeLimit = Math.max(10, Math.min(500, parseInt(limit) || 100));
   const supporters = await all(`
     SELECT LOWER(username) AS username,
@@ -2180,16 +2193,25 @@ async function getMemeEvents(streamerId, afterId = 0) {
   return rows.map(row => { try { return { ...JSON.parse(row.payload), id:row.id, createdAt:row.created_at }; } catch (_) { return null; } }).filter(Boolean);
 }
 async function createMemeSubmission(streamerId, username, text, mediaUrl, status='pending', options={}) {
-  const r=await run(`INSERT INTO meme_submissions (streamer_id,username,text,media_url,media_type,tts_url,tts_requested,status) VALUES (?,?,?,?,?,?,?,?)`,[Number(streamerId),username,text,mediaUrl,options.mediaType||'image',options.ttsUrl||null,options.ttsRequested?1:0,status]);
+  const r=await run(`INSERT INTO meme_submissions (streamer_id,username,text,media_url,media_type,tts_url,tts_requested,kick_user_id,status) VALUES (?,?,?,?,?,?,?,?,?)`,[Number(streamerId),username,text,mediaUrl,options.mediaType||'image',options.ttsUrl||null,options.ttsRequested?1:0,options.kickUserId||null,status]);
   return get(`SELECT * FROM meme_submissions WHERE id=?`,[Number(r.lastInsertRowid)]);
 }
-async function getMemeSubmissions(streamerId, status='pending') { return all(`SELECT * FROM meme_submissions WHERE streamer_id=? AND status=? ORDER BY id DESC LIMIT 100`,[Number(streamerId),status]); }
+async function getMemeSubmissions(streamerId, status='all') {
+  if(status&&status!=='all')return all(`SELECT * FROM meme_submissions WHERE streamer_id=? AND status=? ORDER BY id DESC LIMIT 200`,[Number(streamerId),status]);
+  return all(`SELECT * FROM meme_submissions WHERE streamer_id=? ORDER BY id DESC LIMIT 200`,[Number(streamerId)]);
+}
 async function getMemeSubmission(id, streamerId) { return get(`SELECT * FROM meme_submissions WHERE id=? AND streamer_id=?`,[Number(id),Number(streamerId)]); }
 async function setMemeSubmissionStatus(id, streamerId, status) { await run(`UPDATE meme_submissions SET status=? WHERE id=? AND streamer_id=?`,[status,Number(id),Number(streamerId)]); return getMemeSubmission(id,streamerId); }
-async function createMemeAccessToken(streamerId, username, trusted=false) { const token=require('crypto').randomBytes(18).toString('hex'),level=trusted===2?2:(trusted?1:0);await run(`INSERT INTO meme_access_tokens (token,streamer_id,username,trusted,expires_at) VALUES (?,?,?,?,?)`,[token,Number(streamerId),username,level,Date.now()+3600000]);return token; }
-async function getMemeAccessToken(token, streamerId) { return await get(`SELECT * FROM meme_access_tokens WHERE token=? AND streamer_id=? AND expires_at>?`,[String(token),Number(streamerId),Date.now()])||null; }
+async function createMemeAccessToken(streamerId, username, trusted=false) {
+  const token=require('crypto').randomBytes(24).toString('hex'),level=trusted===2?2:(trusted?1:0),sid=Number(streamerId),normalized=String(username||'').trim().replace(/^@+/, '').toLowerCase();
+  await run(`DELETE FROM meme_access_tokens WHERE streamer_id=? AND LOWER(username)=? AND used_at IS NULL`,[sid,normalized]);
+  await run(`INSERT INTO meme_access_tokens (token,streamer_id,username,trusted,expires_at) VALUES (?,?,?,?,?)`,[token,sid,normalized,level,Date.now()+15*60*1000]);return token;
+}
+async function getMemeAccessToken(token, streamerId) { return await get(`SELECT * FROM meme_access_tokens WHERE token=? AND streamer_id=? AND expires_at>? AND used_at IS NULL`,[String(token),Number(streamerId),Date.now()])||null; }
 async function deleteMemeAccessToken(token) { await run(`DELETE FROM meme_access_tokens WHERE token=?`,[String(token)]); }
-async function touchMemeAccessToken(token, streamerId) { const row=await getMemeAccessToken(token,streamerId);if(row)await run(`UPDATE meme_access_tokens SET expires_at=? WHERE token=?`,[Date.now()+3600000,String(token)]);return row; }
+async function authenticateMemeAccessToken(token,streamerId,kickUserId,authSession){await run(`UPDATE meme_access_tokens SET kick_user_id=?,auth_session=?,authenticated_at=datetime('now') WHERE token=? AND streamer_id=? AND expires_at>? AND used_at IS NULL`,[String(kickUserId||''),String(authSession||''),String(token),Number(streamerId),Date.now()]);return getMemeAccessToken(token,streamerId)}
+async function consumeMemeAccessToken(token,streamerId){await run(`UPDATE meme_access_tokens SET used_at=datetime('now') WHERE token=? AND streamer_id=? AND used_at IS NULL`,[String(token),Number(streamerId)])}
+async function touchMemeAccessToken(token, streamerId) { return getMemeAccessToken(token,streamerId); }
 
 function normalizeOverlayWidget(widget) {
   const w = String(widget || '').toLowerCase().replace(/\.html$/,'').replace(/[^a-z0-9_-]/g, '');
@@ -2345,16 +2367,43 @@ async function migratePointsLogToScoped(defaultStreamerId = 1) {
   try { await run(`CREATE INDEX IF NOT EXISTS idx_points_log_streamer_created ON points_log(streamer_id, created_at DESC)`); } catch(e) {}
 }
 
+async function migrateChatActivityToScopedPrimaryKey(defaultStreamerId = 1) {
+  const sql = await tableCreateSql('chat_activity_daily');
+  if (!sql) return;
+  const alreadyScoped = /PRIMARY\s+KEY\s*\(\s*streamer_id\s*,\s*date\s*\)/i.test(sql);
+  if (alreadyScoped) return;
+
+  console.log('[DB V2] Migration chat_activity_daily: PRIMARY KEY(date) → PRIMARY KEY(streamer_id, date)');
+  const cols = await tableColumns('chat_activity_daily');
+  const sidExpr = cols.includes('streamer_id') ? 'COALESCE(streamer_id, ?)' : '?';
+  await run(`DROP TABLE IF EXISTS chat_activity_daily_v2_migration`);
+  await run(`CREATE TABLE chat_activity_daily_v2_migration (
+    streamer_id     INTEGER NOT NULL DEFAULT 1,
+    date            TEXT NOT NULL,
+    message_count   INTEGER NOT NULL DEFAULT 0,
+    unique_chatters TEXT NOT NULL DEFAULT '[]',
+    PRIMARY KEY(streamer_id, date)
+  )`);
+  await run(`INSERT OR REPLACE INTO chat_activity_daily_v2_migration
+    (streamer_id, date, message_count, unique_chatters)
+    SELECT ${sidExpr}, date, SUM(COALESCE(message_count, 0)), COALESCE(MAX(unique_chatters), '[]')
+    FROM chat_activity_daily
+    GROUP BY ${sidExpr}, date`, [defaultStreamerId, defaultStreamerId]);
+  await run(`DROP TABLE chat_activity_daily`);
+  await run(`ALTER TABLE chat_activity_daily_v2_migration RENAME TO chat_activity_daily`);
+}
+
 async function migrateCoreScopedTables(defaultStreamerId = 1) {
   await migrateViewersToScopedUnique(defaultStreamerId);
   await migratePointsLogToScoped(defaultStreamerId);
+  await migrateChatActivityToScopedPrimaryKey(defaultStreamerId);
   try { await run(`CREATE INDEX IF NOT EXISTS idx_custom_commands_streamer_trigger ON custom_commands(streamer_id, trigger)`); } catch(e) {}
   try { await run(`CREATE INDEX IF NOT EXISTS idx_community_events_streamer_date ON community_events(streamer_id, occurred_at DESC)`); } catch(e) {}
   try { await run(`CREATE INDEX IF NOT EXISTS idx_community_events_streamer_user ON community_events(streamer_id, username)`); } catch(e) {}
   try { await run(`CREATE INDEX IF NOT EXISTS idx_stream_sessions_streamer_started ON stream_sessions(streamer_id, started_at DESC)`); } catch(e) {}
   try { await run(`CREATE INDEX IF NOT EXISTS idx_command_usage_streamer_created ON command_usage(streamer_id, created_at DESC)`); } catch(e) {}
   try { await run(`CREATE INDEX IF NOT EXISTS idx_system_commands_streamer_trigger ON system_commands_state(streamer_id, trigger)`); } catch(e) {}
-  try { await run(`CREATE INDEX IF NOT EXISTS idx_chat_activity_streamer_day ON chat_activity_daily(streamer_id, day)`); } catch(e) {}
+  try { await run(`CREATE INDEX IF NOT EXISTS idx_chat_activity_streamer_date ON chat_activity_daily(streamer_id, date)`); } catch(e) {}
 }
 
 async function migrateLegacyRowsToDefaultStreamer(defaultStreamerId = 1) {
@@ -2365,8 +2414,12 @@ async function migrateLegacyRowsToDefaultStreamer(defaultStreamerId = 1) {
 }
 
 let initialized = false;
+let initializationPromise = null;
 async function ensureInit() {
-  if (!initialized) {
+  if (initialized) return;
+  if (initializationPromise) return initializationPromise;
+
+  initializationPromise = (async () => {
     try {
       await initSchema();
       const defaultStreamer = await ensureDefaultStreamer();
@@ -2374,11 +2427,16 @@ async function ensureInit() {
       await ensureBotIdentities();
       await migrateCoreScopedTables(defaultStreamer?.id || 1);
       await migrateLegacyRowsToDefaultStreamer(defaultStreamer?.id || 1);
+      initialized = true;
     } catch(e) {
       console.error('[DB] Erreur init schema:', e.message);
+      throw e;
+    } finally {
+      initializationPromise = null;
     }
-    initialized = true;
-  }
+  })();
+
+  return initializationPromise;
 }
 
 module.exports = {
@@ -2425,5 +2483,5 @@ module.exports = {
   getStreamerSetting, setStreamerSetting, getOrCreateOverlayToken, regenerateOverlayToken, getOverlayTokenByValue, getOverlayTokensForStreamer, saveOAuthTokenForStreamer, getOAuthTokenForStreamer, deleteOAuthTokenForStreamer,
   createMemeEvent, getMemeEvents,
   createMemeSubmission, getMemeSubmissions, getMemeSubmission, setMemeSubmissionStatus,
-  createMemeAccessToken, getMemeAccessToken, deleteMemeAccessToken, touchMemeAccessToken,
+  createMemeAccessToken, getMemeAccessToken, deleteMemeAccessToken, authenticateMemeAccessToken, consumeMemeAccessToken, touchMemeAccessToken,
 };

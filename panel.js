@@ -678,7 +678,8 @@ async function recordSubEvent(type, payload = {}, source = null) {
       amount,
       months: event.months,
       occurredAt: event.at,
-      source: 'kick_event'
+      source: 'kick_event',
+      sourceKey: payload.sourceKey || undefined
     }, tm.streamerId);
     await Promise.all([
       tm.setSetting('subcounter_total', String(state.total)),
@@ -701,10 +702,14 @@ async function recordSubEvent(type, payload = {}, source = null) {
 // ── Traitement commun events Kick : webhook + websocket bot ────────────────────
 
 const processedKickEvents = new Map();
+const processedKickEventSemantics = new Map();
 function cleanupProcessedKickEvents() {
   const now = Date.now();
   for (const [key, ts] of processedKickEvents.entries()) {
     if (now - ts > 10 * 60 * 1000) processedKickEvents.delete(key);
+  }
+  for (const [key, ts] of processedKickEventSemantics.entries()) {
+    if (now - ts > 12 * 1000) processedKickEventSemantics.delete(key);
   }
 }
 function pick(...values) {
@@ -760,6 +765,17 @@ function extractSubInfo(payload = {}) {
   const months = parseInt(data?.duration || data?.months || data?.month || sub?.months || sub?.duration || root?.months || 1) || 1;
   return { username, gifter: gifterName, count: Math.max(1, count), months };
 }
+function semanticKickEventKey(eventType,payload={}){
+  const data=getPayloadData(payload),type=normalizeKickEventType(eventType);
+  if(type==='channel.subscription.gifts'){
+    const info=extractSubInfo(payload),recipients=[...(data?.giftees||data?.recipients||[])].map(x=>String(x?.username||x?.name||x||'').toLowerCase()).filter(Boolean).sort().join(',');
+    return `${type}:${String(info.gifter||'').toLowerCase()}:${info.count}:${recipients}`;
+  }
+  if(type==='channel.subscription.new'||type==='channel.subscription.renewal'){
+    const info=extractSubInfo(payload);return `${type}:${String(info.username||'').toLowerCase()}:${type.endsWith('renewal')?info.months:1}`;
+  }
+  return '';
+}
 async function sendAnnouncementToChat(message, logLabel) {
   if (!message) return false;
   if (!shared.hasSendChat()) {
@@ -781,9 +797,13 @@ async function processKickEvent(eventTypeRaw, payload = {}) {
   const eventType = normalizeKickEventType(eventTypeRaw || payload?.event || payload?.type || '');
   const data = getPayloadData(payload);
   const dedupe = `${tm.slug}:${eventDedupeKey(eventType, payload)}`;
+  const persistentEventKey=`kick:${eventDedupeKey(eventType,payload)}`;
+  const semanticRaw=semanticKickEventKey(eventType,payload),semantic=semanticRaw?`${tm.slug}:${semanticRaw}`:'';
   cleanupProcessedKickEvents();
   if (processedKickEvents.has(dedupe)) return { ok: true, duplicate: true, eventType };
+  if (semantic&&processedKickEventSemantics.has(semantic)) return {ok:true,duplicate:true,eventType};
   processedKickEvents.set(dedupe, Date.now());
+  if(semantic)processedKickEventSemantics.set(semantic,Date.now());
 
   if (eventType === 'channel.followed') {
     const username = pick(
@@ -811,7 +831,7 @@ async function processKickEvent(eventTypeRaw, payload = {}) {
 
   if (eventType === 'channel.subscription.new') {
     const info = extractSubInfo(payload);
-    await recordSubEvent('new', { username: info.username, count: 1 }, tm);
+    await recordSubEvent('new', { username: info.username, count: 1, sourceKey:persistentEventKey }, tm);
     await pushObsAlert('sub', { username: info.username }, false, tm).catch(e=>console.warn('[ALERT OBS] sub ignorée:', e.message));
     const enabled = await db.getSetting('sub_announce_enabled');
     if (enabled) {
@@ -824,7 +844,7 @@ async function processKickEvent(eventTypeRaw, payload = {}) {
 
   if (eventType === 'channel.subscription.renewal') {
     const info = extractSubInfo(payload);
-    await recordSubEvent('renewal', { username: info.username, months: info.months }, tm);
+    await recordSubEvent('renewal', { username: info.username, months: info.months, sourceKey:persistentEventKey }, tm);
     await pushObsAlert('renew', { username: info.username, months: info.months }, false, tm).catch(e=>console.warn('[ALERT OBS] renew ignorée:', e.message));
     const enabled = await db.getSetting('sub_announce_enabled');
     if (enabled) {
@@ -840,7 +860,7 @@ async function processKickEvent(eventTypeRaw, payload = {}) {
     const gifterRaw = pick(data?.gifter?.username, data?.user?.username, data?.username, data?.gifter?.name, data?.user?.name);
     const gifter = isAnon ? 'un anonyme' : (gifterRaw || 'Anonyme');
     const count = parseInt(data?.count || data?.gift_count || data?.giftees?.length || data?.recipients?.length || 1) || 1;
-    await recordSubEvent('gift', { gifter, count }, tm);
+    await recordSubEvent('gift', { gifter, count, sourceKey:persistentEventKey }, tm);
     await pushObsAlert('gift', { gifter, count }, false, tm).catch(e=>console.warn('[ALERT OBS] gift ignorée:', e.message));
     const enabled = await db.getSetting('sub_announce_enabled');
     if (enabled) {
@@ -2552,6 +2572,19 @@ app.get('/auth/login', (req, res) => {
   return res.redirect(url);
 });
 
+const MEME_AUTH_COOKIE='elbot_meme_auth';
+function memeAuthCookieOptions(req){const forwarded=String(req.headers['x-forwarded-proto']||'').split(',')[0].trim();return{httpOnly:true,secure:forwarded==='https'||req.secure||process.env.NODE_ENV==='production',sameSite:'lax',path:'/',maxAge:15*60*1000}}
+app.get('/auth/meme/login',async(req,res)=>{
+  try{
+    if(!kickOAuth.isConfigured())return res.status(503).send('Connexion Kick indisponible.');
+    const token=String(req.query.token||''),streamer=await db.getStreamerBySlug(tenant.normalizeSlug(req.query.streamer||''));
+    if(!streamer)return res.status(404).send('Chaîne inconnue.');
+    const access=await db.getMemeAccessToken(token,streamer.id);if(!access)return res.status(410).send('Lien meme expiré. Retape !meme dans le chat.');
+    const url=kickOAuth.getAuthorizationUrl('user:read',{mode:'meme_viewer_login',memeToken:token,streamerId:streamer.id,expectedUsername:access.username,returnTo:`/memes/${streamer.slug}?token=${token}`});
+    res.redirect(url);
+  }catch(e){res.status(500).send(e.message)}
+});
+
 app.get('/auth/callback', async (req, res) => {
   console.log('[OAUTH CALLBACK V2] Requête reçue — query:', JSON.stringify(req.query));
   try {
@@ -2563,6 +2596,17 @@ app.get('/auth/callback', async (req, res) => {
     const mode = token.meta?.mode || 'streamer_login';
     const kickUser = await kickOAuth.fetchCurrentUser(token.accessToken);
     const username = kickUser.username || kickUser.displayName || kickUser.id;
+    if(mode==='meme_viewer_login'){
+      const streamerId=Number(token.meta?.streamerId),memeToken=String(token.meta?.memeToken||''),streamer=await db.getStreamerById(streamerId),access=await db.getMemeAccessToken(memeToken,streamerId);
+      if(!streamer||!access)throw new Error('Lien meme expiré. Retape !meme dans le chat.');
+      const expected=tenant.normalizeSlug(access.username),connected=tenant.normalizeSlug(username);
+      if(!connected||connected!==expected)throw new Error(`Ce lien est réservé à @${access.username}. Tu es connecté avec @${username||'inconnu'}.`);
+      const authSession=crypto.randomBytes(32).toString('hex');
+      await db.authenticateMemeAccessToken(memeToken,streamerId,kickUser.id||'',authSession);
+      res.cookie(MEME_AUTH_COOKIE,`${memeToken}.${authSession}`,memeAuthCookieOptions(req));
+      console.log(`[MEME AUTH:${streamer.slug}] @${access.username} vérifié par Kick (${kickUser.id||'id inconnu'})`);
+      return res.redirect(`/memes/${encodeURIComponent(streamer.slug)}?token=${encodeURIComponent(memeToken)}`);
+    }
     if (mode === 'bot_login') {
       const bot7up = await db.getBotIdentityByKey('bot7up');
       if (bot7up) {
@@ -3518,24 +3562,34 @@ app.post('/api/admin/memes/test', requireAuth, requireTenant, async (req,res) =>
 });
 app.post('/api/admin/memes/stop', requireAuth, requireTenant, async (req,res) => { const tm=createTenantManager({db,io,req}); tm.emit('meme-overlay-stop',{at:new Date().toISOString()}); res.json({success:true}); });
 app.post('/api/admin/memes/points',requireAuth,requireTenant,async(req,res)=>{try{const username=String(req.body?.username||'').trim().replace(/^@+/,''),amount=Number(req.body?.amount);if(!username||!Number.isFinite(amount)||amount===0)return res.status(400).json({error:'Pseudo et montant requis'});if(Math.abs(amount)>1000000)return res.status(400).json({error:'Montant trop élevé'});await db.addMemePoints(username,Math.trunc(amount));const viewer=await db.getViewer(username);res.json({success:true,data:{username:viewer?.username||username,points:Number(viewer?.meme_points||0)}})}catch(e){res.status(500).json({error:e.message})}});
-app.get('/api/admin/memes/submissions',requireAuth,requireTenant,async(req,res)=>{const tm=createTenantManager({db,io,req});res.json({data:await db.getMemeSubmissions(tm.streamerId,'pending')})});
+app.get('/api/admin/memes/submissions',requireAuth,requireTenant,async(req,res)=>{const tm=createTenantManager({db,io,req});res.json({data:await db.getMemeSubmissions(tm.streamerId,String(req.query.status||'all'))})});
 app.post('/api/admin/memes/submissions/:id/:action',requireAuth,requireTenant,async(req,res)=>{const tm=createTenantManager({db,io,req}),row=await db.getMemeSubmission(req.params.id,tm.streamerId);if(!row)return res.status(404).json({error:'Introuvable'});if(req.params.action==='approve'){const cfg=await getMemesConfig(tm),payload={username:row.username,text:row.text,mediaUrl:row.media_url,mediaType:row.media_type,ttsUrl:row.tts_url,speakText:row.tts_requested&&!row.tts_url?row.text:'',duration:cfg.duration,size:cfg.size,position:cfg.position,launchSound:cfg.launchSound,launchSoundType:cfg.launchSoundType,launchSoundVolume:cfg.launchSoundVolume,volume:0,at:new Date().toISOString()};await db.createMemeEvent(tm.streamerId,payload);tm.emit('meme-overlay-event',payload)}await db.setMemeSubmissionStatus(row.id,tm.streamerId,req.params.action==='approve'?'approved':'rejected');res.json({success:true})});
 
 const memeTempDir=path.join(__dirname,'data','meme-temp');fs.mkdirSync(memeTempDir,{recursive:true});
+function memeAuthCookieValue(req){return String(tenant.parseCookies(req)?.[MEME_AUTH_COOKIE]||'')}
+function memeAccessAuthorized(req,access,token){
+  if(Number(access?.trusted)===2)return true;
+  if(!access?.authenticated_at||!access?.kick_user_id||!access?.auth_session)return false;
+  const raw=memeAuthCookieValue(req),prefix=`${token}.`;if(!raw.startsWith(prefix))return false;
+  const supplied=Buffer.from(raw.slice(prefix.length)),expected=Buffer.from(String(access.auth_session));
+  return supplied.length===expected.length&&crypto.timingSafeEqual(supplied,expected);
+}
 const cleanupMemeFiles=()=>{for(const file of fs.readdirSync(memeTempDir)){const full=path.join(memeTempDir,file);try{if(Date.now()-fs.statSync(full).mtimeMs>86400000)fs.unlinkSync(full)}catch(_){}}};cleanupMemeFiles();setInterval(cleanupMemeFiles,3600000).unref();
 app.get('/meme-media/:file',(req,res)=>{const file=String(req.params.file||'').replace(/[^a-z0-9_.-]/gi,'');res.sendFile(path.join(memeTempDir,file))});
 app.get('/memes/:streamer',(req,res)=>res.sendFile(path.join(__dirname,'public','memes-submit.html')));
-app.get('/api/public/memes/:streamer/config',async(req,res)=>{res.set('Cache-Control','no-store, no-cache, must-revalidate');const s=await db.getStreamerBySlug(tenant.normalizeSlug(req.params.streamer));if(!s)return res.status(404).json({error:'Chaîne inconnue'});const tm=createTenantManager({db,io,streamer:s,req});const c=await getMemesConfig(tm);if(req.query.token)await db.touchMemeAccessToken(String(req.query.token),s.id);res.json({data:{enabled:c.enabled,maxText:c.maxText,maxFileMb:c.maxFileMb,maxVideoDuration:c.maxVideoDuration,viewerTts:c.viewerTts,cost:c.cost,streamer:s.display_name||s.slug}})});
+app.get('/api/public/memes/:streamer/config',async(req,res)=>{res.set('Cache-Control','no-store, no-cache, must-revalidate');const s=await db.getStreamerBySlug(tenant.normalizeSlug(req.params.streamer));if(!s)return res.status(404).json({error:'Chaîne inconnue'});const tm=createTenantManager({db,io,streamer:s,req}),c=await getMemesConfig(tm),token=String(req.query.token||''),access=await db.getMemeAccessToken(token,s.id);if(!access)return res.status(410).json({error:'Lien expiré. Retape !meme dans le chat.'});if(c.mode==='trust'&&!access.trusted)return res.status(403).json({error:'Le mode Confiance est réservé aux abonnés.'});if(!memeAccessAuthorized(req,access,token))return res.status(401).json({error:'Connexion Kick requise',authRequired:true,expectedUsername:access.username,authUrl:`/auth/meme/login?streamer=${encodeURIComponent(s.slug)}&token=${encodeURIComponent(token)}`});res.json({data:{enabled:c.enabled,maxText:c.maxText,maxFileMb:c.maxFileMb,maxVideoDuration:c.maxVideoDuration,viewerTts:c.viewerTts,cost:c.cost,streamer:s.display_name||s.slug,username:access.username,authenticated:true}})});
 app.post('/api/public/memes/:streamer/submit',async(req,res)=>{try{
   const s=await db.getStreamerBySlug(tenant.normalizeSlug(req.params.streamer));if(!s)return res.status(404).json({error:'Chaîne inconnue'});
   const tm=createTenantManager({db,io,streamer:s,req}),cfg=await getMemesConfig(tm);if(!cfg.enabled)return res.status(403).json({error:'Widget désactivé'});
   const text=cleanMemeText(req.body?.text,cfg.maxText),data=String(req.body?.image||''),token=String(req.body?.token||''),wantsTts=req.body?.readText===true;
+  const access=await db.getMemeAccessToken(token,s.id);if(!access)return res.status(401).json({error:'Lien expiré. Retape !meme dans le chat.'});
+  if(cfg.mode==='trust'&&!access.trusted)return res.status(403).json({error:'Le mode Confiance est réservé aux abonnés.'});
+  if(!memeAccessAuthorized(req,access,token))return res.status(401).json({error:'Reconnecte-toi avec le compte Kick autorisé.'});
   const m=data.match(/^data:(image\/(png|jpeg|gif|webp)|video\/(mp4|webm));base64,([A-Za-z0-9+/=]+)$/);if(!m)return res.status(400).json({error:'Image, GIF ou vidéo MP4/WebM invalide'});
   const mediaType=m[1].startsWith('video/')?'video':'image',videoDuration=Number(req.body?.videoDuration||0);
   if(mediaType==='video'&&(!videoDuration||videoDuration>cfg.maxVideoDuration+.25))return res.status(400).json({error:`La vidéo doit durer ${cfg.maxVideoDuration} secondes maximum`});
   const bytes=Buffer.from(m[4],'base64');if(bytes.length>cfg.maxFileMb*1024*1024)return res.status(413).json({error:'Fichier trop volumineux'});
   if(text){const banned=await tenant.runWithStreamer(s,()=>db.checkBannedWords(text));if(banned)return res.status(400).json({error:'Texte refusé'})}
-  const access=await db.getMemeAccessToken(token,s.id);if(!access)return res.status(401).json({error:'Lien expiré. Retape !meme dans le chat.'});
   const username=access.username,cooldownKey=`viewer:${s.id}:${username.toLowerCase()}`,remaining=Math.ceil(((memeCooldowns.get(cooldownKey)||0)-Date.now())/1000);if(remaining>0)return res.status(429).json({error:`Réessaie dans ${remaining}s`});
   const viewer=await tenant.runWithStreamer(s,()=>db.getViewer(username));if(access.trusted!==2&&cfg.cost>0&&(!viewer||Number(viewer.meme_points||0)<cfg.cost))return res.status(400).json({error:`Il faut ${cfg.cost} points mèmes`});
   if(wantsTts&&(!cfg.viewerTts||!text))return res.status(400).json({error:'Lecture IA indisponible ou texte vide'});
@@ -3543,9 +3597,9 @@ app.post('/api/public/memes/:streamer/submit',async(req,res)=>{try{
   let ttsUrl=null;if(wantsTts){const audio=await tenant.runWithStreamer(s,async()=>await generateTTSAudio(text)||await generateFallbackTTSAudio(text));if(audio){const audioFile=`${s.id}-${Date.now()}-${crypto.randomBytes(5).toString('hex')}.mp3`;await fs.promises.writeFile(path.join(memeTempDir,audioFile),Buffer.from(audio,'base64'));ttsUrl=`/meme-media/${audioFile}`}}
   if(access.trusted!==2&&cfg.cost>0)await tenant.runWithStreamer(s,()=>db.addMemePoints(username,-cfg.cost));
   const trusted=!!access.trusted,instant=cfg.mode==='instant'||(cfg.mode==='trust'&&trusted),status=instant?'approved':'pending';
-  const row=await db.createMemeSubmission(s.id,username,text,mediaUrl,status,{mediaType,ttsUrl,ttsRequested:wantsTts});memeCooldowns.set(cooldownKey,Date.now()+cfg.cooldown*1000);
+  const row=await db.createMemeSubmission(s.id,username,text,mediaUrl,status,{mediaType,ttsUrl,ttsRequested:wantsTts,kickUserId:access.kick_user_id});memeCooldowns.set(cooldownKey,Date.now()+cfg.cooldown*1000);
   if(instant){const payload={username,text,mediaUrl,mediaType,ttsUrl,speakText:wantsTts&&!ttsUrl?text:'',duration:mediaType==='video'?Math.min(cfg.maxVideoDuration,videoDuration):cfg.duration,size:cfg.size,position:cfg.position,launchSound:cfg.launchSound,launchSoundType:cfg.launchSoundType,launchSoundVolume:cfg.launchSoundVolume,volume:0,at:new Date().toISOString()};await db.createMemeEvent(s.id,payload);tm.emit('meme-overlay-event',payload)}
-  await db.touchMemeAccessToken(token,s.id);res.json({success:true,status})
+  await db.consumeMemeAccessToken(token,s.id);const clearMemeCookie=memeAuthCookieOptions(req);delete clearMemeCookie.maxAge;res.clearCookie(MEME_AUTH_COOKIE,clearMemeCookie);res.json({success:true,status,submissionId:row?.id})
 }catch(e){res.status(500).json({error:e.message})}});
 app.get('/api/widgets/memes', async (req,res) => {
   try { if(req.overlayTokenInvalid || req.overlayTokenRow?.widget !== 'memes') return res.status(404).json({error:'overlay_invalid'}); const tm=createTenantManager({db,io,req}); res.json({data:await getMemesConfig(tm),events:await db.getMemeEvents(tm.streamerId,req.query.after||0)}); }
