@@ -2364,6 +2364,7 @@ async function generateTTSAudio(text, voiceIdOverride = '') {
 }
 
 let memeVoicesCache={at:0,rows:[]};
+let memeElevenLabsDisabledUntil=0;
 async function getPublicMemeVoices(){
   if(Date.now()-memeVoicesCache.at<10*60*1000&&memeVoicesCache.rows.length)return memeVoicesCache.rows;
   const cfg=await getTTSSettings(),rows=[
@@ -2372,7 +2373,13 @@ async function getPublicMemeVoices(){
     {id:'builtin:es',name:'Voz española'},{id:'builtin:de',name:'Deutsche Stimme'},
     {id:'builtin:it',name:'Voce italiana'},{id:'builtin:ja',name:'日本語の音声'}
   ];
-  if(cfg.apiKey)try{const r=await axios.get('https://api.elevenlabs.io/v1/voices',{headers:{'xi-api-key':cfg.apiKey.trim()},timeout:10000});for(const v of (r.data?.voices||[]).slice(0,30))rows.push({id:String(v.voice_id),name:String(v.name||'Voix IA')})}catch(e){console.warn('[MEMES TTS] Liste des voix indisponible:',e.response?.status||e.message)}
+  if(cfg.apiKey&&Date.now()>=memeElevenLabsDisabledUntil)try{const r=await axios.get('https://api.elevenlabs.io/v1/voices',{headers:{'xi-api-key':cfg.apiKey.trim()},timeout:10000});for(const v of (r.data?.voices||[]).slice(0,30))rows.push({id:String(v.voice_id),name:String(v.name||'Voix IA')})}catch(e){
+    // Une ancienne cle enregistree ne doit ni polluer les logs ni bloquer les
+    // voix integrees du navigateur. Une erreur d'authentification suspend
+    // ElevenLabs pendant une heure; les voix femme/homme/robot restent actives.
+    if(Number(e.response?.status)===401)memeElevenLabsDisabledUntil=Date.now()+60*60*1000;
+    else console.warn('[MEMES TTS] Service externe temporairement indisponible:',e.response?.status||e.message);
+  }
   memeVoicesCache={at:Date.now(),rows};return rows;
 }
 
