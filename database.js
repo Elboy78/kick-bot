@@ -194,6 +194,12 @@ async function initSchema() {
       trusted INTEGER NOT NULL DEFAULT 0, kick_user_id TEXT, auth_session TEXT,
       authenticated_at TEXT, used_at TEXT, expires_at INTEGER NOT NULL
     )`,
+    `CREATE TABLE IF NOT EXISTS meme_auth_sessions (
+      session_token TEXT PRIMARY KEY, streamer_id INTEGER NOT NULL,
+      kick_user_id TEXT NOT NULL, username TEXT NOT NULL,
+      role TEXT NOT NULL DEFAULT 'viewer', verified_at TEXT NOT NULL DEFAULT (datetime('now')),
+      expires_at INTEGER NOT NULL
+    )`,
     `CREATE TABLE IF NOT EXISTS viewers (
       id            INTEGER PRIMARY KEY AUTOINCREMENT,
       streamer_id   INTEGER NOT NULL DEFAULT 1,
@@ -2193,10 +2199,12 @@ async function getMemeEvents(streamerId, afterId = 0) {
   return rows.map(row => { try { return { ...JSON.parse(row.payload), id:row.id, createdAt:row.created_at }; } catch (_) { return null; } }).filter(Boolean);
 }
 async function createMemeSubmission(streamerId, username, text, mediaUrl, status='pending', options={}) {
+  await run(`DELETE FROM meme_submissions WHERE streamer_id=? AND created_at < datetime('now','-1 day')`,[Number(streamerId)]);
   const r=await run(`INSERT INTO meme_submissions (streamer_id,username,text,media_url,media_type,tts_url,tts_requested,kick_user_id,status) VALUES (?,?,?,?,?,?,?,?,?)`,[Number(streamerId),username,text,mediaUrl,options.mediaType||'image',options.ttsUrl||null,options.ttsRequested?1:0,options.kickUserId||null,status]);
   return get(`SELECT * FROM meme_submissions WHERE id=?`,[Number(r.lastInsertRowid)]);
 }
 async function getMemeSubmissions(streamerId, status='all') {
+  await run(`DELETE FROM meme_submissions WHERE streamer_id=? AND created_at < datetime('now','-1 day')`,[Number(streamerId)]);
   if(status&&status!=='all')return all(`SELECT * FROM meme_submissions WHERE streamer_id=? AND status=? ORDER BY id DESC LIMIT 200`,[Number(streamerId),status]);
   return all(`SELECT * FROM meme_submissions WHERE streamer_id=? ORDER BY id DESC LIMIT 200`,[Number(streamerId)]);
 }
@@ -2212,6 +2220,15 @@ async function deleteMemeAccessToken(token) { await run(`DELETE FROM meme_access
 async function authenticateMemeAccessToken(token,streamerId,kickUserId,authSession){await run(`UPDATE meme_access_tokens SET kick_user_id=?,auth_session=?,authenticated_at=datetime('now') WHERE token=? AND streamer_id=? AND expires_at>? AND used_at IS NULL`,[String(kickUserId||''),String(authSession||''),String(token),Number(streamerId),Date.now()]);return getMemeAccessToken(token,streamerId)}
 async function consumeMemeAccessToken(token,streamerId){await run(`UPDATE meme_access_tokens SET used_at=datetime('now') WHERE token=? AND streamer_id=? AND used_at IS NULL`,[String(token),Number(streamerId)])}
 async function touchMemeAccessToken(token, streamerId) { return getMemeAccessToken(token,streamerId); }
+async function createMemeAuthSession(streamerId,kickUserId,username,role='viewer'){
+  const sessionToken=require('crypto').randomBytes(32).toString('hex'),sid=Number(streamerId),name=String(username||'').trim().replace(/^@+/, '').toLowerCase(),safeRole=role==='moderator'?'moderator':'viewer';
+  await run(`DELETE FROM meme_auth_sessions WHERE expires_at<=? OR (streamer_id=? AND kick_user_id=? AND role=?)`,[Date.now(),sid,String(kickUserId||''),safeRole]);
+  await run(`INSERT INTO meme_auth_sessions (session_token,streamer_id,kick_user_id,username,role,expires_at) VALUES (?,?,?,?,?,?)`,[sessionToken,sid,String(kickUserId||''),name,safeRole,Date.now()+30*86400000]);
+  return getMemeAuthSession(sessionToken,sid);
+}
+async function getMemeAuthSession(sessionToken,streamerId){return await get(`SELECT * FROM meme_auth_sessions WHERE session_token=? AND streamer_id=? AND expires_at>?`,[String(sessionToken||''),Number(streamerId),Date.now()])||null}
+async function refreshMemeAuthSession(sessionToken,streamerId){await run(`UPDATE meme_auth_sessions SET verified_at=datetime('now'),expires_at=? WHERE session_token=? AND streamer_id=?`,[Date.now()+30*86400000,String(sessionToken||''),Number(streamerId)]);return getMemeAuthSession(sessionToken,streamerId)}
+async function deleteMemeAuthSession(sessionToken){await run(`DELETE FROM meme_auth_sessions WHERE session_token=?`,[String(sessionToken||'')])}
 
 function normalizeOverlayWidget(widget) {
   const w = String(widget || '').toLowerCase().replace(/\.html$/,'').replace(/[^a-z0-9_-]/g, '');
@@ -2484,4 +2501,5 @@ module.exports = {
   createMemeEvent, getMemeEvents,
   createMemeSubmission, getMemeSubmissions, getMemeSubmission, setMemeSubmissionStatus,
   createMemeAccessToken, getMemeAccessToken, deleteMemeAccessToken, authenticateMemeAccessToken, consumeMemeAccessToken, touchMemeAccessToken,
+  createMemeAuthSession, getMemeAuthSession, refreshMemeAuthSession, deleteMemeAuthSession,
 };

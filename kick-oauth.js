@@ -89,7 +89,7 @@ function getAuthorizationUrl(scopes, options = {}) {
     response_type: 'code',
     client_id: CLIENT_ID,
     redirect_uri: REDIRECT_URI,
-    scope: normalizeScopes(scopes, meta.mode !== 'meme_viewer_login'),
+    scope: normalizeScopes(scopes, !['meme_viewer_login','meme_moderator_login'].includes(meta.mode)),
     code_challenge: codeChallenge,
     code_challenge_method: 'S256',
     state,
