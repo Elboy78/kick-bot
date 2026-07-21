@@ -165,6 +165,26 @@ async function initSchema() {
       updated_at  TEXT NOT NULL DEFAULT (datetime('now')),
       PRIMARY KEY(streamer_id, key)
     )`,
+    `CREATE TABLE IF NOT EXISTS support_tickets (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      streamer_id INTEGER NOT NULL,
+      subject TEXT NOT NULL,
+      category TEXT NOT NULL DEFAULT 'question',
+      priority TEXT NOT NULL DEFAULT 'normal',
+      status TEXT NOT NULL DEFAULT 'open',
+      discord_channel_id TEXT,
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+    )`,
+    `CREATE TABLE IF NOT EXISTS support_messages (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      ticket_id INTEGER NOT NULL,
+      streamer_id INTEGER NOT NULL,
+      author_slug TEXT NOT NULL,
+      author_role TEXT NOT NULL DEFAULT 'streamer',
+      message TEXT NOT NULL,
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    )`,
     `CREATE TABLE IF NOT EXISTS overlay_tokens (
       id          INTEGER PRIMARY KEY AUTOINCREMENT,
       streamer_id INTEGER NOT NULL,
@@ -1559,6 +1579,23 @@ async function toggleTimer(name, enabled) {
 }
 async function deleteTimer(name) { await run(`DELETE FROM timers WHERE name = ?`, [name.toLowerCase()]); }
 
+// ─── Support ElBot ───────────────────────────────────────────────────────────
+async function createSupportTicket(streamerId, data = {}) {
+  const sid=Number(streamerId),subject=String(data.subject||'').trim().slice(0,120),message=String(data.message||'').trim().slice(0,4000);
+  const category=['bug','question','suggestion','account'].includes(data.category)?data.category:'question';
+  const priority=['low','normal','high','urgent'].includes(data.priority)?data.priority:'normal';
+  if(!sid||!subject||!message)throw new Error('Sujet et message requis');
+  const result=await run(`INSERT INTO support_tickets (streamer_id,subject,category,priority) VALUES (?,?,?,?)`,[sid,subject,category,priority]);
+  const ticketId=Number(result?.lastInsertRowid??result?.lastInsertRowID??result?.lastInsertId);
+  await run(`INSERT INTO support_messages (ticket_id,streamer_id,author_slug,author_role,message) VALUES (?,?,?,?,?)`,[ticketId,sid,String(data.authorSlug||'streamer'),String(data.authorRole||'streamer'),message]);
+  return getSupportTicket(ticketId,sid,false);
+}
+async function getSupportTicket(ticketId,streamerId=null,includeAll=false){const params=[Number(ticketId)];let where='t.id=?';if(!includeAll){where+=' AND t.streamer_id=?';params.push(Number(streamerId));}return get(`SELECT t.*,s.slug AS streamer_slug,s.display_name AS streamer_name FROM support_tickets t LEFT JOIN streamers s ON s.id=t.streamer_id WHERE ${where}`,params)}
+async function listSupportTickets(streamerId=null,includeAll=false){const params=[];let where='1=1';if(!includeAll){where='t.streamer_id=?';params.push(Number(streamerId));}return all(`SELECT t.*,s.slug AS streamer_slug,s.display_name AS streamer_name,(SELECT COUNT(*) FROM support_messages m WHERE m.ticket_id=t.id) AS message_count,(SELECT MAX(created_at) FROM support_messages m WHERE m.ticket_id=t.id) AS last_message_at FROM support_tickets t LEFT JOIN streamers s ON s.id=t.streamer_id WHERE ${where} ORDER BY CASE t.status WHEN 'open' THEN 0 WHEN 'waiting' THEN 1 ELSE 2 END,t.updated_at DESC LIMIT 200`,params)}
+async function getSupportMessages(ticketId,streamerId=null,includeAll=false){const ticket=await getSupportTicket(ticketId,streamerId,includeAll);if(!ticket)return null;return all(`SELECT * FROM support_messages WHERE ticket_id=? ORDER BY created_at ASC,id ASC`,[Number(ticketId)])}
+async function addSupportMessage(ticketId,streamerId,data={},includeAll=false){const ticket=await getSupportTicket(ticketId,streamerId,includeAll);if(!ticket)throw new Error('Ticket introuvable');const message=String(data.message||'').trim().slice(0,4000);if(!message)throw new Error('Message requis');await run(`INSERT INTO support_messages (ticket_id,streamer_id,author_slug,author_role,message) VALUES (?,?,?,?,?)`,[ticket.id,ticket.streamer_id,String(data.authorSlug||'streamer'),String(data.authorRole||'streamer'),message]);await run(`UPDATE support_tickets SET status=?,updated_at=datetime('now') WHERE id=?`,[data.authorRole==='admin'?'waiting':'open',ticket.id]);return getSupportTicket(ticket.id,ticket.streamer_id,true)}
+async function updateSupportTicket(ticketId,streamerId,patch={},includeAll=false){const ticket=await getSupportTicket(ticketId,streamerId,includeAll);if(!ticket)throw new Error('Ticket introuvable');const status=['open','waiting','closed'].includes(patch.status)?patch.status:ticket.status;const channel=patch.discordChannelId===undefined?ticket.discord_channel_id:String(patch.discordChannelId||'');await run(`UPDATE support_tickets SET status=?,discord_channel_id=?,updated_at=datetime('now') WHERE id=?`,[status,channel,ticket.id]);return getSupportTicket(ticket.id,ticket.streamer_id,true)}
+
 // ─── Queue ────────────────────────────────────────────────────────────────────
 
 async function getQueue() { return all(`SELECT * FROM queue ORDER BY joined_at ASC`); }
@@ -1737,7 +1774,7 @@ async function reconcileStoredCommunityGiftBadges(streamerId = null) {
     let badges=[];try{badges=JSON.parse(row.badges_json||'[]')}catch(_){continue}
     const badge=(Array.isArray(badges)?badges:[]).find(item=>['sub_gifter','subgifter','subscription_gifter','gift_sub_gifter'].includes(String(item?.type||item?.slug||item?.name||'').toLowerCase().replace(/[\s-]+/g,'_')));
     if(!badge)continue;
-    const count=parseInt(String(badge.count??badge.gift_count??badge.gifts??badge.quantity??badge.value??'').replace(/[^0-9]/g,''),10);
+    const count=parseInt(String(badge.count??badge.gift_count??badge.gifts??badge.quantity??badge.value??badge?.metadata?.count??badge?.metadata?.gift_count??badge.text??'').replace(/[^0-9]/g,''),10);
     if(Number.isSafeInteger(count)&&count>0)await upsertCommunityGiftBadge(row.username,count,sid);
   }
 }
@@ -2488,6 +2525,7 @@ module.exports = {
   getQuotes, addQuote, getRandomQuote, deleteQuote,
   getCounters, getCounter, setCounter, incrementCounter, deleteCounter,
   getTimers, setTimer, toggleTimer, deleteTimer,
+  createSupportTicket, getSupportTicket, listSupportTickets, getSupportMessages, addSupportMessage, updateSupportTicket,
   getQueue, joinQueue, removeFromQueue, clearQueue, getQueuePosition,
   createPoll, getActivePoll, votePoll, closePoll, getPolls,
   getAnnouncements, addAnnouncement, toggleAnnouncement, deleteAnnouncement, updateAnnouncementSent,

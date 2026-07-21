@@ -125,6 +125,24 @@ app.post('/api/platform-admin/exit', requireAuth, requirePlatformAdmin, (req, re
   res.json({ success: true, data: { slug: req.authStreamer.slug, redirect: `/s/${req.authStreamer.slug}/dashboard` } });
 });
 
+// ── Support ElBot : tickets isolés par streamer + relais Discord optionnel ───
+function discordSupportConfigured(){return Boolean(process.env.DISCORD_BOT_TOKEN&&process.env.DISCORD_GUILD_ID&&process.env.DISCORD_SUPPORT_CATEGORY_ID)}
+async function discordSupportRequest(method,url,data){return axios({method,url:`https://discord.com/api/v10${url}`,data,headers:{Authorization:`Bot ${process.env.DISCORD_BOT_TOKEN}`,'Content-Type':'application/json'},timeout:8000})}
+function supportChannelName(ticket){return `support-${String(ticket.streamer_slug||'streamer').toLowerCase().replace(/[^a-z0-9-]/g,'-').slice(0,45)}-${ticket.id}`}
+async function ensureDiscordSupportChannel(ticket){
+  if(!discordSupportConfigured())return null;if(ticket.discord_channel_id)return ticket.discord_channel_id;
+  const created=await discordSupportRequest('post',`/guilds/${process.env.DISCORD_GUILD_ID}/channels`,{name:supportChannelName(ticket),type:0,parent_id:String(process.env.DISCORD_SUPPORT_CATEGORY_ID),topic:`Ticket ElBot #${ticket.id} · ${ticket.streamer_slug} · ${ticket.category} · ${ticket.priority}`});
+  const channelId=String(created.data?.id||'');if(channelId)await db.updateSupportTicket(ticket.id,ticket.streamer_id,{discordChannelId:channelId},true);return channelId||null;
+}
+async function postDiscordSupportMessage(ticket,message,author){
+  try{const channelId=await ensureDiscordSupportChannel(ticket);if(!channelId)return false;await discordSupportRequest('post',`/channels/${channelId}/messages`,{content:`**${String(author||ticket.streamer_slug).slice(0,80)}**\n${String(message||'').slice(0,1900)}`});return true}catch(error){console.warn('[SUPPORT DISCORD]',error.response?.data?.message||error.message);return false}
+}
+app.get('/api/support/tickets',requireAuth,requireTenant,waitDB,async(req,res)=>{try{const allTickets=Boolean(req.platformAdmin&&!req.isAdminImpersonation);res.json({data:await db.listSupportTickets(req.streamer.id,allTickets),discordConfigured:discordSupportConfigured(),admin:allTickets})}catch(e){res.status(500).json({error:e.message})}});
+app.post('/api/support/tickets',requireAuth,requireTenant,waitDB,async(req,res)=>{try{const ticket=await db.createSupportTicket(req.streamer.id,{...req.body,authorSlug:req.authStreamer.slug,authorRole:'streamer'});const first=(await db.getSupportMessages(ticket.id,req.streamer.id,false))?.[0];const discord=await postDiscordSupportMessage(ticket,`Nouveau ticket : **${ticket.subject}**\n${first?.message||''}`,req.authStreamer.slug);res.json({success:true,data:ticket,discord})}catch(e){res.status(400).json({error:e.message})}});
+app.get('/api/support/tickets/:id/messages',requireAuth,requireTenant,waitDB,async(req,res)=>{try{const includeAll=Boolean(req.platformAdmin&&!req.isAdminImpersonation),ticket=await db.getSupportTicket(req.params.id,req.streamer.id,includeAll);if(!ticket)return res.status(404).json({error:'Ticket introuvable'});res.json({data:{ticket,messages:await db.getSupportMessages(ticket.id,req.streamer.id,includeAll)}})}catch(e){res.status(500).json({error:e.message})}});
+app.post('/api/support/tickets/:id/messages',requireAuth,requireTenant,waitDB,async(req,res)=>{try{const isAdmin=Boolean(req.platformAdmin&&!req.isAdminImpersonation),ticket=await db.getSupportTicket(req.params.id,req.streamer.id,isAdmin);if(!ticket)return res.status(404).json({error:'Ticket introuvable'});const updated=await db.addSupportMessage(ticket.id,ticket.streamer_id,{message:req.body?.message,authorSlug:req.authStreamer.slug,authorRole:isAdmin?'admin':'streamer'},isAdmin);await postDiscordSupportMessage(updated,req.body?.message,`${req.authStreamer.slug}${isAdmin?' · Support ElBot':''}`);res.json({success:true,data:updated})}catch(e){res.status(400).json({error:e.message})}});
+app.patch('/api/support/tickets/:id',requireAuth,requireTenant,waitDB,async(req,res)=>{try{const isAdmin=Boolean(req.platformAdmin&&!req.isAdminImpersonation),ticket=await db.updateSupportTicket(req.params.id,req.streamer.id,{status:req.body?.status},isAdmin);res.json({success:true,data:ticket})}catch(e){res.status(400).json({error:e.message})}});
+
 // ── V2 Multi-streamer : socle sans casser la V1 ──────────────────────────────
 app.get('/api/v2/streamers/current', requireAuth, requireTenant, waitDB, async (req, res) => {
   try {
@@ -2346,6 +2364,7 @@ async function generateTTSAudio(text, voiceIdOverride = '') {
 }
 
 let memeVoicesCache={at:0,rows:[]};
+let memeElevenLabsDisabledUntil=0;
 async function getPublicMemeVoices(){
   if(Date.now()-memeVoicesCache.at<10*60*1000&&memeVoicesCache.rows.length)return memeVoicesCache.rows;
   const cfg=await getTTSSettings(),rows=[
@@ -2354,7 +2373,13 @@ async function getPublicMemeVoices(){
     {id:'builtin:es',name:'Voz española'},{id:'builtin:de',name:'Deutsche Stimme'},
     {id:'builtin:it',name:'Voce italiana'},{id:'builtin:ja',name:'日本語の音声'}
   ];
-  if(cfg.apiKey)try{const r=await axios.get('https://api.elevenlabs.io/v1/voices',{headers:{'xi-api-key':cfg.apiKey.trim()},timeout:10000});for(const v of (r.data?.voices||[]).slice(0,30))rows.push({id:String(v.voice_id),name:String(v.name||'Voix IA')})}catch(e){console.warn('[MEMES TTS] Liste des voix indisponible:',e.response?.status||e.message)}
+  if(cfg.apiKey&&Date.now()>=memeElevenLabsDisabledUntil)try{const r=await axios.get('https://api.elevenlabs.io/v1/voices',{headers:{'xi-api-key':cfg.apiKey.trim()},timeout:10000});for(const v of (r.data?.voices||[]).slice(0,30))rows.push({id:String(v.voice_id),name:String(v.name||'Voix IA')})}catch(e){
+    // Une ancienne cle enregistree ne doit ni polluer les logs ni bloquer les
+    // voix integrees du navigateur. Une erreur d'authentification suspend
+    // ElevenLabs pendant une heure; les voix femme/homme/robot restent actives.
+    if(Number(e.response?.status)===401)memeElevenLabsDisabledUntil=Date.now()+60*60*1000;
+    else console.warn('[MEMES TTS] Service externe temporairement indisponible:',e.response?.status||e.message);
+  }
   memeVoicesCache={at:Date.now(),rows};return rows;
 }
 
