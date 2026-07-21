@@ -827,7 +827,7 @@ body.light .card,body.light .panel,body.light .widget-engine-card{background:lin
 
   <!-- ══ COMMUNAUTÉ ══ -->
   <div class="page" id="page-communaute">
-    <div class="header"><div><h1>Communauté</h1><p>Mémoire de la chaîne, soutiens et followers connus</p></div><button class="btn" onclick="loadCommunity()">↻ Actualiser</button></div>
+    <div class="header"><div><h1>Communauté</h1><p>Mémoire de la chaîne, soutiens et followers connus</p></div><button class="btn" id="community-refresh-btn" onclick="refreshCommunity()">↻ Actualiser</button></div>
     <div class="g3" style="margin-bottom:14px">
       <div class="panel"><h3>👥 Viewers connus</h3><div id="community-known-viewers" style="font-size:28px;font-weight:900;color:var(--accent)">—</div></div>
       <div class="panel"><h3>💚 Follows datés</h3><div id="community-known-followers" style="font-size:28px;font-weight:900;color:#22c55e">—</div></div>
@@ -5292,6 +5292,16 @@ async function loadCommunity() {
   }
 }
 
+async function refreshCommunity() {
+  const button = document.getElementById('community-refresh-btn');
+  if (button) { button.disabled = true; button.textContent = '↻ Actualisation…'; }
+  communityKickSyncDone = false;
+  try { await loadCommunity(); }
+  finally {
+    if (button) { button.disabled = false; button.textContent = '↻ Actualiser'; }
+  }
+}
+
 let communitySupporters = [], communityFollowers = [], communitySupportPage = 1, communityFollowPage = 1, communityKickSyncDone = false;
 const COMMUNITY_PAGE_SIZE = 25;
 function communityPager(id, page, total, setter) {
@@ -7316,6 +7326,13 @@ try {
     }
   });
   chestSocket.on('dashboard-activity', data => { if(typeof pushReferenceActivity==='function')pushReferenceActivity(data); });
+  let communityReloadTimer = null;
+  chestSocket.on('community-update', () => {
+    clearTimeout(communityReloadTimer);
+    communityReloadTimer = setTimeout(() => {
+      if (document.getElementById('page-communaute')?.classList.contains('active')) loadCommunity();
+    }, 250);
+  });
 } catch(e) { console.warn('[CHESTS] socket indisponible', e); }
 
 async function newChestSeason() {

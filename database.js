@@ -1685,7 +1685,7 @@ async function addCommunityEvent(event = {}, streamerId = null) {
   const username = String(event.username || event.gifter || 'Anonyme').trim();
   const occurredAt = event.occurredAt || event.occurred_at || new Date().toISOString();
   const sourceKey = String(event.sourceKey || event.source_key || `${type}:${username.toLowerCase()}:${occurredAt}`);
-  await run(
+  const result = await run(
     `INSERT OR IGNORE INTO community_events
       (streamer_id,event_type,username,gifter,amount,months,occurred_at,source,source_key,metadata)
      VALUES (?,?,?,?,?,?,?,?,?,?)`,
@@ -1693,6 +1693,27 @@ async function addCommunityEvent(event = {}, streamerId = null) {
      event.months ? Math.max(1, parseInt(event.months) || 1) : null, occurredAt,
      event.source || 'elbot', sourceKey, event.metadata ? JSON.stringify(event.metadata) : null]
   );
+  const inserted = Number(result?.changes ?? result?.rowsAffected ?? 0) > 0;
+
+  // Le classement all-time est aussi alimenté en direct. Avant ce correctif,
+  // l'événement était bien conservé dans community_events, mais l'ancien
+  // snapshot Kick restait prioritaire dans l'interface : un actualisation du
+  // panel rechargeait donc toujours l'ancien total. La clé source_key rend
+  // cette addition idempotente, même si Kick renvoie plusieurs fois le webhook.
+  if (inserted && type === 'gift' && String(event.source || 'elbot') === 'kick_event') {
+    const gifter = String(event.gifter || event.username || '').trim().replace(/^@+/, '').toLowerCase();
+    const amount = Math.max(1, parseInt(event.amount || event.count || 1, 10) || 1);
+    if (gifter && !['anonyme', 'anonymous', 'un anonyme'].includes(gifter)) {
+      await run(`INSERT INTO community_support_snapshots
+          (streamer_id,username,gifts_all_time,source,synced_at)
+        VALUES (?,?,?,'kick_event',datetime('now'))
+        ON CONFLICT(streamer_id,username) DO UPDATE SET
+          gifts_all_time = community_support_snapshots.gifts_all_time + excluded.gifts_all_time,
+          source = excluded.source,
+          synced_at = excluded.synced_at`,
+        [sid, gifter, amount]);
+    }
+  }
   if (type === 'follow') {
     await run(`INSERT INTO viewers (streamer_id,username,following_since,last_seen)
       VALUES (?,?,?,?)
@@ -1701,6 +1722,7 @@ async function addCommunityEvent(event = {}, streamerId = null) {
         last_seen = COALESCE(viewers.last_seen, excluded.last_seen)`,
       [sid, username.toLowerCase(), occurredAt, occurredAt]);
   }
+  return { inserted, id: Number(result?.lastInsertRowid ?? result?.lastInsertRowID ?? 0) || null };
 }
 
 async function backfillCommunityHistory(streamerId = null) {
@@ -1779,9 +1801,41 @@ async function reconcileStoredCommunityGiftBadges(streamerId = null) {
   }
 }
 
+// Répare les événements Kick déjà enregistrés mais jamais répercutés dans
+// l'ancien snapshot all-time. Le cutoff synced_at empêche toute nouvelle
+// addition lors des chargements suivants. Les badges sont réconciliés juste
+// après et restent la source absolue lorsqu'ils sont disponibles.
+async function reconcilePendingCommunityGiftEvents(streamerId = null) {
+  const sid = Number(streamerId || scopedStreamerId());
+  const rows = await all(`SELECT LOWER(e.username) AS username,
+      SUM(e.amount) AS missing_gifts,
+      MAX(e.occurred_at) AS latest_event
+    FROM community_events e
+    LEFT JOIN community_support_snapshots s
+      ON s.streamer_id = e.streamer_id AND s.username = LOWER(e.username)
+    WHERE e.streamer_id = ? AND e.event_type = 'gift' AND e.source = 'kick_event'
+      AND LOWER(e.username) NOT IN ('anonyme','anonymous','un anonyme')
+      AND (s.username IS NULL OR julianday(e.occurred_at) > julianday(s.synced_at))
+    GROUP BY LOWER(e.username)`, [sid]);
+  for (const row of rows) {
+    const username = String(row.username || '').trim();
+    const amount = Math.max(0, parseInt(row.missing_gifts, 10) || 0);
+    if (!username || !amount) continue;
+    await run(`INSERT INTO community_support_snapshots
+        (streamer_id,username,gifts_all_time,source,synced_at)
+      VALUES (?,?,?,'kick_event_repair',datetime('now'))
+      ON CONFLICT(streamer_id,username) DO UPDATE SET
+        gifts_all_time = community_support_snapshots.gifts_all_time + excluded.gifts_all_time,
+        source = excluded.source,
+        synced_at = excluded.synced_at`, [sid, username, amount]);
+  }
+  return rows.length;
+}
+
 async function getCommunityData(limit = 100, streamerId = null) {
   const sid = Number(streamerId || scopedStreamerId());
   await backfillCommunityHistory(sid);
+  await reconcilePendingCommunityGiftEvents(sid);
   await reconcileStoredCommunityGiftBadges(sid);
   const safeLimit = Math.max(10, Math.min(500, parseInt(limit) || 100));
   const supporters = await all(`

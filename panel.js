@@ -689,7 +689,7 @@ async function recordSubEvent(type, payload = {}, source = null) {
     }
 
     state.latest = [event, ...state.latest].slice(0, 12);
-    await db.addCommunityEvent({
+    const communityEvent = await db.addCommunityEvent({
       type,
       username: event.username,
       gifter: event.gifter,
@@ -709,6 +709,15 @@ async function recordSubEvent(type, payload = {}, source = null) {
     ]);
     tm.emit('subcounter-update', state);
     tm.emit('subgoal-update', publicSubGoalState(state));
+    if (communityEvent?.inserted) {
+      tm.emit('community-update', {
+        type,
+        username: event.username,
+        gifter: event.gifter,
+        count: amount,
+        at: event.at
+      });
+    }
     console.log(`[SUBCOUNTER:${tm.slug}] ${type} +${amount} → total=${state.total} session=${state.session}`);
     return state;
   } catch(e) {
