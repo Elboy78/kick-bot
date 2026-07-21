@@ -3663,16 +3663,29 @@ async function memeAccessAuthorized(req,access,token){
   return !!access?.kick_user_id;
 }
 function profileBadges(payload){
-  const found=[];const visit=(value,key='')=>{if(!value||typeof value!=='object')return;if(Array.isArray(value)){if(/badge/i.test(key))found.push(...value);else value.forEach(v=>visit(v,key));return}for(const [k,v] of Object.entries(value))visit(v,k)};visit(payload);return found.filter(x=>x&&typeof x==='object');
+  const found=[],seen=new Set();
+  const add=value=>{if(!value||typeof value!=='object'||seen.has(value))return;const kind=String(value.type||value.slug||value.name||value.badge_type||'').trim();if(kind){seen.add(value);found.push(value)}};
+  const visit=(value,key='')=>{if(!value||typeof value!=='object')return;if(Array.isArray(value)){if(/badge/i.test(key))value.forEach(add);value.forEach(v=>visit(v,key));return}add(value);for(const [k,v] of Object.entries(value))visit(v,k)};
+  visit(payload);return found;
 }
-function isModeratorBadge(b){return ['moderator','broadcaster'].includes(String(b?.type||b?.slug||b?.name||'').toLowerCase())}
+function isModeratorBadge(b){
+  const type=String(b?.type||b?.slug||b?.name||b?.badge_type||'').trim().toLowerCase().replace(/[\s-]+/g,'_');
+  return ['moderator','mod','broadcaster','channel_moderator','channel_broadcaster'].includes(type)||/(^|_)moderator$/.test(type);
+}
+function profileSaysModerator(payload){
+  let allowed=false;
+  const visit=value=>{if(allowed||!value||typeof value!=='object')return;for(const [rawKey,rawValue] of Object.entries(value)){const key=String(rawKey).toLowerCase().replace(/[\s-]+/g,'_'),text=String(rawValue||'').toLowerCase();if((key==='is_moderator'||key==='moderator'||key==='is_broadcaster'||key==='broadcaster')&&(rawValue===true||rawValue===1||text==='true'||text==='1')){allowed=true;return}if(['role','channel_role','user_role'].includes(key)&&['moderator','mod','broadcaster','owner'].includes(text)){allowed=true;return}if(rawValue&&typeof rawValue==='object')visit(rawValue)}};
+  visit(payload);return allowed;
+}
 async function verifyMemeModerator(streamer,username){
   const normalized=tenant.normalizeSlug(username);if(normalized===tenant.normalizeSlug(streamer.slug)||normalized===tenant.normalizeSlug(streamer.kick_username))return true;
+  const cachedModerator=async()=>{const viewer=await tenant.runWithStreamer(streamer,()=>db.getViewer(normalized));let badges=[];try{badges=JSON.parse(viewer?.badges_json||'[]')}catch(_e){}const checkedAt=viewer?.badges_synced_at?new Date(String(viewer.badges_synced_at).replace(' ','T')+'Z').getTime():0;return !!checkedAt&&Date.now()-checkedAt<86400000&&badges.some(isModeratorBadge)};
+  const wasCachedModerator=await cachedModerator();
   try{
     const response=await axios.get(`https://kick.com/api/v2/channels/${encodeURIComponent(streamer.slug)}/users/${encodeURIComponent(normalized)}`,{headers:{Accept:'application/json','User-Agent':'Mozilla/5.0'},timeout:8000});
-    const badges=profileBadges(response.data);await tenant.runWithStreamer(streamer,()=>db.setViewerKickProfile(normalized,{badges}));return badges.some(isModeratorBadge);
+    const badges=profileBadges(response.data),verified=profileSaysModerator(response.data)||badges.some(isModeratorBadge);if(badges.length)await tenant.runWithStreamer(streamer,()=>db.setViewerKickProfile(normalized,{badges}));return verified||wasCachedModerator;
   }catch(_){
-    const viewer=await tenant.runWithStreamer(streamer,()=>db.getViewer(normalized));let badges=[];try{badges=JSON.parse(viewer?.badges_json||'[]')}catch(_e){}const fresh=viewer?.badges_synced_at&&Date.now()-new Date(String(viewer.badges_synced_at).replace(' ','T')+'Z').getTime()<86400000;return !!fresh&&badges.some(isModeratorBadge);
+    return wasCachedModerator;
   }
 }
 const cleanupMemeFiles=()=>{for(const file of fs.readdirSync(memeTempDir)){const full=path.join(memeTempDir,file);try{if(Date.now()-fs.statSync(full).mtimeMs>86400000)fs.unlinkSync(full)}catch(_){}}};cleanupMemeFiles();setInterval(cleanupMemeFiles,3600000).unref();
