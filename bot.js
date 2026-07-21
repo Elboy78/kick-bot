@@ -21,6 +21,9 @@ const CONFIG = {
   intervalMs:   parseInt(process.env.POINTS_INTERVAL_MS  || '600000'),
   debug:        process.env.DEBUG === 'true',
   legacyChannelEnabled: process.env.KICK_LEGACY_CHANNEL === 'true',
+  // Permet de laisser un worker de test écouter les événements Kick sans
+  // exécuter une deuxième fois les commandes déjà gérées en production.
+  chatCommandsEnabled: process.env.BOT_CHAT_COMMANDS_ENABLED !== 'false',
 };
 
 const PUSHER_URL = 'wss://ws-us2.pusher.com/app/32cbd69e4b950bf97679?protocol=7&client=js&version=7.4.0&flash=false';
@@ -475,6 +478,10 @@ async function handleChatMessageScoped(payload, ctx = null) {
 
   const parts = content.trim().split(' ');
   const cmd   = parts[0].toLowerCase();
+  if (cmd.startsWith('!') && !CONFIG.chatCommandsEnabled) {
+    if (CONFIG.debug) console.log(`[COMMANDES] ${cmd} ignorée — BOT_CHAT_COMMANDS_ENABLED=false`);
+    return;
+  }
   if (process.env.BOT_MEME_ONLY === 'true' && cmd !== '!meme') return;
 
   // Memes interactifs — configuration et diffusion gérées par le panel du tenant.
