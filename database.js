@@ -1645,6 +1645,11 @@ async function addAnnouncement(message, interval_ms) {
   const r = await run(`INSERT INTO announcements (message, interval_ms) VALUES (?, ?)`, [message, interval_ms]);
   return Number(r?.lastInsertRowid ?? r?.lastInsertRowID ?? r?.lastInsertId);
 }
+async function updateAnnouncement(id, message, interval_ms) {
+  await run(`UPDATE announcements SET message = ?, interval_ms = ? WHERE id = ?`,
+    [String(message || '').trim(), Math.max(60000, Number(interval_ms) || 600000), Number(id)]);
+  return get(`SELECT * FROM announcements WHERE id = ?`, [Number(id)]);
+}
 
 async function getViewersMissingFollow(limit = 10) {
   return all(`SELECT username FROM viewers
@@ -2528,7 +2533,7 @@ module.exports = {
   createSupportTicket, getSupportTicket, listSupportTickets, getSupportMessages, addSupportMessage, updateSupportTicket,
   getQueue, joinQueue, removeFromQueue, clearQueue, getQueuePosition,
   createPoll, getActivePoll, votePoll, closePoll, getPolls,
-  getAnnouncements, addAnnouncement, toggleAnnouncement, deleteAnnouncement, updateAnnouncementSent,
+  getAnnouncements, addAnnouncement, updateAnnouncement, toggleAnnouncement, deleteAnnouncement, updateAnnouncementSent,
   getTTSBlacklist, addTTSBlacklistWord, deleteTTSBlacklistWord, isTTSBlacklisted,
   getTTSHistory, addTTSHistory, clearTTSHistory,
   getTTSConfig, setTTSConfigValue, setTTSConfigBulk,

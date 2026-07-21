@@ -11,6 +11,16 @@ const shared   = require('./shared');
 const tenant   = require('./tenant');
 const { AsyncLocalStorage } = require('async_hooks');
 
+function isTestPanelDeployment() {
+  try {
+    return new URL(String(process.env.PANEL_PUBLIC_URL || '')).hostname
+      .toLowerCase()
+      .startsWith('test.');
+  } catch (_) {
+    return false;
+  }
+}
+
 const CONFIG = {
   channel:      process.env.KICK_CHANNEL       || 'votre_chaine',
   channelId:    process.env.KICK_CHANNEL_ID    || '0',
@@ -21,6 +31,11 @@ const CONFIG = {
   intervalMs:   parseInt(process.env.POINTS_INTERVAL_MS  || '600000'),
   debug:        process.env.DEBUG === 'true',
   legacyChannelEnabled: process.env.KICK_LEGACY_CHANNEL === 'true',
+  // Permet de laisser un worker de test écouter les événements Kick sans
+  // exécuter une deuxième fois les commandes déjà gérées en production.
+  chatCommandsEnabled:
+    process.env.BOT_CHAT_COMMANDS_ENABLED === 'true' ||
+    (process.env.BOT_CHAT_COMMANDS_ENABLED !== 'false' && !isTestPanelDeployment()),
 };
 
 const PUSHER_URL = 'wss://ws-us2.pusher.com/app/32cbd69e4b950bf97679?protocol=7&client=js&version=7.4.0&flash=false';
@@ -36,6 +51,10 @@ let sessionStart     = null;
 let peakViewers      = 0;
 const pendingDuelTimeouts = {};
 let announcementIntervals = {};
+const spamMessageWindows = new Map();
+const SPAM_DEFAULTS={level:0,action:'timeout',timeoutSeconds:60,filters:{caps:true,links:true,emotes:true,paragraph:true,symbols:true,repetition:true,zalgo:true,oneMan:true},limits:{capsPercent:70,capsMinLetters:10,maxLinks:2,maxEmotes:8,maxLength:350,maxSymbols:18,maxRepeats:5,oneManMessages:6,oneManWindow:8},allowedDomains:['kick.com','youtube.com','youtu.be']};
+async function getSpamConfig(){let raw='{}';try{raw=await db.getSettingStr('spam_filters_config','{}')}catch(_){}let cfg={};try{cfg=JSON.parse(raw||'{}')}catch(_){}return {...SPAM_DEFAULTS,...cfg,filters:{...SPAM_DEFAULTS.filters,...(cfg.filters||{})},limits:{...SPAM_DEFAULTS.limits,...(cfg.limits||{})},allowedDomains:Array.isArray(cfg.allowedDomains)?cfg.allowedDomains:SPAM_DEFAULTS.allowedDomains}}
+function detectSpam(content,username,cfg,slug=''){if(!cfg.level)return null;const f=cfg.filters||{},l=cfg.limits||{},text=String(content||''),letters=(text.match(/[a-zà-ÿ]/gi)||[]),upper=(text.match(/[A-ZÀ-Þ]/g)||[]);if(f.zalgo&&/[\u0300-\u036f]{3,}/u.test(text))return 'caractères Zalgo';if(f.paragraph&&text.length>Number(l.maxLength))return 'message trop long';if(f.caps&&letters.length>=Number(l.capsMinLetters)&&upper.length/letters.length*100>=Number(l.capsPercent))return 'majuscules excessives';const urls=text.match(/https?:\/\/[^\s]+|(?:www\.)[^\s]+/gi)||[];if(f.links&&urls.length){const allowed=urls.every(url=>(cfg.allowedDomains||[]).some(domain=>url.toLowerCase().includes(String(domain).toLowerCase())));if(!allowed||(Number(l.maxLinks)>0&&urls.length>Number(l.maxLinks)))return 'lien non autorisé'}const emotes=(text.match(/\[emote:\d+:[^\]]+\]|:[a-z0-9_]{2,}:/gi)||[]);if(f.emotes&&emotes.length>Number(l.maxEmotes))return 'trop d’émotes';const symbols=(text.match(/[^\p{L}\p{N}\s.,!?'-]/gu)||[]);if(f.symbols&&symbols.length>Number(l.maxSymbols))return 'trop de symboles';if(f.repetition&&((new RegExp(`(.)\\1{${Math.max(2,Number(l.maxRepeats)||5)},}`,'iu')).test(text)||(new RegExp(`\\b(\\p{L}+)\\b(?:\\s+\\1){${Math.max(2,Number(l.maxRepeats)||5)},}`,'iu')).test(text)))return 'répétition excessive';if(f.oneMan){const key=`${slug}:${String(username).toLowerCase()}`,now=Date.now(),windowMs=Math.max(3,Number(l.oneManWindow)||8)*1000,rows=(spamMessageWindows.get(key)||[]).filter(t=>now-t<windowMs);rows.push(now);spamMessageWindows.set(key,rows);if(rows.length>Number(l.oneManMessages))return 'spam rapide'}return null}
 let streamStartTime = null;
 let lastFollowerCount = 0;
 let followerCheckInterval = null;
@@ -171,7 +190,7 @@ async function init() {
   await syncPointsConfig();
   // V2 : synchronise régulièrement les chaînes ajoutées au bot.
   await syncActiveBotChannels();
-  setInterval(syncActiveBotChannels, 30000);
+  setInterval(syncActiveBotChannels, 60000);
   // Vérifier live + followers toutes les 2 minutes
   if (process.env.BOT_MEME_ONLY !== 'true') setInterval(checkLiveStatus, 120000);
   // Resynchroniser montant/intervalle de points toutes les 2 minutes (changements panel)
@@ -406,7 +425,8 @@ function getSubGifterBadgeCount(badges) {
 
     // Forme actuelle Kick : { type: 'sub_gifter', text: 'Sub Gifter', count: 42 }.
     // Les autres clés servent de filet de sécurité si Kick renomme le champ.
-    const rawCount = badge?.count ?? badge?.gift_count ?? badge?.gifts ?? badge?.quantity ?? badge?.value;
+    const rawCount = badge?.count ?? badge?.gift_count ?? badge?.gifts ?? badge?.quantity ?? badge?.value
+      ?? badge?.metadata?.count ?? badge?.metadata?.gift_count ?? badge?.text;
     const count = Number.parseInt(String(rawCount ?? '').replace(/[^0-9]/g, ''), 10);
     if (Number.isSafeInteger(count) && count > 0) return Math.min(count, 100000000);
   }
@@ -459,6 +479,12 @@ async function handleChatMessageScoped(payload, ctx = null) {
     }, ctx || currentChatContext());
   } catch(e) {}
 
+  // Anti-spam indépendant de la liste des mots bannis. Le niveau 0 le coupe,
+  // tandis que les modérateurs et le broadcaster sont toujours exemptés.
+  try {
+    if(!isModOrBroadcaster){const spamCfg=await getSpamConfig(),spamReason=detectSpam(content,username,spamCfg,ctx?.slug||'');if(spamReason){console.log(`[SPAM:${ctx?.slug||'chaine'}] ${username}: ${spamReason}`);await moderateUser(username,kickId,spamCfg.action==='ban'?'ban':'timeout',Number(spamCfg.timeoutSeconds)||60,spamReason);await db.addModerationLog('spam',username,Number(spamCfg.timeoutSeconds)||60,spamReason,content,'ElBot');return}}
+  } catch(e) { console.error('[SPAM] Vérification ignorée:', e.message); }
+
   // Vérifier les mots bannis
   if (await db.getSetting('moderation_enabled')) {
     try {
@@ -475,6 +501,10 @@ async function handleChatMessageScoped(payload, ctx = null) {
 
   const parts = content.trim().split(' ');
   const cmd   = parts[0].toLowerCase();
+  if (cmd.startsWith('!') && !CONFIG.chatCommandsEnabled) {
+    if (CONFIG.debug) console.log(`[COMMANDES] ${cmd} ignorée — BOT_CHAT_COMMANDS_ENABLED=false`);
+    return;
+  }
   if (process.env.BOT_MEME_ONLY === 'true' && cmd !== '!meme') return;
 
   // Memes interactifs — configuration et diffusion gérées par le panel du tenant.
@@ -1315,14 +1345,16 @@ async function cmdRPS(username, parts) {
 // ─── Announcements automatiques ───────────────────────────────────────────────
 
 async function startAnnouncements() {
-  // Arrêter les anciens timers
-  Object.values(announcementIntervals).forEach(t => clearInterval(t));
-  announcementIntervals = {};
+  // Recharge uniquement les annonces du streamer courant : modifier une chaîne
+  // ne doit jamais arrêter les annonces des autres tenants.
+  const streamerId=Number(tenant?.getCurrentStreamerId?.()||currentChatContext()?.streamerId||1);
+  const prefix=`${streamerId}:`;
+  for(const [key,timer] of Object.entries(announcementIntervals)){if(key.startsWith(prefix)){clearInterval(timer);delete announcementIntervals[key]}}
 
   const announcements = await db.getAnnouncements();
   for (const ann of announcements) {
     if (!ann.enabled) continue;
-    announcementIntervals[ann.id] = setInterval(async () => {
+    announcementIntervals[`${streamerId}:${ann.id}`] = setInterval(async () => {
       if (!isLive) return;
       if (!await db.getSetting('announcements_enabled')) return;
       await sendChat(ann.message);
@@ -1331,6 +1363,7 @@ async function startAnnouncements() {
     console.log(`[ANN] Annonce #${ann.id} programmée toutes les ${ann.interval_ms/60000} min`);
   }
 }
+shared.registerAnnouncementReloader(startAnnouncements);
 
 // ─── Modération ──────────────────────────────────────────────────────────────
 

@@ -9,6 +9,7 @@ let _songRequestAdder = null;
 let _songRequestSkipVoter = null;
 let _chatOverlayEmitter = null;
 let _memeTrigger = null;
+let _announcementReloader = null;
 
 module.exports = {
   registerSendChat(fn) { _sendChat = fn; },
@@ -47,6 +48,12 @@ module.exports = {
   triggerMeme(username, meme, text = '', ctx = null) {
     if (_memeTrigger) return _memeTrigger(username, meme, text, ctx);
     return Promise.resolve({ error: 'Module Memes pas encore initialisé.' });
+  },
+
+  registerAnnouncementReloader(fn) { _announcementReloader = fn; },
+  reloadAnnouncements() {
+    if (_announcementReloader) return _announcementReloader();
+    return Promise.resolve(false);
   },
 
   registerOpenChest(fn) { _openChest = fn; },

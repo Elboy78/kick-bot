@@ -544,6 +544,7 @@ body.light .card,body.light .panel,body.light .widget-engine-card{background:lin
     <div class="menu-section">Outils</div>
     <a onclick="showPage('commands')">⚙️ Commandes</a>
     <a onclick="showPage('moderation')">🛡️ Modération</a>
+    <a onclick="showPage('spam')">🚫 Anti-spam</a>
     <a onclick="showPage('jeux')">🎁 Giveaways &amp; Jeux</a>
     <a onclick="showPage('lobby')">🎮 Lobby</a>
     <a onclick="showPage('outils')">🛠️ Outils Chat</a>
@@ -976,6 +977,27 @@ body.light .card,body.light .panel,body.light .widget-engine-card{background:lin
       <div class="dbd-build-actions"><button class="btnx btn-ghost" onclick="toggleAllDBDLocks()">🔒 Verrouiller / déverrouiller</button><button class="btnx btn-outline" onclick="copyDBDBuild()">Copier le build</button><button class="btnx btn-red" onclick="clearDBDHistory()">Effacer l’historique</button></div>
     </div>
     <div class="panel dbd-history-panel" style="margin-top:14px"><h3>Derniers builds</h3><div id="dbd-history"><div class="empty"><p>Aucun build</p></div></div></div>
+  </div>
+
+  <!-- ══ ANTI-SPAM ══ -->
+  <div class="page" id="page-spam">
+    <div class="header"><div><h1>Filtres anti-spam</h1><p>Protège automatiquement le chat des comportements abusifs sans sanctionner les modérateurs.</p></div><button class="btnx btn-primary" onclick="saveSpamConfig()">💾 Enregistrer</button></div>
+    <div class="spam-level-card">
+      <div class="spam-level-title">Choisis ton niveau de protection</div>
+      <div class="spam-levels">
+        <button onclick="setSpamLevel(0)" data-spam-level="0"><span>◇</span><b>Désactivé</b></button>
+        <button onclick="setSpamLevel(1)" data-spam-level="1"><span>◐</span><b>Minimum</b></button>
+        <button onclick="setSpamLevel(2)" data-spam-level="2"><span>◑</span><b>Moyen</b></button>
+        <button onclick="setSpamLevel(3)" data-spam-level="3"><span>⬟</span><b>Maximum</b></button>
+      </div>
+      <div class="spam-level-track"><i id="spam-level-progress"></i></div>
+    </div>
+    <div id="spam-filter-list" class="spam-filter-list"></div>
+    <div class="panel spam-global-settings">
+      <h3>⚙️ Action automatique</h3>
+      <div class="form-row"><div><label class="lbl">Action</label><select class="inp" id="spam-action"><option value="timeout">Timeout</option><option value="ban">Ban permanent</option></select></div><div><label class="lbl">Durée du timeout (secondes)</label><input class="inp" id="spam-timeout" type="number" min="10" value="60"></div><div><label class="lbl">Domaines autorisés</label><input class="inp" id="spam-domains" placeholder="kick.com, youtube.com, youtu.be"></div></div>
+      <div id="spam-save-status" style="font-size:10px;color:var(--muted);margin-top:9px">Les réglages sont isolés pour cette chaîne.</div>
+    </div>
   </div>
 
   <!-- ══ MODÉRATION ══ -->
@@ -4748,7 +4770,7 @@ if (typeof window.io === 'function') {
 const MEDALS = ['🥇','🥈','🥉'];
 try { document.querySelectorAll('#settings-channel-name').forEach(el => el.textContent = CURRENT_STREAMER_SLUG || 'connecté'); } catch(e) {}
 let lbData = [], levels = [];
-const PAGE_TITLES = {dashboard:'Dashboard',classement:'Classement',communaute:'Communauté',lobby:'Lobby',jeux:'Jeux',objectifs:'Objectifs',dbd:'Dead by Daylight',moderation:'Modération',commands:'Commandes',historique:'Historique',admin:'Administration',settings:'Paramètres',outils:'Outils Chat',alertes:'Alertes'};
+const PAGE_TITLES = {dashboard:'Dashboard',classement:'Classement',communaute:'Communauté',lobby:'Lobby',jeux:'Jeux',objectifs:'Objectifs',dbd:'Dead by Daylight',moderation:'Modération',spam:'Anti-spam',commands:'Commandes',historique:'Historique',admin:'Administration',settings:'Paramètres',outils:'Outils Chat',alertes:'Alertes'};
 let songRequestRefreshTimer = null;
 
 // ── Navigation ─────────────────────────────────────────────────────────────────
@@ -4990,6 +5012,7 @@ function showPage(name) {
   if(name==='commands') { loadCommandsPage(); loadSystemCommands(); }
   if(name==='dbd') initDBD();
   if(name==='moderation') { loadBannedWords(); loadAllowedWords(); }
+  if(name==='spam') loadSpamConfig();
   if(name==='settings') initSettings();
   if(name==='outils') loadOutils();
   if(name==='lobby') { loadLobby(); renderWheelWinners(); }
@@ -6352,12 +6375,16 @@ const DBD_KILLER_PERKS = [
 
 let dbdHistory=[],dbdSide='survivor',dbdRunning=false;
 let dbdSlots=Array.from({length:4},()=>({perk:'',locked:false,spinning:false}));
-function dbdPool(){return dbdSide==='survivor'?DBD_SURVIVOR_PERKS:DBD_KILLER_PERKS}
+const DBD_REAL_SURVIVOR=['Ace in the Hole','Adrenaline','Aftercare','Alert','Any Means Necessary','Autodidact','Balanced Landing','Better Together','Blood Pact','Boil Over','Bond','Botany Knowledge','Borrowed Time','Breakdown','Breakout','Buckle Up','Calm Spirit','Clairvoyance','Corrective Action','Dance With Me','Dark Sense','Dead Hard','Decisive Strike','Déjà Vu','Deliverance','Distortion','Diversion','Empathy','Fixated','Flashbang','For the People','Head On','Hope','Inner Healing','Iron Will','Kindred','Leader','Left Behind','Lithe','Lucky Break','Mettle of Man','No Mither','Object of Obsession','Off the Record','Open-Handed','Overcome','Pharmacy','Plunderer’s Instinct','Prove Thyself','Quick & Quiet','Reassurance','Repressed Alliance','Resilience','Saboteur','Self-Aware','Self-Care','Slippery Meat','Small Game','Soul Guard','Spine Chill','Sprint Burst','Stake Out','Streetwise','Technician','Tenacity','This Is Not Happening','Unbreakable','Up the Ante','Urban Evasion','Vigil','Visionary','Windows of Opportunity'];
+const DBD_REAL_KILLER=['A Nurse’s Calling','Agitation','Alien Instinct','Bamboozle','Barbecue & Chilli','Batteries Included','Beast of Prey','Bitter Murmur','Blood Echo','Blood Warden','Brutal Strength','Call of Brine','Corrupt Intervention','Coulrophobia','Cruel Limits','Dark Devotion','Dead Man’s Switch','Deadlock','Deathbound','Discordance','Distressing','Dragon’s Grip','Enduring','Fire Up','Forced Hesitation','Franklin’s Demise','Friends ’til the End','Gearhead','Grim Embrace','Hex: Blood Favour','Hex: Crowd Control','Hex: Devour Hope','Hex: Haunted Ground','Hex: Huntress Lullaby','Hex: No One Escapes Death','Hex: Pentimento','Hex: Plaything','Hex: Ruin','Hex: The Third Seal','Hex: Thrill of the Hunt','Hoarder','Hubris','Hysteria','I’m All Ears','Infectious Fright','Insidious','Iron Grasp','Knock Out','Lethal Pursuer','Lightborn','Mad Grit','Merciless Storm','Monitor & Abuse','Nemesis','No Way Out','Nowhere to Hide','Oppression','Overcharge','Overwhelming Presence','Play with Your Food','Pop Goes the Weasel','Predator','Remember Me','Save the Best for Last','Scourge Hook: Gift of Pain','Scourge Hook: Pain Resonance','Sloppy Butcher','Spirit Fury','Starstruck','Superior Anatomy','Surge','Surveillance','Tinkerer','Trail of Torment','Unbound','Unnerving Presence','Unrelenting','Whispers','Zanshin Tactics'];
+function dbdPool(){return dbdSide==='survivor'?DBD_REAL_SURVIVOR:DBD_REAL_KILLER}
 function dbdPick(excluded=[]){const pool=dbdPool().filter(p=>!excluded.includes(p));return pool[Math.floor(Math.random()*pool.length)]||dbdPool()[0]}
 function dbdRune(name){return String(name||'?').split(/\s+/).slice(0,2).map(x=>x[0]).join('').toUpperCase()}
+function dbdPerkFile(name){const words=String(name||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[’']/g,'').replace(/[^a-zA-Z0-9]+/g,' ').trim().split(/\s+/);return words.map((w,i)=>(i?w[0].toUpperCase()+w.slice(1):w.toLowerCase())).join('')}
+function dbdPerkImage(name){return 'https://deadbydaylight.wiki.gg/wiki/Special:Redirect/file/IconPerks_'+encodeURIComponent(dbdPerkFile(name))+'.png'}
 function initDBD(){if(!dbdSlots.some(s=>s.perk)){const used=[];dbdSlots.forEach(s=>{s.perk=dbdPick(used);used.push(s.perk)})}renderDBDSlots();renderDBDHistory()}
 function setDBDSide(side){if(dbdRunning)return;dbdSide=side==='killer'?'killer':'survivor';dbdSlots=Array.from({length:4},()=>({perk:'',locked:false,spinning:false}));document.getElementById('dbd-tab-survivor')?.classList.toggle('active',dbdSide==='survivor');document.getElementById('dbd-tab-killer')?.classList.toggle('active',dbdSide==='killer');document.getElementById('dbd-machine-role').textContent=(dbdSide==='survivor'?'SURVIVOR':'KILLER')+' PERK ROULETTE';initDBD()}
-function renderDBDSlots(){const root=document.getElementById('dbd-reels');if(!root)return;const colored=document.getElementById('dbd-colored')?.checked!==false;root.innerHTML=dbdSlots.map((slot,i)=>`<div class="dbd-reel ${slot.locked?'locked':''} ${slot.spinning?'spinning':''}" onclick="handleDBDSlot(event,${i})"><button class="dbd-reel-lock" onclick="event.stopPropagation();toggleDBDLock(${i})" title="Verrouiller">${slot.locked?'🔒':'○'}</button><div class="dbd-reel-window"><div class="dbd-perk-diamond ${dbdSide==='killer'?'killer':''} ${colored?'':'mono'}"><span class="dbd-perk-rune">${esc(dbdRune(slot.perk))}</span></div></div><div class="dbd-perk-name">${esc(slot.perk||'PERK')}</div></div>`).join('')}
+function renderDBDSlots(){const root=document.getElementById('dbd-reels');if(!root)return;const colored=document.getElementById('dbd-colored')?.checked!==false;root.innerHTML=dbdSlots.map((slot,i)=>`<div class="dbd-reel ${slot.locked?'locked':''} ${slot.spinning?'spinning':''}" onclick="handleDBDSlot(event,${i})"><button class="dbd-reel-lock" onclick="event.stopPropagation();toggleDBDLock(${i})" title="Verrouiller">${slot.locked?'🔒':'○'}</button><div class="dbd-reel-window"><div class="dbd-perk-diamond ${dbdSide==='killer'?'killer':''} ${colored?'':'mono'}"><img src="${dbdPerkImage(slot.perk)}" alt="${escapeAttr(slot.perk)}" loading="lazy" referrerpolicy="no-referrer" onerror="this.style.display='none';this.nextElementSibling.style.display='block'"><span class="dbd-perk-rune" style="display:none">${esc(dbdRune(slot.perk))}</span></div></div><div class="dbd-perk-name">${esc(slot.perk||'PERK')}</div></div>`).join('')}
 function handleDBDSlot(event,index){if(event.shiftKey)return spinDBD(index);spinDBD()}
 function toggleDBDLock(index){if(dbdRunning)return;dbdSlots[index].locked=!dbdSlots[index].locked;renderDBDSlots()}
 function toggleAllDBDLocks(){if(dbdRunning)return;const lock=!dbdSlots.every(s=>s.locked);dbdSlots.forEach(s=>s.locked=lock);renderDBDSlots()}
@@ -6537,6 +6564,7 @@ async function loadAnnouncements() {
           <div style="font-size:11px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(a.message)}</div>
           <div style="font-size:9px;color:var(--muted2)">Toutes les ${fmtMin(a.interval_ms/60000)}</div>
         </div>
+        <button class="btnx btn-ghost btn-xs" onclick="editAnn(${a.id},decodeURIComponent('${encodeURIComponent(a.message)}'),${Number(a.interval_ms)||600000})">✏️ Modifier</button>
         <button class="btnx btn-red btn-xs" onclick="deleteAnn(${a.id})">✕</button>
       </div>`).join('');
   } catch(e) {}
@@ -6558,6 +6586,13 @@ async function addAnnouncement() {
   document.getElementById('ann-message').value = '';
   loadAnnouncements();
 }
+
+function editAnn(id,message,interval){
+  const next=prompt('Modifier le message de l’annonce :',message);if(next===null)return;
+  const minutes=prompt('Intervalle en minutes :',String(Math.max(1,Math.round(Number(interval)/60000))));if(minutes===null)return;
+  saveAnnEdit(id,next,Math.max(1,Number(minutes)||10)*60000);
+}
+async function saveAnnEdit(id,message,interval_ms){const r=await fetch('/api/admin/announcements/'+id,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({message,interval_ms})});const j=await r.json().catch(()=>({}));if(!r.ok)return toast(j.error||'Modification impossible',false);toast('Annonce modifiée et enregistrée ✓');loadAnnouncements()}
 
 async function toggleAnn(id, enabled) {
   await fetch('/api/admin/announcements/toggle', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({id, enabled}) });
@@ -7583,6 +7618,7 @@ const SEARCH_PAGES = [
   { icon:'🎚️', label:'Config Classement',page:'config-classement' },
   { icon:'⚙️', label:'Commandes',        page:'commands' },
   { icon:'🛡️', label:'Modération',       page:'moderation' },
+  { icon:'🚫', label:'Anti-spam',         page:'spam', tags:'spam caps liens emotes répétition zalgo symboles protection chat' },
   { icon:'🎁', label:'Giveaways',        page:'jeux' },
   { icon:'🎮', label:'Lobby',            page:'lobby' },
   { icon:'🛠️', label:'Outils Chat',      page:'outils' },
@@ -10177,6 +10213,23 @@ async function toggleBannedWord(id, enabled) {
   loadBannedWords();
 }
 
+// ── Anti-spam ────────────────────────────────────────────────────────────────
+const SPAM_FILTER_META={
+  caps:{icon:'Aa',title:'Protection majuscules',desc:'Sanctionne les messages écrits presque entièrement en lettres capitales.',fields:[['capsPercent','Pourcentage maximal de majuscules','%'],['capsMinLetters','Minimum de lettres','']]},
+  links:{icon:'↗',title:'Protection des liens',desc:'Bloque les liens dont le domaine n’est pas présent dans la liste autorisée.',fields:[['maxLinks','Nombre de liens autorisés','']]},
+  emotes:{icon:'☻',title:'Protection des émotes',desc:'Empêche les messages contenant une quantité excessive d’émotes.',fields:[['maxEmotes','Émotes maximum','']]},
+  paragraph:{icon:'≡',title:'Protection des paragraphes',desc:'Supprime les murs de texte beaucoup trop longs.',fields:[['maxLength','Caractères maximum','']]},
+  symbols:{icon:'#!',title:'Protection des symboles',desc:'Détecte une quantité anormale de symboles et caractères décoratifs.',fields:[['maxSymbols','Symboles maximum','']]},
+  repetition:{icon:'↻',title:'Protection des répétitions',desc:'Détecte les lettres, mots ou expressions répétés abusivement.',fields:[['maxRepeats','Répétitions maximum','']]},
+  zalgo:{icon:'♟',title:'Protection Zalgo',desc:'Bloque les caractères déformés, superposés ou illisibles.',fields:[]},
+  oneMan:{icon:'☷',title:'Spam individuel',desc:'Sanctionne un viewer qui envoie trop de messages en quelques secondes.',fields:[['oneManMessages','Messages maximum',''],['oneManWindow','Fenêtre de temps','secondes']]}
+};
+let spamState={level:0,action:'timeout',timeoutSeconds:60,filters:{},limits:{},allowedDomains:[]};
+function renderSpamConfig(){document.querySelectorAll('[data-spam-level]').forEach(x=>x.classList.toggle('active',Number(x.dataset.spamLevel)===Number(spamState.level)));const progress=document.getElementById('spam-level-progress');if(progress)progress.style.width=(Number(spamState.level)/3*100)+'%';const root=document.getElementById('spam-filter-list');if(root)root.innerHTML=Object.entries(SPAM_FILTER_META).map(([key,m])=>`<section class="spam-filter-row ${spamState.filters?.[key]?'enabled':''}"><div class="spam-filter-icon">${m.icon}</div><div class="spam-filter-copy"><strong>${m.title}</strong><small>${m.desc}</small><div class="spam-filter-fields">${m.fields.map(([field,label,unit])=>`<label>${label}<span><input type="number" min="0" value="${Number(spamState.limits?.[field]??0)}" onchange="spamState.limits.${field}=Number(this.value)">${unit}</span></label>`).join('')}</div></div><label class="co-toggle-line"><span class="co-switch"><input type="checkbox" ${spamState.filters?.[key]?'checked':''} onchange="spamState.filters.${key}=this.checked;renderSpamConfig()"><span></span></span></label></section>`).join('');const action=document.getElementById('spam-action'),timeout=document.getElementById('spam-timeout'),domains=document.getElementById('spam-domains');if(action)action.value=spamState.action||'timeout';if(timeout)timeout.value=Number(spamState.timeoutSeconds)||60;if(domains)domains.value=(spamState.allowedDomains||[]).join(', ')}
+async function loadSpamConfig(){try{const r=await fetch('/api/spam/config',{cache:'no-store'}),j=await r.json();if(r.ok){spamState=j.data;renderSpamConfig()}}catch(e){toast('Chargement anti-spam impossible',false)}}
+function setSpamLevel(level){spamState.level=Number(level);const presets=[{}, {capsPercent:85,capsMinLetters:15,maxEmotes:14,maxLength:500,maxSymbols:28,maxRepeats:8,oneManMessages:9,oneManWindow:8}, {capsPercent:75,capsMinLetters:11,maxEmotes:10,maxLength:380,maxSymbols:20,maxRepeats:6,oneManMessages:7,oneManWindow:8}, {capsPercent:65,capsMinLetters:8,maxEmotes:7,maxLength:280,maxSymbols:14,maxRepeats:4,oneManMessages:5,oneManWindow:7}][spamState.level]||{};spamState.limits={...(spamState.limits||{}),...presets};renderSpamConfig()}
+async function saveSpamConfig(){spamState.action=document.getElementById('spam-action').value;spamState.timeoutSeconds=Math.max(10,Number(document.getElementById('spam-timeout').value)||60);spamState.allowedDomains=document.getElementById('spam-domains').value.split(/[\s,;]+/).map(x=>x.trim()).filter(Boolean);const r=await fetch('/api/admin/spam/config',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(spamState)}),j=await r.json().catch(()=>({}));const status=document.getElementById('spam-save-status');if(!r.ok){status.textContent=j.error||'Enregistrement impossible';return toast(status.textContent,false)}spamState=j.data;status.textContent='✓ Protection enregistrée pour cette chaîne';renderSpamConfig();toast('Filtres anti-spam enregistrés ✓')}
+
 // ── Toggle toutes les commandes ───────────────────────────────────────────────
 
 async function toggleAllCommands(enabled) {
@@ -11531,6 +11584,8 @@ body[data-ref-interface="aurora"] .ref-panel{
 @media(prefers-reduced-motion:reduce){.ref-wave,.lpd.blink{animation:none!important}}
 .elbot-support{display:block!important}.support-tabs{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:14px}.support-tabs button{border:1px solid var(--theme-soft-border,var(--brd));background:var(--theme-soft-bg,var(--surface2));color:var(--theme-muted,var(--muted));padding:9px;border-radius:9px;font:700 10px inherit;cursor:pointer}.support-tabs button.active{background:var(--accent);border-color:var(--accent);color:#06101f}.support-discord-state{font-size:9px;color:var(--muted);margin-bottom:9px}.support-ticket{padding:11px;margin-bottom:7px;border:1px solid var(--theme-soft-border,var(--brd));border-radius:10px;background:var(--theme-soft-bg,var(--surface2));cursor:pointer}.support-ticket:hover{border-color:var(--accent)}.support-ticket-top{display:flex;gap:7px;align-items:center}.support-ticket-top strong{font-size:11px;flex:1}.support-pill{font-size:7px;font-weight:900;text-transform:uppercase;padding:3px 6px;border-radius:999px;background:rgba(38,143,255,.15);color:#71c7ff}.support-pill.closed{background:rgba(111,124,145,.15);color:#9ca8b8}.support-ticket small{display:block;color:var(--muted);font-size:8px;margin-top:5px}.support-detail-card{padding:12px 0}.support-detail-card h3{font-size:14px;margin:8px 0 4px}.support-message{padding:9px 10px;margin:7px 0;border-radius:10px;background:rgba(27,105,210,.12);border:1px solid rgba(82,157,255,.15);font-size:10px;line-height:1.5}.support-message.admin{background:rgba(37,211,131,.10);border-color:rgba(37,211,131,.18)}.support-message b{display:block;font-size:8px;color:var(--accent);margin-bottom:4px}.support-message time{display:block;font-size:7px;color:var(--muted);margin-top:5px}.support-thread{max-height:310px;overflow:auto;margin:8px 0 10px}
 .dbd-roulette{--dbd-red:#a91419;position:relative;overflow:hidden;border:1px solid rgba(255,255,255,.11);border-radius:18px;padding:18px;background:radial-gradient(circle at 50% -20%,rgba(166,16,24,.24),transparent 42%),linear-gradient(160deg,rgba(19,20,22,.97),rgba(5,6,7,.98));box-shadow:0 28px 80px rgba(0,0,0,.4)}.dbd-roulette:before{content:"";position:absolute;inset:0;pointer-events:none;opacity:.22;background:repeating-linear-gradient(105deg,transparent 0 90px,rgba(255,255,255,.025) 92px,transparent 94px)}.dbd-roulette-head{position:relative;display:flex;justify-content:space-between;align-items:center;margin-bottom:15px}.dbd-role-tabs{display:flex;gap:5px}.dbd-role-tabs button{padding:8px 18px;border:1px solid rgba(255,255,255,.12);background:#111315;color:#87909a;border-radius:7px;font:900 10px inherit;text-transform:uppercase;letter-spacing:.7px;cursor:pointer}.dbd-role-tabs button.active{color:#fff;border-color:#ba252a;background:linear-gradient(#a7191e,#681014);box-shadow:0 0 18px rgba(202,26,34,.28)}.dbd-color-toggle{display:flex;gap:7px;align-items:center;color:#aeb5bc;font-size:9px}.dbd-machine{position:relative;border:1px solid #3b3d3f;border-radius:12px;padding:20px;background:linear-gradient(180deg,#1a1c1e,#090a0b);box-shadow:inset 0 1px rgba(255,255,255,.07),inset 0 -30px 60px rgba(0,0,0,.55)}.dbd-machine-title{text-align:center;margin-bottom:18px}.dbd-machine-title span{display:block;color:#c3252b;font-size:9px;font-weight:950;letter-spacing:5px}.dbd-machine-title strong{display:block;color:#f0f1f1;font-size:20px;letter-spacing:2px;margin-top:5px;text-shadow:0 2px 12px #000}.dbd-machine-title small{display:block;color:#7e858b;font-size:9px;margin-top:6px}.dbd-reels{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}.dbd-reel{position:relative;min-height:245px;border:1px solid #44484c;border-radius:9px;overflow:hidden;background:linear-gradient(180deg,#060708,#17191b 50%,#060708);cursor:pointer;box-shadow:inset 0 0 30px #000,0 9px 24px rgba(0,0,0,.38)}.dbd-reel:before,.dbd-reel:after{content:"";position:absolute;z-index:4;left:0;right:0;height:54px;pointer-events:none}.dbd-reel:before{top:0;background:linear-gradient(#050607,transparent)}.dbd-reel:after{bottom:0;background:linear-gradient(transparent,#050607)}.dbd-reel-window{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;padding:16px}.dbd-perk-diamond{width:130px;height:130px;display:grid;place-items:center;transform:rotate(45deg);border:3px solid #d4d4d4;background:linear-gradient(135deg,#53276c,#1d0c28);box-shadow:0 0 0 4px #17191b,0 0 28px rgba(152,55,192,.35);transition:.16s}.dbd-perk-diamond.killer{background:linear-gradient(135deg,#761c22,#25080a);box-shadow:0 0 0 4px #17191b,0 0 28px rgba(207,37,45,.34)}.dbd-perk-diamond.mono{filter:grayscale(1);background:#303236}.dbd-perk-rune{transform:rotate(-45deg);font-size:30px;font-weight:950;color:#fff;text-shadow:0 2px 8px #000;letter-spacing:-2px}.dbd-perk-name{position:absolute;z-index:6;left:8px;right:8px;bottom:14px;text-align:center;color:#f4f4f4;font-size:10px;font-weight:900;text-transform:uppercase;text-shadow:0 2px 5px #000}.dbd-reel-lock{position:absolute;z-index:7;right:7px;top:7px;width:25px;height:25px;border-radius:50%;border:1px solid rgba(255,255,255,.15);background:#111;color:#8e969e;display:grid;place-items:center}.dbd-reel.locked{border-color:#d5a448}.dbd-reel.locked .dbd-reel-lock{color:#ffd36b;border-color:#d5a448}.dbd-reel.spinning .dbd-perk-diamond{animation:dbdSlot .11s linear infinite;filter:blur(1px)}@keyframes dbdSlot{0%{transform:translateY(-22px) rotate(45deg);opacity:.25}50%{transform:translateY(0) rotate(45deg);opacity:1}100%{transform:translateY(22px) rotate(45deg);opacity:.25}}.dbd-spin-button{display:flex;align-items:center;justify-content:center;gap:10px;width:min(420px,90%);margin:19px auto 0;padding:12px;border:1px solid #e04147;border-radius:7px;background:linear-gradient(#b51e24,#681014);color:#fff;font:950 11px inherit;letter-spacing:1px;cursor:pointer;box-shadow:0 8px 24px rgba(160,16,23,.28)}.dbd-spin-button:hover{filter:brightness(1.18)}.dbd-spin-button span{font-size:18px}.dbd-build-actions{position:relative;display:flex;justify-content:center;gap:7px;margin-top:13px}.dbd-history-panel #dbd-history{display:grid;gap:6px;max-height:180px;overflow:auto}.dbd-history-row{display:grid;grid-template-columns:70px 1fr auto;gap:10px;align-items:center;padding:8px 10px;border-bottom:1px solid rgba(255,255,255,.07);font-size:9px}.dbd-history-row b{color:#d64a50;text-transform:uppercase}.dbd-history-row span{color:#d9dde1}.dbd-history-row time{color:#737c84}@media(max-width:900px){.dbd-reels{grid-template-columns:repeat(2,1fr)}.dbd-reel{min-height:210px}.dbd-perk-diamond{width:105px;height:105px}}
+.dbd-perk-diamond img{width:142%;height:142%;object-fit:contain;transform:rotate(-45deg);filter:drop-shadow(0 2px 5px #000)}.dbd-perk-diamond.mono img{filter:grayscale(1) contrast(1.15) drop-shadow(0 2px 5px #000)}
+.spam-level-card{padding:22px 26px;margin-bottom:14px;border:1px solid var(--brd);border-radius:14px;background:linear-gradient(180deg,rgba(9,14,22,.82),rgba(6,9,14,.66))}.spam-level-title{text-align:center;font-size:11px;font-weight:900;margin-bottom:16px}.spam-levels{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;max-width:600px;margin:auto}.spam-levels button{border:0;background:transparent;color:var(--muted);display:grid;place-items:center;gap:6px;cursor:pointer}.spam-levels button span{font-size:25px;color:#438eea}.spam-levels button b{font-size:9px}.spam-levels button.active{color:var(--text)}.spam-levels button.active span{color:#72b6ff;filter:drop-shadow(0 0 7px #1979f0)}.spam-level-track{height:7px;max-width:460px;margin:12px auto 0;border-radius:99px;background:#111b2d;overflow:hidden}.spam-level-track i{display:block;height:100%;width:0;background:linear-gradient(90deg,#0961df,#42a1ff);transition:.25s}.spam-filter-list{display:grid;gap:9px}.spam-filter-row{display:grid;grid-template-columns:40px minmax(0,1fr) auto;align-items:center;gap:12px;padding:12px 14px;border:1px solid transparent;border-radius:12px;background:rgba(15,20,28,.78);opacity:.7}.spam-filter-row.enabled{opacity:1;border-color:rgba(53,139,255,.16)}.spam-filter-icon{width:34px;height:34px;display:grid;place-items:center;border-radius:9px;background:#0d42a0;color:#d9ecff;font-weight:900}.spam-filter-copy strong{display:block;font-size:11px}.spam-filter-copy small{display:block;color:var(--muted);font-size:9px;margin-top:3px}.spam-filter-fields{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}.spam-filter-fields label{font-size:8px;color:var(--muted)}.spam-filter-fields label span{display:flex;align-items:center;gap:3px;margin-top:3px}.spam-filter-fields input{width:65px;padding:5px;border:1px solid var(--brd);border-radius:6px;background:var(--surface2);color:var(--text)}.spam-global-settings{margin-top:14px}.spam-global-settings .form-row{grid-template-columns:160px 190px 1fr}@media(max-width:800px){.spam-global-settings .form-row{grid-template-columns:1fr}.spam-levels{grid-template-columns:repeat(2,1fr)}}
 </style>
 </body>
 </html>
