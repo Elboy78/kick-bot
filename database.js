@@ -186,11 +186,19 @@ async function initSchema() {
       id INTEGER PRIMARY KEY AUTOINCREMENT, streamer_id INTEGER NOT NULL,
       username TEXT NOT NULL, text TEXT, media_url TEXT NOT NULL,
       media_type TEXT NOT NULL DEFAULT 'image', tts_url TEXT, tts_requested INTEGER NOT NULL DEFAULT 0,
+      kick_user_id TEXT, tts_voice TEXT,
       status TEXT NOT NULL DEFAULT 'pending', created_at TEXT NOT NULL DEFAULT (datetime('now'))
     )`,
     `CREATE TABLE IF NOT EXISTS meme_access_tokens (
       token TEXT PRIMARY KEY, streamer_id INTEGER NOT NULL, username TEXT NOT NULL,
-      trusted INTEGER NOT NULL DEFAULT 0, expires_at INTEGER NOT NULL
+      trusted INTEGER NOT NULL DEFAULT 0, kick_user_id TEXT, auth_session TEXT,
+      authenticated_at TEXT, used_at TEXT, expires_at INTEGER NOT NULL
+    )`,
+    `CREATE TABLE IF NOT EXISTS meme_auth_sessions (
+      session_token TEXT PRIMARY KEY, streamer_id INTEGER NOT NULL,
+      kick_user_id TEXT NOT NULL, username TEXT NOT NULL,
+      role TEXT NOT NULL DEFAULT 'viewer', verified_at TEXT NOT NULL DEFAULT (datetime('now')),
+      expires_at INTEGER NOT NULL
     )`,
     `CREATE TABLE IF NOT EXISTS viewers (
       id            INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -547,6 +555,12 @@ async function initSchema() {
     `ALTER TABLE meme_submissions ADD COLUMN media_type TEXT NOT NULL DEFAULT 'image'`,
     `ALTER TABLE meme_submissions ADD COLUMN tts_url TEXT`,
     `ALTER TABLE meme_submissions ADD COLUMN tts_requested INTEGER NOT NULL DEFAULT 0`,
+    `ALTER TABLE meme_submissions ADD COLUMN kick_user_id TEXT`,
+    `ALTER TABLE meme_submissions ADD COLUMN tts_voice TEXT`,
+    `ALTER TABLE meme_access_tokens ADD COLUMN kick_user_id TEXT`,
+    `ALTER TABLE meme_access_tokens ADD COLUMN auth_session TEXT`,
+    `ALTER TABLE meme_access_tokens ADD COLUMN authenticated_at TEXT`,
+    `ALTER TABLE meme_access_tokens ADD COLUMN used_at TEXT`,
     `ALTER TABLE chest_seasons ADD COLUMN ever_secured INTEGER NOT NULL DEFAULT 0`,
     `ALTER TABLE chest_seasons ADD COLUMN victory_pending INTEGER NOT NULL DEFAULT 0`,
     `ALTER TABLE chest_seasons ADD COLUMN protected_number INTEGER DEFAULT NULL`,
@@ -1687,8 +1701,9 @@ async function importCommunityGiftLeaderboard(rows = [], streamerId = null) {
 }
 
 // Le badge `sub_gifter` présent sur les messages Kick contient le total all-time
-// affiché publiquement pour ce viewer. Il s'agit d'un compteur absolu : on garde
-// donc toujours la valeur la plus haute au lieu de l'additionner à chaque message.
+// affiché publiquement pour ce viewer. Il s'agit d'un compteur absolu et
+// autoritaire : il remplace le total précédent, même lorsqu'il corrige une
+// ancienne valeur trop haute provenant d'un événement reçu deux fois.
 async function upsertCommunityGiftBadge(username, giftCount, streamerId = null) {
   const sid = Number(streamerId || scopedStreamerId());
   const normalizedUsername = String(username || '').trim().replace(/^@+/, '').toLowerCase();
@@ -1703,29 +1718,34 @@ async function upsertCommunityGiftBadge(username, giftCount, streamerId = null) 
       (streamer_id,username,gifts_all_time,source,synced_at)
     VALUES (?,?,?,'kick_chat_badge',datetime('now'))
     ON CONFLICT(streamer_id,username) DO UPDATE SET
-      gifts_all_time = CASE
-        WHEN excluded.gifts_all_time > community_support_snapshots.gifts_all_time
-          THEN excluded.gifts_all_time
-        ELSE community_support_snapshots.gifts_all_time
-      END,
-      source = CASE
-        WHEN excluded.gifts_all_time > community_support_snapshots.gifts_all_time
-          THEN excluded.source
-        ELSE community_support_snapshots.source
-      END,
+      gifts_all_time = excluded.gifts_all_time,
+      source = excluded.source,
       synced_at = excluded.synced_at`,
     [sid, normalizedUsername, normalizedCount]);
 
   return {
-    changed: normalizedCount > previousCount,
-    gifts: Math.max(previousCount, normalizedCount),
+    changed: normalizedCount !== previousCount,
+    gifts: normalizedCount,
     previous: previousCount
   };
+}
+
+async function reconcileStoredCommunityGiftBadges(streamerId = null) {
+  const sid=Number(streamerId||scopedStreamerId());
+  const rows=await all(`SELECT username,badges_json FROM viewers WHERE COALESCE(streamer_id,1)=? AND badges_json IS NOT NULL AND badges_json!=''`,[sid]);
+  for(const row of rows){
+    let badges=[];try{badges=JSON.parse(row.badges_json||'[]')}catch(_){continue}
+    const badge=(Array.isArray(badges)?badges:[]).find(item=>['sub_gifter','subgifter','subscription_gifter','gift_sub_gifter'].includes(String(item?.type||item?.slug||item?.name||'').toLowerCase().replace(/[\s-]+/g,'_')));
+    if(!badge)continue;
+    const count=parseInt(String(badge.count??badge.gift_count??badge.gifts??badge.quantity??badge.value??'').replace(/[^0-9]/g,''),10);
+    if(Number.isSafeInteger(count)&&count>0)await upsertCommunityGiftBadge(row.username,count,sid);
+  }
 }
 
 async function getCommunityData(limit = 100, streamerId = null) {
   const sid = Number(streamerId || scopedStreamerId());
   await backfillCommunityHistory(sid);
+  await reconcileStoredCommunityGiftBadges(sid);
   const safeLimit = Math.max(10, Math.min(500, parseInt(limit) || 100));
   const supporters = await all(`
     SELECT LOWER(username) AS username,
@@ -1763,6 +1783,7 @@ async function getCommunityData(limit = 100, streamerId = null) {
     FROM viewers WHERE COALESCE(streamer_id,1) = ?`, [sid]);
   return { totals: totals || {}, supporters, historicalSupporters, followers, currentSubscribers, events };
 }
+async function getRecentCommunityEvents(limit=20,streamerId=null){const sid=Number(streamerId||scopedStreamerId()),safe=Math.max(1,Math.min(50,parseInt(limit)||20));return all(`SELECT event_type AS type,username,gifter,amount AS count,months,occurred_at AS at FROM community_events WHERE streamer_id=? ORDER BY occurred_at DESC LIMIT ?`,[sid,safe])}
 async function toggleAnnouncement(id, enabled) { await run(`UPDATE announcements SET enabled = ? WHERE id = ?`, [enabled ? 1 : 0, id]); }
 async function deleteAnnouncement(id) { await run(`DELETE FROM announcements WHERE id = ?`, [id]); }
 async function updateAnnouncementSent(id) { await run(`UPDATE announcements SET last_sent = datetime('now') WHERE id = ?`, [id]); }
@@ -2180,16 +2201,36 @@ async function getMemeEvents(streamerId, afterId = 0) {
   return rows.map(row => { try { return { ...JSON.parse(row.payload), id:row.id, createdAt:row.created_at }; } catch (_) { return null; } }).filter(Boolean);
 }
 async function createMemeSubmission(streamerId, username, text, mediaUrl, status='pending', options={}) {
-  const r=await run(`INSERT INTO meme_submissions (streamer_id,username,text,media_url,media_type,tts_url,tts_requested,status) VALUES (?,?,?,?,?,?,?,?)`,[Number(streamerId),username,text,mediaUrl,options.mediaType||'image',options.ttsUrl||null,options.ttsRequested?1:0,status]);
+  await run(`DELETE FROM meme_submissions WHERE streamer_id=? AND created_at < datetime('now','-1 day')`,[Number(streamerId)]);
+  const r=await run(`INSERT INTO meme_submissions (streamer_id,username,text,media_url,media_type,tts_url,tts_requested,kick_user_id,tts_voice,status) VALUES (?,?,?,?,?,?,?,?,?,?)`,[Number(streamerId),username,text,mediaUrl,options.mediaType||'image',options.ttsUrl||null,options.ttsRequested?1:0,options.kickUserId||null,options.ttsVoice||null,status]);
   return get(`SELECT * FROM meme_submissions WHERE id=?`,[Number(r.lastInsertRowid)]);
 }
-async function getMemeSubmissions(streamerId, status='pending') { return all(`SELECT * FROM meme_submissions WHERE streamer_id=? AND status=? ORDER BY id DESC LIMIT 100`,[Number(streamerId),status]); }
+async function getMemeSubmissions(streamerId, status='all') {
+  await run(`DELETE FROM meme_submissions WHERE streamer_id=? AND created_at < datetime('now','-1 day')`,[Number(streamerId)]);
+  if(status&&status!=='all')return all(`SELECT * FROM meme_submissions WHERE streamer_id=? AND status=? ORDER BY id DESC LIMIT 200`,[Number(streamerId),status]);
+  return all(`SELECT * FROM meme_submissions WHERE streamer_id=? ORDER BY id DESC LIMIT 200`,[Number(streamerId)]);
+}
 async function getMemeSubmission(id, streamerId) { return get(`SELECT * FROM meme_submissions WHERE id=? AND streamer_id=?`,[Number(id),Number(streamerId)]); }
 async function setMemeSubmissionStatus(id, streamerId, status) { await run(`UPDATE meme_submissions SET status=? WHERE id=? AND streamer_id=?`,[status,Number(id),Number(streamerId)]); return getMemeSubmission(id,streamerId); }
-async function createMemeAccessToken(streamerId, username, trusted=false) { const token=require('crypto').randomBytes(18).toString('hex'),level=trusted===2?2:(trusted?1:0);await run(`INSERT INTO meme_access_tokens (token,streamer_id,username,trusted,expires_at) VALUES (?,?,?,?,?)`,[token,Number(streamerId),username,level,Date.now()+3600000]);return token; }
-async function getMemeAccessToken(token, streamerId) { return await get(`SELECT * FROM meme_access_tokens WHERE token=? AND streamer_id=? AND expires_at>?`,[String(token),Number(streamerId),Date.now()])||null; }
+async function createMemeAccessToken(streamerId, username, trusted=false) {
+  const token=require('crypto').randomBytes(24).toString('hex'),level=trusted===2?2:(trusted?1:0),sid=Number(streamerId),normalized=String(username||'').trim().replace(/^@+/, '').toLowerCase();
+  await run(`DELETE FROM meme_access_tokens WHERE streamer_id=? AND LOWER(username)=? AND used_at IS NULL`,[sid,normalized]);
+  await run(`INSERT INTO meme_access_tokens (token,streamer_id,username,trusted,expires_at) VALUES (?,?,?,?,?)`,[token,sid,normalized,level,Date.now()+15*60*1000]);return token;
+}
+async function getMemeAccessToken(token, streamerId) { return await get(`SELECT * FROM meme_access_tokens WHERE token=? AND streamer_id=? AND expires_at>? AND used_at IS NULL`,[String(token),Number(streamerId),Date.now()])||null; }
 async function deleteMemeAccessToken(token) { await run(`DELETE FROM meme_access_tokens WHERE token=?`,[String(token)]); }
-async function touchMemeAccessToken(token, streamerId) { const row=await getMemeAccessToken(token,streamerId);if(row)await run(`UPDATE meme_access_tokens SET expires_at=? WHERE token=?`,[Date.now()+3600000,String(token)]);return row; }
+async function authenticateMemeAccessToken(token,streamerId,kickUserId,authSession){await run(`UPDATE meme_access_tokens SET kick_user_id=?,auth_session=?,authenticated_at=datetime('now') WHERE token=? AND streamer_id=? AND expires_at>? AND used_at IS NULL`,[String(kickUserId||''),String(authSession||''),String(token),Number(streamerId),Date.now()]);return getMemeAccessToken(token,streamerId)}
+async function consumeMemeAccessToken(token,streamerId){await run(`UPDATE meme_access_tokens SET used_at=datetime('now') WHERE token=? AND streamer_id=? AND used_at IS NULL`,[String(token),Number(streamerId)])}
+async function touchMemeAccessToken(token, streamerId) { return getMemeAccessToken(token,streamerId); }
+async function createMemeAuthSession(streamerId,kickUserId,username,role='viewer'){
+  const sessionToken=require('crypto').randomBytes(32).toString('hex'),sid=Number(streamerId),name=String(username||'').trim().replace(/^@+/, '').toLowerCase(),safeRole=role==='moderator'?'moderator':'viewer';
+  await run(`DELETE FROM meme_auth_sessions WHERE expires_at<=? OR (streamer_id=? AND kick_user_id=? AND role=?)`,[Date.now(),sid,String(kickUserId||''),safeRole]);
+  await run(`INSERT INTO meme_auth_sessions (session_token,streamer_id,kick_user_id,username,role,expires_at) VALUES (?,?,?,?,?,?)`,[sessionToken,sid,String(kickUserId||''),name,safeRole,Date.now()+30*86400000]);
+  return getMemeAuthSession(sessionToken,sid);
+}
+async function getMemeAuthSession(sessionToken,streamerId){return await get(`SELECT * FROM meme_auth_sessions WHERE session_token=? AND streamer_id=? AND expires_at>?`,[String(sessionToken||''),Number(streamerId),Date.now()])||null}
+async function refreshMemeAuthSession(sessionToken,streamerId){await run(`UPDATE meme_auth_sessions SET verified_at=datetime('now'),expires_at=? WHERE session_token=? AND streamer_id=?`,[Date.now()+30*86400000,String(sessionToken||''),Number(streamerId)]);return getMemeAuthSession(sessionToken,streamerId)}
+async function deleteMemeAuthSession(sessionToken){await run(`DELETE FROM meme_auth_sessions WHERE session_token=?`,[String(sessionToken||'')])}
 
 function normalizeOverlayWidget(widget) {
   const w = String(widget || '').toLowerCase().replace(/\.html$/,'').replace(/[^a-z0-9_-]/g, '');
@@ -2422,7 +2463,7 @@ module.exports = {
   getDB,
   upsertViewer, addPoints, addMemePoints, grantMemePointsIfDue, getMemeLeaderboard, getViewer, getLeaderboard, getViewerRank,
   getGlobalStats, getRecentLogs, getActiveViewers, getViewersMissingFollow, getViewersForBadgeSync, setViewerKickProfile, clearAllPoints,
-  addCommunityEvent, backfillCommunityHistory, importCommunityGiftLeaderboard, upsertCommunityGiftBadge, getCommunityData,
+  addCommunityEvent, backfillCommunityHistory, importCommunityGiftLeaderboard, upsertCommunityGiftBadge, getCommunityData, getRecentCommunityEvents,
   getLevel, getNextLevel, getLevels, getRankingEngine, addLevel, updateLevel, deleteLevel,
   getCustomCommands, getCustomCommand, setCustomCommand, deleteCustomCommand, toggleCustomCommand,
   getObjectives, createObjective, deleteObjective, achieveObjective,
@@ -2461,5 +2502,6 @@ module.exports = {
   getStreamerSetting, setStreamerSetting, getOrCreateOverlayToken, regenerateOverlayToken, getOverlayTokenByValue, getOverlayTokensForStreamer, saveOAuthTokenForStreamer, getOAuthTokenForStreamer, deleteOAuthTokenForStreamer,
   createMemeEvent, getMemeEvents,
   createMemeSubmission, getMemeSubmissions, getMemeSubmission, setMemeSubmissionStatus,
-  createMemeAccessToken, getMemeAccessToken, deleteMemeAccessToken, touchMemeAccessToken,
+  createMemeAccessToken, getMemeAccessToken, deleteMemeAccessToken, authenticateMemeAccessToken, consumeMemeAccessToken, touchMemeAccessToken,
+  createMemeAuthSession, getMemeAuthSession, refreshMemeAuthSession, deleteMemeAuthSession,
 };

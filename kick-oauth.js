@@ -44,9 +44,9 @@ function safeJson(value, fallback = {}) {
   try { return JSON.parse(value || '{}'); } catch { return fallback; }
 }
 
-function normalizeScopes(scopes) {
+function normalizeScopes(scopes, includeEvents = true) {
   const requested = String(scopes || process.env.KICK_OAUTH_SCOPES || 'user:read channel:read chat:write');
-  return [...new Set(`${requested} events:subscribe`.trim().split(/\s+/))].join(' ');
+  return [...new Set(`${requested}${includeEvents?' events:subscribe':''}`.trim().split(/\s+/))].join(' ');
 }
 
 async function subscribeStreamerEvents(accessToken, broadcasterUserId) {
@@ -72,6 +72,8 @@ function getAuthorizationUrl(scopes, options = {}) {
     streamerId: options.streamerId || options.streamer_id || null,
     identityId: options.identityId || options.identity_id || null,
     botType: options.botType || options.bot_type || '',
+    memeToken: options.memeToken || options.meme_token || '',
+    expectedUsername: options.expectedUsername || options.expected_username || '',
     platformAdmin: Boolean(options.platformAdmin),
     createdAt: Date.now()
   };
@@ -87,7 +89,7 @@ function getAuthorizationUrl(scopes, options = {}) {
     response_type: 'code',
     client_id: CLIENT_ID,
     redirect_uri: REDIRECT_URI,
-    scope: normalizeScopes(scopes),
+    scope: normalizeScopes(scopes, !['meme_viewer_login','meme_moderator_login'].includes(meta.mode)),
     code_challenge: codeChallenge,
     code_challenge_method: 'S256',
     state,

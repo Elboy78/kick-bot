@@ -482,10 +482,14 @@ async function handleChatMessageScoped(payload, ctx = null) {
     const meme = String(parts[1] || '').trim();
     const text = parts.slice(2).join(' ').trim();
     if (!meme) {
-      const context=currentChatContext(), trusted=badges.some(b=>['subscriber','vip','moderator','broadcaster'].includes(String(b.type||'').toLowerCase()));
+      const context=currentChatContext();
+      const raw=await db.getStreamerSetting(context?.streamerId,'memes_config_v1','{}');let cfg={};try{cfg=JSON.parse(raw||'{}')}catch(_){}
+      if(cfg.enabled!==true)return sendChat(`@${username} Les memes sont désactivés sur cette chaîne.`);
+      const trusted=badges.some(b=>['subscriber','subscribed','founder','broadcaster'].includes(String(b.type||b.slug||'').toLowerCase()));
+      if(String(cfg.mode||'trust')==='trust'&&!trusted)return sendChat(`@${username} Le mode Confiance est actif : seuls les abonnés peuvent recevoir un lien meme.`);
       const token=await db.createMemeAccessToken(context.streamerId,username,trusted);
       let base='https://panel.elbot.fr';try{base=new URL(String(process.env.PANEL_PUBLIC_URL||base)).origin}catch(_){}
-      return sendChat(`@${username} Envoie ton image/GIF et ton texte ici : ${base}/memes/${context.slug}?token=${token}`);
+      return sendChat(`@${username} Ton lien personnel (connexion Kick obligatoire, valable une seule fois) : ${base}/memes/${context.slug}?token=${token}`);
     }
     try {
       const context = currentChatContext();
@@ -516,6 +520,13 @@ async function handleChatMessageScoped(payload, ctx = null) {
   // Song Request V2 — scoping par streamer via le contexte chat courant.
   // Chaque chaîne a sa propre file d'attente et ses propres réglages.
   try {
+    if (cmd === '!skip') {
+      const result = await shared.voteSongRequestSkip(username, currentChatContext());
+      if (result?.error) return sendChat(`@${username} ${result.error}`);
+      if (result?.skipped) return sendChat(`⏭️ Vote validé (${result.votes}/${result.required}) : musique suivante !`);
+      if (result?.duplicate) return sendChat(`@${username} Tu as déjà voté (${result.votes}/${result.required}).`);
+      return sendChat(`⏭️ @${username} vote pour passer la musique (${result.votes}/${result.required}).`);
+    }
     const srEnabled = await db.getSetting('songrequest_enabled');
     const srCommand = String(await db.getSettingStr('songrequest_command', '!sr') || '!sr').toLowerCase();
     const srAliases = new Set([srCommand, '!sr', '!songrequest']);

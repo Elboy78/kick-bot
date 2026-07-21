@@ -663,8 +663,7 @@ body.light .card,body.light .panel,body.light .widget-engine-card{background:lin
           <article class="ref-kpi kpi-watch ref-kpi-rich">
             <div class="ref-kpi-head"><span class="ref-kpi-icon">◈</span><span>Top viewer</span></div>
             <div class="ref-kpi-value ref-kpi-name" id="s-top">—</div>
-            <div class="ref-trend" id="spark-top-trend">● En attente</div><div class="ref-kpi-sub" id="s-top-sub">—</div>
-            <div class="ref-sparkline ref-real-spark"><svg viewBox="0 0 220 42" preserveAspectRatio="none"><path id="spark-top-area" class="spark-area"></path><path id="spark-top-line" class="spark-line"></path></svg></div>
+            <div class="ref-kpi-sub" id="s-top-sub">—</div>
           </article>
           <article class="ref-kpi kpi-live ref-kpi-rich">
             <div class="ref-kpi-head"><span class="ref-kpi-icon">◷</span><span>Temps regardé</span></div>
@@ -756,7 +755,7 @@ body.light .card,body.light .panel,body.light .widget-engine-card{background:lin
           </article>
 
           <article class="ref-panel ref-alert-card">
-            <header><div><span class="ref-title-icon">♢</span><strong>Alertes récentes</strong></div><button type="button" onclick="showPage('alerts')">Tout voir</button></header>
+            <header><div><span class="ref-title-icon">♢</span><strong>Alertes récentes</strong></div><button type="button" onclick="showPage('alertes')">Tout voir</button></header>
             <ul id="dash-events" class="ref-alert-list">
               <li class="ref-empty-line">Aucune activité récente</li>
             </ul>
@@ -1359,8 +1358,15 @@ Option 3" rows="4"></textarea><div style="display:flex;gap:6px;margin-top:10px">
         <label class="lbl">Message de confirmation</label>
         <input class="inp" id="sr-confirm" placeholder="🎵 @{username}, ta musique a été ajoutée" maxlength="180" style="margin-bottom:10px">
         <label class="sr-toggle-line"><span class="sr-switch"><input type="checkbox" id="sr-chat-confirm"><span></span></span><b>Envoyer le message de confirmation dans le chat</b></label>
+        <label class="sr-toggle-line"><span class="sr-switch"><input type="checkbox" id="sr-now-playing-chat"><span></span></span><b>Annoncer automatiquement chaque musique qui démarre</b></label>
+        <label class="lbl">Message de lecture · variables {title} et {username}</label>
+        <input class="inp" id="sr-now-playing-message" placeholder="🎵 Lecture : {title} · demandé par @{username}" maxlength="220" style="margin-bottom:10px">
         <label class="lbl">Nombre maximum dans la file</label>
         <input type="number" class="inp" id="sr-max" min="1" max="100" placeholder="30" style="margin-bottom:12px">
+        <label class="sr-toggle-line"><span class="sr-switch"><input type="checkbox" id="sr-skip-vote-enabled"><span></span></span><b>Autoriser le vote viewers avec !skip</b></label>
+        <label class="lbl">Votes de viewers différents nécessaires</label>
+        <input type="number" class="inp" id="sr-skip-vote-required" min="1" max="50" value="3" style="margin-bottom:6px">
+        <div id="sr-skip-vote-status" style="font-size:10px;color:var(--muted);margin-bottom:12px">0 vote sur 3 pour la musique actuelle</div>
         <button class="dark-btn" onclick="saveSongRequestSettings()" style="width:100%;justify-content:center">ENREGISTRER</button>
         <div class="obs-link-box">
           <div class="obs-link-head"><b>🔗 Lien overlay OBS Song Request</b><span><button class="obs-copy-btn" onclick="copyObsUrl('songrequest-obs-url')">Copier</button><button class="obs-regenerate-btn" onclick="regenerateObsToken('songrequest')">Régénérer</button></span></div>
@@ -1724,8 +1730,9 @@ Option 3" rows="4"></textarea><div style="display:flex;gap:6px;margin-top:10px">
       </div>
       <div class="panel"><h3>Source OBS privée</h3><div class="obs-link-row"><code class="obs-link-code" id="memes-obs-url">Chargement…</code></div><div style="display:flex;gap:8px;margin-top:10px"><button class="btnx btn-outline btn-sm" onclick="copyMemeObs()">Copier</button><button class="btnx btn-red btn-sm" onclick="stopMemes()">⏹ Arrêt d’urgence</button></div><p style="font-size:10px;color:var(--muted);margin-top:10px">Ajoute cette URL comme source navigateur OBS, en 1920×1080.</p></div>
     </div>
-    <div class="panel" style="margin-top:14px"><h3>🔗 Portail viewers</h3><div class="obs-link-row"><code class="obs-link-code" id="memes-viewer-url">Chargement…</code></div><button class="btnx btn-outline btn-sm" style="margin-top:10px" onclick="copyMemeViewer()">Copier le lien viewer</button><p style="color:var(--muted);font-size:10px">Le viewer choisit son image ou GIF, écrit son texte et l’envoie. En mode Confiance, les viewers reconnus comme subs passent immédiatement ; les autres attendent une validation.</p></div>
-    <div class="panel" style="margin-top:14px"><h3>File de validation</h3><div id="meme-pending">Aucun envoi en attente.</div></div>
+    <div class="panel" style="margin-top:14px"><h3>🔗 Portail viewers</h3><div class="obs-link-row"><code class="obs-link-code" id="memes-viewer-url">Chargement…</code></div><button class="btnx btn-outline btn-sm" style="margin-top:10px" onclick="copyMemeViewer()">Copier le lien de test</button><p style="color:var(--muted);font-size:10px">Chaque commande <b>!meme</b> génère désormais un lien personnel à usage unique. Le viewer doit se connecter avec le compte Kick exactement lié au pseudo mentionné par le bot. En mode Confiance, seuls les abonnés reçoivent un lien.</p></div>
+    <div class="panel" style="margin-top:14px"><div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap"><h3>📜 Historique et validation des mèmes · 24 h</h3><button class="btnx btn-outline btn-sm" onclick="loadMemePending()">↻ Actualiser</button></div><div id="meme-pending">Aucun envoi enregistré.</div><div id="meme-history-pager" style="display:flex;justify-content:center;align-items:center;gap:8px;margin-top:10px"></div></div>
+    <div class="panel" style="margin-top:14px"><h3>🛡️ Portail des modérateurs</h3><div class="obs-link-row"><code class="obs-link-code" id="memes-moderator-url">Chargement…</code></div><button class="btnx btn-outline btn-sm" style="margin-top:10px" onclick="navigator.clipboard.writeText(document.getElementById('memes-moderator-url').textContent);toast('Lien modérateur copié')">Copier le lien modérateur</button><p style="color:var(--muted);font-size:10px">Connexion Kick obligatoire. Le statut de modérateur de cette chaîne est revérifié régulièrement.</p></div>
     <div class="grid2" style="margin-top:14px"><div class="panel"><h3>⭐ Points mèmes séparés</h3><div class="form-row"><div><label class="lbl">Solde de départ</label><input class="inp" id="meme-starting-points" type="number" min="0" value="100"></div><div><label class="lbl">Gain</label><input class="inp" id="meme-points-amount" type="number" min="0" value="5"></div><div><label class="lbl">Toutes les (minutes)</label><input class="inp" id="meme-points-interval" type="number" min="1" value="10"></div></div><div id="meme-points-summary" style="font-size:12px;line-height:2;margin-top:8px">Chargement…</div><hr style="border:0;border-top:1px solid var(--brd);margin:12px 0"><h3>🛠️ Modifier un solde</h3><div class="form-row"><input class="inp" id="meme-admin-user" placeholder="Pseudo Kick"><input class="inp" id="meme-admin-points" type="number" min="1" placeholder="Nombre de points"><div style="display:flex;gap:7px"><button class="btnx btn-green btn-sm" onclick="changeMemePoints(1)">+ Ajouter</button><button class="btnx btn-red btn-sm" onclick="changeMemePoints(-1)">− Retirer</button></div></div><div id="meme-admin-points-status" style="font-size:11px;color:var(--muted);margin-top:7px"></div></div><div class="panel"><h3>🏆 Classement points mèmes</h3><div id="meme-points-ranking">Chargement…</div></div></div>
   </div>
 
@@ -4940,7 +4947,7 @@ async function resetSubCounterSession() {
 
 let memeState={enabled:false,volume:70,maxText:80,items:[]};
 function selectMemePosition(pos='center'){const input=document.getElementById('meme-position');if(input)input.value=pos;document.querySelectorAll('#meme-position-screen button').forEach(b=>{const active=b.dataset.pos===pos;b.style.border=active?'2px solid var(--accent)':'1px solid var(--brd)';b.style.background=active?'rgba(40,255,102,.24)':'rgba(255,255,255,.035)';b.style.color=active?'var(--accent)':'var(--text)';b.style.borderRadius='8px';b.style.fontSize='20px';b.style.cursor='pointer'})}
-async function loadMemes(){try{const r=await fetch('/api/admin/memes',{cache:'no-store'}),j=await r.json();if(!r.ok)throw new Error(j.error||'Erreur');memeState=j.data.config||memeState;const set=(id,v)=>{const e=document.getElementById(id);if(e)e.value=v};document.getElementById('meme-enabled').checked=!!memeState.enabled;set('meme-mode',memeState.mode||'trust');set('meme-duration',memeState.duration||6);set('meme-cost',memeState.cost??75);set('meme-cooldown',memeState.cooldown??60);set('meme-size',memeState.size??80);selectMemePosition(memeState.position||'center');set('meme-max-text',memeState.maxText??100);set('meme-max-file',memeState.maxFileMb??15);set('meme-video-duration',memeState.maxVideoDuration??20);set('meme-launch-type',memeState.launchSoundType||'pop');set('meme-launch-volume',memeState.launchSoundVolume??55);document.getElementById('meme-launch-sound').checked=memeState.launchSound!==false;document.getElementById('meme-viewer-tts').checked=!!memeState.viewerTts;set('meme-starting-points',j.data.points?.starting??100);set('meme-points-amount',j.data.points?.amount??5);set('meme-points-interval',j.data.points?.interval??10);document.getElementById('memes-obs-url').textContent=j.data.overlayUrl||'';document.getElementById('memes-viewer-url').textContent=j.data.viewerUrl||'';renderMemePoints(j.data.points,j.data.leaderboard);loadMemePending()}catch(e){toast(e.message,false)}}
+async function loadMemes(){try{const r=await fetch('/api/admin/memes',{cache:'no-store'}),j=await r.json();if(!r.ok)throw new Error(j.error||'Erreur');memeState=j.data.config||memeState;const set=(id,v)=>{const e=document.getElementById(id);if(e)e.value=v};document.getElementById('meme-enabled').checked=!!memeState.enabled;set('meme-mode',memeState.mode||'trust');set('meme-duration',memeState.duration||6);set('meme-cost',memeState.cost??75);set('meme-cooldown',memeState.cooldown??60);set('meme-size',memeState.size??80);selectMemePosition(memeState.position||'center');set('meme-max-text',memeState.maxText??100);set('meme-max-file',memeState.maxFileMb??15);set('meme-video-duration',memeState.maxVideoDuration??20);set('meme-launch-type',memeState.launchSoundType||'pop');set('meme-launch-volume',memeState.launchSoundVolume??55);document.getElementById('meme-launch-sound').checked=memeState.launchSound!==false;document.getElementById('meme-viewer-tts').checked=!!memeState.viewerTts;set('meme-starting-points',j.data.points?.starting??100);set('meme-points-amount',j.data.points?.amount??5);set('meme-points-interval',j.data.points?.interval??10);document.getElementById('memes-obs-url').textContent=j.data.overlayUrl||'';document.getElementById('memes-viewer-url').textContent=j.data.viewerUrl||'';document.getElementById('memes-moderator-url').textContent=j.data.moderatorUrl||'';renderMemePoints(j.data.points,j.data.leaderboard);loadMemePending()}catch(e){toast(e.message,false)}}
 function renderMemeRows(){const root=document.getElementById('meme-list');if(!root)return;if(!memeState.items.length){root.innerHTML='<div style="padding:25px;text-align:center;color:var(--muted)">Aucun meme. Ajoute le premier pour commencer.</div>';return}root.innerHTML=memeState.items.map((m,i)=>`<div class="card" style="padding:12px"><div class="form-row"><div><label class="lbl">Nom de commande</label><input class="inp" value="${esc(m.id)}" oninput="memeField(${i},'id',this.value)" placeholder="rire"></div><div><label class="lbl">Titre</label><input class="inp" value="${esc(m.name)}" oninput="memeField(${i},'name',this.value)"></div></div><label class="lbl" style="margin-top:8px">URL image, GIF ou vidéo</label><input class="inp" value="${esc(m.mediaUrl)}" oninput="memeField(${i},'mediaUrl',this.value)" placeholder="https://..."><label class="lbl" style="margin-top:8px">URL du son (facultatif)</label><input class="inp" value="${esc(m.soundUrl||'')}" oninput="memeField(${i},'soundUrl',this.value)" placeholder="https://...mp3"><div class="form-row" style="margin-top:8px"><div><label class="lbl">Durée (secondes)</label><input class="inp" type="number" min="2" max="20" value="${m.duration}" oninput="memeField(${i},'duration',this.value)"></div><div><label class="lbl">Coût en points</label><input class="inp" type="number" min="0" value="${m.cost}" oninput="memeField(${i},'cost',this.value)"></div><div><label class="lbl">Cooldown (secondes)</label><input class="inp" type="number" min="0" value="${m.cooldown}" oninput="memeField(${i},'cooldown',this.value)"></div></div><div style="display:flex;gap:8px;align-items:center;margin-top:10px"><label><input type="checkbox" ${m.allowText!==false?'checked':''} onchange="memeField(${i},'allowText',this.checked)"> Texte personnalisé</label><label><input type="checkbox" ${m.enabled!==false?'checked':''} onchange="memeField(${i},'enabled',this.checked)"> Actif</label><span style="flex:1"></span><button class="btnx btn-outline btn-sm" onclick="testMeme(${i})">▶ Tester</button><button class="btnx btn-red btn-sm" onclick="deleteMeme(${i})">Supprimer</button></div></div>`).join('')}
 function memeField(i,k,v){if(['duration','cost','cooldown'].includes(k))v=Number(v)||0;memeState.items[i][k]=v}
 function addMemeRow(){memeState.items.push({id:'nouveau',name:'Nouveau meme',mediaUrl:'',soundUrl:'',duration:6,cost:0,cooldown:30,allowText:true,enabled:true});renderMemeRows()}
@@ -4952,10 +4959,13 @@ function copyMemeObs(){const v=document.getElementById('memes-obs-url').textCont
 function copyMemeViewer(){navigator.clipboard.writeText(document.getElementById('memes-viewer-url').textContent);toast('Lien viewer copié')}
 function renderMemePoints(points={},rows=[]){const s=document.getElementById('meme-points-summary'),r=document.getElementById('meme-points-ranking');if(s)s.innerHTML=`Ces points sont indépendants du classement watchtime.<br>Nouveau viewer : <b>${points.starting??100} points mèmes</b><br>Gain : <b>+${points.amount??5}</b> toutes les <b>${points.interval??10} minutes</b><br>Envoi : <b>−${memeState.cost??75}</b>`;if(r)r.innerHTML=(rows||[]).length?(rows||[]).map((v,i)=>`<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--brd)"><span>#${i+1} ${esc(v.username)}</span><b>${v.points} pts mèmes</b></div>`).join(''):'Aucun viewer classé.'}
 async function changeMemePoints(direction){const username=String(document.getElementById('meme-admin-user')?.value||'').trim(),value=Math.abs(Number(document.getElementById('meme-admin-points')?.value||0)),status=document.getElementById('meme-admin-points-status');if(!username||!value)return status.textContent='Entre un pseudo et un nombre de points.';const r=await fetch('/api/admin/memes/points',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username,amount:Math.trunc(value)*direction})}),j=await r.json();if(!r.ok)return status.textContent=j.error||'Modification impossible';status.textContent=`✓ ${j.data.username} possède maintenant ${j.data.points} points mèmes`;loadMemes()}
-async function loadMemePending(){const r=await fetch('/api/admin/memes/submissions'),j=await r.json();const root=document.getElementById('meme-pending'),rows=j.data||[];root.innerHTML=rows.length?rows.map(x=>`<div class="card" style="padding:10px;margin:8px 0"><b>${esc(x.username)}</b> — ${esc(x.text||'Sans texte')}<div style="display:flex;gap:6px;margin-top:7px"><button class="btnx btn-green btn-sm" onclick="reviewMeme(${x.id},'approve')">Accepter</button><button class="btnx btn-red btn-sm" onclick="reviewMeme(${x.id},'reject')">Refuser</button></div></div>`).join(''):'Aucun envoi en attente.'}
+let memeHistoryRows=[],memeHistoryPage=1;const MEME_HISTORY_PAGE_SIZE=10;
+async function loadMemePending(){const r=await fetch('/api/admin/memes/submissions?status=all',{cache:'no-store'}),j=await r.json();memeHistoryRows=j.data||[];memeHistoryPage=Math.min(memeHistoryPage,Math.max(1,Math.ceil(memeHistoryRows.length/MEME_HISTORY_PAGE_SIZE)));renderMemeHistory()}
+function renderMemeHistory(){const root=document.getElementById('meme-pending'),pager=document.getElementById('meme-history-pager'),labels={pending:'⏳',approved:'✅',rejected:'❌'},rows=memeHistoryRows.slice((memeHistoryPage-1)*MEME_HISTORY_PAGE_SIZE,memeHistoryPage*MEME_HISTORY_PAGE_SIZE);root.innerHTML=rows.length?rows.map(x=>{const date=x.created_at?new Date(String(x.created_at).replace(' ','T')+'Z').toLocaleString('fr-FR'):'Date inconnue',actions=x.status==='pending'?`<button class="btnx btn-green btn-sm" onclick="reviewMeme(${x.id},'approve')">Accepter</button><button class="btnx btn-red btn-sm" onclick="reviewMeme(${x.id},'reject')">Refuser</button>`:'';return `<div style="display:flex;align-items:center;gap:8px;padding:7px 4px;border-bottom:1px solid var(--brd);font-size:11px;flex-wrap:wrap"><b>${labels[x.status]||''} @${esc(x.username)}</b><span style="flex:1;min-width:160px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${escapeAttr(x.text||'Sans texte')}">${esc(x.text||'Sans texte')}</span><span style="color:var(--muted)">${esc(date)}</span><a href="${escapeAttr(x.media_url||'#')}" target="_blank" rel="noopener" style="color:var(--accent)">Média</a>${actions}</div>`}).join(''):'Aucun envoi enregistré.';const pages=Math.max(1,Math.ceil(memeHistoryRows.length/MEME_HISTORY_PAGE_SIZE));pager.innerHTML=pages>1?`<button class="btnx btn-outline btn-sm" ${memeHistoryPage<=1?'disabled':''} onclick="memeHistoryPage--;renderMemeHistory()">←</button><b>${memeHistoryPage} / ${pages}</b><button class="btnx btn-outline btn-sm" ${memeHistoryPage>=pages?'disabled':''} onclick="memeHistoryPage++;renderMemeHistory()">→</button>`:''}
 async function reviewMeme(id,action){await fetch(`/api/admin/memes/submissions/${id}/${action}`,{method:'POST'});loadMemePending()}
 
 function showPage(name) {
+  if(name==='alerts') name='alertes';
   hydrateAllObsLinks();
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
   document.querySelectorAll('.menu a').forEach(t => t.classList.remove('active'));
@@ -5068,7 +5078,6 @@ async function loadStats() {
   try {
     const d = await get('/api/stats'); if(!d) return;
     const setEl = (id, val) => { const el = document.getElementById(id); if(el) el.textContent = val; };
-    setEl('sc-active', (d.total_viewers||0).toLocaleString('fr'));
     setEl('s-points', (d.total_points_distributed||0).toLocaleString('fr'));
     setEl('s-minutes', fmtMin(d.total_minutes_watched||0));
     setEl('s-top', d.top_viewer || '—');
@@ -5252,7 +5261,7 @@ async function loadCommunity() {
     for (const historical of data.historicalSupporters || []) {
       const key = String(historical.username || '').toLowerCase();
       if (!supporterMap.has(key)) supporterMap.set(key, { username:historical.username, gifts:historical.gifts_all_time, renewals:0, new_subs:0, max_months:0, last_support:null, kickHistorical:true });
-      else { supporterMap.get(key).gifts = Math.max(Number(supporterMap.get(key).gifts || 0), Number(historical.gifts_all_time || 0)); supporterMap.get(key).kickHistorical = true; }
+      else { supporterMap.get(key).gifts = Number(historical.gifts_all_time || 0); supporterMap.get(key).kickHistorical = true; supporterMap.get(key).giftSource=historical.source||'kick'; }
     }
     for (const current of data.currentSubscribers || []) {
       const key = String(current.username || '').toLowerCase();
@@ -5917,6 +5926,8 @@ function updateLiveUI(live, viewers, followers) {
 
   // Viewers (panel info uniquement — la sidebar affiche maintenant l'uptime)
   const viewersFmt = live ? (viewers || '0') : '—';
+  const dashboardViewers = document.getElementById('sc-active');
+  if (dashboardViewers) dashboardViewers.textContent = viewersFmt;
   const icViewers = document.getElementById('ic-viewers');
   if (icViewers) icViewers.textContent = viewersFmt;
 
@@ -6558,7 +6569,7 @@ async function loadAnnouncements() {
         <label class="toggle"><input type="checkbox" ${a.enabled?'checked':''} onchange="toggleAnn(${a.id},this.checked)"><span class="tsl"></span></label>
         <div style="flex:1;min-width:0">
           <div style="font-size:11px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(a.message)}</div>
-          <div style="font-size:9px;color:var(--muted2)">Toutes les ${fmtMin(a.interval_ms/60000*60)}</div>
+          <div style="font-size:9px;color:var(--muted2)">Toutes les ${fmtMin(a.interval_ms/60000)}</div>
         </div>
         <button class="btnx btn-red btn-xs" onclick="deleteAnn(${a.id})">✕</button>
       </div>`).join('');
@@ -6568,7 +6579,7 @@ async function loadAnnouncements() {
 function setAnnInterval(ms) {
   annInterval = ms;
   document.getElementById('ann-interval').value = ms;
-  toast('Intervalle : ' + fmtMin(ms/60000*60));
+  toast('Intervalle : ' + fmtMin(ms/60000));
 }
 
 async function addAnnouncement() {
@@ -6603,7 +6614,7 @@ async function loadTimers() {
         <label class="toggle"><input type="checkbox" ${t.enabled?'checked':''} onchange="toggleTimer('${esc(t.name)}',this.checked)"><span class="tsl"></span></label>
         <span class="cpill">${esc(t.name)}</span>
         <span style="font-size:10px;color:var(--muted);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(t.message)}</span>
-        <span style="font-size:9px;color:var(--muted2)">${fmtMin(t.interval_ms/60000*60)}</span>
+        <span style="font-size:9px;color:var(--muted2)">${fmtMin(t.interval_ms/60000)}</span>
         <button class="btnx btn-red btn-xs" onclick="deleteTimer('${esc(t.name)}')">✕</button>
       </div>`).join('');
   } catch(e) {}
@@ -6612,7 +6623,7 @@ async function loadTimers() {
 function setTimerInterval(ms) {
   timerInterval = ms;
   document.getElementById('timer-interval').value = ms;
-  toast('Intervalle timer : ' + fmtMin(ms/60000*60));
+  toast('Intervalle timer : ' + fmtMin(ms/60000));
 }
 
 async function addTimer() {
@@ -7363,6 +7374,7 @@ function closeChestAnimOnBg(event) {
 // Socket : animation quand le coffre est ouvert depuis le chat (!coffre N)
 try {
   const chestSocket = io();
+  chestSocket.on('connect',()=>{const slug=String(window.CURRENT_STREAMER_SLUG||CURRENT_STREAMER_SLUG||'').trim();if(slug)chestSocket.emit('tenant-join',slug)});
   chestSocket.on('chest-opened', (data) => {
     playChestAnimation(data);
     if (document.getElementById('page-chests')?.classList.contains('active')) loadChests();
@@ -7383,6 +7395,7 @@ try {
       renderSongRequestPlayer(srLastQueue, srPlayer);
     }
   });
+  chestSocket.on('dashboard-activity', data => { if(typeof pushReferenceActivity==='function')pushReferenceActivity(data); });
 } catch(e) { console.warn('[CHESTS] socket indisponible', e); }
 
 async function newChestSeason() {
@@ -7538,10 +7551,7 @@ function renderViewersLiveChart() {
   if (avgEl)  avgEl.textContent  = `moy ${avgV}`;
   if (peakEl) peakEl.textContent = `pic ${peakV}`;
 
-  chart.innerHTML = viewersLiveHistory.map(s => {
-    const h = Math.max(4, Math.round((s.count / maxV) * 76));
-    return `<div style="flex:1;height:${h}px;background:var(--accent);border-radius:2px 2px 0 0;opacity:.8" title="${s.count} viewers"></div>`;
-  }).join('');
+  const width=320,height=82,pad=4,step=(width-pad*2)/Math.max(1,counts.length-1),range=Math.max(1,peakV-minV),points=counts.map((v,i)=>[pad+i*step,height-pad-((v-minV)/range)*(height-pad*2)]);let line=`M${points[0][0]},${points[0][1]}`;for(let i=1;i<points.length;i++)line+=` L${points[i][0].toFixed(1)},${points[i][1].toFixed(1)}`;const area=`${line} L${points[points.length-1][0]},${height} L${points[0][0]},${height} Z`;chart.innerHTML=`<svg viewBox="0 0 ${width} ${height}" preserveAspectRatio="none" aria-label="Évolution des viewers"><defs><linearGradient id="liveViewerFill" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="var(--accent)" stop-opacity=".42"/><stop offset="1" stop-color="var(--accent)" stop-opacity=".02"/></linearGradient></defs><path d="${area}" fill="url(#liveViewerFill)"/><path d="${line}" fill="none" stroke="var(--accent)" stroke-width="3" vector-effect="non-scaling-stroke" stroke-linejoin="round" stroke-linecap="round"/></svg>`;
 }
 
 // ── Fidélité ──────────────────────────────────────────────────────────────────
@@ -7673,22 +7683,30 @@ const SEARCH_PAGES = [
 
 let searchIdx = 0;
 let searchViewers = [];
+let searchCommands = [];
 let searchResultActions = [];
+const normalizeSearchText=value=>String(value||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();
 
 function openSearch() {
   const overlay = document.getElementById('search-overlay');
   const input   = document.getElementById('search-input');
   if (!overlay || !input) return;
   overlay.classList.add('open');
+  overlay.style.display = 'flex';
   input.value = '';
   input.focus();
   runSearch();
   // Pré-charger les viewers pour la recherche
-  get('/api/leaderboard?limit=200').then(d => { searchViewers = d || []; }).catch(()=>{});
+  Promise.all([
+    get('/api/leaderboard?limit=200').then(d=>{searchViewers=d||[]}),
+    get('/api/commands').then(d=>{searchCommands=d||[]})
+  ]).then(()=>runSearch()).catch(()=>{});
 }
 
 function closeSearch() {
-  document.getElementById('search-overlay')?.classList.remove('open');
+  const overlay=document.getElementById('search-overlay');
+  overlay?.classList.remove('open');
+  if(overlay) overlay.style.display='none';
 }
 
 function handleSearchKey(e) {
@@ -7706,7 +7724,7 @@ function highlightSearch() {
 }
 
 async function runSearch() {
-  const q = (document.getElementById('search-input')?.value || '').toLowerCase().trim();
+  const q = normalizeSearchText(document.getElementById('search-input')?.value).trim();
   const el = document.getElementById('search-results');
   if (!el) return;
   searchIdx = 0;
@@ -7715,7 +7733,7 @@ async function runSearch() {
 
   // Pages correspondantes
   const matchPages = SEARCH_PAGES.filter(p =>
-    p.label.toLowerCase().includes(q) || p.page.includes(q) || String(p.tags||'').includes(q)
+    normalizeSearchText(p.label).includes(q) || normalizeSearchText(p.page).includes(q) || normalizeSearchText(p.tags).includes(q)
   );
   results.push(...matchPages.map(p => ({
     icon: p.icon, label: p.label, sub: p.widget ? 'Widget' : 'Page', action: () => { closeSearch(); showPage(p.page); if(p.widget)setTimeout(()=>openWidgetSettings(p.widget),50); }
@@ -7740,6 +7758,11 @@ async function runSearch() {
         }, 300);
       }
     })));
+  }
+
+  if (q.length >= 1 && searchCommands.length) {
+    const matches=searchCommands.filter(c=>normalizeSearchText(`${c.trigger||''} ${c.response||''}`).includes(q)).slice(0,6);
+    results.push(...matches.map(c=>({icon:'⚡',label:c.trigger||'Commande',sub:'Commande personnalisée',action:()=>{closeSearch();showPage('commands');setTimeout(()=>document.getElementById('cmd-page-list')?.scrollIntoView({behavior:'smooth',block:'start'}),250)}})));
   }
 
   if (!results.length && q.length > 0) {
@@ -8043,7 +8066,13 @@ async function loadSongRequest(silent = false) {
     srSetVal('sr-command', d.command || '!sr');
     srSetVal('sr-confirm', d.confirmMessage || '🎵 @{username}, ta musique a été ajoutée à la file !');
     srSetChecked('sr-chat-confirm', d.chatConfirmEnabled === true);
+    srSetChecked('sr-now-playing-chat', d.nowPlayingChatEnabled !== false);
+    srSetVal('sr-now-playing-message', d.nowPlayingMessage || '🎵 Lecture : {title} · demandé par @{username}');
     srSetVal('sr-max', d.maxQueue || 30);
+    srSetChecked('sr-skip-vote-enabled', d.skipVoteEnabled !== false);
+    srSetVal('sr-skip-vote-required', d.skipVoteRequired || 3);
+    const skipStatus=document.getElementById('sr-skip-vote-status');
+    if(skipStatus) skipStatus.textContent=`${Number(d.skipVotes?.count||0)} vote${Number(d.skipVotes?.count||0)>1?'s':''} sur ${Number(d.skipVoteRequired||3)} pour la musique actuelle`;
     const vol = document.getElementById('sr-volume');
     if (vol && d.player?.volume !== undefined) vol.value = d.player.volume;
     hydrateAllObsLinks();
@@ -8342,7 +8371,11 @@ async function saveSongRequestSettings() {
     command: (document.getElementById('sr-command')?.value || '!sr').trim(),
     confirmMessage: (document.getElementById('sr-confirm')?.value || '').trim(),
     chatConfirmEnabled: document.getElementById('sr-chat-confirm')?.checked === true,
-    maxQueue: parseInt(document.getElementById('sr-max')?.value || '30') || 30
+    nowPlayingChatEnabled: document.getElementById('sr-now-playing-chat')?.checked === true,
+    nowPlayingMessage: (document.getElementById('sr-now-playing-message')?.value || '').trim(),
+    maxQueue: parseInt(document.getElementById('sr-max')?.value || '30') || 30,
+    skipVoteEnabled: document.getElementById('sr-skip-vote-enabled')?.checked === true,
+    skipVoteRequired: parseInt(document.getElementById('sr-skip-vote-required')?.value || '3') || 3
   };
   const r = await fetch(API + '/api/admin/widgets/songrequest/settings', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body) });
   const d = await r.json().catch(()=>null);
@@ -8685,7 +8718,7 @@ function getEngineWidget(id) {
   return WIDGET_ENGINE_CACHE?.widgets?.find(w => w.id === id) || null;
 }
 function configureEngineWidget(id) {
-  if (id === 'alerts') return showPage('alerts');
+  if (id === 'alerts') return showPage('alertes');
   if (id === 'memes') return showPage('memes');
   openWidgetSettings(id);
 }
@@ -8800,6 +8833,18 @@ try {
       if (!srLastQueue.length) srPlayer = Object.assign(srPlayer, { status:'stopped', currentTime:0, duration:0, itemId:'' });
       if (prevItemId !== srPlayer.itemId || prevStatus !== srPlayer.status || Math.abs(incomingTime - localTime) > 1.25) srSyncClockFromPlayer(srPlayer);
       renderSongRequestPlayer(srLastQueue, srPlayer);
+    });
+    srSocket.on('songrequest-skip-votes', data=>{
+      const status=document.getElementById('sr-skip-vote-status');
+      if(status)status.textContent=`${Number(data?.count||0)} vote${Number(data?.count||0)>1?'s':''} sur ${Number(data?.required||3)} pour la musique actuelle`;
+    });
+    let alertHistoryTimer=null;
+    srSocket.on('alert-overlay-event',()=>{
+      clearTimeout(alertHistoryTimer);
+      alertHistoryTimer=setTimeout(()=>{if(document.getElementById('page-alertes')?.classList.contains('active'))loadAlertHistory()},150);
+    });
+    srSocket.on('alert-overlay-settings',data=>{
+      if(data?.configs){alertsConfigs=data.configs;if(document.getElementById('page-alertes')?.classList.contains('active'))selectAlertType(currentAlertType)}
     });
   }
 } catch(e) {}
@@ -10674,8 +10719,12 @@ async function loadReferenceChests() {
     set('ref-chest-best', best || '—');
   } catch (_) {}
 }
+let refActivityItems=[];
+function pushReferenceActivity(item){if(!item)return;const key=item.id||`${item.type}:${item.username}:${item.at}:${item.content||''}`;if(refActivityItems.some(x=>x._key===key))return;refActivityItems.unshift({...item,_key:key});refActivityItems=refActivityItems.slice(0,12);renderReferenceActivity()}
+function renderReferenceActivity(){const root=document.getElementById('ref-activity-feed');if(!root)return;const icons={chat:'💬',follow:'💚',sub:'⭐',new:'⭐',renewal:'🔄',gift:'🎁',raid:'🚀'};root.innerHTML=refActivityItems.length?refActivityItems.slice(0,7).map(x=>{const type=String(x.type||'chat'),user=esc(x.username||x.gifter||'Viewer'),detail=type==='chat'?esc(x.content||'a écrit dans le chat'):type==='follow'?'vient de suivre la chaîne':type==='gift'?`a offert ${Number(x.count||1)} sub${Number(x.count||1)>1?'s':''}`:type==='renewal'?`renouvelle son abonnement (${Number(x.months||1)} mois)`:type==='raid'?`arrive avec ${Number(x.count||1)} viewers`:'vient de s’abonner',date=x.at?timeAgo(String(x.at).replace('T',' ').replace('Z','')):'maintenant';return `<div class="ref-feed-row"><span>${icons[type]||'•'}</span><div><b>@${user}</b><small>${detail}</small></div><time>${esc(date)}</time></div>`}).join(''):'<div class="ref-feed-empty"><span>💬</span><strong>L’activité apparaîtra ici</strong><small>Followers, messages et événements récents</small></div>'}
+async function loadReferenceActivity(){try{const d=await refFetchJson(API+'/api/v2/dashboard-activity?ts='+Date.now());refActivityItems=[];(Array.isArray(d.data)?d.data:[]).slice().reverse().forEach(pushReferenceActivity)}catch(_){renderReferenceActivity()}}
 function loadReferenceDashboard() {
-  Promise.allSettled([loadReferenceSongRequest(), loadReferenceSubGoal(), loadReferenceChests()]);
+  Promise.allSettled([loadReferenceSongRequest(), loadReferenceSubGoal(), loadReferenceChests(),loadReferenceActivity()]);
 }
 setTimeout(loadReferenceDashboard, 50);
 setInterval(() => {
@@ -11039,12 +11088,13 @@ function openSearchFromTop(value = '') {
   const input = document.getElementById('search-input');
   if (!overlay || !input) return;
   overlay.classList.add('open');
+  overlay.style.display = 'flex';
   input.value = value || '';
   input.focus();
   if (typeof runSearch === 'function') runSearch();
   if (typeof get === 'function') {
-    get('/api/leaderboard?limit=200')
-      .then(data => { searchViewers = data || []; if (typeof runSearch === 'function') runSearch(); })
+    Promise.all([get('/api/leaderboard?limit=200'),get('/api/commands')])
+      .then(([viewers,commands]) => { searchViewers=viewers||[];searchCommands=commands||[];if(typeof runSearch==='function')runSearch(); })
       .catch(() => {});
   }
 }
@@ -11122,16 +11172,7 @@ function refAppendMetric(series, value) {
   return series.slice(-REF_KPI_HISTORY_MAX);
 }
 function refSeedSeries(series, current) {
-  if (series.length >= 4) return series;
-  const base = Math.max(0, current);
-  const seeded = [];
-  for (let i=0;i<12;i++) {
-    const factor = 0.84 + (i/11)*0.16;
-    const wave = Math.sin(i*1.7)*0.025;
-    seeded.push(Math.max(0, Math.round(base*(factor+wave))));
-  }
-  seeded[seeded.length-1] = base;
-  return seeded;
+  return Array.isArray(series) ? series : [];
 }
 function refSeriesPath(values, width=220, height=42, pad=2) {
   if (!values.length) values = [0,0];
@@ -11145,7 +11186,7 @@ function refSeriesPath(values, width=220, height=42, pad=2) {
     const y = height-pad - ((value-min)/range)*(height-pad*2);
     return [x,y];
   });
-  const line = points.map((point,index) => `${index?'L':'M'}${point[0].toFixed(1)},${point[1].toFixed(1)}`).join(' ');
+  let line=`M${points[0][0].toFixed(1)},${points[0][1].toFixed(1)}`;for(let i=1;i<points.length-1;i++){const mid=[(points[i][0]+points[i+1][0])/2,(points[i][1]+points[i+1][1])/2];line+=` Q${points[i][0].toFixed(1)},${points[i][1].toFixed(1)} ${mid[0].toFixed(1)},${mid[1].toFixed(1)}`}const last=points[points.length-1];if(points.length>1)line+=` Q${points[Math.max(0,points.length-2)][0].toFixed(1)},${points[Math.max(0,points.length-2)][1].toFixed(1)} ${last[0].toFixed(1)},${last[1].toFixed(1)}`;
   const area = `${line} L${points[points.length-1][0].toFixed(1)},${height} L${points[0][0].toFixed(1)},${height} Z`;
   return {line,area};
 }
@@ -11185,7 +11226,6 @@ function updateReferenceKpiCharts() {
     viewers:refReadMetric('sc-active'),
     followers:refReadMetric('s-followers'),
     points:refReadMetric('s-points'),
-    top:refTopViewerMetric()
   };
   const history = refLoadKpiHistory();
   for (const key of Object.keys(current)) {
@@ -11512,6 +11552,26 @@ document.addEventListener('DOMContentLoaded', () => {
 window.addEventListener('pageshow', loadReferenceAppearance);
 
 </script>
+
+<style>
+/* Dashboard V14 : données live, cartes lisibles et lecteur Song Request vertical */
+body:has(#page-dashboard.active) .kpi-watch .ref-kpi-name{font-size:31px!important;line-height:1.05!important;margin-top:13px!important;max-width:100%!important;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+body:has(#page-dashboard.active) .kpi-watch .ref-kpi-sub{position:static!important;margin-top:8px!important;font-size:11px!important;color:#8ee7ff!important}
+body:has(#page-dashboard.active) .ref-real-spark{border-radius:8px;background:repeating-linear-gradient(0deg,transparent 0 7px,rgba(130,184,255,.055) 8px),linear-gradient(180deg,rgba(31,139,255,.055),transparent)!important;overflow:hidden}
+body:has(#page-dashboard.active) .spark-line{stroke-width:2.2!important;filter:drop-shadow(0 0 4px color-mix(in srgb,var(--ref-blue) 50%,transparent))}
+body:has(#page-dashboard.active) .ref-song-body{display:flex!important;flex-direction:column!important;gap:9px!important;min-height:0!important}
+body:has(#page-dashboard.active) .ref-song-cover{width:100%!important;height:42%!important;min-height:92px!important;max-height:150px!important;flex:0 0 auto!important;background-size:cover!important;background-position:center 35%!important;border-radius:12px!important}
+body:has(#page-dashboard.active) .ref-song-copy{display:flex!important;flex-direction:column!important;justify-content:flex-start!important;min-height:0!important}
+body:has(#page-dashboard.active) .ref-song-copy strong{font-size:17px!important;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+body:has(#page-dashboard.active) .ref-song-copy>span{display:none!important}
+body:has(#page-dashboard.active) .ref-progress{margin-top:8px!important}
+body:has(#page-dashboard.active) .ref-player-controls{margin-top:7px!important;align-self:center!important}
+body:has(#page-dashboard.active) .ref-player-controls .ref-play{width:40px!important;height:40px!important;font-size:15px!important}
+.ref-activity-feed{display:block!important;overflow:hidden!important;padding:4px 7px!important}
+.ref-feed-row{display:grid;grid-template-columns:24px minmax(0,1fr) auto;gap:8px;align-items:center;padding:6px 3px;border-bottom:1px solid rgba(90,151,224,.12);min-height:30px}
+.ref-feed-row>span{font-size:15px;text-align:center}.ref-feed-row div{min-width:0}.ref-feed-row b{display:inline;font-size:10px;color:#e8f5ff}.ref-feed-row small{display:block;font-size:8px;color:#91a8c4;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:2px}.ref-feed-row time{font-size:7px;color:#66819f}
+.ref-viewers-chart{display:block!important;padding:5px!important;border-radius:10px;background:repeating-linear-gradient(0deg,transparent 0 18px,rgba(111,168,231,.055) 19px),linear-gradient(180deg,rgba(14,111,230,.08),transparent)!important}.ref-viewers-chart svg{display:block;width:100%;height:100%;filter:drop-shadow(0 0 5px color-mix(in srgb,var(--accent) 38%,transparent))}
+</style>
 
 <!-- ElBot Theme Engine V2 — chargé en dernier pour rester prioritaire -->
 <link rel="stylesheet" href="/themes/engine.css?v=33">
