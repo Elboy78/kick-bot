@@ -1783,6 +1783,7 @@ async function getCommunityData(limit = 100, streamerId = null) {
     FROM viewers WHERE COALESCE(streamer_id,1) = ?`, [sid]);
   return { totals: totals || {}, supporters, historicalSupporters, followers, currentSubscribers, events };
 }
+async function getRecentCommunityEvents(limit=20,streamerId=null){const sid=Number(streamerId||scopedStreamerId()),safe=Math.max(1,Math.min(50,parseInt(limit)||20));return all(`SELECT event_type AS type,username,gifter,amount AS count,months,occurred_at AS at FROM community_events WHERE streamer_id=? ORDER BY occurred_at DESC LIMIT ?`,[sid,safe])}
 async function toggleAnnouncement(id, enabled) { await run(`UPDATE announcements SET enabled = ? WHERE id = ?`, [enabled ? 1 : 0, id]); }
 async function deleteAnnouncement(id) { await run(`DELETE FROM announcements WHERE id = ?`, [id]); }
 async function updateAnnouncementSent(id) { await run(`UPDATE announcements SET last_sent = datetime('now') WHERE id = ?`, [id]); }
@@ -2462,7 +2463,7 @@ module.exports = {
   getDB,
   upsertViewer, addPoints, addMemePoints, grantMemePointsIfDue, getMemeLeaderboard, getViewer, getLeaderboard, getViewerRank,
   getGlobalStats, getRecentLogs, getActiveViewers, getViewersMissingFollow, getViewersForBadgeSync, setViewerKickProfile, clearAllPoints,
-  addCommunityEvent, backfillCommunityHistory, importCommunityGiftLeaderboard, upsertCommunityGiftBadge, getCommunityData,
+  addCommunityEvent, backfillCommunityHistory, importCommunityGiftLeaderboard, upsertCommunityGiftBadge, getCommunityData, getRecentCommunityEvents,
   getLevel, getNextLevel, getLevels, getRankingEngine, addLevel, updateLevel, deleteLevel,
   getCustomCommands, getCustomCommand, setCustomCommand, deleteCustomCommand, toggleCustomCommand,
   getObjectives, createObjective, deleteObjective, achieveObjective,

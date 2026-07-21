@@ -791,6 +791,7 @@ async function sendAnnouncementToChat(message, logLabel) {
     return false;
   }
 }
+function emitDashboardActivity(tm,payload){tm.emit('dashboard-activity',{id:`${Date.now()}_${Math.random().toString(36).slice(2,7)}`,at:new Date().toISOString(),...payload})}
 async function processKickEvent(eventTypeRaw, payload = {}) {
   const eventContext = payload?.__streamerContext || payload?.streamer || null;
   const tm = getSubCounterManager(eventContext);
@@ -816,6 +817,7 @@ async function processKickEvent(eventTypeRaw, payload = {}) {
       type: 'follow', username, occurredAt: data?.created_at || payload?.created_at || new Date().toISOString(),
       source: 'kick_event', sourceKey: `follow:${username.toLowerCase()}:${data?.created_at || payload?.created_at || eventDedupeKey(eventType, payload)}`
     }, tm.streamerId);
+    emitDashboardActivity(tm,{type:'follow',username});
 
     const enabled = await db.getSetting('follow_announce_enabled');
     // Synchronise aussi l'ancien réglage utilisé par le tracker followers de bot.js
@@ -832,6 +834,7 @@ async function processKickEvent(eventTypeRaw, payload = {}) {
   if (eventType === 'channel.subscription.new') {
     const info = extractSubInfo(payload);
     await recordSubEvent('new', { username: info.username, count: 1, sourceKey:persistentEventKey }, tm);
+    emitDashboardActivity(tm,{type:'sub',username:info.username});
     await pushObsAlert('sub', { username: info.username }, false, tm).catch(e=>console.warn('[ALERT OBS] sub ignorée:', e.message));
     const enabled = await db.getSetting('sub_announce_enabled');
     if (enabled) {
@@ -845,6 +848,7 @@ async function processKickEvent(eventTypeRaw, payload = {}) {
   if (eventType === 'channel.subscription.renewal') {
     const info = extractSubInfo(payload);
     await recordSubEvent('renewal', { username: info.username, months: info.months, sourceKey:persistentEventKey }, tm);
+    emitDashboardActivity(tm,{type:'renewal',username:info.username,months:info.months});
     await pushObsAlert('renew', { username: info.username, months: info.months }, false, tm).catch(e=>console.warn('[ALERT OBS] renew ignorée:', e.message));
     const enabled = await db.getSetting('sub_announce_enabled');
     if (enabled) {
@@ -861,6 +865,7 @@ async function processKickEvent(eventTypeRaw, payload = {}) {
     const gifter = isAnon ? 'un anonyme' : (gifterRaw || 'Anonyme');
     const count = parseInt(data?.count || data?.gift_count || data?.giftees?.length || data?.recipients?.length || 1) || 1;
     await recordSubEvent('gift', { gifter, count, sourceKey:persistentEventKey }, tm);
+    emitDashboardActivity(tm,{type:'gift',username:gifter,count});
     await pushObsAlert('gift', { gifter, count }, false, tm).catch(e=>console.warn('[ALERT OBS] gift ignorée:', e.message));
     const enabled = await db.getSetting('sub_announce_enabled');
     if (enabled) {
@@ -876,6 +881,7 @@ async function processKickEvent(eventTypeRaw, payload = {}) {
     const username = pick(data?.raider?.username, data?.user?.username, data?.username, data?.raider?.name, data?.user?.name) || "quelqu'un";
     const count = parseInt(data?.viewer_count || data?.viewers || data?.count || data?.amount || 1) || 1;
     await pushObsAlert('raid', { username, count, viewerCount: count }, false, tm).catch(e=>console.warn('[ALERT OBS] raid ignorée:', e.message));
+    emitDashboardActivity(tm,{type:'raid',username,count});
     return { ok:true, eventType:'channel.raid', username, count };
   }
 
@@ -2855,6 +2861,7 @@ app.get('/api/v2/dashboard-summary', requireAuth, requireTenant, async (req, res
     });
   } catch(e) { res.status(500).json({ error: e.message }); }
 });
+app.get('/api/v2/dashboard-activity',requireAuth,requireTenant,async(req,res)=>{try{res.set('Cache-Control','no-store');res.json({data:await db.getRecentCommunityEvents(20,req.streamer?.id)})}catch(e){res.json({data:[]})}});
 
 app.get('/api/v2/account', requireAuth, requireTenant, async (req, res) => {
   try {
@@ -3362,10 +3369,12 @@ async function emitChatOverlayMessage(msg = {}, ctx = null) {
   try {
     const tm = getChatOverlayTM(ctx || msg?.ctx || null);
     if (!tm?.slug) return false;
-    const cfg = await getChatOverlaySettings(tm);
     const username = String(msg.username || '').trim();
     const content = String(msg.content || '').trim();
-    if (!cfg.enabled || !username || !content) return false;
+    if (!username || !content) return false;
+    emitDashboardActivity(tm,{type:'chat',username:username.slice(0,60),content:content.slice(0,180),at:msg.at||new Date().toISOString()});
+    const cfg = await getChatOverlaySettings(tm);
+    if (!cfg.enabled) return true;
 
     const lower = username.replace(/^@+/, '').toLowerCase();
     const ignored = normalizeIgnoredUsers(cfg.ignoredUsers);
