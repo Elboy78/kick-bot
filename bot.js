@@ -11,6 +11,16 @@ const shared   = require('./shared');
 const tenant   = require('./tenant');
 const { AsyncLocalStorage } = require('async_hooks');
 
+function isTestPanelDeployment() {
+  try {
+    return new URL(String(process.env.PANEL_PUBLIC_URL || '')).hostname
+      .toLowerCase()
+      .startsWith('test.');
+  } catch (_) {
+    return false;
+  }
+}
+
 const CONFIG = {
   channel:      process.env.KICK_CHANNEL       || 'votre_chaine',
   channelId:    process.env.KICK_CHANNEL_ID    || '0',
@@ -23,7 +33,9 @@ const CONFIG = {
   legacyChannelEnabled: process.env.KICK_LEGACY_CHANNEL === 'true',
   // Permet de laisser un worker de test écouter les événements Kick sans
   // exécuter une deuxième fois les commandes déjà gérées en production.
-  chatCommandsEnabled: process.env.BOT_CHAT_COMMANDS_ENABLED !== 'false',
+  chatCommandsEnabled:
+    process.env.BOT_CHAT_COMMANDS_ENABLED === 'true' ||
+    (process.env.BOT_CHAT_COMMANDS_ENABLED !== 'false' && !isTestPanelDeployment()),
 };
 
 const PUSHER_URL = 'wss://ws-us2.pusher.com/app/32cbd69e4b950bf97679?protocol=7&client=js&version=7.4.0&flash=false';
