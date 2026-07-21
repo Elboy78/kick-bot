@@ -247,17 +247,17 @@ window.onYouTubeIframeAPIReady=function(){
 load(true);
 
 // Affichage local fluide.
-setInterval(() => updateTimeUI(), 250);
+setInterval(() => updateTimeUI(), 500);
 
 // Remontée de la progression du lecteur OBS.
-setInterval(() => postState(desiredStatus, false), 2000);
+setInterval(() => postState(desiredStatus, false), 5000);
 
 // File et métadonnées : resynchronisation légère.
-setInterval(() => load(false), 15000);
+setInterval(() => load(false), 30000);
 
 // Play / Pause / Seek / Volume : secours temps réel.
 // La fonction existait, mais elle n’était jamais appelée.
-setInterval(() => pollControl(), 800);
+setInterval(() => pollControl(), 1500);
 
 try{
   srSocket=io({transports:['websocket','polling']});

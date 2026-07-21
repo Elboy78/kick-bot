@@ -113,7 +113,9 @@ if(data.streamer)joinStreamerRoom(data.streamer);
 localStorage.setItem(storageKey,JSON.stringify(settings));apply()}catch{}}
 socket.on('chat-overlay-message',add);
 socket.on('chat-overlay-settings',cfg=>{if(!accepts(cfg))return;settings={...settings,...cfg};try{localStorage.setItem(storageKey,JSON.stringify(settings))}catch{}apply()});
-load();setInterval(load,12000);
+// Les réglages arrivent déjà instantanément par socket. Cette requête n'est
+// qu'une resynchronisation de sécurité.
+load();setInterval(load,60000);
 })();
 </script>
 </body>

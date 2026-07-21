@@ -186,7 +186,7 @@ async function init() {
   await syncPointsConfig();
   // V2 : synchronise régulièrement les chaînes ajoutées au bot.
   await syncActiveBotChannels();
-  setInterval(syncActiveBotChannels, 30000);
+  setInterval(syncActiveBotChannels, 60000);
   // Vérifier live + followers toutes les 2 minutes
   if (process.env.BOT_MEME_ONLY !== 'true') setInterval(checkLiveStatus, 120000);
   // Resynchroniser montant/intervalle de points toutes les 2 minutes (changements panel)

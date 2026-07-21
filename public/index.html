@@ -4798,9 +4798,9 @@ function isSongRequestVisible() {
 function startSongRequestRefresh() {
   stopSongRequestRefresh();
   songRequestRefreshTimer = setInterval(() => {
-    if (isSongRequestVisible()) loadSongRequest(true);
+    if (!document.hidden && isSongRequestVisible()) loadSongRequest(true);
     else stopSongRequestRefresh();
-  }, 2000);
+  }, 5000);
 }
 
 function stopSongRequestRefresh() {
@@ -8059,13 +8059,15 @@ function srUpdateProgressOnly(force = false) {
   if (durTimeEl && force) durTimeEl.textContent = duration ? fmtSongTime(duration) : '0:00';
 }
 function srStartSmoothUiLoop(){
-  if (srRafTimer) cancelAnimationFrame(srRafTimer);
+  if (srRafTimer) clearTimeout(srRafTimer);
   const loop = () => {
     if (document.hidden || !isSongRequestOpen()) { srRafTimer = null; return; }
     srUpdateProgressOnly(false);
-    srRafTimer = requestAnimationFrame(loop);
+    // 4 mises à jour/seconde suffisent pour une barre fluide. L'ancienne
+    // boucle requestAnimationFrame tournait jusqu'à 60 fois/seconde.
+    srRafTimer = setTimeout(loop, 250);
   };
-  if (!document.hidden && isSongRequestOpen()) srRafTimer = requestAnimationFrame(loop);
+  if (!document.hidden && isSongRequestOpen()) srRafTimer = setTimeout(loop, 250);
 }
 async function loadSongRequest(silent = false) {
   try {
@@ -10738,7 +10740,7 @@ function loadReferenceDashboard() {
 setTimeout(loadReferenceDashboard, 50);
 setInterval(() => {
   if (!document.hidden && document.getElementById('page-dashboard')?.classList.contains('active')) loadReferenceDashboard();
-}, 30000);
+}, 60000);
 
 </script>
 
@@ -11585,5 +11587,29 @@ body:has(#page-dashboard.active) .ref-player-controls .ref-play{width:40px!impor
 <!-- ElBot Theme Engine V2 — chargé en dernier pour rester prioritaire -->
 <link rel="stylesheet" href="/themes/engine.css?v=33">
 <script src="/theme-engine.js?v=32"></script>
+<style>
+/* Mode équilibré : conserve le verre, mais limite les couches GPU coûteuses. */
+body[data-ref-interface="liquid"] .sidebar,
+body[data-ref-interface="liquid"] .elbot-topbar,
+body[data-ref-interface="liquid"] .panel,
+body[data-ref-interface="liquid"] .card,
+body[data-ref-interface="liquid"] .ref-kpi,
+body[data-ref-interface="liquid"] .ref-panel,
+body[data-ref-interface="vision"] .sidebar,
+body[data-ref-interface="vision"] .elbot-topbar,
+body[data-ref-interface="vision"] .panel,
+body[data-ref-interface="vision"] .card,
+body[data-ref-interface="vision"] .ref-kpi,
+body[data-ref-interface="vision"] .ref-panel,
+body[data-ref-interface="aurora"] .sidebar,
+body[data-ref-interface="aurora"] .elbot-topbar,
+body[data-ref-interface="aurora"] .ref-kpi,
+body[data-ref-interface="aurora"] .ref-panel{
+  backdrop-filter:blur(12px) saturate(135%)!important;
+  -webkit-backdrop-filter:blur(12px) saturate(135%)!important;
+}
+.page:not(.active),.widget-settings[style*="display: none"]{animation:none!important}
+@media(prefers-reduced-motion:reduce){.ref-wave,.lpd.blink{animation:none!important}}
+</style>
 </body>
 </html>
