@@ -1737,7 +1737,7 @@ async function reconcileStoredCommunityGiftBadges(streamerId = null) {
     let badges=[];try{badges=JSON.parse(row.badges_json||'[]')}catch(_){continue}
     const badge=(Array.isArray(badges)?badges:[]).find(item=>['sub_gifter','subgifter','subscription_gifter','gift_sub_gifter'].includes(String(item?.type||item?.slug||item?.name||'').toLowerCase().replace(/[\s-]+/g,'_')));
     if(!badge)continue;
-    const count=parseInt(String(badge.count??badge.gift_count??badge.gifts??badge.quantity??badge.value??'').replace(/[^0-9]/g,''),10);
+    const count=parseInt(String(badge.count??badge.gift_count??badge.gifts??badge.quantity??badge.value??badge?.metadata?.count??badge?.metadata?.gift_count??badge.text??'').replace(/[^0-9]/g,''),10);
     if(Number.isSafeInteger(count)&&count>0)await upsertCommunityGiftBadge(row.username,count,sid);
   }
 }

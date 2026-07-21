@@ -421,7 +421,8 @@ function getSubGifterBadgeCount(badges) {
 
     // Forme actuelle Kick : { type: 'sub_gifter', text: 'Sub Gifter', count: 42 }.
     // Les autres clés servent de filet de sécurité si Kick renomme le champ.
-    const rawCount = badge?.count ?? badge?.gift_count ?? badge?.gifts ?? badge?.quantity ?? badge?.value;
+    const rawCount = badge?.count ?? badge?.gift_count ?? badge?.gifts ?? badge?.quantity ?? badge?.value
+      ?? badge?.metadata?.count ?? badge?.metadata?.gift_count ?? badge?.text;
     const count = Number.parseInt(String(rawCount ?? '').replace(/[^0-9]/g, ''), 10);
     if (Number.isSafeInteger(count) && count > 0) return Math.min(count, 100000000);
   }

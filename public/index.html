@@ -5261,7 +5261,16 @@ async function loadCommunity() {
     for (const historical of data.historicalSupporters || []) {
       const key = String(historical.username || '').toLowerCase();
       if (!supporterMap.has(key)) supporterMap.set(key, { username:historical.username, gifts:historical.gifts_all_time, renewals:0, new_subs:0, max_months:0, last_support:null, kickHistorical:true });
-      else { supporterMap.get(key).gifts = Number(historical.gifts_all_time || 0); supporterMap.get(key).kickHistorical = true; supporterMap.get(key).giftSource=historical.source||'kick'; }
+      else {
+        const liveGifts = Number(supporterMap.get(key).gifts || 0);
+        const historicalGifts = Number(historical.gifts_all_time || 0);
+        // Un compteur absolu Kick positif est prioritaire (il corrige notamment
+        // les webhooks reçus deux fois). Une ancienne ligne vide/à zéro ne doit
+        // jamais effacer un premier cadeau réellement détecté en direct.
+        supporterMap.get(key).gifts = historicalGifts > 0 ? historicalGifts : liveGifts;
+        supporterMap.get(key).kickHistorical = historicalGifts > 0;
+        supporterMap.get(key).giftSource=historical.source||'kick';
+      }
     }
     for (const current of data.currentSubscribers || []) {
       const key = String(current.username || '').toLowerCase();
