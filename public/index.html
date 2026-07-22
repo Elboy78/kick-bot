@@ -401,8 +401,8 @@ body.light .card,body.light .panel,body.light .widget-engine-card{background:lin
 .sidebar{width:224px;padding:18px 14px 16px;background:linear-gradient(180deg,rgba(4,15,37,.76),rgba(3,12,29,.58));border:1px solid rgba(124,187,255,.14);border-left:0;border-radius:0 22px 22px 0;z-index:100;scrollbar-width:none}
 .sidebar::-webkit-scrollbar{display:none}
 .logo{height:62px;margin:0 7px 12px;padding-bottom:14px;border-bottom:1px solid rgba(125,181,255,.12);font-size:25px;letter-spacing:-1px}
-.logo-mark{position:relative;width:33px;height:43px;display:inline-grid;place-items:center;color:#fff;font-size:24px;filter:drop-shadow(0 0 14px rgba(22,151,255,.7))}
-.logo-mark:before{content:'';position:absolute;inset:0;background:linear-gradient(150deg,#12c8ff,#1765ff 62%,#0b36c7);clip-path:polygon(35% 0,92% 0,65% 41%,95% 41%,20% 100%,37% 56%,5% 56%)}
+.logo-mark{position:relative;width:45px;height:45px;display:inline-grid;place-items:center;flex:0 0 45px;filter:drop-shadow(0 0 12px rgba(0,190,255,.32))}
+.logo-mark:before{display:none}.logo-mark img{width:45px;height:45px;display:block;object-fit:contain}
 .logo-word span{color:#fff}.logo-word small{display:block;font-size:9px;letter-spacing:.2px;color:var(--muted);font-weight:500;margin-top:2px}
 .menu a{position:relative;min-height:39px;padding:10px 12px;margin:2px 0;border-radius:11px;color:#c9d7eb;font-size:11.5px;transition:.2s}
 .menu a:hover{background:rgba(37,130,255,.13);color:#fff;font-weight:600;transform:translateX(2px)}
@@ -533,7 +533,7 @@ body.light .card,body.light .panel,body.light .widget-engine-card{background:lin
 </div>
 
 <aside class="sidebar">
-  <div class="logo"><span class="logo-mark" aria-hidden="true"></span><span class="logo-word"><span>ElBot</span><small>Panel de contrôle</small></span></div>
+  <div class="logo"><span class="logo-mark" aria-hidden="true"><img src="/assets/brand/elbot-logo.png?v=1" alt=""></span><span class="logo-word"><span>ElBot</span><small>Panel de contrôle</small></span></div>
   <button class="sb-btnx" id="stream-mode-btn" onclick="toggleStreamMode()" style="margin:6px 0 4px">🎥 Mode stream</button>
   <nav class="menu">
     <a class="active" onclick="showPage('dashboard')">🏠 Dashboard</a>
@@ -8746,12 +8746,14 @@ function renderWidgetEngine(data) {
   const widgets = Array.isArray(data?.widgets) ? data.widgets : [];
   grid.innerHTML = widgets.map(w => {
     const color = w.color || '#94a3b8';
-    const status = w.enabled ? 'Actif' : 'Désactivé';
+    const hasOverlay = w.hasOverlay !== false;
+    const status = hasOverlay ? (w.enabled ? 'Actif' : 'Inactif') : 'Disponible';
+    const statusColor = hasOverlay ? (w.enabled ? '#86efac' : '#94a3b8') : '#7dd3fc';
     return `<article class="widget-engine-card">
       <div class="widget-engine-glow" style="background:radial-gradient(circle,${color}38,transparent 68%)"></div>
       <div class="widget-engine-top">
         <div class="widget-engine-icon" style="color:${color};background:${color}16">${escapeHtml(w.icon || '🧩')}</div>
-        <span class="widget-engine-status" style="color:${w.enabled ? '#86efac' : '#94a3b8'}">${status}</span>
+        <span class="widget-engine-status" style="color:${statusColor}">${status}</span>
       </div>
       <div class="widget-engine-name">${escapeHtml(w.name)}</div>
       <div class="widget-engine-desc">${escapeHtml(w.description || '')}</div>
@@ -10471,6 +10473,7 @@ applyStoredPrefs();
 checkPanelAuth().then(ok => { if (ok) { hydrateAllObsLinks(); loadAll(); } });
 setTimeout(() => { hydrateAllObsLinks(); if (document.getElementById('widget-engine-grid')) loadWidgetEngine(); }, 250);
 setInterval(() => { if (!document.hidden && document.getElementById('page-dashboard')?.classList.contains('active')) loadAll(); },60000);
+setInterval(() => { if (!document.hidden && document.getElementById('page-widgets')?.classList.contains('active')) loadWidgetEngine(true); },15000);
 setInterval(()=>{if(!document.hidden && document.getElementById('page-lobby').classList.contains('active'))loadLobby();},30000);
 
 // Résolveur de dates de follow : le navigateur peut appeler l'API interne Kick

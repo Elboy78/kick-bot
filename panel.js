@@ -184,14 +184,19 @@ app.get('/api/v2/widgets', requireAuth, requireTenant, waitDB, async (req, res) 
     for (const definition of widgetEngine.listWidgets()) {
       const hasOverlay = definition.overlay !== false;
       const tokenRow = hasOverlay ? (tokens[definition.id] || await db.getOrCreateOverlayToken(streamer.id, definition.id)) : null;
-      let enabled = true;
+      let configured = true;
       if (definition.enabledSetting) {
         const raw = await tm.getSetting(definition.enabledSetting, '1');
-        enabled = !['0', 'false', 'off', 'disabled'].includes(String(raw).toLowerCase());
+        configured = !['0', 'false', 'off', 'disabled'].includes(String(raw).toLowerCase());
       }
+      const lastUsedRaw=String(tokenRow?.last_used_at||'').trim();
+      const lastUsedMs=lastUsedRaw?Date.parse(lastUsedRaw.includes('T')?lastUsedRaw:`${lastUsedRaw.replace(' ','T')}Z`):0;
+      const recentlyUsed=hasOverlay&&lastUsedMs>0&&(Date.now()-lastUsedMs)<120000;
       widgets.push({
         ...definition,
-        enabled,
+        enabled: hasOverlay ? (configured&&recentlyUsed) : configured,
+        configured,
+        recentlyUsed,
         url: hasOverlay ? `${base}/o/${tokenRow.token}/${definition.id}.html` : '',
         hasOverlay,
         maskedToken: hasOverlay ? `${String(tokenRow.token).slice(0, 6)}…${String(tokenRow.token).slice(-6)}` : '',
