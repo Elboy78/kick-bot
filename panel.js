@@ -486,7 +486,9 @@ app.get('/api/community', waitDB, async (req, res) => {
 app.post('/api/admin/community/kick-gifts-import', waitDB, requireAuth, async (req, res) => {
   try {
     const rows = Array.isArray(req.body?.rows) ? req.body.rows : [];
-    const imported = await db.importCommunityGiftLeaderboard(rows, req.streamer?.id);
+    const authoritative = req.body?.authoritative === true;
+    const source = authoritative ? 'kick_leaderboard' : 'kick_history';
+    const imported = await db.importCommunityGiftLeaderboard(rows, req.streamer?.id, { authoritative, source });
     res.json({ success: true, imported });
   } catch (e) {
     console.error('[COMMUNAUTÉ] Import leaderboard Kick impossible:', e.message);

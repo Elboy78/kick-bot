@@ -5323,7 +5323,7 @@ function communityDate(value, unknown = 'Date inconnue') {
   return Number.isNaN(date.getTime()) ? unknown : date.toLocaleDateString('fr-FR', { day:'2-digit', month:'2-digit', year:'numeric' });
 }
 
-async function loadCommunity() {
+async function loadCommunity(skipKickSync = false) {
   const supportersBody = document.getElementById('community-supporters');
   try {
     const data = await get('/api/community?limit=500') || {};
@@ -5361,7 +5361,10 @@ async function loadCommunity() {
     const labels = { follow:'💚 Nouveau follow', new:'⭐ Nouveau sub', renewal:'🔄 Renouvellement', gift:'🎁 Subs offerts' };
     const eventsEl = document.getElementById('community-events');
     eventsEl.innerHTML = (data.events || []).length ? data.events.map(item => `<div style="padding:10px 12px;border:1px solid var(--border);border-radius:10px;background:var(--surface2)"><div style="display:flex;justify-content:space-between;gap:8px"><strong>${labels[item.type] || esc(item.type)}</strong><small style="color:var(--muted)">${communityDate(item.at)}</small></div><div style="margin-top:4px;color:var(--text)">${esc(item.username || item.gifter || 'Anonyme')}${item.type==='gift' ? ` · ${Number(item.count||1)} gifts` : ''}${item.months ? ` · ${Number(item.months)} mois` : ''}</div><small style="color:var(--muted)">${item.source === 'legacy_subcounter' ? 'Historique récupéré' : 'Détecté par ElBot'}</small></div>`).join('') : '<div class="empty"><p>Aucun événement enregistré</p></div>';
-    if (!communityKickSyncDone) await syncKickHistoricalGiftLeaderboard();
+    if (!skipKickSync && !communityKickSyncDone) {
+      const synchronized = await syncKickHistoricalGiftLeaderboard();
+      if (synchronized) return loadCommunity(true);
+    }
   } catch (e) {
     if (supportersBody) supportersBody.innerHTML = '<tr><td colspan="6"><div class="empty"><p>Historique indisponible</p></div></td></tr>';
   }
@@ -5378,6 +5381,14 @@ async function refreshCommunity() {
 }
 
 let communitySupporters = [], communityFollowers = [], communitySupportPage = 1, communityFollowPage = 1, communityKickSyncDone = false;
+let communityAutoSyncBusy = false;
+setInterval(async () => {
+  if (document.hidden || communityAutoSyncBusy || !document.getElementById('page-communaute')?.classList.contains('active')) return;
+  communityAutoSyncBusy = true;
+  communityKickSyncDone = false;
+  try { await loadCommunity(); }
+  finally { communityAutoSyncBusy = false; }
+}, 60000);
 const COMMUNITY_PAGE_SIZE = 25;
 function communityPager(id, page, total, setter) {
   const pages = Math.max(1, Math.ceil(total / COMMUNITY_PAGE_SIZE)); page = Math.min(page, pages);
@@ -5411,9 +5422,10 @@ async function syncKickHistoricalGiftLeaderboard(){
     const payload=await response.json(); const candidates=[payload?.gifts,payload?.data?.gifts,payload?.gifted_subscriptions,payload?.data?.gifted_subscriptions,payload?.all_time,payload?.data?.all_time];
     const raw=candidates.find(Array.isArray)||[]; const rows=raw.map(x=>({username:x?.username||x?.user?.username||x?.user?.name||x?.name,quantity:Number(x?.quantity??x?.count??x?.gifts??0)})).filter(x=>x.username&&x.quantity>0);
     if(!rows.length)throw new Error('format Kick inconnu');
-    const saved=await fetch(API+'/api/admin/community/kick-gifts-import',{method:'POST',headers:{'Content-Type':'application/json','x-panel-key':getKey()},body:JSON.stringify({rows})}); if(!saved.ok)throw new Error('import refusé');
-    if(status)status.textContent=`✓ ${rows.length} gifters all time synchronisés`; setTimeout(loadCommunity,300);
-  }catch(e){if(status)status.textContent='Historique Kick conservé · synchronisation indisponible';}
+    const saved=await fetch(API+'/api/admin/community/kick-gifts-import',{method:'POST',headers:{'Content-Type':'application/json','x-panel-key':getKey()},body:JSON.stringify({rows,authoritative:true})}); if(!saved.ok)throw new Error('import refusé');
+    if(status)status.textContent=`✓ ${rows.length} gifters all time synchronisés`;
+    return true;
+  }catch(e){if(status)status.textContent='Historique Kick conservé · synchronisation indisponible';return false;}
 }
 
 async function syncCommunityUserProfile(){

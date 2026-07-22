@@ -1750,19 +1750,24 @@ async function backfillCommunityHistory(streamerId = null) {
   }
 }
 
-async function importCommunityGiftLeaderboard(rows = [], streamerId = null) {
+async function importCommunityGiftLeaderboard(rows = [], streamerId = null, options = {}) {
   const sid = Number(streamerId || scopedStreamerId());
+  const authoritative = options?.authoritative === true;
+  const source = String(options?.source || (authoritative ? 'kick_leaderboard' : 'kick_history'))
+    .replace(/[^a-z0-9_-]/gi, '').slice(0, 40) || 'kick_history';
   let imported = 0;
   for (const item of Array.isArray(rows) ? rows.slice(0, 500) : []) {
     const username = String(item.username || '').trim().toLowerCase();
     const gifts = Math.max(0, parseInt(item.quantity ?? item.gifts ?? 0) || 0);
     if (!username || !gifts) continue;
     await run(`INSERT INTO community_support_snapshots (streamer_id,username,gifts_all_time,source,synced_at)
-      VALUES (?,?,?,'kick_leaderboard',datetime('now'))
+      VALUES (?,?,?,?,datetime('now'))
       ON CONFLICT(streamer_id,username) DO UPDATE SET
-        gifts_all_time = CASE WHEN excluded.gifts_all_time > community_support_snapshots.gifts_all_time THEN excluded.gifts_all_time ELSE community_support_snapshots.gifts_all_time END,
+        gifts_all_time = CASE WHEN ? = 1 THEN excluded.gifts_all_time
+          WHEN excluded.gifts_all_time > community_support_snapshots.gifts_all_time THEN excluded.gifts_all_time
+          ELSE community_support_snapshots.gifts_all_time END,
         source = excluded.source, synced_at = excluded.synced_at`,
-      [sid, username, gifts]);
+      [sid, username, gifts, source, authoritative ? 1 : 0]);
     imported++;
   }
   return imported;
@@ -1800,8 +1805,18 @@ async function upsertCommunityGiftBadge(username, giftCount, streamerId = null) 
 
 async function reconcileStoredCommunityGiftBadges(streamerId = null) {
   const sid=Number(streamerId||scopedStreamerId());
-  const rows=await all(`SELECT username,badges_json FROM viewers WHERE COALESCE(streamer_id,1)=? AND badges_json IS NOT NULL AND badges_json!=''`,[sid]);
+  const rows=await all(`SELECT v.username,v.badges_json,v.badges_synced_at,
+      s.synced_at AS snapshot_synced_at
+    FROM viewers v
+    LEFT JOIN community_support_snapshots s
+      ON s.streamer_id = ? AND s.username = LOWER(v.username)
+    WHERE COALESCE(v.streamer_id,1)=? AND v.badges_json IS NOT NULL AND v.badges_json!=''`,[sid,sid]);
   for(const row of rows){
+    // Un ancien badge mis en cache ne doit jamais annuler une correction plus
+    // récente récupérée depuis le leaderboard Kick.
+    if(row.snapshot_synced_at&&row.badges_synced_at&&
+      new Date(String(row.badges_synced_at).replace(' ','T')+'Z').getTime()<
+      new Date(String(row.snapshot_synced_at).replace(' ','T')+'Z').getTime())continue;
     let badges=[];try{badges=JSON.parse(row.badges_json||'[]')}catch(_){continue}
     const badge=(Array.isArray(badges)?badges:[]).find(item=>['sub_gifter','subgifter','subscription_gifter','gift_sub_gifter'].includes(String(item?.type||item?.slug||item?.name||'').toLowerCase().replace(/[\s-]+/g,'_')));
     if(!badge)continue;
