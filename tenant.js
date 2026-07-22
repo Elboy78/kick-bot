@@ -99,9 +99,14 @@ async function attachTenant(db, req, res, next) {
     // ?streamer=, un Referer ou un ancien cookie ne doit jamais permettre de
     // lire les données d'un autre compte. Seul l'administrateur plateforme
     // peut utiliser la cible d'impersonation déjà vérifiée par loadSession.
-    const sessionStreamer = req.platformAdmin && req.adminTargetStreamer
-      ? req.adminTargetStreamer
-      : req.authStreamer;
+    // Les classements publics doivent toujours être résolus depuis leur URL.
+    // Une session panel ouverte dans le même navigateur ne doit jamais forcer
+    // le tenant connecté à la place du streamer demandé publiquement.
+    const sessionStreamer = req.publicTenantLookupOnly
+      ? null
+      : (req.platformAdmin && req.adminTargetStreamer
+        ? req.adminTargetStreamer
+        : req.authStreamer);
     const slug = sessionStreamer?.slug || readRequestedSlug(req);
     const streamer = sessionStreamer || await ensureRequestedStreamer(db, slug, { createIfMissing: !req.publicTenantLookupOnly });
     req.streamer = streamer || null;
