@@ -353,6 +353,7 @@ html[data-elbot-glow="true"] body .ref-panel:hover{
 
 .premium-theme-gallery{grid-template-columns:1fr!important}
 .premium-theme-gallery button.premium-locked{opacity:.58;cursor:not-allowed!important}
+#ref-personalization-button.premium-locked{opacity:.58;cursor:not-allowed!important}
 .premium-theme-preview{
   background-size:cover!important;
   background-position:center!important;

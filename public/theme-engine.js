@@ -299,6 +299,16 @@
   window.applyReferenceInterface = applyTheme;
   window.setThemePremiumAccess = allowed => {
     premiumThemeAccess = !!allowed;
+    window.ELBOT_PREMIUM_ACCESS = premiumThemeAccess;
+    const accessButton = document.getElementById('ref-personalization-button');
+    if (accessButton) {
+      accessButton.classList.toggle('premium-locked',!premiumThemeAccess);
+      accessButton.setAttribute('aria-disabled',String(!premiumThemeAccess));
+      const subtitle = accessButton.querySelector('small');
+      const arrow = accessButton.querySelector('em');
+      if (subtitle) subtitle.textContent = premiumThemeAccess ? 'Thème et apparence' : 'Réservé aux comptes Premium';
+      if (arrow) arrow.textContent = premiumThemeAccess ? '›' : '🔒';
+    }
     if (!premiumThemeAccess) {
       saveState({theme:'classic'});
       applyTheme('classic',false);
@@ -340,6 +350,17 @@
   window.applyReferenceBackground = () => {};
   window.loadReferenceAppearance = loadAppearance;
 
+  async function loadPremiumEntitlement(){
+    try {
+      const response = await fetch('/api/bot-identity',{cache:'no-store'});
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload.error || 'Accès indisponible');
+      window.setThemePremiumAccess(Boolean(payload.data?.premium || payload.data?.platformAdmin));
+    } catch (_) {
+      window.setThemePremiumAccess(false);
+    }
+  }
+
   window.resetReferenceAppearance = () => {
     localStorage.removeItem(storageKey());
     LEGACY_KEYS.forEach(key => localStorage.removeItem(key));
@@ -348,9 +369,10 @@
   };
 
   if (document.readyState === 'loading'){
-    document.addEventListener('DOMContentLoaded',loadAppearance,{once:true});
+    document.addEventListener('DOMContentLoaded',()=>{loadAppearance();loadPremiumEntitlement()},{once:true});
   } else {
     loadAppearance();
+    loadPremiumEntitlement();
   }
   window.addEventListener('pageshow',loadAppearance);
 })();
