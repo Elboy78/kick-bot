@@ -44,7 +44,7 @@ function getDefaultStreamerSeed() {
 
 function readRequestedSlug(req) {
   const directPath = `${req?.originalUrl || ''} ${req?.path || ''} ${req?.url || ''}`;
-  const pathSlug = String(directPath).match(/(?:\/s|\/classement|\/api\/public\/(?:leaderboard|levels|streamer))\/([^\/?#\s]+)/)?.[1];
+  const pathSlug = String(directPath).match(/(?:\/s|\/classement|\/subgifts|\/api\/public\/(?:leaderboard|subgifts|levels|streamer))\/([^\/?#\s]+)/)?.[1];
   let refererSlug = '';
   try {
     const ref = String(req?.headers?.referer || req?.headers?.referrer || '');
