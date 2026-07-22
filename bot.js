@@ -1387,8 +1387,20 @@ shared.registerAnnouncementReloader(startAnnouncements);
 // ─── Modération ──────────────────────────────────────────────────────────────
 
 async function moderateUser(username, kickId, action, duration, word) {
-  const { token, official } = await getActiveToken();
+  const moderationContext = currentChatContext();
+  let token = moderationContext?.streamerId
+    ? await kickOAuth.getValidAccessToken(moderationContext.streamerId).catch(() => null)
+    : null;
+  let official = Boolean(token);
+  let tokenSource = token ? 'streamer' : '';
+  if (!token) {
+    const active = await getActiveToken();
+    token = active.token;
+    official = active.official;
+    tokenSource = active.identity?.display_name || (active.official ? 'bot OAuth' : 'token manuel');
+  }
   if (!token) { console.log(`[MOD] Simulation: ${action} ${username} pour "${word}"`); return false; }
+  console.log(`[MOD] Jeton utilisé: ${tokenSource || 'inconnu'}${moderationContext?.slug ? ` pour ${moderationContext.slug}` : ''}`);
 
   // Récupérer l'ID numérique Kick du viewer si on ne l'a pas déjà (requis par l'API officielle)
   let userId = kickId;
