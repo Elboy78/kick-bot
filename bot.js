@@ -1388,16 +1388,16 @@ shared.registerAnnouncementReloader(startAnnouncements);
 
 async function moderateUser(username, kickId, action, duration, word) {
   const moderationContext = currentChatContext();
-  let token = moderationContext?.streamerId
-    ? await kickOAuth.getValidAccessToken(moderationContext.streamerId).catch(() => null)
-    : null;
-  let official = Boolean(token);
-  let tokenSource = token ? 'streamer' : '';
+  const active = await getActiveToken();
+  let token = active.token;
+  let official = active.official;
+  let tokenSource = active.identity?.display_name || (active.official ? 'bot OAuth' : 'token manuel');
   if (!token) {
-    const active = await getActiveToken();
-    token = active.token;
-    official = active.official;
-    tokenSource = active.identity?.display_name || (active.official ? 'bot OAuth' : 'token manuel');
+    token = moderationContext?.streamerId
+      ? await kickOAuth.getValidAccessToken(moderationContext.streamerId).catch(() => null)
+      : null;
+    official = Boolean(token);
+    tokenSource = token ? 'streamer (secours)' : tokenSource;
   }
   if (!token) { console.log(`[MOD] Simulation: ${action} ${username} pour "${word}"`); return false; }
   console.log(`[MOD] Jeton utilisé: ${tokenSource || 'inconnu'}${moderationContext?.slug ? ` pour ${moderationContext.slug}` : ''}`);
