@@ -917,6 +917,7 @@ async function processTimeoutReward(tm, data) {
   const customResult=await processCustomKickInteraction(tm,data,rewardId,redeemer,redemptionId);if(customResult)return customResult;
   const counterId=String(await tm.getSetting('kick_counter_reward_id','')).trim();
   const messageId=String(await tm.getSetting('kick_message_reward_id','')).trim();
+  const untoId=String(await tm.getSetting('kick_unto_reward_id','')).trim();
   if(rewardId===counterId&&(await tm.getSetting('kick_counter_reward_enabled','0'))==='1'){
     let shields={};try{shields=JSON.parse(await tm.getSetting('kick_timeout_shields','{}')||'{}')}catch(_){}
     const key=redeemer.toLowerCase();shields[key]=Math.min(10,(Number(shields[key])||0)+1);
@@ -931,6 +932,27 @@ async function processTimeoutReward(tm, data) {
     const sent=await shared.sendChatTo(`🎟️ @${redeemer} : ${message}`,rewardContext);
     await settleKickReward(tm.streamerId,redemptionId,!!sent);
     return {ok:true,accepted:!!sent,type:'chat_message',eventType:'channel.reward.redemption.updated'};
+  }
+  if(rewardId===untoId&&(await tm.getSetting('kick_unto_reward_enabled','0'))==='1'){
+    const target=String(data?.user_input||'').trim().replace(/^@+/,'').replace(/[^a-zA-Z0-9_]/g,'').slice(0,25);
+    let rejection='';
+    if(!redemptionId||!target)rejection='Pseudo cible manquant ou invalide';
+    if(target.toLowerCase()===redeemer.toLowerCase())rejection='Le viewer doit sauver une autre personne';
+    const viewer=target?await db.getViewerForStreamer(target,tm.streamerId).catch(()=>null):null;
+    if(!viewer?.kick_user_id)rejection='Ce viewer doit avoir parlé au moins une fois dans le chat';
+    let active={};try{active=JSON.parse(await tm.getSetting('kick_reward_active_timeouts','{}')||'{}')}catch(_){}
+    const now=Date.now();for(const [key,value] of Object.entries(active))if(Number(value?.expiresAt||value||0)<=now)delete active[key];
+    const activeTimeout=active[target.toLowerCase()];
+    if(!rejection&&!activeTimeout)rejection='Ce viewer ne possède aucun TO actif créé par ElBot';
+    if(rejection){await tm.setSetting('kick_reward_active_timeouts',JSON.stringify(active));if(redemptionId)await settleKickReward(tm.streamerId,redemptionId,false);console.log(`[REWARD UNTO:${tm.slug}] Refus ${redeemer} → ${target||'?'}: ${rejection}`);return {ok:true,rejected:true,reason:rejection,eventType:'channel.reward.redemption.updated'}}
+    const success=await shared.moderateUser(target,viewer.kick_user_id,'unban',0,`UnTO acheté par ${redeemer}`,rewardContext);
+    await settleKickReward(tm.streamerId,redemptionId,!!success);
+    if(!success)throw new Error(`Le UnTO de @${target} a échoué; la récompense a été remboursée.`);
+    delete active[target.toLowerCase()];await tm.setSetting('kick_reward_active_timeouts',JSON.stringify(active));
+    await shared.sendChatTo(`🕊️ @${redeemer} vient de libérer @${target} de son timeout !`,rewardContext).catch(()=>{});
+    await db.addModerationLog('untimeout',target,0,`UnTO points Kick par ${redeemer}`,'',redeemer).catch(()=>{});
+    console.log(`[REWARD UNTO:${tm.slug}] ${redeemer} → ${target}`);
+    return {ok:true,accepted:true,target,type:'untimeout',eventType:'channel.reward.redemption.updated'};
   }
   const enabled = (await tm.getSetting('kick_timeout_reward_enabled','0')) === '1';
   const configuredId = String(await tm.getSetting('kick_timeout_reward_id','')).trim();
@@ -956,6 +978,9 @@ async function processTimeoutReward(tm, data) {
   await settleKickReward(tm.streamerId,redemptionId,!!success);
   if (!success) throw new Error(`Le timeout de @${target} a échoué; la récompense a été remboursée.`);
   await db.addModerationLog('timeout',target,duration,`Récompense points Kick par ${redeemer}`,'',redeemer).catch(()=>{});
+  let activeTimeouts={};try{activeTimeouts=JSON.parse(await tm.getSetting('kick_reward_active_timeouts','{}')||'{}')}catch(_){}
+  activeTimeouts[target.toLowerCase()]={expiresAt:Date.now()+duration*1000,redeemer,duration};
+  await tm.setSetting('kick_reward_active_timeouts',JSON.stringify(activeTimeouts));
   console.log(`[REWARD TO:${tm.slug}] ${redeemer} → ${target} (${duration}s)`);
   return {ok:true,accepted:true,target,duration,eventType:'channel.reward.redemption.updated'};
 }
@@ -3065,6 +3090,7 @@ app.get('/api/channel-rewards/timeout',requireAuth,requireTenant,waitDB,async(re
 
 const KICK_REWARD_TYPES={
   timeout:{title:'Timeout un viewer',cost:1000,duration:300,input:true,color:'#ef4444',description:d=>`Choisis le pseudo du viewer à timeout pendant ${d} secondes.`},
+  unto:{title:'UnTO un viewer',cost:750,duration:0,input:true,color:'#22c55e',description:()=>`Choisis le pseudo d’un viewer temporairement timeout par ElBot pour le libérer.`},
   counter:{title:'Counter TO',cost:750,duration:0,input:false,color:'#168cff',description:()=>`Protège ton pseudo contre le prochain Timeout acheté.`},
   message:{title:'Message du viewer',cost:300,duration:0,input:true,color:'#a855f7',description:()=>`Écris un message que le bot publiera dans le chat.`}
 };

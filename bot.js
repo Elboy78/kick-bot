@@ -1418,6 +1418,16 @@ async function moderateUser(username, kickId, action, duration, word) {
       console.error(`[MOD] IDs invalides — broadcasterId=${broadcasterId} userId=${userIdInt} (broadcaster_user_id stocké="${storedBroadcasterId}", channelId brut="${CONFIG.channelId}", userId brut="${userId}") — passage au fallback legacy`);
     } else {
       try {
+        if (action === 'unban') {
+          const body = { broadcaster_user_id: broadcasterId, user_id: userIdInt };
+          console.log('[MOD DEBUG] Levée de sanction envoyée:', JSON.stringify(body));
+          await axios.delete('https://api.kick.com/public/v1/moderation/bans', {
+            data: body,
+            headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json', 'Accept': 'application/json' }
+          });
+          console.log(`[MOD] Timeout retiré pour ${username} (API officielle) — ${word || 'UnTO'}`);
+          return true;
+        }
         const durationMinutes = action === 'ban' ? undefined : Math.max(1, Math.round((duration || 300) / 60));
         const body = {
           broadcaster_user_id: broadcasterId,
