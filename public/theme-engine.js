@@ -297,8 +297,12 @@
   }
 
   window.applyReferenceInterface = applyTheme;
+  let premiumEntitlementLoaded = false;
   window.setThemePremiumAccess = allowed => {
-    premiumThemeAccess = !!allowed;
+    const next = !!allowed;
+    const changed = !premiumEntitlementLoaded || premiumThemeAccess !== next;
+    premiumEntitlementLoaded = true;
+    premiumThemeAccess = next;
     window.ELBOT_PREMIUM_ACCESS = premiumThemeAccess;
     const accessButton = document.getElementById('ref-personalization-button');
     if (accessButton) {
@@ -309,11 +313,13 @@
       if (subtitle) subtitle.textContent = premiumThemeAccess ? 'Thème et apparence' : 'Réservé aux comptes Premium';
       if (arrow) arrow.textContent = premiumThemeAccess ? '›' : '🔒';
     }
-    if (!premiumThemeAccess) {
+    if (!premiumThemeAccess && changed) {
       saveState({theme:'classic'});
       applyTheme('classic',false);
-    } else loadAppearance();
+      window.closeReferenceDrawers?.();
+    } else if (changed) loadAppearance();
     refreshThemeButtons(readState().theme);
+    if (changed) window.dispatchEvent(new CustomEvent('elbot-premium-change',{detail:{premium:premiumThemeAccess}}));
   };
   window.setReferenceBackgroundIntensity = applyBackgroundVisibility;
   window.setReferencePanelOpacity = applyPanelOpacity;
@@ -374,5 +380,6 @@
     loadAppearance();
     loadPremiumEntitlement();
   }
+  setInterval(()=>{ if (!document.hidden) loadPremiumEntitlement(); },5000);
   window.addEventListener('pageshow',loadAppearance);
 })();

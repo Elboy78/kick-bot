@@ -187,7 +187,12 @@ async function init() {
   await db.ensureInit();
   await db.initSystemCommandsState(SYSTEM_COMMANDS);
   // Enregistrer sendChat dans le module partagé pour que panel.js puisse l'utiliser
-  shared.registerSendChat(sendChat);
+  shared.registerSendChat((message,requestedContext=null)=>{
+    const context=requestedContext?.streamerId
+      ? ([...botChannelState.chatrooms.values()].find(item=>Number(item.streamerId)===Number(requestedContext.streamerId))||requestedContext)
+      : currentChatContext();
+    return withChatContext(context,()=>sendChat(message));
+  });
   if (process.env.BOT_MEME_ONLY !== 'true') await startAnnouncements();
   await syncPointsConfig();
   // V2 : synchronise régulièrement les chaînes ajoutées au bot.

@@ -23,6 +23,7 @@ const STREAMER_EVENT_TYPES = [
   'channel.subscription.gifts',
   'channel.reward.redemption.updated',
 ];
+const OPTIONAL_STREAMER_EVENT_TYPES = ['kicks.gifted'];
 
 let pendingPKCE = null;
 
@@ -65,6 +66,15 @@ async function subscribeStreamerEvents(accessToken, broadcasterUserId) {
     headers: { Authorization: `Bearer ${accessToken}`, Accept: 'application/json', 'Content-Type': 'application/json' },
     timeout: 12000,
   });
+  for (const name of OPTIONAL_STREAMER_EVENT_TYPES) {
+    try {
+      await axios.post(`${KICK_API_BASE}/events/subscriptions`, {...body,events:[{name,version:1}]}, {
+        headers: { Authorization: `Bearer ${accessToken}`, Accept: 'application/json', 'Content-Type': 'application/json' }, timeout: 12000,
+      });
+    } catch (e) {
+      console.warn(`[KICK EVENTS] ${name} indisponible pour ce compte/API:`,e.response?.data?.message||e.message);
+    }
+  }
   return data;
 }
 

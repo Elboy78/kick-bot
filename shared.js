@@ -20,6 +20,10 @@ module.exports = {
     return Promise.resolve(false);
   },
   hasSendChat() { return typeof _sendChat === 'function'; },
+  sendChatTo(msg, ctx = null) {
+    if (_sendChat) return _sendChat(msg, ctx);
+    return Promise.resolve(false);
+  },
 
   registerKickEventHandler(fn) { _kickEventHandler = fn; },
   processKickEvent(eventType, payload) {

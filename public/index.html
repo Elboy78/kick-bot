@@ -1192,6 +1192,13 @@ Option 3" rows="4"></textarea><div style="display:flex;gap:6px;margin-top:10px">
 
           <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-bottom:12px">
             <div>
+              <label class="lbl">Style du widget</label>
+              <select class="inp" id="subgoal-style-input" onchange="saveSubGoalLayout()"><option value="bar">Barre progressive</option><option value="numbers">Chiffres uniquement</option><option value="compact">Compteur compact</option><option value="circle">Progression circulaire</option></select>
+            </div>
+            <div><label class="lbl">Taille des chiffres</label><input class="inp" id="subgoal-font-size-input" type="number" min="18" max="72" value="32" onchange="saveSubGoalLayout()"></div>
+            <div><label class="lbl">Couleur principale</label><input class="inp" id="subgoal-color-input" type="color" value="#26e07f" onchange="saveSubGoalLayout()"></div>
+            <div><label class="lbl">Afficher l’objectif</label><select class="inp" id="subgoal-show-target-input" onchange="saveSubGoalLayout()"><option value="1">Oui · 25 / 50</option><option value="0">Non · 25</option></select></div>
+            <div>
               <label class="lbl">Placement du texte</label>
               <select class="inp" id="subgoal-text-position-input" onchange="saveSubGoalLayout()">
                 <option value="inside">Dans la barre</option>
@@ -1437,6 +1444,17 @@ Option 3" rows="4"></textarea><div style="display:flex;gap:6px;margin-top:10px">
 
 
   <!-- ══ CHAT OVERLAY WIDGET SETTINGS ══ -->
+  <div id="widget-kickrewards-settings" style="display:none">
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:14px"><button class="dark-btn" onclick="backToWidgetsHome()">← Retour aux widgets</button><div style="font-size:10px;color:var(--muted);font-weight:800;text-transform:uppercase">Widget actif : Interactions points Kick</div></div>
+    <div class="panel" style="margin-bottom:14px"><h3>🎟️ Interactions avec les points de chaîne</h3><p style="font-size:10px;color:var(--muted);line-height:1.6">ElBot crée et relie les récompenses à ta chaîne. Chaque interaction est isolée par streamer et les achats sont validés ou remboursés automatiquement.</p></div>
+    <div class="grid2">
+      <div class="panel"><h3>⏱️ Timeout un viewer</h3><label class="co-toggle-line"><span class="co-switch"><input type="checkbox" id="kick-timeout-enabled"><span></span></span><b>Activer</b></label><label class="lbl">Nom</label><input class="inp" id="kick-timeout-title" value="Timeout un viewer"><div class="form-row"><div><label class="lbl">Coût</label><input class="inp" type="number" id="kick-timeout-cost" min="1" value="1000"></div><div><label class="lbl">Durée (secondes)</label><input class="inp" type="number" id="kick-timeout-duration" min="60" value="300"></div></div><button class="btnx btn-outline" style="width:100%;justify-content:center;margin-top:10px" onclick="setupKickReward('timeout')">Créer / mettre à jour</button><div id="kick-timeout-status" class="alert-mini" style="margin-top:8px">Chargement…</div></div>
+      <div class="panel"><h3>🛡️ Counter TO</h3><label class="co-toggle-line"><span class="co-switch"><input type="checkbox" id="kick-counter-enabled"><span></span></span><b>Activer</b></label><label class="lbl">Nom</label><input class="inp" id="kick-counter-title" value="Counter TO"><label class="lbl">Coût</label><input class="inp" type="number" id="kick-counter-cost" min="1" value="750"><p class="alert-mini">Protège le viewer contre le prochain Timeout acheté.</p><button class="btnx btn-outline" style="width:100%;justify-content:center;margin-top:10px" onclick="setupKickReward('counter')">Créer / mettre à jour</button><div id="kick-counter-status" class="alert-mini" style="margin-top:8px">Chargement…</div></div>
+      <div class="panel"><h3>💬 Message du viewer</h3><label class="co-toggle-line"><span class="co-switch"><input type="checkbox" id="kick-message-enabled"><span></span></span><b>Activer</b></label><label class="lbl">Nom</label><input class="inp" id="kick-message-title" value="Message du viewer"><label class="lbl">Coût</label><input class="inp" type="number" id="kick-message-cost" min="1" value="300"><p class="alert-mini">Le texte saisi dans la récompense est publié par le bot après validation.</p><button class="btnx btn-outline" style="width:100%;justify-content:center;margin-top:10px" onclick="setupKickReward('message')">Créer / mettre à jour</button><div id="kick-message-status" class="alert-mini" style="margin-top:8px">Chargement…</div></div>
+      <div class="panel"><h3>✨ Prochaines interactions</h3><p class="alert-mini">Le moteur est prévu pour accueillir ensuite son, défi, commande personnalisée ou action OBS. On garde une liste courte pour éviter les abus et rester lisible.</p></div>
+    </div>
+  </div>
+
   <div id="widget-chat-settings" style="display:none">
     <div class="co-page-head">
       <button class="dark-btn" onclick="backToWidgetsHome()">← Retour aux widgets</button>
@@ -1541,7 +1559,7 @@ Option 3" rows="4"></textarea><div style="display:flex;gap:6px;margin-top:10px">
             <div><label class="lbl">Durée d’affichage</label><input type="number" class="inp" id="co-duration" min="0" max="60"></div>
             <div><label class="lbl">Messages maximum</label><input type="number" class="inp" id="co-max" min="1" max="30"></div>
             <div><label class="lbl">Délai de regroupement</label><input type="number" class="inp" id="co-group-window" min="2" max="60"></div>
-            <div><label class="lbl">Taille de police</label><input type="number" class="inp" id="co-font-size" min="10" max="42"></div>
+            <div><label class="lbl">Taille du texte <output id="co-font-size-output" style="float:right;color:var(--accent)">21 px</output></label><input type="range" class="inp" id="co-font-size" min="10" max="42" oninput="document.getElementById('co-font-size-output').textContent=this.value+' px'"></div>
           </div>
         </section>
         <section class="co-section">
@@ -1756,6 +1774,7 @@ Option 3" rows="4"></textarea><div style="display:flex;gap:6px;margin-top:10px">
 
   <div class="page" id="page-alertes">
     <div class="header"><div><h1>Alertes</h1><p>Moteur d’alertes OBS multi-streamer, profils et file d’attente</p></div><button class="btn" onclick="loadAlertsPanel()">↻ Actualiser</button></div>
+    <div class="panel" style="margin-bottom:14px;font-size:10px;color:var(--muted);line-height:1.65"><b style="color:var(--text)">Sources des alertes :</b> les KICKs sont reçus automatiquement par l’événement officiel Kick. Les dons externes nécessitent la connexion ou le webhook du service de dons, car Kick ne transmet pas ces paiements à ElBot. La catégorie <b>Bits / KICKs</b> est déjà prête à réunir Kick et Twitch lorsque la connexion Twitch sera ajoutée.</div>
     <style>
       .alert-toolbar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:16px}.alert-toolbar .inp{max-width:220px}.alert-tabs{display:flex;gap:8px;flex-wrap:wrap;margin:12px 0 18px}.alert-tab{border:1px solid var(--brd);background:#151824;color:var(--text);border-radius:10px;padding:10px 14px;font-weight:900;cursor:pointer}.alert-tab.active{border-color:#22c55e;background:rgba(34,197,94,.18)}
       .alert-grid{display:grid;grid-template-columns:minmax(0,1fr) 430px;gap:18px}.alert-form{display:grid;grid-template-columns:190px minmax(0,1fr);gap:12px;align-items:center}.alert-form label{color:var(--muted);font-weight:800;font-size:12px}.alert-preview{min-height:310px;display:flex;align-items:center;justify-content:center;background:radial-gradient(circle at 50% 10%,rgba(34,197,94,.12),rgba(0,0,0,.25));border:1px solid var(--brd);border-radius:16px;overflow:hidden;padding:20px}.alert-preview-card{min-width:260px;max-width:370px;text-align:center;padding:24px;border-radius:20px;background:rgba(5,8,15,.86);box-shadow:0 18px 50px rgba(0,0,0,.45);border:1px solid rgba(255,255,255,.12)}.alert-preview-card img,.alert-preview-card video{max-width:150px;max-height:110px;object-fit:contain;border-radius:12px;margin-bottom:12px}.alert-layout-left{display:flex;align-items:center;gap:16px;text-align:left}.alert-layout-right{display:flex;align-items:center;gap:16px;flex-direction:row-reverse;text-align:right}.alert-layout-left img,.alert-layout-left video,.alert-layout-right img,.alert-layout-right video{margin:0}.alert-text-only img,.alert-text-only video{display:none}.alert-mini{font-size:11px;color:var(--muted);line-height:1.5}.alert-actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:16px}.alert-switch{position:relative;width:46px;height:24px;display:inline-block}.alert-switch input{opacity:0;width:0;height:0}.alert-switch span{position:absolute;inset:0;border-radius:999px;background:#2c3140;cursor:pointer;transition:.2s}.alert-switch span:after{content:"";position:absolute;width:18px;height:18px;left:3px;top:3px;border-radius:50%;background:#fff;transition:.2s}.alert-switch input:checked+span{background:#22c55e}.alert-switch input:checked+span:after{transform:translateX(22px)}.alert-upload-row{display:flex;gap:8px;align-items:center}.alert-upload-row input[type=file]{max-width:180px;font-size:11px}.alert-profile-badge{font-size:11px;font-weight:900;color:#86efac;border:1px solid rgba(34,197,94,.35);padding:6px 9px;border-radius:999px}.alert-history{max-height:250px;overflow:auto;display:flex;flex-direction:column;gap:8px}.alert-history-item{padding:10px 12px;border-radius:10px;border:1px solid var(--brd);background:rgba(255,255,255,.025);font-size:11px}.alert-history-item b{display:block;margin-bottom:3px}.alert-range{display:flex;gap:10px;align-items:center}.alert-range output{min-width:42px;text-align:right;font-weight:900;color:#86efac}@media(max-width:1050px){.alert-grid{grid-template-columns:1fr}.alert-form{grid-template-columns:1fr}}
@@ -4665,16 +4684,6 @@ body.ref-theme-transition *:after{
           <div id="bot-identity-message" style="margin-top:9px"></div>
         </div>
 
-        <div class="panel" style="margin-bottom:14px" id="kick-timeout-reward-card">
-          <h3>🎟️ Récompense points Kick · Timeout</h3>
-          <div style="font-size:9px;color:var(--muted);line-height:1.55;margin-bottom:10px">ElBot crée la récompense sur ta chaîne. Le viewer indique un pseudo ; les streamers et modérateurs restent protégés.</div>
-          <label style="display:flex;align-items:center;gap:8px;margin-bottom:9px"><input type="checkbox" id="kick-to-enabled"> Activer la récompense</label>
-          <label class="lbl">Nom de la récompense</label><input class="inp" id="kick-to-title" value="Timeout un viewer" maxlength="50">
-          <div class="form-row" style="margin-top:8px"><div><label class="lbl">Coût en points Kick</label><input class="inp" type="number" id="kick-to-cost" min="1" value="1000"></div><div><label class="lbl">Durée du timeout (secondes)</label><input class="inp" type="number" id="kick-to-duration" min="60" max="86400" value="300"></div></div>
-          <button class="btnx btn-outline" style="width:100%;justify-content:center;margin-top:10px" onclick="setupKickTimeoutReward()">⚡ Créer ou mettre à jour sur Kick</button>
-          <div id="kick-to-status" style="font-size:9px;color:var(--muted);margin-top:8px;line-height:1.5">Chargement…</div>
-        </div>
-
         <div class="panel" style="margin-bottom:14px" id="token-card">
           <h3>🔑 Connexion Kick <span id="token-status-badge" style="font-size:9px;font-weight:700;padding:3px 9px;border-radius:20px"></span></h3>
 
@@ -4786,14 +4795,17 @@ function openWidgetSettings(name) {
   const tts = document.getElementById('widget-tts-settings');
   const songrequest = document.getElementById('widget-songrequest-settings');
   const chat = document.getElementById('widget-chat-settings');
+  const kickrewards = document.getElementById('widget-kickrewards-settings');
   if (home) home.style.display = 'none';
   if (subgoal) subgoal.style.display = name === 'subgoal' ? 'block' : 'none';
   if (tts) tts.style.display = name === 'tts' ? 'block' : 'none';
   if (songrequest) songrequest.style.display = name === 'songrequest' ? 'block' : 'none';
   if (chat) chat.style.display = name === 'chat' ? 'block' : 'none';
+  if (kickrewards) kickrewards.style.display = name === 'kickrewards' ? 'block' : 'none';
   if (name === 'subgoal') loadSubGoal();
   if (name === 'tts') loadTTS();
   if (name === 'chat') loadChatOverlaySettings();
+  if (name === 'kickrewards') loadKickRewards();
   if (name === 'songrequest') {
     loadSongRequest();
     startSongRequestRefresh();
@@ -4808,11 +4820,13 @@ function backToWidgetsHome() {
   const tts = document.getElementById('widget-tts-settings');
   const songrequest = document.getElementById('widget-songrequest-settings');
   const chat = document.getElementById('widget-chat-settings');
+  const kickrewards = document.getElementById('widget-kickrewards-settings');
   if (home) home.style.display = 'block';
   if (subgoal) subgoal.style.display = 'none';
   if (tts) tts.style.display = 'none';
   if (songrequest) songrequest.style.display = 'none';
   if (chat) chat.style.display = 'none';
+  if (kickrewards) kickrewards.style.display = 'none';
   stopSongRequestRefresh();
 }
 
@@ -4871,6 +4885,10 @@ function renderSubCounter(d) {
   setVal('subgoal-count-position-input', d.countPosition || 'inside');
   setVal('subgoal-progress-display-input', d.progressDisplay || 'count');
   setVal('subgoal-text-align-input', d.textAlign || 'center');
+  setVal('subgoal-style-input', d.style || 'bar');
+  setVal('subgoal-font-size-input', d.fontSize || 32);
+  setVal('subgoal-color-input', d.primaryColor || '#26e07f');
+  setVal('subgoal-show-target-input', d.showTarget===false?'0':'1');
   renderSubCounterLatest(d.latest || []);
 }
 
@@ -4922,6 +4940,10 @@ async function saveSubGoalLayout() {
     countPosition: document.getElementById('subgoal-count-position-input')?.value || 'inside',
     progressDisplay: document.getElementById('subgoal-progress-display-input')?.value || 'count',
     textAlign: document.getElementById('subgoal-text-align-input')?.value || 'center'
+    ,style: document.getElementById('subgoal-style-input')?.value || 'bar'
+    ,fontSize: Number(document.getElementById('subgoal-font-size-input')?.value || 32)
+    ,primaryColor: document.getElementById('subgoal-color-input')?.value || '#26e07f'
+    ,showTarget: document.getElementById('subgoal-show-target-input')?.value !== '0'
   };
   const r = await fetch(API + '/api/admin/widgets/subgoal/layout', {
     method: 'POST', headers: { 'Content-Type': 'application/json', 'x-panel-key': getKey() },
@@ -7887,7 +7909,7 @@ async function loadBotIdentity() {
     const customAction = d.custom?.status === 'connected'
       ? `<button class="btnx ${customActive?'btn-green':'btn-outline'} btn-sm" ${customActive?'disabled':''} onclick="assignBotIdentity('custom')">${customActive?'Actif':'Utiliser ce bot'}</button>`
       : `<button class="btnx btn-outline btn-sm" onclick="connectBotIdentity('custom')">Connecter mon bot</button>`;
-    const premiumAllowed = d.premium || d.platformAdmin;
+    const premiumAllowed = Boolean(d.premium);
 
     optionsEl.innerHTML = `
       <div style="padding:11px;border:1px solid ${elbotActive?'var(--accent)':'var(--brd)'};border-radius:10px;display:flex;align-items:center;justify-content:space-between;gap:10px">
@@ -7903,9 +7925,13 @@ async function loadBotIdentity() {
     optionsEl.innerHTML = '';
   }
 }
+window.addEventListener('elbot-premium-change',()=>loadBotIdentity());
+setInterval(()=>{if(!document.hidden)loadBotIdentity()},10000);
 
 async function loadKickTimeoutReward(){const status=document.getElementById('kick-to-status');if(!status)return;try{const r=await fetch('/api/channel-rewards/timeout',{cache:'no-store'}),j=await r.json();if(!r.ok)throw new Error(j.error||'Chargement impossible');const d=j.data||{};document.getElementById('kick-to-enabled').checked=!!d.enabled;document.getElementById('kick-to-title').value=d.title||'Timeout un viewer';document.getElementById('kick-to-cost').value=d.cost||1000;document.getElementById('kick-to-duration').value=d.duration||300;status.innerHTML=d.rewardId?`✅ Récompense liée à ElBot · <b>${esc(d.rewardId)}</b>`:(d.oauthConnected?'Prête à être créée sur Kick.':'⚠️ Reconnecte ton compte Kick avant la création.')}catch(e){status.textContent=e.message}}
 async function setupKickTimeoutReward(){const status=document.getElementById('kick-to-status');status.textContent='Configuration sur Kick…';const body={enabled:document.getElementById('kick-to-enabled').checked,title:document.getElementById('kick-to-title').value,cost:Number(document.getElementById('kick-to-cost').value),duration:Number(document.getElementById('kick-to-duration').value)};try{const r=await fetch('/api/admin/channel-rewards/timeout/setup',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}),j=await r.json();if(!r.ok)throw new Error(j.error||'Configuration impossible');status.textContent='✅ Récompense créée et reliée à ElBot';toast('Récompense points Kick enregistrée ✓')}catch(e){status.innerHTML=`❌ ${esc(e.message)}<br><button class="btnx btn-outline btn-sm" style="margin-top:7px" onclick="window.location.href='/auth/login'">Reconnecter le compte streamer Kick</button>`;toast(e.message,false)}}
+async function loadKickRewards(){try{const r=await fetch('/api/channel-rewards',{cache:'no-store'}),j=await r.json();if(!r.ok)throw new Error(j.error||'Chargement impossible');for(const d of j.data?.rewards||[]){const p=`kick-${d.type}`;document.getElementById(`${p}-enabled`).checked=!!d.enabled;document.getElementById(`${p}-title`).value=d.title||'';document.getElementById(`${p}-cost`).value=d.cost||1;if(d.type==='timeout')document.getElementById(`${p}-duration`).value=d.duration||300;document.getElementById(`${p}-status`).textContent=d.rewardId?'✅ Récompense liée et prête':(j.data.oauthConnected?'Prête à être créée':'⚠️ Reconnecte le compte streamer Kick')}}catch(e){['timeout','counter','message'].forEach(t=>{const x=document.getElementById(`kick-${t}-status`);if(x)x.textContent=e.message})}}
+async function setupKickReward(type){const p=`kick-${type}`,status=document.getElementById(`${p}-status`),body={enabled:document.getElementById(`${p}-enabled`).checked,title:document.getElementById(`${p}-title`).value,cost:Number(document.getElementById(`${p}-cost`).value)};if(type==='timeout')body.duration=Number(document.getElementById(`${p}-duration`).value);status.textContent='Configuration sur Kick…';try{const r=await fetch(`/api/admin/channel-rewards/${type}/setup`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}),j=await r.json();if(!r.ok)throw new Error(j.error||'Configuration impossible');status.textContent='✅ Récompense créée et reliée à ElBot';toast('Interaction points Kick enregistrée ✓')}catch(e){status.innerHTML=`❌ ${esc(e.message)}<br><button class="btnx btn-outline btn-sm" style="margin-top:7px" onclick="window.location.href='/auth/login'">Reconnecter Kick</button>`;toast(e.message,false)}}
 
 async function assignBotIdentity(choice) {
   if (!confirm(`Confirmer le changement vers ${choice === 'elbot' ? 'ElBot' : 'ton bot personnalisé'} ? L’autre bot ne pourra plus écrire sur la chaîne.`)) return;
@@ -8785,7 +8811,7 @@ function escapeAttr(v) { return escapeHtml(v); }
 
 // ── Alertes OBS ───────────────────────────────────────────────────────────────
 function alertSetVal(id,value){const el=document.getElementById(id);if(el)el.value=value??'';}function alertSetChk(id,v){const el=document.getElementById(id);if(el)el.checked=!!v;}function alertVal(id){return document.getElementById(id)?.value||'';}
-const ALERT_TYPES_UI=['follow','sub','renew','gift','raid','donation','bits','custom'];const ALERT_LABELS_UI={follow:'❤️ Follow',sub:'⭐ Abonnement',renew:'🔄 Renouvellement',gift:'🎁 Sub offerte',raid:'🚨 Raid',donation:'💸 Don',bits:'💎 Bits',custom:'🧪 Custom'};
+const ALERT_TYPES_UI=['follow','sub','renew','gift','raid','donation','bits','custom'];const ALERT_LABELS_UI={follow:'❤️ Follow',sub:'⭐ Abonnement',renew:'🔄 Renouvellement',gift:'🎁 Sub offerte',raid:'🚨 Raid',donation:'💸 Don',bits:'💎 Bits / KICKs',custom:'🧪 Custom'};
 let alertsConfigs={},alertProfiles=[],activeAlertProfile='default',currentAlertType='follow';
 async function loadAlertsPanel(){hydrateAllObsLinks();const r=await fetch(API+'/api/widgets/alerts',{cache:'no-store'});const d=await r.json();alertsConfigs=d.configs||{};alertProfiles=d.profiles||[{id:'default',name:'Défaut'}];activeAlertProfile=d.activeProfile||'default';renderAlertProfiles();renderAlertTabs();selectAlertType(currentAlertType||'follow');loadAlertHistory();}
 function renderAlertProfiles(){const s=document.getElementById('alert-profile-select');if(!s)return;s.innerHTML=alertProfiles.map(p=>`<option value="${escapeAttr(p.id)}" ${p.id===activeAlertProfile?'selected':''}>${escapeHtml(p.name)}</option>`).join('');}
@@ -9120,6 +9146,7 @@ const ChatOverlayUI = (() => {
     setValue('co-group-window', settings.groupWindow);
     setValue('co-ignored', settings.ignoredUsers);
     setValue('co-font-size', settings.fontSize);
+    const fontSizeOutput=byId('co-font-size-output');if(fontSizeOutput)fontSizeOutput.textContent=settings.fontSize+' px';
     setValue('co-duration', settings.messageDuration);
     setValue('co-max', settings.maxMessages);
     setValue('co-animation', settings.animation);

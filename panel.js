@@ -635,6 +635,10 @@ async function getSubCounterState(source = null) {
     countPosition: await tm.getSetting('subgoal_count_position', 'inside'),
     progressDisplay: await tm.getSetting('subgoal_progress_display', 'count'),
     textAlign: await tm.getSetting('subgoal_text_align', 'center'),
+    style: await tm.getSetting('subgoal_style', 'bar'),
+    fontSize: Math.max(18,Math.min(72,parseInt(await tm.getSetting('subgoal_font_size','32'))||32)),
+    primaryColor: await tm.getSetting('subgoal_primary_color','#26e07f'),
+    showTarget: (await tm.getSetting('subgoal_show_target','1')) === '1',
     latest: Array.isArray(latest) ? latest.slice(0, 12) : []
   };
 }
@@ -648,6 +652,10 @@ function publicSubGoalState(state) {
     textPosition: state.textPosition,
     countPosition: state.countPosition,
     progressDisplay: state.progressDisplay,
+    style: state.style,
+    fontSize: state.fontSize,
+    primaryColor: state.primaryColor,
+    showTarget: state.showTarget,
     textAlign: state.textAlign,
     updatedAt: new Date().toISOString()
   };
@@ -828,13 +836,32 @@ async function settleKickReward(streamerId, redemptionId, accepted) {
   });
 }
 async function processTimeoutReward(tm, data) {
-  const enabled = (await tm.getSetting('kick_timeout_reward_enabled','0')) === '1';
-  const configuredId = String(await tm.getSetting('kick_timeout_reward_id','')).trim();
   const rewardId = String(data?.reward?.id || '').trim();
   const status = String(data?.status || 'pending').toLowerCase();
-  if (!enabled || !configuredId || rewardId !== configuredId || status !== 'pending') return {ok:true,ignored:true,eventType:'channel.reward.redemption.updated'};
-  const redemptionId = String(data?.id || '').trim();
+  if(status!=='pending')return {ok:true,ignored:true,eventType:'channel.reward.redemption.updated'};
   const redeemer = String(data?.redeemer?.username || 'viewer').trim().replace(/^@+/, '');
+  const redemptionId = String(data?.id || '').trim();
+  const rewardContext={streamerId:tm.streamerId,slug:tm.slug};
+  const counterId=String(await tm.getSetting('kick_counter_reward_id','')).trim();
+  const messageId=String(await tm.getSetting('kick_message_reward_id','')).trim();
+  if(rewardId===counterId&&(await tm.getSetting('kick_counter_reward_enabled','0'))==='1'){
+    let shields={};try{shields=JSON.parse(await tm.getSetting('kick_timeout_shields','{}')||'{}')}catch(_){}
+    const key=redeemer.toLowerCase();shields[key]=Math.min(10,(Number(shields[key])||0)+1);
+    await tm.setSetting('kick_timeout_shields',JSON.stringify(shields));
+    await settleKickReward(tm.streamerId,redemptionId,true);
+    await shared.sendChatTo(`🛡️ @${redeemer} possède maintenant une protection Counter TO !`,rewardContext);
+    return {ok:true,accepted:true,type:'counter_timeout',eventType:'channel.reward.redemption.updated'};
+  }
+  if(rewardId===messageId&&(await tm.getSetting('kick_message_reward_enabled','0'))==='1'){
+    const message=String(data?.user_input||'').replace(/[\r\n]+/g,' ').trim().slice(0,180);
+    if(!message){await settleKickReward(tm.streamerId,redemptionId,false);return {ok:true,rejected:true,reason:'Message vide',eventType:'channel.reward.redemption.updated'}}
+    const sent=await shared.sendChatTo(`🎟️ @${redeemer} : ${message}`,rewardContext);
+    await settleKickReward(tm.streamerId,redemptionId,!!sent);
+    return {ok:true,accepted:!!sent,type:'chat_message',eventType:'channel.reward.redemption.updated'};
+  }
+  const enabled = (await tm.getSetting('kick_timeout_reward_enabled','0')) === '1';
+  const configuredId = String(await tm.getSetting('kick_timeout_reward_id','')).trim();
+  if (!enabled || !configuredId || rewardId !== configuredId) return {ok:true,ignored:true,eventType:'channel.reward.redemption.updated'};
   const target = String(data?.user_input || '').trim().replace(/^@+/, '').replace(/[^a-zA-Z0-9_]/g,'').slice(0,25);
   const duration = Math.max(60,Math.min(86400,parseInt(await tm.getSetting('kick_timeout_reward_duration','300'))||300));
   let rejection = '';
@@ -845,6 +872,8 @@ async function processTimeoutReward(tm, data) {
   let badges=[];try{badges=JSON.parse(viewer?.badges_json||'[]')}catch(_){}
   if (badges.some(b=>/moderator|broadcaster/i.test(String(b?.type||b?.text||'')))) rejection = 'Les modérateurs et le streamer sont protégés';
   if (!viewer?.kick_user_id) rejection = 'Ce viewer doit avoir parlé au moins une fois dans le chat';
+  let shields={};try{shields=JSON.parse(await tm.getSetting('kick_timeout_shields','{}')||'{}')}catch(_){}
+  if(!rejection&&Number(shields[target.toLowerCase()]||0)>0){shields[target.toLowerCase()]--;await tm.setSetting('kick_timeout_shields',JSON.stringify(shields));rejection='Counter TO activé : la protection du viewer a bloqué ce timeout'}
   if (rejection) {
     if (redemptionId) await settleKickReward(tm.streamerId,redemptionId,false);
     console.log(`[REWARD TO:${tm.slug}] Refus ${redeemer} → ${target||'?'}: ${rejection}`);
@@ -872,6 +901,14 @@ async function processKickEvent(eventTypeRaw, payload = {}) {
   if(semantic)processedKickEventSemantics.set(semantic,Date.now());
 
   if (eventType === 'channel.reward.redemption.updated') return processTimeoutReward(tm,data);
+
+  if (eventType === 'kicks.gifted') {
+    const username=pick(data?.sender?.username,data?.user?.username,data?.username,payload?.username)||'quelqu\'un';
+    const amount=Math.max(1,Number(data?.amount||data?.kicks||data?.quantity||payload?.amount)||1);
+    emitDashboardActivity(tm,{type:'bits',username,amount,platform:'kick'});
+    await pushObsAlert('bits',{username,amount,platform:'kick'},false,tm).catch(e=>console.warn('[ALERT OBS] KICKs ignorés:',e.message));
+    return {ok:true,eventType,username,amount};
+  }
 
   if (eventType === 'channel.followed') {
     const username = pick(
@@ -1311,8 +1348,8 @@ const { createTenantManager } = require('./tenant-manager');
 app.get('/api/widgets/subgoal', async (req, res) => {
   try {
     const state = await getSubCounterState(req.tenantManager || req);
-    res.json({ current: state.total, target: state.target, label: state.label, textPosition: state.textPosition, countPosition: state.countPosition, progressDisplay: state.progressDisplay, textAlign: state.textAlign });
-  } catch(e) { res.json({ current: 0, target: 50, label: 'Sub Goal', textPosition: 'inside', countPosition: 'inside', progressDisplay: 'count', textAlign: 'center' }); }
+    res.json({ current: state.total, target: state.target, label: state.label, textPosition: state.textPosition, countPosition: state.countPosition, progressDisplay: state.progressDisplay, textAlign: state.textAlign, style:state.style, fontSize:state.fontSize, primaryColor:state.primaryColor, showTarget:state.showTarget });
+  } catch(e) { res.json({ current: 0, target: 50, label: 'Sub Goal', textPosition: 'inside', countPosition: 'inside', progressDisplay: 'count', textAlign: 'center', style:'bar',fontSize:32,primaryColor:'#26e07f',showTarget:true }); }
 });
 
 app.get('/api/widgets/subcounter', async (req, res) => {
@@ -1366,14 +1403,23 @@ app.post('/api/admin/widgets/subgoal/layout', requireAuth, async (req, res) => {
     const allowedCountPositions = ['above','inside','right','hidden'];
     const allowedDisplays = ['count','progress','percent','hidden'];
     const allowedAligns = ['left','center','right'];
+    const allowedStyles = ['bar','numbers','compact','circle'];
     const textPosition = allowedTextPositions.includes(req.body.textPosition) ? req.body.textPosition : 'inside';
     const countPosition = allowedCountPositions.includes(req.body.countPosition) ? req.body.countPosition : 'inside';
     const progressDisplay = allowedDisplays.includes(req.body.progressDisplay) ? req.body.progressDisplay : 'count';
     const textAlign = allowedAligns.includes(req.body.textAlign) ? req.body.textAlign : 'center';
+    const style = allowedStyles.includes(req.body.style) ? req.body.style : 'bar';
+    const fontSize = Math.max(18,Math.min(72,parseInt(req.body.fontSize)||32));
+    const primaryColor = /^#[0-9a-f]{6}$/i.test(String(req.body.primaryColor||'')) ? String(req.body.primaryColor) : '#26e07f';
+    const showTarget = req.body.showTarget !== false;
     await req.tenantManager.setSetting('subgoal_text_position', textPosition);
     await req.tenantManager.setSetting('subgoal_count_position', countPosition);
     await req.tenantManager.setSetting('subgoal_progress_display', progressDisplay);
     await req.tenantManager.setSetting('subgoal_text_align', textAlign);
+    await req.tenantManager.setSetting('subgoal_style', style);
+    await req.tenantManager.setSetting('subgoal_font_size', String(fontSize));
+    await req.tenantManager.setSetting('subgoal_primary_color', primaryColor);
+    await req.tenantManager.setSetting('subgoal_show_target', showTarget?'1':'0');
     res.json({ success: true, ...(await emitSubCounterState(req.tenantManager || req)) });
   } catch(e) { res.status(500).json({ error: e.message }); }
 });
@@ -2942,6 +2988,28 @@ app.get('/api/channel-rewards/timeout',requireAuth,requireTenant,waitDB,async(re
     }});
   }catch(e){res.status(500).json({error:e.message})}
 });
+
+const KICK_REWARD_TYPES={
+  timeout:{title:'Timeout un viewer',cost:1000,duration:300,input:true,color:'#ef4444',description:d=>`Choisis le pseudo du viewer à timeout pendant ${d} secondes.`},
+  counter:{title:'Counter TO',cost:750,duration:0,input:false,color:'#168cff',description:()=>`Protège ton pseudo contre le prochain Timeout acheté.`},
+  message:{title:'Message du viewer',cost:300,duration:0,input:true,color:'#a855f7',description:()=>`Écris un message que le bot publiera dans le chat.`}
+};
+async function readKickReward(tm,type){const d=KICK_REWARD_TYPES[type],p=`kick_${type}_reward`;return {type,enabled:(await tm.getSetting(`${p}_enabled`,'0'))==='1',rewardId:await tm.getSetting(`${p}_id`,''),title:await tm.getSetting(`${p}_title`,d.title),cost:parseInt(await tm.getSetting(`${p}_cost`,String(d.cost)))||d.cost,duration:type==='timeout'?(parseInt(await tm.getSetting(`${p}_duration`,String(d.duration)))||d.duration):0}}
+app.get('/api/channel-rewards',requireAuth,requireTenant,waitDB,async(req,res)=>{try{const tm=createTenantManager({db,io,req});res.set('Cache-Control','no-store');res.json({data:{oauthConnected:await kickOAuth.isConnected(tm.streamerId),rewards:await Promise.all(Object.keys(KICK_REWARD_TYPES).map(t=>readKickReward(tm,t)))}})}catch(e){res.status(500).json({error:e.message})}});
+app.post('/api/admin/channel-rewards/:type/setup',requireAuth,requireTenant,waitDB,async(req,res)=>{
+  try{
+    const type=String(req.params.type||''),defaults=KICK_REWARD_TYPES[type];if(!defaults)return res.status(404).json({error:'Interaction inconnue'});
+    const tm=createTenantManager({db,io,req}),token=await kickOAuth.getValidAccessToken(tm.streamerId);if(!token)return res.status(409).json({error:'Reconnecte le compte streamer Kick pour autoriser les récompenses de chaîne.'});
+    const prefix=`kick_${type}_reward`,title=String(req.body?.title||defaults.title).trim().slice(0,50)||defaults.title,cost=Math.max(1,Math.min(10000000,parseInt(req.body?.cost)||defaults.cost)),duration=type==='timeout'?Math.max(60,Math.min(86400,parseInt(req.body?.duration)||defaults.duration)):0,enabled=req.body?.enabled!==false,rewardId=String(await tm.getSetting(`${prefix}_id`,'')).trim();
+    const body={title,cost,is_enabled:enabled,is_user_input_required:defaults.input,should_redemptions_skip_request_queue:false,background_color:defaults.color,description:defaults.description(duration)};
+    const headers={Authorization:`Bearer ${token}`,'Content-Type':'application/json',Accept:'application/json'};let reward;
+    if(rewardId){try{const response=await axios.patch(`https://api.kick.com/public/v1/channels/rewards/${rewardId}`,body,{headers,timeout:12000});reward=response.data?.data||response.data}catch(e){if(e.response?.status!==404)throw e}}
+    if(!reward){const response=await axios.post('https://api.kick.com/public/v1/channels/rewards',body,{headers,timeout:12000});reward=response.data?.data||response.data}
+    const id=String(reward?.id||rewardId||'');if(!id)throw new Error('Kick n’a renvoyé aucun identifiant de récompense.');
+    await Promise.all([tm.setSetting(`${prefix}_enabled`,enabled?'1':'0'),tm.setSetting(`${prefix}_id`,id),tm.setSetting(`${prefix}_title`,title),tm.setSetting(`${prefix}_cost`,String(cost)),...(type==='timeout'?[tm.setSetting(`${prefix}_duration`,String(duration))]:[])]);
+    res.json({success:true,data:{type,enabled,rewardId:id,title,cost,duration}});
+  }catch(e){const detail=e.response?.data?.message||e.response?.data?.error||e.message;res.status(e.response?.status===403?409:500).json({error:/scope|forbidden|403/i.test(String(detail))?'Reconnecte le compte streamer Kick afin d’accorder les droits Récompenses et Modération.':detail})}
+});
 app.post('/api/admin/channel-rewards/timeout/setup',requireAuth,requireTenant,waitDB,async(req,res)=>{
   try{
     const tm=createTenantManager({db,io,req}),token=await kickOAuth.getValidAccessToken(tm.streamerId);
@@ -3096,7 +3164,7 @@ app.get('/api/bot-status', async (req, res) => {
 
 // ── Alertes OBS ───────────────────────────────────────────────────────────────
 const ALERT_TYPES = ['follow','sub','renew','gift','raid','donation','bits','custom'];
-const ALERT_LABELS = { follow:'Follow', sub:'Abonnement', renew:'Renouvellement', gift:'Sub offerte', raid:'Raid', donation:'Donation', bits:'Bits', custom:'Alerte personnalisée' };
+const ALERT_LABELS = { follow:'Follow', sub:'Abonnement', renew:'Renouvellement', gift:'Sub offerte', raid:'Raid', donation:'Donation', bits:'Bits / KICKs', custom:'Alerte personnalisée' };
 const ALERT_DEFAULTS = {
   follow:   { enabled:true,  title:'Nouveau follow',       message:'{username} vient de follow !', media:'', mediaType:'image', sound:'', volume:35, duration:6, enterAnimation:'pop', exitAnimation:'fade', layout:'image_top', position:'center', font:'Inter', titleSize:36, messageSize:24, textTop:'#ffffff', textBottom:'#22c55e', accent:'#22c55e', background:'rgba(7,10,18,.86)', showLabel:true },
   sub:      { enabled:true,  title:'Nouvel abonnement',    message:'{username} vient de s’abonner !', media:'', mediaType:'image', sound:'', volume:40, duration:7, enterAnimation:'bounce', exitAnimation:'fade', layout:'image_top', position:'center', font:'Inter', titleSize:36, messageSize:24, textTop:'#ffffff', textBottom:'#22c55e', accent:'#22c55e', background:'rgba(7,10,18,.86)', showLabel:true },
@@ -3104,7 +3172,7 @@ const ALERT_DEFAULTS = {
   gift:     { enabled:true,  title:'Sub offerte',          message:'{gifter} offre {count} sub !', media:'', mediaType:'image', sound:'', volume:40, duration:7, enterAnimation:'bounce', exitAnimation:'fade', layout:'image_top', position:'center', font:'Inter', titleSize:36, messageSize:24, textTop:'#ffffff', textBottom:'#f59e0b', accent:'#f59e0b', background:'rgba(7,10,18,.86)', showLabel:true },
   raid:     { enabled:true,  title:'Raid',                 message:'{username} raid avec {count} viewers !', media:'', mediaType:'image', sound:'', volume:45, duration:8, enterAnimation:'slide_left', exitAnimation:'slide_right', layout:'image_left', position:'center', font:'Inter', titleSize:38, messageSize:24, textTop:'#ffffff', textBottom:'#38bdf8', accent:'#38bdf8', background:'rgba(7,10,18,.86)', showLabel:true },
   donation: { enabled:false, title:'Donation',             message:'{username} donne {amount}€ : {message}', media:'', mediaType:'image', sound:'', volume:40, duration:8, enterAnimation:'pop', exitAnimation:'fade', layout:'image_top', position:'center', font:'Inter', titleSize:36, messageSize:24, textTop:'#ffffff', textBottom:'#f59e0b', accent:'#f59e0b', background:'rgba(7,10,18,.86)', showLabel:true },
-  bits:     { enabled:false, title:'Bits',                 message:'{username} envoie {amount} bits !', media:'', mediaType:'image', sound:'', volume:40, duration:7, enterAnimation:'zoom', exitAnimation:'fade', layout:'image_top', position:'center', font:'Inter', titleSize:36, messageSize:24, textTop:'#ffffff', textBottom:'#a78bfa', accent:'#a78bfa', background:'rgba(7,10,18,.86)', showLabel:true },
+  bits:     { enabled:false, title:'Bits / KICKs',         message:'{username} envoie {amount} Bits / KICKs !', media:'', mediaType:'image', sound:'', volume:40, duration:7, enterAnimation:'zoom', exitAnimation:'fade', layout:'image_top', position:'center', font:'Inter', titleSize:36, messageSize:24, textTop:'#ffffff', textBottom:'#a78bfa', accent:'#a78bfa', background:'rgba(7,10,18,.86)', showLabel:true },
   custom:   { enabled:true,  title:'Alerte personnalisée', message:'Alerte test pour {username}', media:'', mediaType:'image', sound:'', volume:35, duration:6, enterAnimation:'fade', exitAnimation:'fade', layout:'image_top', position:'center', font:'Inter', titleSize:36, messageSize:24, textTop:'#ffffff', textBottom:'#22c55e', accent:'#22c55e', background:'rgba(7,10,18,.86)', showLabel:true }
 };
 
