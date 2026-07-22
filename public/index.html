@@ -8721,12 +8721,10 @@ function renderWidgetEngine(data) {
       </div>
       <div class="widget-engine-name">${escapeHtml(w.name)}</div>
       <div class="widget-engine-desc">${escapeHtml(w.description || '')}</div>
-      <div class="widget-engine-link" id="widget-engine-link-${escapeAttr(w.id)}">${escapeHtml(w.url || '')}</div>
+      ${w.hasOverlay===false?'':`<div class="widget-engine-link" id="widget-engine-link-${escapeAttr(w.id)}">${escapeHtml(w.url || '')}</div>`}
       <div class="widget-engine-actions">
         <button class="dark-btn" onclick="configureEngineWidget('${escapeAttr(w.id)}')">⚙ Configurer</button>
-        <button class="dark-btn" onclick="copyEngineWidget('${escapeAttr(w.id)}')">⧉ Copier</button>
-        <button class="dark-btn" onclick="openEngineWidget('${escapeAttr(w.id)}')">↗ Ouvrir</button>
-        <button class="dark-btn" onclick="regenerateEngineWidget('${escapeAttr(w.id)}')">⟳ Régénérer</button>
+        ${w.hasOverlay===false?'':`<button class="dark-btn" onclick="copyEngineWidget('${escapeAttr(w.id)}')">⧉ Copier</button><button class="dark-btn" onclick="openEngineWidget('${escapeAttr(w.id)}')">↗ Ouvrir</button><button class="dark-btn" onclick="regenerateEngineWidget('${escapeAttr(w.id)}')">⟳ Régénérer</button>`}
       </div>
     </article>`;
   }).join('') || '<div class="panel" style="grid-column:1/-1;color:var(--muted)">Aucun widget disponible.</div>';

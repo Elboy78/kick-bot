@@ -182,7 +182,8 @@ app.get('/api/v2/widgets', requireAuth, requireTenant, waitDB, async (req, res) 
     const tm = createTenantManager({ db, io, streamer });
     const widgets = [];
     for (const definition of widgetEngine.listWidgets()) {
-      const tokenRow = tokens[definition.id] || await db.getOrCreateOverlayToken(streamer.id, definition.id);
+      const hasOverlay = definition.overlay !== false;
+      const tokenRow = hasOverlay ? (tokens[definition.id] || await db.getOrCreateOverlayToken(streamer.id, definition.id)) : null;
       let enabled = true;
       if (definition.enabledSetting) {
         const raw = await tm.getSetting(definition.enabledSetting, '1');
@@ -191,9 +192,10 @@ app.get('/api/v2/widgets', requireAuth, requireTenant, waitDB, async (req, res) 
       widgets.push({
         ...definition,
         enabled,
-        url: `${base}/o/${tokenRow.token}/${definition.id}.html`,
-        maskedToken: `${String(tokenRow.token).slice(0, 6)}…${String(tokenRow.token).slice(-6)}`,
-        lastUsedAt: tokenRow.last_used_at || null
+        url: hasOverlay ? `${base}/o/${tokenRow.token}/${definition.id}.html` : '',
+        hasOverlay,
+        maskedToken: hasOverlay ? `${String(tokenRow.token).slice(0, 6)}…${String(tokenRow.token).slice(-6)}` : '',
+        lastUsedAt: tokenRow?.last_used_at || null
       });
     }
     res.set('Cache-Control', 'no-store');

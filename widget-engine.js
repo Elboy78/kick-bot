@@ -44,7 +44,8 @@ const WIDGETS = Object.freeze([
     color: '#a78bfa',
     description: 'Crée des récompenses interactives : TO, Counter TO et message du viewer.',
     settingsSection: 'kickrewards',
-    enabledSetting: null
+    enabledSetting: null,
+    overlay: false
   },
   {
     id: 'memes', name: 'Memes interactifs', icon: '😂', color: '#f59e0b',
