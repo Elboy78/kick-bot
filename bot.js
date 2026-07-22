@@ -446,6 +446,14 @@ async function handleChatMessageScoped(payload, ctx = null) {
   const isModOrBroadcaster = badges.some(b => b.type === 'moderator' || b.type === 'broadcaster');
 
   await db.upsertViewer(username, kickId);
+  // La source la plus fiable pour les rôles de chaîne reste l'identité reçue
+  // avec un vrai message du chat. On conserve immédiatement le badge MOD afin
+  // que les portails protégés puissent valider la personne même si l'API de
+  // profil Kick ne renvoie pas ce rôle.
+  if (isModOrBroadcaster) {
+    await db.setViewerKickProfile(username, { badges }).catch(e =>
+      console.warn(`[MEME MOD${ctx?.slug ? `:${ctx.slug}` : ''}] Cache badge impossible pour ${username}: ${e.message}`));
+  }
   const subGifterCount = getSubGifterBadgeCount(badges);
   if (subGifterCount > 0) {
     try {
@@ -559,17 +567,21 @@ async function handleChatMessageScoped(payload, ctx = null) {
       if (result?.duplicate) return sendChat(`@${username} Tu as déjà voté (${result.votes}/${result.required}).`);
       return sendChat(`⏭️ @${username} vote pour passer la musique (${result.votes}/${result.required}).`);
     }
-    const srEnabled = await db.getSetting('songrequest_enabled');
-    const srCommand = String(await db.getSettingStr('songrequest_command', '!sr') || '!sr').toLowerCase();
+    const srContext = currentChatContext();
+    const srSetting = async (key, fallback = '') => srContext?.streamerId
+      ? db.getStreamerSetting(srContext.streamerId, key, fallback)
+      : db.getSettingStr(key, fallback);
+    const srEnabled = String(await srSetting('songrequest_enabled', '1')) === '1';
+    const srCommand = String(await srSetting('songrequest_command', '!sr') || '!sr').toLowerCase();
     const srAliases = new Set([srCommand, '!sr', '!songrequest']);
     if (srEnabled && srAliases.has(cmd)) {
       const requested = parts.slice(1).join(' ').trim();
       if (!requested) return sendChat(`@${username} Utilisation : ${srCommand} <lien YouTube ou titre>`);
       const result = await shared.addSongRequest(username, requested, currentChatContext());
       if (result?.error) return sendChat(`@${username} ${result.error}`);
-      const chatConfirmEnabled = String(await db.getSettingStr('songrequest_chat_confirm_enabled', '0')) === '1';
+      const chatConfirmEnabled = String(await srSetting('songrequest_chat_confirm_enabled', '0')) === '1';
       if (chatConfirmEnabled) {
-        const template = await db.getSettingStr('songrequest_confirm', '🎵 @{username}, ta musique a été ajoutée à la file !');
+        const template = await srSetting('songrequest_confirm', '🎵 @{username}, ta musique a été ajoutée à la file !');
         const msg = String(template || '').replace(/\{username\}/gi, username).replace(/@\s*@/g, '@');
         if (msg.trim()) return sendChat(msg.trim());
       }

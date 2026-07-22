@@ -4,7 +4,7 @@
    ========================================================================== */
 
 :root{
-  --panel-wallpaper:url("/assets/themes/control.webp");
+  --panel-wallpaper:linear-gradient(145deg,#071225,#020817 58%,#07101f);
   --panel-overlay-rgb:2 8 20;
   --panel-overlay-alpha:.10;
   --panel-surface-opacity:92%;
@@ -352,6 +352,7 @@ html[data-elbot-glow="true"] body .ref-panel:hover{
 }
 
 .premium-theme-gallery{grid-template-columns:1fr!important}
+.premium-theme-gallery button.premium-locked{opacity:.58;cursor:not-allowed!important}
 .premium-theme-preview{
   background-size:cover!important;
   background-position:center!important;
@@ -493,6 +494,7 @@ html[data-elbot-glow="true"] body .ref-panel:hover{
 }
 
 /* Mapping des 13 wallpapers. */
+html[data-panel-theme="classic"]{--panel-wallpaper:linear-gradient(145deg,#071225,#020817 58%,#07101f);--panel-overlay-rgb:2 8 20}
 html[data-panel-theme="control"]{--panel-wallpaper:url("/assets/themes/control.webp");--panel-overlay-rgb:2 8 20}
 html[data-panel-theme="dbd"]{--panel-wallpaper:url("/assets/themes/dbd.webp");--panel-overlay-rgb:0 0 0}
 html[data-panel-theme="obs"]{--panel-wallpaper:url("/assets/themes/obs.webp");--panel-overlay-rgb:4 7 9}

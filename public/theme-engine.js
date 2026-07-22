@@ -5,12 +5,13 @@
   const LEGACY_KEYS = ['elbot_theme_v2','elbot_ref_appearance_v1','elbot_ref_appearance'];
 
   const THEMES = new Set([
-    'control','dbd','obs','vision','neon','elite','steam','riot',
+    'classic','control','dbd','obs','vision','neon','elite','steam','riot',
     'midnight','ocean','sunset','forest','minimal'
   ]);
   const SIDEBAR_MODES = new Set(['solid','theme','transparent','glass']);
 
-  const LEGACY_NAMES = {classic:'control',liquid:'control',aurora:'vision'};
+  const LEGACY_NAMES = {liquid:'control',aurora:'vision'};
+  let premiumThemeAccess = false;
 
   const PRESETS = {
     kick:{primary:'#53fc18',secondary:'#168cff'},
@@ -22,7 +23,7 @@
   };
 
   const DEFAULTS = {
-    theme:'control',
+    theme:'classic',
     backgroundVisibility:100,
     panelOpacity:92,
     primaryColor:'#28ff66',
@@ -119,9 +120,12 @@
   function refreshThemeButtons(theme){
     document.querySelectorAll('[data-ref-interface]').forEach(button => {
       const active = button.dataset.refInterface === theme;
+      const locked = button.dataset.refInterface !== 'classic' && !premiumThemeAccess;
       button.classList.toggle('active',active);
+      button.classList.toggle('premium-locked',locked);
+      button.setAttribute('aria-disabled',String(locked));
       const action = button.querySelector('em');
-      if (action) action.textContent = active ? 'Actif' : 'Appliquer';
+      if (action) action.textContent = locked ? '🔒 Premium' : (active ? 'Actif' : 'Appliquer');
     });
   }
 
@@ -142,7 +146,13 @@
   }
 
   function applyTheme(value,save=true){
-    const theme = normalizeTheme(value);
+    const requested = normalizeTheme(value);
+    if (requested !== 'classic' && !premiumThemeAccess) {
+      if (save && typeof window.toast === 'function') window.toast('Les fonds personnalisés sont réservés aux comptes Premium',false);
+      refreshThemeButtons(DEFAULTS.theme);
+      return;
+    }
+    const theme = requested;
 
     document.body.removeAttribute('data-ref-interface');
     document.body.removeAttribute('data-ref-wallpaper');
@@ -287,6 +297,14 @@
   }
 
   window.applyReferenceInterface = applyTheme;
+  window.setThemePremiumAccess = allowed => {
+    premiumThemeAccess = !!allowed;
+    if (!premiumThemeAccess) {
+      saveState({theme:'classic'});
+      applyTheme('classic',false);
+    } else loadAppearance();
+    refreshThemeButtons(readState().theme);
+  };
   window.setReferenceBackgroundIntensity = applyBackgroundVisibility;
   window.setReferencePanelOpacity = applyPanelOpacity;
 

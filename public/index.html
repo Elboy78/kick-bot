@@ -828,7 +828,7 @@ body.light .card,body.light .panel,body.light .widget-engine-card{background:lin
 
   <!-- ══ COMMUNAUTÉ ══ -->
   <div class="page" id="page-communaute">
-    <div class="header"><div><h1>Communauté</h1><p>Mémoire de la chaîne, soutiens et followers connus</p></div><button class="btn" onclick="loadCommunity()">↻ Actualiser</button></div>
+    <div class="header"><div><h1>Communauté</h1><p>Mémoire de la chaîne, soutiens et followers connus</p></div><button class="btn" id="community-refresh-btn" onclick="refreshCommunity()">↻ Actualiser</button></div>
     <div class="g3" style="margin-bottom:14px">
       <div class="panel"><h3>👥 Viewers connus</h3><div id="community-known-viewers" style="font-size:28px;font-weight:900;color:var(--accent)">—</div></div>
       <div class="panel"><h3>💚 Follows datés</h3><div id="community-known-followers" style="font-size:28px;font-weight:900;color:#22c55e">—</div></div>
@@ -5311,6 +5311,16 @@ async function loadCommunity() {
   }
 }
 
+async function refreshCommunity() {
+  const button = document.getElementById('community-refresh-btn');
+  if (button) { button.disabled = true; button.textContent = '↻ Actualisation…'; }
+  communityKickSyncDone = false;
+  try { await loadCommunity(); }
+  finally {
+    if (button) { button.disabled = false; button.textContent = '↻ Actualiser'; }
+  }
+}
+
 let communitySupporters = [], communityFollowers = [], communitySupportPage = 1, communityFollowPage = 1, communityKickSyncDone = false;
 const COMMUNITY_PAGE_SIZE = 25;
 function communityPager(id, page, total, setter) {
@@ -7352,6 +7362,13 @@ try {
     }
   });
   chestSocket.on('dashboard-activity', data => { if(typeof pushReferenceActivity==='function')pushReferenceActivity(data); });
+  let communityReloadTimer = null;
+  chestSocket.on('community-update', () => {
+    clearTimeout(communityReloadTimer);
+    communityReloadTimer = setTimeout(() => {
+      if (document.getElementById('page-communaute')?.classList.contains('active')) loadCommunity();
+    }, 250);
+  });
 } catch(e) { console.warn('[CHESTS] socket indisponible', e); }
 
 async function newChestSeason() {
@@ -7841,6 +7858,7 @@ async function loadBotIdentity() {
     const payload = await r.json();
     if (!r.ok) throw new Error(payload.error || 'Identité indisponible');
     const d = payload.data || {};
+    window.setThemePremiumAccess?.(Boolean(d.premium || d.platformAdmin));
     const assigned = d.assigned;
     const connected = assigned?.status === 'connected';
     planBadge.textContent = d.premium ? 'PREMIUM' : 'STANDARD';
@@ -10222,17 +10240,23 @@ const SPAM_FILTER_META={
   paragraph:{icon:'≡',title:'Protection des paragraphes',desc:'Supprime les longs murs de texte.',fields:[['maxAmount','Nombre maximal de caractères','']]},
   symbols:{icon:'#!',title:'Protection des symboles',desc:'Supprime les messages contenant trop de symboles.',fields:[['maxAmount','Quantité maximale',''],['minChars','Nombre minimum de caractères',''],['maxPercent','Pourcentage maximal','%']]},
   repetition:{icon:'↻',title:'Protection des répétitions',desc:'Supprime les messages contenant des mots ou expressions très répétés.',fields:[['maxRepeats','Répétitions maximales d’un mot',''],['minChars','Taille minimale du mot','caractères']]},
-  zalgo:{icon:'♟',title:'Protection Zalgo',desc:'Supprime les messages contenant des caractères déformés ou corrompus.',fields:[['maxAmount','Caractères Zalgo maximum','']]},
+  zalgo:{icon:'⚡',title:'Protection ElBot',desc:'Bloque les caractères corrompus et les messages visuellement malveillants.',fields:[['maxAmount','Caractères suspects maximum','']]},
   oneMan:{icon:'☷',title:'Protection contre le spam individuel',desc:'Supprime les messages répétés par un même utilisateur.',fields:[['minChars','Caractères minimum',''],['minMessages','Messages minimum',''],['lookback','Période analysée','secondes'],['threshold','Seuil de ressemblance','%']]}
 };
 let spamState={level:0,filters:{},settings:{}},spamOpenFilters={};
+const SPAM_LEVEL_PRESETS={
+  0:{enabled:false,announce:false,probation:false,caps:{duration:30,maxAmount:30,minChars:10,maxPercent:50},links:{duration:120},emotes:{duration:30,maxAmount:15},paragraph:{duration:30,maxAmount:140},symbols:{duration:15,maxAmount:25,minChars:10,maxPercent:50},repetition:{duration:30,maxRepeats:15,minChars:3},zalgo:{duration:30,maxAmount:15},oneMan:{duration:30,minChars:4,minMessages:5,lookback:30,threshold:75}},
+  1:{enabled:true,announce:false,probation:false,caps:{duration:15,maxAmount:45,minChars:15,maxPercent:75},links:{duration:60},emotes:{duration:15,maxAmount:25},paragraph:{duration:15,maxAmount:300},symbols:{duration:15,maxAmount:40,minChars:15,maxPercent:70},repetition:{duration:15,maxRepeats:20,minChars:3},zalgo:{duration:15,maxAmount:25},oneMan:{duration:15,minChars:4,minMessages:7,lookback:30,threshold:90}},
+  2:{enabled:true,announce:true,probation:false,caps:{duration:30,maxAmount:30,minChars:10,maxPercent:55},links:{duration:120},emotes:{duration:30,maxAmount:15},paragraph:{duration:30,maxAmount:180},symbols:{duration:30,maxAmount:25,minChars:10,maxPercent:50},repetition:{duration:30,maxRepeats:12,minChars:3},zalgo:{duration:30,maxAmount:15},oneMan:{duration:30,minChars:4,minMessages:5,lookback:30,threshold:78}},
+  3:{enabled:true,announce:true,probation:true,caps:{duration:120,maxAmount:15,minChars:6,maxPercent:40},links:{duration:300},emotes:{duration:120,maxAmount:8},paragraph:{duration:120,maxAmount:100},symbols:{duration:120,maxAmount:12,minChars:6,maxPercent:35},repetition:{duration:120,maxRepeats:6,minChars:2},zalgo:{duration:120,maxAmount:5},oneMan:{duration:120,minChars:3,minMessages:3,lookback:45,threshold:65}}
+};
 function spamGeneralFields(key,rule){return `<div class="spam-section-title"><b>Réglages généraux</b><small>Configure la sanction et les exceptions de ce filtre.</small></div><div class="spam-settings-grid"><label>Sanction<select onchange="spamState.settings.${key}.action=this.value"><option value="timeout" ${rule.action==='timeout'?'selected':''}>Timeout</option><option value="ban" ${rule.action==='ban'?'selected':''}>Bannissement permanent</option></select><small>Action appliquée lorsque le filtre se déclenche</small></label><label>Durée<input type="number" min="1" value="${Number(rule.duration)||30}" onchange="spamState.settings.${key}.duration=Number(this.value)"><small>Durée du timeout en secondes</small></label><label>Groupe exclu<select onchange="spamState.settings.${key}.exclude=this.value"><option value="none" ${rule.exclude==='none'?'selected':''}>Aucun viewer</option><option value="subscribers" ${rule.exclude==='subscribers'?'selected':''}>Abonnés</option></select><small>Les modérateurs et le streamer sont toujours immunisés</small></label></div>`}
 function spamSpecificFields(key,meta,rule){if(key==='links')return `<div class="spam-section-title"><b>Réglages du filtre</b><small>Les domaines autorisés passent le filtre. La liste bloquée double la sanction.</small></div><div class="spam-settings-grid spam-links-grid"><label>Liens autorisés<textarea rows="3" onchange="spamState.settings.links.allowlist=this.value.split(/[\\n,;]+/).map(x=>x.trim()).filter(Boolean)">${esc((rule.allowlist||[]).join('\n'))}</textarea><small>Un domaine par ligne, par exemple youtube.com</small></label><label>Liens bloqués avec sanction doublée<textarea rows="3" onchange="spamState.settings.links.blocklist=this.value.split(/[\\n,;]+/).map(x=>x.trim()).filter(Boolean)">${esc((rule.blocklist||[]).join('\n'))}</textarea><small>Domaines dangereux ou indésirables</small></label></div>`;return `<div class="spam-section-title"><b>Réglages du filtre</b><small>Ajuste précisément la sensibilité de cette protection.</small></div><div class="spam-settings-grid">${meta.fields.map(([field,label,unit])=>`<label>${label}<span class="spam-number"><input type="number" min="0" value="${Number(rule[field]??0)}" onchange="spamState.settings.${key}.${field}=Number(this.value)"><i>${unit}</i></span></label>`).join('')}</div>`}
 function renderSpamConfig(){document.querySelectorAll('[data-spam-level]').forEach(x=>x.classList.toggle('active',Number(x.dataset.spamLevel)===Number(spamState.level)));const progress=document.getElementById('spam-level-progress');if(progress)progress.style.width=(Number(spamState.level)/3*100)+'%';const root=document.getElementById('spam-filter-list');if(!root)return;root.innerHTML=Object.entries(SPAM_FILTER_META).map(([key,m])=>{const enabled=!!spamState.filters?.[key],open=!!spamOpenFilters[key],rule=spamState.settings?.[key]||{};return `<section class="spam-filter-row ${enabled?'enabled':''} ${open?'open':''}"><div class="spam-filter-head" onclick="toggleSpamPanel('${key}')"><div class="spam-filter-icon">${m.icon}</div><div class="spam-filter-copy"><strong>${m.title}</strong><small>${m.desc}</small></div><label class="co-toggle-line" onclick="event.stopPropagation()"><span class="co-switch"><input type="checkbox" ${enabled?'checked':''} onchange="toggleSpamFilter('${key}',this.checked)"><span></span></span></label><button class="spam-chevron" type="button">⌄</button></div>${open?`<div class="spam-filter-body">${spamGeneralFields(key,rule)}${spamSpecificFields(key,m,rule)}<div class="spam-extra-toggles"><label><span class="co-switch"><input type="checkbox" ${rule.announce?'checked':''} onchange="spamState.settings.${key}.announce=this.checked"><span></span></span><b>Avertissement public</b><small>Le bot annonce la sanction dans le chat.</small></label><label><span class="co-switch"><input type="checkbox" ${rule.probation?'checked':''} onchange="spamState.settings.${key}.probation=this.checked"><span></span></span><b>Récidive progressive</b><small>Augmente la durée pour les récidivistes.</small></label></div></div>`:''}</section>`}).join('')}
 async function loadSpamConfig(){try{const r=await fetch('/api/spam/config',{cache:'no-store'}),j=await r.json();if(r.ok){spamState=j.data;spamOpenFilters={};renderSpamConfig()}}catch(e){toast('Chargement anti-spam impossible',false)}}
 function toggleSpamPanel(key){spamOpenFilters[key]=!spamOpenFilters[key];renderSpamConfig()}
 function toggleSpamFilter(key,enabled){spamState.filters[key]=!!enabled;if(enabled&&Number(spamState.level)===0)spamState.level=1;if(!Object.values(spamState.filters).some(Boolean))spamState.level=0;renderSpamConfig()}
-function setSpamLevel(level){spamState.level=Number(level);renderSpamConfig()}
+function setSpamLevel(level){const value=Math.max(0,Math.min(3,Number(level)||0)),preset=SPAM_LEVEL_PRESETS[value];spamState.level=value;for(const key of Object.keys(SPAM_FILTER_META)){spamState.filters[key]=preset.enabled;spamState.settings[key]={...(spamState.settings[key]||{}),...(preset[key]||{}),announce:preset.announce,probation:preset.probation}}renderSpamConfig();const status=document.getElementById('spam-save-status');if(status)status.textContent='Niveau appliqué à toutes les protections — clique sur Enregistrer'}
 async function saveSpamConfig(){const r=await fetch('/api/admin/spam/config',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(spamState)}),j=await r.json().catch(()=>({}));const status=document.getElementById('spam-save-status');if(!r.ok){status.textContent=j.error||'Enregistrement impossible';return toast(status.textContent,false)}spamState=j.data;status.textContent='✓ Tous les filtres et réglages ont été enregistrés pour cette chaîne';renderSpamConfig();toast('Filtres anti-spam enregistrés ✓')}
 
 // ── Toggle toutes les commandes ───────────────────────────────────────────────
@@ -10725,6 +10749,13 @@ setInterval(() => {
       <h3>Thèmes Premium ElBot</h3>
       <div class="premium-theme-gallery">
 
+        <button type="button" data-ref-interface="classic" onclick="applyReferenceInterface('classic')">
+          <span class="premium-theme-preview" style="background:linear-gradient(145deg,#071225,#020817 58%,#07101f)">
+            <i class="pv-side"></i><i class="pv-top"></i><i class="pv-card a"></i><i class="pv-card b"></i><i class="pv-wide"></i>
+          </span>
+          <span class="premium-theme-copy"><b>ElBot Classique</b><small>Simple • Fluide • Inclus par défaut</small></span>
+          <em>Appliquer</em>
+        </button>
         <button type="button" data-ref-interface="control" onclick="applyReferenceInterface('control')">
           <span class="premium-theme-preview" style="background-image:url('/assets/themes/control.webp?v=28')">
             <i class="pv-side"></i><i class="pv-top"></i><i class="pv-card a"></i><i class="pv-card b"></i><i class="pv-wide"></i>
