@@ -2972,8 +2972,8 @@ app.post('/api/admin/oauth/disconnect', requireAuth, requireTenant, async (req, 
   try {
     const tm = createTenantManager({ db, io, req });
     await kickOAuth.disconnect(tm.streamerId);
-    clearStreamerCookie(res);
-    res.json({ success: true });
+    res.set('Cache-Control','no-store');
+    res.json({ success: true, connected:false, streamerId:tm.streamerId });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 

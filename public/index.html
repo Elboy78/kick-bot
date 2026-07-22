@@ -7899,9 +7899,12 @@ async function loadOAuthStatus() {
 
 async function disconnectOAuth() {
   if (!confirm('Déconnecter le compte Kick officiel ? Le bot repassera sur le token manuel si configuré.')) return;
-  await fetch('/api/admin/oauth/disconnect', { method:'POST', headers:{'Content-Type':'application/json'}, body:'{}' });
+  const r=await fetch('/api/admin/oauth/disconnect', { method:'POST', headers:{'Content-Type':'application/json'}, body:'{}' });
+  const d=await r.json();
+  if(!r.ok){toast(d.error||'Déconnexion impossible',false);return}
   toast('Compte Kick déconnecté');
-  loadOAuthStatus();
+  await loadOAuthStatus();
+  await loadKickRewards();
 }
 
 async function loadBotIdentity() {

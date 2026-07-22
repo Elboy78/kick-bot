@@ -303,7 +303,6 @@ async function isBotConnected() {
 
 async function getValidAccessToken(streamerId = null) {
   let stored = await db.getOAuthToken(providerForStreamer(streamerId));
-  if (!stored && streamerId) stored = await db.getOAuthToken(PROVIDER);
   if (!stored) return null;
   if (Date.now() < stored.expires_at - 60000) return stored.access_token;
   try {
@@ -329,7 +328,6 @@ async function getValidAccessToken(streamerId = null) {
 
 async function isConnected(streamerId = null) {
   let stored = await db.getOAuthToken(providerForStreamer(streamerId));
-  if (!stored && streamerId) stored = await db.getOAuthToken(PROVIDER);
   return !!stored;
 }
 
