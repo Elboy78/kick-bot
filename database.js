@@ -761,6 +761,10 @@ async function getViewer(username) {
   return engine.apply(viewer);
 }
 
+async function getViewerForStreamer(username, streamerId) {
+  return get(`SELECT * FROM viewers WHERE username = ? AND COALESCE(streamer_id, 1) = ?`, [String(username || '').trim().toLowerCase(), Number(streamerId || 1)]);
+}
+
 async function addMemePoints(username, points) {
   const sid = scopedStreamerId();
   const lower = String(username || '').trim().toLowerCase();
@@ -1644,6 +1648,11 @@ async function getAnnouncements() { return all(`SELECT * FROM announcements ORDE
 async function addAnnouncement(message, interval_ms) {
   const r = await run(`INSERT INTO announcements (message, interval_ms) VALUES (?, ?)`, [message, interval_ms]);
   return Number(r?.lastInsertRowid ?? r?.lastInsertRowID ?? r?.lastInsertId);
+}
+async function updateAnnouncement(id, message, interval_ms) {
+  await run(`UPDATE announcements SET message = ?, interval_ms = ? WHERE id = ?`,
+    [String(message || '').trim(), Math.max(60000, Number(interval_ms) || 600000), Number(id)]);
+  return get(`SELECT * FROM announcements WHERE id = ?`, [Number(id)]);
 }
 
 async function getViewersMissingFollow(limit = 10) {
@@ -2575,6 +2584,7 @@ module.exports = {
   initSystemCommandsState, isSystemCmdEnabled, getAllSystemCommandsState, toggleSystemCommand,
   getAllSettings, getSetting, setSetting, getSettingStr, setSettingStr, DEFAULT_SETTINGS,
   getBannedWords, addBannedWord, deleteBannedWord, deleteBannedWordByText, getBannedWordByText, toggleBannedWord, checkBannedWords,
+  getViewerForStreamer,
   getAllowedWords, addAllowedWord, deleteAllowedWord, deleteAllowedWordByText, getAllowedWordByText,
   getQuotes, addQuote, getRandomQuote, deleteQuote,
   getCounters, getCounter, setCounter, incrementCounter, deleteCounter,
@@ -2582,7 +2592,7 @@ module.exports = {
   createSupportTicket, getSupportTicket, listSupportTickets, getSupportMessages, addSupportMessage, updateSupportTicket,
   getQueue, joinQueue, removeFromQueue, clearQueue, getQueuePosition,
   createPoll, getActivePoll, votePoll, closePoll, getPolls,
-  getAnnouncements, addAnnouncement, toggleAnnouncement, deleteAnnouncement, updateAnnouncementSent,
+  getAnnouncements, addAnnouncement, updateAnnouncement, toggleAnnouncement, deleteAnnouncement, updateAnnouncementSent,
   getTTSBlacklist, addTTSBlacklistWord, deleteTTSBlacklistWord, isTTSBlacklisted,
   getTTSHistory, addTTSHistory, clearTTSHistory,
   getTTSConfig, setTTSConfigValue, setTTSConfigBulk,

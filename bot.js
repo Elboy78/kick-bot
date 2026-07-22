@@ -51,6 +51,12 @@ let sessionStart     = null;
 let peakViewers      = 0;
 const pendingDuelTimeouts = {};
 let announcementIntervals = {};
+const spamMessageWindows = new Map();
+const SPAM_FILTER_DEFAULTS={caps:{action:'timeout',duration:30,exclude:'none',announce:false,probation:false,maxAmount:30,minChars:10,maxPercent:50},links:{action:'timeout',duration:120,exclude:'subscribers',announce:false,probation:false,allowlist:['kick.com','youtube.com','youtu.be'],blocklist:[]},emotes:{action:'timeout',duration:30,exclude:'subscribers',announce:false,probation:false,maxAmount:15},paragraph:{action:'timeout',duration:30,exclude:'none',announce:false,probation:false,maxAmount:140},symbols:{action:'timeout',duration:15,exclude:'none',announce:false,probation:false,maxAmount:25,minChars:10,maxPercent:50},repetition:{action:'timeout',duration:30,exclude:'none',announce:false,probation:false,maxRepeats:15,minChars:3},zalgo:{action:'timeout',duration:30,exclude:'none',announce:false,probation:false,maxAmount:15},oneMan:{action:'timeout',duration:30,exclude:'none',announce:false,probation:false,minChars:4,minMessages:5,lookback:30,threshold:75}};
+const spamProbation=new Map();
+async function getSpamConfig(){let raw='{}';try{raw=await db.getSettingStr('spam_filters_config','{}')}catch(_){}let cfg={};try{cfg=JSON.parse(raw||'{}')}catch(_){}const settings={};for(const [key,defaults] of Object.entries(SPAM_FILTER_DEFAULTS))settings[key]={...defaults,...(cfg.settings?.[key]||{})};return {level:Math.max(0,Math.min(3,Number(cfg.level)||0)),filters:{caps:false,links:false,emotes:false,paragraph:false,symbols:false,repetition:false,zalgo:false,oneMan:false,...(cfg.filters||{})},settings}}
+function spamSimilarity(a,b){const bigrams=s=>{const clean=String(s).toLowerCase().replace(/\s+/g,' ').trim(),set=new Set();for(let i=0;i<clean.length-1;i++)set.add(clean.slice(i,i+2));return set},aa=bigrams(a),bb=bigrams(b);if(!aa.size||!bb.size)return a===b?100:0;let common=0;for(const x of aa)if(bb.has(x))common++;return common/Math.max(aa.size,bb.size)*100}
+function detectSpam(content,username,cfg,slug='',isSubscriber=false,payloadEmoteCount=0){if(!cfg.level)return null;const f=cfg.filters||{},s=cfg.settings||{},text=String(content||''),letters=(text.match(/[a-zà-ÿ]/gi)||[]),upper=(text.match(/[A-ZÀ-Þ]/g)||[]),skip=key=>s[key]?.exclude==='subscribers'&&isSubscriber;if(f.zalgo&&!skip('zalgo')){const count=(text.match(/[\u0300-\u036f]/gu)||[]).length;if(count>Number(s.zalgo.maxAmount))return {key:'zalgo',reason:'caractères Zalgo'}}if(f.paragraph&&!skip('paragraph')&&text.length>Number(s.paragraph.maxAmount))return {key:'paragraph',reason:'message trop long'};if(f.caps&&!skip('caps')&&letters.length>=Number(s.caps.minChars)&&upper.length>Number(s.caps.maxAmount)&&upper.length/letters.length*100>=Number(s.caps.maxPercent))return {key:'caps',reason:'majuscules excessives'};const urls=text.match(/https?:\/\/[^\s]+|(?:www\.)[^\s]+/gi)||[];if(f.links&&!skip('links')&&urls.length){const blocked=urls.some(url=>(s.links.blocklist||[]).some(domain=>url.toLowerCase().includes(String(domain).toLowerCase()))),allowed=urls.every(url=>(s.links.allowlist||[]).some(domain=>url.toLowerCase().includes(String(domain).toLowerCase())));if(blocked||!allowed)return {key:'links',reason:blocked?'lien dangereux bloqué':'lien non autorisé',doublePenalty:blocked}}const emotes=Math.max(Number(payloadEmoteCount)||0,(text.match(/\[emote:\d+:[^\]]+\]|:[a-z0-9_]{2,}:/gi)||[]).length);if(f.emotes&&!skip('emotes')&&emotes>Number(s.emotes.maxAmount))return {key:'emotes',reason:'trop d’émotes'};const symbols=(text.match(/[^\p{L}\p{N}\s.,!?'-]/gu)||[]);if(f.symbols&&!skip('symbols')&&text.length>=Number(s.symbols.minChars)&&symbols.length>Number(s.symbols.maxAmount)&&symbols.length/text.length*100>=Number(s.symbols.maxPercent))return {key:'symbols',reason:'trop de symboles'};if(f.repetition&&!skip('repetition')){const min=Math.max(1,Number(s.repetition.minChars)||3),max=Math.max(2,Number(s.repetition.maxRepeats)||15),words=text.toLowerCase().match(new RegExp(`\\p{L}{${min},}`,'gu'))||[],counts={};for(const word of words)counts[word]=(counts[word]||0)+1;if(Object.values(counts).some(n=>n>max)||(new RegExp(`(.)\\1{${max},}`,'iu')).test(text))return {key:'repetition',reason:'répétition excessive'}}if(f.oneMan&&!skip('oneMan')&&text.trim().length>=Number(s.oneMan.minChars)){const key=`${slug}:${String(username).toLowerCase()}`,now=Date.now(),windowMs=Math.max(3,Number(s.oneMan.lookback)||30)*1000,rows=(spamMessageWindows.get(key)||[]).filter(row=>now-row.at<windowMs);const similar=rows.filter(row=>spamSimilarity(row.text,text)>=Number(s.oneMan.threshold)).length;rows.push({at:now,text});spamMessageWindows.set(key,rows.slice(-30));if(similar+1>=Number(s.oneMan.minMessages))return {key:'oneMan',reason:'spam individuel répété'}}return null}
 let streamStartTime = null;
 let lastFollowerCount = 0;
 let followerCheckInterval = null;
@@ -181,7 +187,12 @@ async function init() {
   await db.ensureInit();
   await db.initSystemCommandsState(SYSTEM_COMMANDS);
   // Enregistrer sendChat dans le module partagé pour que panel.js puisse l'utiliser
-  shared.registerSendChat(sendChat);
+  shared.registerSendChat((message,requestedContext=null)=>{
+    const context=requestedContext?.streamerId
+      ? ([...botChannelState.chatrooms.values()].find(item=>Number(item.streamerId)===Number(requestedContext.streamerId))||requestedContext)
+      : currentChatContext();
+    return withChatContext(context,()=>sendChat(message));
+  });
   if (process.env.BOT_MEME_ONLY !== 'true') await startAnnouncements();
   await syncPointsConfig();
   // V2 : synchronise régulièrement les chaînes ajoutées au bot.
@@ -440,7 +451,10 @@ async function handleChatMessageScoped(payload, ctx = null) {
   const isModOrBroadcaster = badges.some(b => b.type === 'moderator' || b.type === 'broadcaster');
 
   await db.upsertViewer(username, kickId);
-  // Enregistre immédiatement le badge MOD réellement reçu dans le chat Kick.
+  // La source la plus fiable pour les rôles de chaîne reste l'identité reçue
+  // avec un vrai message du chat. On conserve immédiatement le badge MOD afin
+  // que les portails protégés puissent valider la personne même si l'API de
+  // profil Kick ne renvoie pas ce rôle.
   if (isModOrBroadcaster) {
     await db.setViewerKickProfile(username, { badges }).catch(e =>
       console.warn(`[MEME MOD${ctx?.slug ? `:${ctx.slug}` : ''}] Cache badge impossible pour ${username}: ${e.message}`));
@@ -479,6 +493,12 @@ async function handleChatMessageScoped(payload, ctx = null) {
       at: new Date().toISOString()
     }, ctx || currentChatContext());
   } catch(e) {}
+
+  // Anti-spam indépendant de la liste des mots bannis. Le niveau 0 le coupe,
+  // tandis que les modérateurs et le broadcaster sont toujours exemptés.
+  try {
+    if(!isModOrBroadcaster){const spamCfg=await getSpamConfig(),isSubscriber=badges.some(b=>/subscriber|sub_gifter/i.test(String(b?.type||''))),rawEmotes=payload?.emotes||payload?.message?.emotes||[],payloadEmoteCount=Array.isArray(rawEmotes)?rawEmotes.reduce((n,e)=>n+(Array.isArray(e?.positions)?e.positions.length:1),0):Object.values(rawEmotes||{}).reduce((n,e)=>n+(Array.isArray(e)?e.length:1),0),hit=detectSpam(content,username,spamCfg,ctx?.slug||'',isSubscriber,payloadEmoteCount);if(hit){const rule=spamCfg.settings?.[hit.key]||SPAM_FILTER_DEFAULTS[hit.key],probationKey=`${ctx?.slug||''}:${username.toLowerCase()}:${hit.key}`,previous=spamProbation.get(probationKey)||{count:0,at:0};let multiplier=hit.doublePenalty?2:1;if(rule.probation&&Date.now()-previous.at<7*86400000)multiplier*=Math.min(5,previous.count+1);spamProbation.set(probationKey,{count:previous.count+1,at:Date.now()});const duration=Math.max(1,Number(rule.duration)||30)*multiplier,action=rule.action==='ban'?'ban':'timeout';console.log(`[SPAM:${ctx?.slug||'chaine'}] ${username}: ${hit.reason}`);await moderateUser(username,kickId,action,duration,hit.reason);await db.addModerationLog('spam',username,duration,hit.reason,content,'ElBot');if(rule.announce)await sendChat(`🛡️ @${username} sanctionné automatiquement : ${hit.reason}.`);return}}
+  } catch(e) { console.error('[SPAM] Vérification ignorée:', e.message); }
 
   // Vérifier les mots bannis
   if (await db.getSetting('moderation_enabled')) {
@@ -552,17 +572,21 @@ async function handleChatMessageScoped(payload, ctx = null) {
       if (result?.duplicate) return sendChat(`@${username} Tu as déjà voté (${result.votes}/${result.required}).`);
       return sendChat(`⏭️ @${username} vote pour passer la musique (${result.votes}/${result.required}).`);
     }
-    const srEnabled = await db.getSetting('songrequest_enabled');
-    const srCommand = String(await db.getSettingStr('songrequest_command', '!sr') || '!sr').toLowerCase();
+    const srContext = currentChatContext();
+    const srSetting = async (key, fallback = '') => srContext?.streamerId
+      ? db.getStreamerSetting(srContext.streamerId, key, fallback)
+      : db.getSettingStr(key, fallback);
+    const srEnabled = String(await srSetting('songrequest_enabled', '1')) === '1';
+    const srCommand = String(await srSetting('songrequest_command', '!sr') || '!sr').toLowerCase();
     const srAliases = new Set([srCommand, '!sr', '!songrequest']);
     if (srEnabled && srAliases.has(cmd)) {
       const requested = parts.slice(1).join(' ').trim();
       if (!requested) return sendChat(`@${username} Utilisation : ${srCommand} <lien YouTube ou titre>`);
       const result = await shared.addSongRequest(username, requested, currentChatContext());
       if (result?.error) return sendChat(`@${username} ${result.error}`);
-      const chatConfirmEnabled = String(await db.getSettingStr('songrequest_chat_confirm_enabled', '0')) === '1';
+      const chatConfirmEnabled = String(await srSetting('songrequest_chat_confirm_enabled', '0')) === '1';
       if (chatConfirmEnabled) {
-        const template = await db.getSettingStr('songrequest_confirm', '🎵 @{username}, ta musique a été ajoutée à la file !');
+        const template = await srSetting('songrequest_confirm', '🎵 @{username}, ta musique a été ajoutée à la file !');
         const msg = String(template || '').replace(/\{username\}/gi, username).replace(/@\s*@/g, '@');
         if (msg.trim()) return sendChat(msg.trim());
       }
@@ -1340,14 +1364,16 @@ async function cmdRPS(username, parts) {
 // ─── Announcements automatiques ───────────────────────────────────────────────
 
 async function startAnnouncements() {
-  // Arrêter les anciens timers
-  Object.values(announcementIntervals).forEach(t => clearInterval(t));
-  announcementIntervals = {};
+  // Recharge uniquement les annonces du streamer courant : modifier une chaîne
+  // ne doit jamais arrêter les annonces des autres tenants.
+  const streamerId=Number(tenant?.getCurrentStreamerId?.()||currentChatContext()?.streamerId||1);
+  const prefix=`${streamerId}:`;
+  for(const [key,timer] of Object.entries(announcementIntervals)){if(key.startsWith(prefix)){clearInterval(timer);delete announcementIntervals[key]}}
 
   const announcements = await db.getAnnouncements();
   for (const ann of announcements) {
     if (!ann.enabled) continue;
-    announcementIntervals[ann.id] = setInterval(async () => {
+    announcementIntervals[`${streamerId}:${ann.id}`] = setInterval(async () => {
       if (!isLive) return;
       if (!await db.getSetting('announcements_enabled')) return;
       await sendChat(ann.message);
@@ -1356,6 +1382,7 @@ async function startAnnouncements() {
     console.log(`[ANN] Annonce #${ann.id} programmée toutes les ${ann.interval_ms/60000} min`);
   }
 }
+shared.registerAnnouncementReloader(startAnnouncements);
 
 // ─── Modération ──────────────────────────────────────────────────────────────
 
@@ -1438,6 +1465,12 @@ async function moderateUser(username, kickId, action, duration, word) {
     return false;
   }
 }
+shared.registerModerateUser((username,kickId,action,duration,reason,requestedContext=null)=>{
+  const context = requestedContext?.streamerId
+    ? ([...botChannelState.chatrooms.values()].find(item=>Number(item.streamerId)===Number(requestedContext.streamerId)) || requestedContext)
+    : currentChatContext();
+  return withChatContext(context,()=>moderateUser(username,kickId,action,duration,reason));
+});
 
 // ─── Token actif (OAuth officiel en priorité, sinon token manuel legacy) ──────
 

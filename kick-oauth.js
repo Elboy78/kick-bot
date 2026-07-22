@@ -21,7 +21,9 @@ const STREAMER_EVENT_TYPES = [
   'channel.subscription.new',
   'channel.subscription.renewal',
   'channel.subscription.gifts',
+  'channel.reward.redemption.updated',
 ];
+const OPTIONAL_STREAMER_EVENT_TYPES = ['kicks.gifted'];
 
 let pendingPKCE = null;
 
@@ -46,7 +48,10 @@ function safeJson(value, fallback = {}) {
 
 function normalizeScopes(scopes, includeEvents = true) {
   const requested = String(scopes || process.env.KICK_OAUTH_SCOPES || 'user:read channel:read chat:write');
-  return [...new Set(`${requested}${includeEvents?' events:subscribe':''}`.trim().split(/\s+/))].join(' ');
+  const required = includeEvents
+    ? 'events:subscribe channel:rewards:read channel:rewards:write moderation:ban'
+    : '';
+  return [...new Set(`${requested} ${required}`.trim().split(/\s+/))].join(' ');
 }
 
 async function subscribeStreamerEvents(accessToken, broadcasterUserId) {
@@ -61,6 +66,15 @@ async function subscribeStreamerEvents(accessToken, broadcasterUserId) {
     headers: { Authorization: `Bearer ${accessToken}`, Accept: 'application/json', 'Content-Type': 'application/json' },
     timeout: 12000,
   });
+  for (const name of OPTIONAL_STREAMER_EVENT_TYPES) {
+    try {
+      await axios.post(`${KICK_API_BASE}/events/subscriptions`, {...body,events:[{name,version:1}]}, {
+        headers: { Authorization: `Bearer ${accessToken}`, Accept: 'application/json', 'Content-Type': 'application/json' }, timeout: 12000,
+      });
+    } catch (e) {
+      console.warn(`[KICK EVENTS] ${name} indisponible pour ce compte/API:`,e.response?.data?.message||e.message);
+    }
+  }
   return data;
 }
 
@@ -289,7 +303,6 @@ async function isBotConnected() {
 
 async function getValidAccessToken(streamerId = null) {
   let stored = await db.getOAuthToken(providerForStreamer(streamerId));
-  if (!stored && streamerId) stored = await db.getOAuthToken(PROVIDER);
   if (!stored) return null;
   if (Date.now() < stored.expires_at - 60000) return stored.access_token;
   try {
@@ -315,7 +328,6 @@ async function getValidAccessToken(streamerId = null) {
 
 async function isConnected(streamerId = null) {
   let stored = await db.getOAuthToken(providerForStreamer(streamerId));
-  if (!stored && streamerId) stored = await db.getOAuthToken(PROVIDER);
   return !!stored;
 }
 

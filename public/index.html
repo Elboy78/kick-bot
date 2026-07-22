@@ -401,8 +401,8 @@ body.light .card,body.light .panel,body.light .widget-engine-card{background:lin
 .sidebar{width:224px;padding:18px 14px 16px;background:linear-gradient(180deg,rgba(4,15,37,.76),rgba(3,12,29,.58));border:1px solid rgba(124,187,255,.14);border-left:0;border-radius:0 22px 22px 0;z-index:100;scrollbar-width:none}
 .sidebar::-webkit-scrollbar{display:none}
 .logo{height:62px;margin:0 7px 12px;padding-bottom:14px;border-bottom:1px solid rgba(125,181,255,.12);font-size:25px;letter-spacing:-1px}
-.logo-mark{position:relative;width:33px;height:43px;display:inline-grid;place-items:center;color:#fff;font-size:24px;filter:drop-shadow(0 0 14px rgba(22,151,255,.7))}
-.logo-mark:before{content:'';position:absolute;inset:0;background:linear-gradient(150deg,#12c8ff,#1765ff 62%,#0b36c7);clip-path:polygon(35% 0,92% 0,65% 41%,95% 41%,20% 100%,37% 56%,5% 56%)}
+.logo-mark{position:relative;width:45px;height:45px;display:inline-grid;place-items:center;flex:0 0 45px;filter:drop-shadow(0 0 12px rgba(0,190,255,.32))}
+.logo-mark:before{display:none}.logo-mark img{width:45px;height:45px;display:block;object-fit:contain}
 .logo-word span{color:#fff}.logo-word small{display:block;font-size:9px;letter-spacing:.2px;color:var(--muted);font-weight:500;margin-top:2px}
 .menu a{position:relative;min-height:39px;padding:10px 12px;margin:2px 0;border-radius:11px;color:#c9d7eb;font-size:11.5px;transition:.2s}
 .menu a:hover{background:rgba(37,130,255,.13);color:#fff;font-weight:600;transform:translateX(2px)}
@@ -533,7 +533,7 @@ body.light .card,body.light .panel,body.light .widget-engine-card{background:lin
 </div>
 
 <aside class="sidebar">
-  <div class="logo"><span class="logo-mark" aria-hidden="true"></span><span class="logo-word"><span>ElBot</span><small>Panel de contrôle</small></span></div>
+  <div class="logo"><span class="logo-mark" aria-hidden="true"><img src="/assets/brand/elbot-logo.png?v=2" alt=""></span><span class="logo-word"><span>ElBot</span><small>Panel de contrôle</small></span></div>
   <button class="sb-btnx" id="stream-mode-btn" onclick="toggleStreamMode()" style="margin:6px 0 4px">🎥 Mode stream</button>
   <nav class="menu">
     <a class="active" onclick="showPage('dashboard')">🏠 Dashboard</a>
@@ -544,6 +544,7 @@ body.light .card,body.light .panel,body.light .widget-engine-card{background:lin
     <div class="menu-section">Outils</div>
     <a onclick="showPage('commands')">⚙️ Commandes</a>
     <a onclick="showPage('moderation')">🛡️ Modération</a>
+    <a onclick="showPage('spam')">🚫 Anti-spam</a>
     <a onclick="showPage('jeux')">🎁 Giveaways &amp; Jeux</a>
     <a onclick="showPage('lobby')">🎮 Lobby</a>
     <a onclick="showPage('outils')">🛠️ Outils Chat</a>
@@ -563,7 +564,7 @@ body.light .card,body.light .panel,body.light .widget-engine-card{background:lin
 
   <div class="sb-bottom ref-sidebar-bottom">
     <div class="ref-sidebar-tools">
-      <button class="ref-sidebar-tool" type="button" onclick="openInterfaceCustomizer()">
+      <button class="ref-sidebar-tool" id="ref-personalization-button" type="button" onclick="openInterfaceCustomizer()">
         <span class="ref-sidebar-tool-icon">🛠️</span>
         <span><b>Personnalisation</b><small>Thème et apparence</small></span>
         <em>›</em>
@@ -978,6 +979,23 @@ body.light .card,body.light .panel,body.light .widget-engine-card{background:lin
     <div class="panel dbd-history-panel" style="margin-top:14px"><h3>Derniers builds</h3><div id="dbd-history"><div class="empty"><p>Aucun build</p></div></div></div>
   </div>
 
+  <!-- ══ ANTI-SPAM ══ -->
+  <div class="page" id="page-spam">
+    <div class="header"><div><h1>Filtres anti-spam</h1><p>Protège automatiquement le chat des comportements abusifs sans sanctionner les modérateurs.</p></div><button class="btnx btn-primary" onclick="saveSpamConfig()">💾 Enregistrer</button></div>
+    <div class="spam-level-card">
+      <div class="spam-level-title">Choisis ton niveau de protection</div>
+      <div class="spam-levels">
+        <button onclick="setSpamLevel(0)" data-spam-level="0"><span>◇</span><b>Désactivé</b></button>
+        <button onclick="setSpamLevel(1)" data-spam-level="1"><span>◐</span><b>Minimum</b></button>
+        <button onclick="setSpamLevel(2)" data-spam-level="2"><span>◑</span><b>Moyen</b></button>
+        <button onclick="setSpamLevel(3)" data-spam-level="3"><span>⬟</span><b>Maximum</b></button>
+      </div>
+      <div class="spam-level-track"><i id="spam-level-progress"></i></div>
+    </div>
+    <div id="spam-filter-list" class="spam-filter-list"></div>
+    <div id="spam-save-status" class="panel" style="font-size:10px;color:var(--muted);margin-top:14px">Les réglages sont isolés pour cette chaîne. Les catégories sont fermées par défaut.</div>
+  </div>
+
   <!-- ══ MODÉRATION ══ -->
   <div class="page" id="page-moderation">
     <div class="header"><div><h1>Modération</h1><p>Mots bannis et actions automatiques</p></div></div>
@@ -1173,6 +1191,13 @@ Option 3" rows="4"></textarea><div style="display:flex;gap:6px;margin-top:10px">
           <div style="font-size:9px;color:var(--muted);margin-top:-6px;margin-bottom:14px">Exemples : Objectif subs, Road to 50 subs, Support le live.</div>
 
           <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-bottom:12px">
+            <div>
+              <label class="lbl">Style du widget</label>
+              <select class="inp" id="subgoal-style-input" onchange="saveSubGoalLayout()"><option value="bar">Barre progressive</option><option value="numbers">Chiffres uniquement</option><option value="compact">Compteur compact</option><option value="circle">Progression circulaire</option></select>
+            </div>
+            <div><label class="lbl">Taille des chiffres</label><input class="inp" id="subgoal-font-size-input" type="number" min="18" max="72" value="32" onchange="saveSubGoalLayout()"></div>
+            <div><label class="lbl">Couleur principale</label><input class="inp" id="subgoal-color-input" type="color" value="#26e07f" onchange="saveSubGoalLayout()"></div>
+            <div><label class="lbl">Afficher l’objectif</label><select class="inp" id="subgoal-show-target-input" onchange="saveSubGoalLayout()"><option value="1">Oui · 25 / 50</option><option value="0">Non · 25</option></select></div>
             <div>
               <label class="lbl">Placement du texte</label>
               <select class="inp" id="subgoal-text-position-input" onchange="saveSubGoalLayout()">
@@ -1419,6 +1444,41 @@ Option 3" rows="4"></textarea><div style="display:flex;gap:6px;margin-top:10px">
 
 
   <!-- ══ CHAT OVERLAY WIDGET SETTINGS ══ -->
+  <div id="widget-kickrewards-settings" style="display:none">
+    <style>
+      #widget-kickrewards-settings .kir-list{display:flex;flex-direction:column;gap:7px}
+      #widget-kickrewards-settings .kir-item{border:1px solid var(--brd);border-radius:12px;background:var(--card);overflow:hidden}
+      #widget-kickrewards-settings .kir-item>summary{list-style:none;display:grid;grid-template-columns:34px minmax(0,1fr) auto 18px;align-items:center;gap:10px;padding:10px 12px;cursor:pointer;user-select:none}
+      #widget-kickrewards-settings .kir-item>summary::-webkit-details-marker{display:none}
+      #widget-kickrewards-settings .kir-icon{width:32px;height:32px;border-radius:9px;display:grid;place-items:center;background:var(--card2);border:1px solid var(--brd);font-size:15px}
+      #widget-kickrewards-settings .kir-name{font-size:11px;font-weight:900;color:var(--text)}
+      #widget-kickrewards-settings .kir-desc{font-size:8px;color:var(--muted);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+      #widget-kickrewards-settings .kir-chip{font-size:8px;font-weight:900;padding:4px 7px;border-radius:999px;border:1px solid var(--brd);color:#86efac;background:rgba(34,197,94,.08)}
+      #widget-kickrewards-settings .kir-arrow{font-size:12px;color:var(--muted);transition:.2s}#widget-kickrewards-settings .kir-item[open] .kir-arrow{transform:rotate(180deg)}
+      #widget-kickrewards-settings .kir-body{padding:0 12px 12px;border-top:1px solid var(--brd);display:grid;grid-template-columns:minmax(160px,1.4fr) minmax(100px,.65fr) minmax(100px,.65fr) auto;gap:9px;align-items:end}
+      #widget-kickrewards-settings .kir-body>*{margin-top:10px}#widget-kickrewards-settings .kir-status{grid-column:1/-1;margin-top:0;font-size:9px;color:var(--muted)}
+      #widget-kickrewards-settings .kir-create>summary{grid-template-columns:34px minmax(0,1fr) auto 18px}
+      @media(max-width:850px){#widget-kickrewards-settings .kir-body{grid-template-columns:1fr}#widget-kickrewards-settings .kir-status{grid-column:auto}.kir-chip{display:none}}
+    </style>
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:14px"><button class="dark-btn" onclick="backToWidgetsHome()">← Retour aux widgets</button><div style="font-size:10px;color:var(--muted);font-weight:800;text-transform:uppercase">Widget actif : Interactions points Kick</div></div>
+    <div class="panel" style="margin-bottom:14px"><h3>🎟️ Interactions avec les points de chaîne</h3><p style="font-size:10px;color:var(--muted);line-height:1.6">ElBot crée et relie les récompenses à ta chaîne. Chaque interaction est isolée par streamer et les achats sont validés ou remboursés automatiquement.</p></div>
+    <div class="kir-list">
+      <details class="kir-item"><summary><span class="kir-icon">⏱️</span><span><span class="kir-name">Timeout un viewer</span><span class="kir-desc">Le viewer choisit la personne à timeout</span></span><span class="kir-chip">COMMANDE DE BASE</span><span class="kir-arrow">⌄</span></summary><div class="kir-body"><div><label class="lbl">Nom</label><input class="inp" id="kick-timeout-title" value="Timeout un viewer"></div><div><label class="lbl">Coût</label><input class="inp" type="number" id="kick-timeout-cost" min="1" value="1000"></div><div><label class="lbl">Durée (s)</label><input class="inp" type="number" id="kick-timeout-duration" min="60" value="300"></div><div><label><input type="checkbox" id="kick-timeout-enabled"> Activer</label><div><button class="btnx btn-outline btn-sm" onclick="setupKickReward('timeout')">Enregistrer</button> <button class="btnx btn-red btn-sm" onclick="deleteKickReward('timeout')">Retirer de Kick</button></div></div><div id="kick-timeout-status" class="kir-status">Chargement…</div></div></details>
+      <details class="kir-item"><summary><span class="kir-icon">🛡️</span><span><span class="kir-name">Counter TO</span><span class="kir-desc">Protège contre le prochain timeout acheté</span></span><span class="kir-chip">COMMANDE DE BASE</span><span class="kir-arrow">⌄</span></summary><div class="kir-body"><div><label class="lbl">Nom</label><input class="inp" id="kick-counter-title" value="Counter TO"></div><div><label class="lbl">Coût</label><input class="inp" type="number" id="kick-counter-cost" min="1" value="750"></div><div><label><input type="checkbox" id="kick-counter-enabled"> Activer</label></div><div><button class="btnx btn-outline btn-sm" onclick="setupKickReward('counter')">Enregistrer</button> <button class="btnx btn-red btn-sm" onclick="deleteKickReward('counter')">Retirer de Kick</button></div><div id="kick-counter-status" class="kir-status">Chargement…</div></div></details>
+      <details class="kir-item"><summary><span class="kir-icon">💬</span><span><span class="kir-name">Message du viewer</span><span class="kir-desc">ElBot publie le texte saisi dans la récompense</span></span><span class="kir-chip">COMMANDE DE BASE</span><span class="kir-arrow">⌄</span></summary><div class="kir-body"><div><label class="lbl">Nom</label><input class="inp" id="kick-message-title" value="Message du viewer"></div><div><label class="lbl">Coût</label><input class="inp" type="number" id="kick-message-cost" min="1" value="300"></div><div><label><input type="checkbox" id="kick-message-enabled"> Activer</label></div><div><button class="btnx btn-outline btn-sm" onclick="setupKickReward('message')">Enregistrer</button> <button class="btnx btn-red btn-sm" onclick="deleteKickReward('message')">Retirer de Kick</button></div><div id="kick-message-status" class="kir-status">Chargement…</div></div></details>
+    </div>
+    <details class="kir-item kir-create" id="kick-custom-builder" style="margin-top:10px">
+      <summary><span class="kir-icon">👑</span><span><span class="kir-name">Créer une interaction Premium</span><span class="kir-desc">Ajoute une nouvelle commande uniquement pour cette chaîne</span></span><span id="kick-custom-plan" class="kir-chip">Vérification…</span><span class="kir-arrow">⌄</span></summary><div style="padding:12px;border-top:1px solid var(--brd)">
+      <p class="alert-mini">Crée une récompense propre à cette chaîne. Elle est publiée immédiatement sur Kick et son action est exécutée en direct par ElBot.</p>
+      <input type="hidden" id="kick-custom-id"><div class="form-row"><div><label class="lbl">Nom de la récompense</label><input class="inp" id="kick-custom-title" maxlength="50" placeholder="Ex. Fais parler ElBot"></div><div><label class="lbl">Coût en points Kick</label><input class="inp" id="kick-custom-cost" type="number" min="1" value="500"></div><div><label class="lbl">Couleur</label><input class="inp" id="kick-custom-color" type="color" value="#a855f7"></div></div>
+      <div class="form-row" style="margin-top:10px"><div><label class="lbl">Action</label><select class="inp" id="kick-custom-action" onchange="updateKickCustomFields()"><option value="chat_fixed">Message fixe du bot</option><option value="chat_input">Texte saisi par le viewer</option><option value="alert">Alerte personnalisée OBS</option><option value="meme_points">Bonus de points mèmes</option></select></div><div><label class="lbl">Description Kick</label><input class="inp" id="kick-custom-description" maxlength="120" placeholder="Décris ce que fait la récompense"></div><div id="kick-custom-amount-wrap" style="display:none"><label class="lbl">Points mèmes accordés</label><input class="inp" id="kick-custom-amount" type="number" min="1" value="100"></div></div>
+      <label class="lbl" style="margin-top:10px">Réponse / texte <span style="color:var(--muted)">· variables : {username}, {input}</span></label><input class="inp" id="kick-custom-response" maxlength="450" placeholder="🎟️ @{username} : {input}">
+      <label style="display:flex;align-items:center;gap:8px;margin-top:10px"><input type="checkbox" id="kick-custom-enabled" checked> Activer immédiatement sur Kick</label>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px"><button class="btnx btn-green" id="kick-custom-save" onclick="saveKickCustomInteraction()">✨ Créer l’interaction</button><button class="btnx btn-ghost" onclick="resetKickCustomForm()">Annuler</button></div><div id="kick-custom-status" class="alert-mini" style="margin-top:8px"></div>
+    </div></details>
+    <div class="grid2" style="margin-top:14px"><div class="panel"><div style="display:flex;justify-content:space-between"><h3>🎟️ Mes interactions Premium</h3><button class="btnx btn-ghost btn-sm" onclick="loadKickCustomInteractions()">↻</button></div><div id="kick-custom-list" class="alert-mini">Chargement…</div></div><div class="panel"><h3>📜 Activité récente</h3><div id="kick-custom-history" class="alert-mini">Aucune utilisation.</div></div></div>
+  </div>
+
   <div id="widget-chat-settings" style="display:none">
     <div class="co-page-head">
       <button class="dark-btn" onclick="backToWidgetsHome()">← Retour aux widgets</button>
@@ -1523,7 +1583,7 @@ Option 3" rows="4"></textarea><div style="display:flex;gap:6px;margin-top:10px">
             <div><label class="lbl">Durée d’affichage</label><input type="number" class="inp" id="co-duration" min="0" max="60"></div>
             <div><label class="lbl">Messages maximum</label><input type="number" class="inp" id="co-max" min="1" max="30"></div>
             <div><label class="lbl">Délai de regroupement</label><input type="number" class="inp" id="co-group-window" min="2" max="60"></div>
-            <div><label class="lbl">Taille de police</label><input type="number" class="inp" id="co-font-size" min="10" max="42"></div>
+            <div><label class="lbl">Taille du texte <output id="co-font-size-output" style="float:right;color:var(--accent)">21 px</output></label><input type="range" class="inp" id="co-font-size" min="10" max="42" oninput="document.getElementById('co-font-size-output').textContent=this.value+' px'"></div>
           </div>
         </section>
         <section class="co-section">
@@ -1738,6 +1798,7 @@ Option 3" rows="4"></textarea><div style="display:flex;gap:6px;margin-top:10px">
 
   <div class="page" id="page-alertes">
     <div class="header"><div><h1>Alertes</h1><p>Moteur d’alertes OBS multi-streamer, profils et file d’attente</p></div><button class="btn" onclick="loadAlertsPanel()">↻ Actualiser</button></div>
+    <div class="panel" style="margin-bottom:14px;font-size:10px;color:var(--muted);line-height:1.65"><b style="color:var(--text)">Sources des alertes :</b> les KICKs sont reçus automatiquement par l’événement officiel Kick. Les dons externes nécessitent la connexion ou le webhook du service de dons, car Kick ne transmet pas ces paiements à ElBot. La catégorie <b>Bits / KICKs</b> est déjà prête à réunir Kick et Twitch lorsque la connexion Twitch sera ajoutée.</div>
     <style>
       .alert-toolbar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:16px}.alert-toolbar .inp{max-width:220px}.alert-tabs{display:flex;gap:8px;flex-wrap:wrap;margin:12px 0 18px}.alert-tab{border:1px solid var(--brd);background:#151824;color:var(--text);border-radius:10px;padding:10px 14px;font-weight:900;cursor:pointer}.alert-tab.active{border-color:#22c55e;background:rgba(34,197,94,.18)}
       .alert-grid{display:grid;grid-template-columns:minmax(0,1fr) 430px;gap:18px}.alert-form{display:grid;grid-template-columns:190px minmax(0,1fr);gap:12px;align-items:center}.alert-form label{color:var(--muted);font-weight:800;font-size:12px}.alert-preview{min-height:310px;display:flex;align-items:center;justify-content:center;background:radial-gradient(circle at 50% 10%,rgba(34,197,94,.12),rgba(0,0,0,.25));border:1px solid var(--brd);border-radius:16px;overflow:hidden;padding:20px}.alert-preview-card{min-width:260px;max-width:370px;text-align:center;padding:24px;border-radius:20px;background:rgba(5,8,15,.86);box-shadow:0 18px 50px rgba(0,0,0,.45);border:1px solid rgba(255,255,255,.12)}.alert-preview-card img,.alert-preview-card video{max-width:150px;max-height:110px;object-fit:contain;border-radius:12px;margin-bottom:12px}.alert-layout-left{display:flex;align-items:center;gap:16px;text-align:left}.alert-layout-right{display:flex;align-items:center;gap:16px;flex-direction:row-reverse;text-align:right}.alert-layout-left img,.alert-layout-left video,.alert-layout-right img,.alert-layout-right video{margin:0}.alert-text-only img,.alert-text-only video{display:none}.alert-mini{font-size:11px;color:var(--muted);line-height:1.5}.alert-actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:16px}.alert-switch{position:relative;width:46px;height:24px;display:inline-block}.alert-switch input{opacity:0;width:0;height:0}.alert-switch span{position:absolute;inset:0;border-radius:999px;background:#2c3140;cursor:pointer;transition:.2s}.alert-switch span:after{content:"";position:absolute;width:18px;height:18px;left:3px;top:3px;border-radius:50%;background:#fff;transition:.2s}.alert-switch input:checked+span{background:#22c55e}.alert-switch input:checked+span:after{transform:translateX(22px)}.alert-upload-row{display:flex;gap:8px;align-items:center}.alert-upload-row input[type=file]{max-width:180px;font-size:11px}.alert-profile-badge{font-size:11px;font-weight:900;color:#86efac;border:1px solid rgba(34,197,94,.35);padding:6px 9px;border-radius:999px}.alert-history{max-height:250px;overflow:auto;display:flex;flex-direction:column;gap:8px}.alert-history-item{padding:10px 12px;border-radius:10px;border:1px solid var(--brd);background:rgba(255,255,255,.025);font-size:11px}.alert-history-item b{display:block;margin-bottom:3px}.alert-range{display:flex;gap:10px;align-items:center}.alert-range output{min-width:42px;text-align:right;font-weight:900;color:#86efac}@media(max-width:1050px){.alert-grid{grid-template-columns:1fr}.alert-form{grid-template-columns:1fr}}
@@ -4659,9 +4720,9 @@ body.ref-theme-transition *:after{
 
           <div id="oauth-disconnected-block" style="display:none">
             <div style="font-size:10px;color:var(--muted);margin-bottom:10px;line-height:1.6">
-              Connecte le compte du bot une seule fois via l'authentification officielle Kick — le token se renouvellera ensuite automatiquement, sans plus jamais avoir à le faire à la main.
+              Connecte le compte streamer propriétaire de cette chaîne via l’authentification officielle Kick. Ne connecte pas ElBotApp ici.
             </div>
-            <button class="btnx btn-outline" style="width:100%;justify-content:center" onclick="window.location.href='/auth/login'">🔗 Connecter le compte Kick</button>
+            <button type="button" class="btnx btn-outline" id="oauth-connect-streamer-btn" style="width:100%;justify-content:center" onclick="startStreamerOAuthReconnect()">🔗 Connecter le compte streamer Kick</button>
           </div>
 
           <div id="oauth-not-configured-block" style="display:none">
@@ -4748,7 +4809,7 @@ if (typeof window.io === 'function') {
 const MEDALS = ['🥇','🥈','🥉'];
 try { document.querySelectorAll('#settings-channel-name').forEach(el => el.textContent = CURRENT_STREAMER_SLUG || 'connecté'); } catch(e) {}
 let lbData = [], levels = [];
-const PAGE_TITLES = {dashboard:'Dashboard',classement:'Classement',communaute:'Communauté',lobby:'Lobby',jeux:'Jeux',objectifs:'Objectifs',dbd:'Dead by Daylight',moderation:'Modération',commands:'Commandes',historique:'Historique',admin:'Administration',settings:'Paramètres',outils:'Outils Chat',alertes:'Alertes'};
+const PAGE_TITLES = {dashboard:'Dashboard',classement:'Classement',communaute:'Communauté',lobby:'Lobby',jeux:'Jeux',objectifs:'Objectifs',dbd:'Dead by Daylight',moderation:'Modération',spam:'Anti-spam',commands:'Commandes',historique:'Historique',admin:'Administration',settings:'Paramètres',outils:'Outils Chat',alertes:'Alertes'};
 let songRequestRefreshTimer = null;
 
 // ── Navigation ─────────────────────────────────────────────────────────────────
@@ -4758,14 +4819,17 @@ function openWidgetSettings(name) {
   const tts = document.getElementById('widget-tts-settings');
   const songrequest = document.getElementById('widget-songrequest-settings');
   const chat = document.getElementById('widget-chat-settings');
+  const kickrewards = document.getElementById('widget-kickrewards-settings');
   if (home) home.style.display = 'none';
   if (subgoal) subgoal.style.display = name === 'subgoal' ? 'block' : 'none';
   if (tts) tts.style.display = name === 'tts' ? 'block' : 'none';
   if (songrequest) songrequest.style.display = name === 'songrequest' ? 'block' : 'none';
   if (chat) chat.style.display = name === 'chat' ? 'block' : 'none';
+  if (kickrewards) kickrewards.style.display = name === 'kickrewards' ? 'block' : 'none';
   if (name === 'subgoal') loadSubGoal();
   if (name === 'tts') loadTTS();
   if (name === 'chat') loadChatOverlaySettings();
+  if (name === 'kickrewards') {loadKickRewards();loadKickCustomInteractions();}
   if (name === 'songrequest') {
     loadSongRequest();
     startSongRequestRefresh();
@@ -4780,11 +4844,13 @@ function backToWidgetsHome() {
   const tts = document.getElementById('widget-tts-settings');
   const songrequest = document.getElementById('widget-songrequest-settings');
   const chat = document.getElementById('widget-chat-settings');
+  const kickrewards = document.getElementById('widget-kickrewards-settings');
   if (home) home.style.display = 'block';
   if (subgoal) subgoal.style.display = 'none';
   if (tts) tts.style.display = 'none';
   if (songrequest) songrequest.style.display = 'none';
   if (chat) chat.style.display = 'none';
+  if (kickrewards) kickrewards.style.display = 'none';
   stopSongRequestRefresh();
 }
 
@@ -4843,6 +4909,10 @@ function renderSubCounter(d) {
   setVal('subgoal-count-position-input', d.countPosition || 'inside');
   setVal('subgoal-progress-display-input', d.progressDisplay || 'count');
   setVal('subgoal-text-align-input', d.textAlign || 'center');
+  setVal('subgoal-style-input', d.style || 'bar');
+  setVal('subgoal-font-size-input', d.fontSize || 32);
+  setVal('subgoal-color-input', d.primaryColor || '#26e07f');
+  setVal('subgoal-show-target-input', d.showTarget===false?'0':'1');
   renderSubCounterLatest(d.latest || []);
 }
 
@@ -4894,6 +4964,10 @@ async function saveSubGoalLayout() {
     countPosition: document.getElementById('subgoal-count-position-input')?.value || 'inside',
     progressDisplay: document.getElementById('subgoal-progress-display-input')?.value || 'count',
     textAlign: document.getElementById('subgoal-text-align-input')?.value || 'center'
+    ,style: document.getElementById('subgoal-style-input')?.value || 'bar'
+    ,fontSize: Number(document.getElementById('subgoal-font-size-input')?.value || 32)
+    ,primaryColor: document.getElementById('subgoal-color-input')?.value || '#26e07f'
+    ,showTarget: document.getElementById('subgoal-show-target-input')?.value !== '0'
   };
   const r = await fetch(API + '/api/admin/widgets/subgoal/layout', {
     method: 'POST', headers: { 'Content-Type': 'application/json', 'x-panel-key': getKey() },
@@ -4990,6 +5064,7 @@ function showPage(name) {
   if(name==='commands') { loadCommandsPage(); loadSystemCommands(); }
   if(name==='dbd') initDBD();
   if(name==='moderation') { loadBannedWords(); loadAllowedWords(); }
+  if(name==='spam') loadSpamConfig();
   if(name==='settings') initSettings();
   if(name==='outils') loadOutils();
   if(name==='lobby') { loadLobby(); renderWheelWinners(); }
@@ -6360,19 +6435,28 @@ const DBD_KILLER_PERKS = [
   "Vicieux"
 ];
 
-let dbdHistory=[],dbdSide='survivor',dbdRunning=false;
-let dbdSlots=Array.from({length:4},()=>({perk:'',locked:false,spinning:false}));
-function dbdPool(){return dbdSide==='survivor'?DBD_SURVIVOR_PERKS:DBD_KILLER_PERKS}
-function dbdPick(excluded=[]){const pool=dbdPool().filter(p=>!excluded.includes(p));return pool[Math.floor(Math.random()*pool.length)]||dbdPool()[0]}
-function dbdRune(name){return String(name||'?').split(/\s+/).slice(0,2).map(x=>x[0]).join('').toUpperCase()}
-function initDBD(){if(!dbdSlots.some(s=>s.perk)){const used=[];dbdSlots.forEach(s=>{s.perk=dbdPick(used);used.push(s.perk)})}renderDBDSlots();renderDBDHistory()}
-function setDBDSide(side){if(dbdRunning)return;dbdSide=side==='killer'?'killer':'survivor';dbdSlots=Array.from({length:4},()=>({perk:'',locked:false,spinning:false}));document.getElementById('dbd-tab-survivor')?.classList.toggle('active',dbdSide==='survivor');document.getElementById('dbd-tab-killer')?.classList.toggle('active',dbdSide==='killer');document.getElementById('dbd-machine-role').textContent=(dbdSide==='survivor'?'SURVIVOR':'KILLER')+' PERK ROULETTE';initDBD()}
-function renderDBDSlots(){const root=document.getElementById('dbd-reels');if(!root)return;const colored=document.getElementById('dbd-colored')?.checked!==false;root.innerHTML=dbdSlots.map((slot,i)=>`<div class="dbd-reel ${slot.locked?'locked':''} ${slot.spinning?'spinning':''}" onclick="handleDBDSlot(event,${i})"><button class="dbd-reel-lock" onclick="event.stopPropagation();toggleDBDLock(${i})" title="Verrouiller">${slot.locked?'🔒':'○'}</button><div class="dbd-reel-window"><div class="dbd-perk-diamond ${dbdSide==='killer'?'killer':''} ${colored?'':'mono'}"><span class="dbd-perk-rune">${esc(dbdRune(slot.perk))}</span></div></div><div class="dbd-perk-name">${esc(slot.perk||'PERK')}</div></div>`).join('')}
+let dbdHistory=[],dbdSide='survivor',dbdRunning=false,dbdCatalog={survivor:[],killer:[]},dbdCatalogLoaded=false;
+let dbdSlots=Array.from({length:4},()=>({perk:null,locked:false,spinning:false}));
+const DBD_REAL_SURVIVOR=['Ace in the Hole','Adrenaline','Aftercare','Alert','Any Means Necessary','Autodidact','Balanced Landing','Better Together','Blood Pact','Boil Over','Bond','Botany Knowledge','Borrowed Time','Breakdown','Breakout','Buckle Up','Calm Spirit','Clairvoyance','Corrective Action','Dance With Me','Dark Sense','Dead Hard','Decisive Strike','Déjà Vu','Deliverance','Distortion','Diversion','Empathy','Fixated','Flashbang','For the People','Head On','Hope','Inner Healing','Iron Will','Kindred','Leader','Left Behind','Lithe','Lucky Break','Mettle of Man','No Mither','Object of Obsession','Off the Record','Open-Handed','Overcome','Pharmacy','Plunderer’s Instinct','Prove Thyself','Quick & Quiet','Reassurance','Repressed Alliance','Resilience','Saboteur','Self-Aware','Self-Care','Slippery Meat','Small Game','Soul Guard','Spine Chill','Sprint Burst','Stake Out','Streetwise','Technician','Tenacity','This Is Not Happening','Unbreakable','Up the Ante','Urban Evasion','Vigil','Visionary','Windows of Opportunity'];
+const DBD_REAL_KILLER=['A Nurse’s Calling','Agitation','Alien Instinct','Bamboozle','Barbecue & Chilli','Batteries Included','Beast of Prey','Bitter Murmur','Blood Echo','Blood Warden','Brutal Strength','Call of Brine','Corrupt Intervention','Coulrophobia','Cruel Limits','Dark Devotion','Dead Man’s Switch','Deadlock','Deathbound','Discordance','Distressing','Dragon’s Grip','Enduring','Fire Up','Forced Hesitation','Franklin’s Demise','Friends ’til the End','Gearhead','Grim Embrace','Hex: Blood Favour','Hex: Crowd Control','Hex: Devour Hope','Hex: Haunted Ground','Hex: Huntress Lullaby','Hex: No One Escapes Death','Hex: Pentimento','Hex: Plaything','Hex: Ruin','Hex: The Third Seal','Hex: Thrill of the Hunt','Hoarder','Hubris','Hysteria','I’m All Ears','Infectious Fright','Insidious','Iron Grasp','Knock Out','Lethal Pursuer','Lightborn','Mad Grit','Merciless Storm','Monitor & Abuse','Nemesis','No Way Out','Nowhere to Hide','Oppression','Overcharge','Overwhelming Presence','Play with Your Food','Pop Goes the Weasel','Predator','Remember Me','Save the Best for Last','Scourge Hook: Gift of Pain','Scourge Hook: Pain Resonance','Sloppy Butcher','Spirit Fury','Starstruck','Superior Anatomy','Surge','Surveillance','Tinkerer','Trail of Torment','Unbound','Unnerving Presence','Unrelenting','Whispers','Zanshin Tactics'];
+function dbdFallbackPool(){return (dbdSide==='survivor'?DBD_SURVIVOR_PERKS:DBD_KILLER_PERKS).map(name=>({id:name,name,owner:'',image:dbdPerkImage(name)}))}
+function dbdPool(){return dbdCatalog[dbdSide]?.length?dbdCatalog[dbdSide]:dbdFallbackPool()}
+function dbdKey(perk){return String(perk?.id||perk?.name||perk||'')}
+function dbdName(perk){return String(perk?.name||perk||'Perk')}
+function dbdImage(perk){return String(perk?.image||dbdPerkImage(dbdName(perk)))}
+function dbdPick(excluded=[]){const keys=excluded.map(dbdKey),pool=dbdPool().filter(p=>!keys.includes(dbdKey(p)));return pool[Math.floor(Math.random()*pool.length)]||dbdPool()[0]}
+function dbdRune(perk){return dbdName(perk).split(/\s+/).slice(0,2).map(x=>x[0]).join('').toUpperCase()}
+function dbdPerkFile(name){const words=String(name||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[’']/g,'').replace(/[^a-zA-Z0-9]+/g,' ').trim().split(/\s+/);return words.map((w,i)=>(i?w[0].toUpperCase()+w.slice(1):w.toLowerCase())).join('')}
+function dbdPerkImage(name){return 'https://deadbydaylight.wiki.gg/wiki/Special:Redirect/file/IconPerks_'+encodeURIComponent(dbdPerkFile(name))+'.png'}
+async function loadDBDCatalog(){if(dbdCatalogLoaded)return;try{const r=await fetch('/data/dbd-perks-fr.json',{cache:'force-cache'}),j=await r.json();if(Array.isArray(j.survivor)&&Array.isArray(j.killer)){dbdCatalog={survivor:j.survivor,killer:j.killer};dbdCatalogLoaded=true}}catch(e){console.warn('[DBD] Catalogue français indisponible',e.message)}}
+async function initDBD(){await loadDBDCatalog();if(!dbdSlots.some(s=>s.perk)){const used=[];dbdSlots.forEach(s=>{s.perk=dbdPick(used);used.push(s.perk)})}renderDBDSlots();renderDBDHistory();const status=document.getElementById('dbd-machine-status');if(status)status.textContent=`${dbdPool().length} perks ${dbdSide==='survivor'?'survivant':'tueur'} en français · clique pour lancer`}
+function setDBDSide(side){if(dbdRunning)return;dbdSide=side==='killer'?'killer':'survivor';dbdSlots=Array.from({length:4},()=>({perk:null,locked:false,spinning:false}));document.getElementById('dbd-tab-survivor')?.classList.toggle('active',dbdSide==='survivor');document.getElementById('dbd-tab-killer')?.classList.toggle('active',dbdSide==='killer');document.getElementById('dbd-machine-role').textContent=(dbdSide==='survivor'?'SURVIVANT':'TUEUR')+' · ROULETTE DE PERKS';initDBD()}
+function renderDBDSlots(){const root=document.getElementById('dbd-reels');if(!root)return;const colored=document.getElementById('dbd-colored')?.checked!==false;root.innerHTML=dbdSlots.map((slot,i)=>`<div class="dbd-reel ${slot.locked?'locked':''} ${slot.spinning?'spinning':''}" onclick="handleDBDSlot(event,${i})"><button class="dbd-reel-lock" onclick="event.stopPropagation();toggleDBDLock(${i})" title="Verrouiller">${slot.locked?'🔒':'○'}</button><div class="dbd-reel-window"><div class="dbd-perk-diamond ${dbdSide==='killer'?'killer':''} ${colored?'':'mono'}"><img src="${escapeAttr(dbdImage(slot.perk))}" alt="${escapeAttr(dbdName(slot.perk))}" loading="eager" onerror="this.style.display='none';this.nextElementSibling.style.display='grid'"><span class="dbd-perk-rune" style="display:none">${esc(dbdRune(slot.perk))}</span></div></div><div class="dbd-perk-name">${esc(dbdName(slot.perk))}${slot.perk?.owner?`<small>${esc(slot.perk.owner)}</small>`:''}</div></div>`).join('')}
 function handleDBDSlot(event,index){if(event.shiftKey)return spinDBD(index);spinDBD()}
 function toggleDBDLock(index){if(dbdRunning)return;dbdSlots[index].locked=!dbdSlots[index].locked;renderDBDSlots()}
 function toggleAllDBDLocks(){if(dbdRunning)return;const lock=!dbdSlots.every(s=>s.locked);dbdSlots.forEach(s=>s.locked=lock);renderDBDSlots()}
 function spinDBD(singleIndex=null){if(dbdRunning)return;const targets=dbdSlots.map((s,i)=>({s,i})).filter(x=>(singleIndex===null?!x.s.locked:x.i===singleIndex&&!x.s.locked));if(!targets.length)return toast('Déverrouille au moins un slot');dbdRunning=true;document.getElementById('dbd-machine-status').textContent='La machine choisit ton destin...';targets.forEach(x=>x.s.spinning=true);renderDBDSlots();let tick=0;const max=22+(singleIndex===null?8:0),timer=setInterval(()=>{tick++;const fixed=dbdSlots.filter((_,i)=>!targets.some(x=>x.i===i)).map(s=>s.perk);const used=[...fixed];targets.forEach(({s})=>{s.perk=dbdPick(used);used.push(s.perk)});renderDBDSlots();if(tick>=max){clearInterval(timer);targets.forEach(x=>x.s.spinning=false);dbdRunning=false;document.getElementById('dbd-machine-status').textContent=singleIndex===null?'Build généré · verrouille les perks à conserver':'Slot relancé';renderDBDSlots();dbdHistory.unshift({side:dbdSide,perks:dbdSlots.map(s=>s.perk),time:new Date().toLocaleTimeString('fr-FR')});dbdHistory=dbdHistory.slice(0,12);renderDBDHistory()}},70)}
-async function copyDBDBuild(){const text=`${dbdSide==='survivor'?'Survivant':'Tueur'} : ${dbdSlots.map(s=>s.perk).join(' · ')}`;try{await navigator.clipboard.writeText(text);toast('Build copié ✓')}catch(_){toast(text)}}
+async function copyDBDBuild(){const text=`${dbdSide==='survivor'?'Survivant':'Tueur'} : ${dbdSlots.map(s=>dbdName(s.perk)).join(' · ')}`;try{await navigator.clipboard.writeText(text);toast('Build copié ✓')}catch(_){toast(text)}}
 
 function renderDBDHistory() {
   const el = document.getElementById('dbd-history');
@@ -6381,7 +6465,7 @@ function renderDBDHistory() {
     el.innerHTML = '<div class="empty"><p>Aucun build généré</p></div>';
     return;
   }
-  el.innerHTML=dbdHistory.map(h=>`<div class="dbd-history-row"><b>${h.side==='survivor'?'Survivant':'Tueur'}</b><span>${h.perks.map(esc).join(' · ')}</span><time>${h.time}</time></div>`).join('');
+  el.innerHTML=dbdHistory.map(h=>`<div class="dbd-history-row"><b>${h.side==='survivor'?'Survivant':'Tueur'}</b><span>${h.perks.map(p=>esc(dbdName(p))).join(' · ')}</span><time>${h.time}</time></div>`).join('');
 }
 
 function clearDBDHistory() {
@@ -6547,6 +6631,7 @@ async function loadAnnouncements() {
           <div style="font-size:11px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(a.message)}</div>
           <div style="font-size:9px;color:var(--muted2)">Toutes les ${fmtMin(a.interval_ms/60000)}</div>
         </div>
+        <button class="btnx btn-ghost btn-xs" onclick="editAnn(${a.id},decodeURIComponent('${encodeURIComponent(a.message)}'),${Number(a.interval_ms)||600000})">✏️ Modifier</button>
         <button class="btnx btn-red btn-xs" onclick="deleteAnn(${a.id})">✕</button>
       </div>`).join('');
   } catch(e) {}
@@ -6568,6 +6653,13 @@ async function addAnnouncement() {
   document.getElementById('ann-message').value = '';
   loadAnnouncements();
 }
+
+function editAnn(id,message,interval){
+  const next=prompt('Modifier le message de l’annonce :',message);if(next===null)return;
+  const minutes=prompt('Intervalle en minutes :',String(Math.max(1,Math.round(Number(interval)/60000))));if(minutes===null)return;
+  saveAnnEdit(id,next,Math.max(1,Number(minutes)||10)*60000);
+}
+async function saveAnnEdit(id,message,interval_ms){const r=await fetch('/api/admin/announcements/'+id,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({message,interval_ms})});const j=await r.json().catch(()=>({}));if(!r.ok)return toast(j.error||'Modification impossible',false);toast('Annonce modifiée et enregistrée ✓');loadAnnouncements()}
 
 async function toggleAnn(id, enabled) {
   await fetch('/api/admin/announcements/toggle', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({id, enabled}) });
@@ -7600,6 +7692,7 @@ const SEARCH_PAGES = [
   { icon:'🎚️', label:'Config Classement',page:'config-classement' },
   { icon:'⚙️', label:'Commandes',        page:'commands' },
   { icon:'🛡️', label:'Modération',       page:'moderation' },
+  { icon:'🚫', label:'Anti-spam',         page:'spam', tags:'spam caps liens emotes répétition zalgo symboles protection chat' },
   { icon:'🎁', label:'Giveaways',        page:'jeux' },
   { icon:'🎮', label:'Lobby',            page:'lobby' },
   { icon:'🛠️', label:'Outils Chat',      page:'outils' },
@@ -7745,24 +7838,11 @@ async function checkBotTokenStatus() {
     const r = await fetch('/api/bot-status');
     const d = await r.json();
     const banner = document.getElementById('token-alert-banner');
-    const badge  = document.getElementById('token-status-badge');
 
     if (d.tokenExpired) {
       if (banner) banner.style.display = 'flex';
-      if (badge) {
-        badge.textContent = '🔴 Expiré';
-        badge.style.background = 'rgba(255,59,95,.15)';
-        badge.style.color = '#ff3b5f';
-        badge.style.border = '1px solid rgba(255,59,95,.35)';
-      }
     } else {
       if (banner) banner.style.display = 'none';
-      if (badge) {
-        badge.textContent = '🟢 Actif';
-        badge.style.background = 'var(--accent-bg)';
-        badge.style.color = 'var(--accent)';
-        badge.style.border = '1px solid var(--accent-brd)';
-      }
     }
 
     const botLiveEl = document.getElementById('ic-bot-live-status');
@@ -7788,6 +7868,7 @@ async function loadOAuthStatus() {
     const connectedBlock    = document.getElementById('oauth-connected-block');
     const disconnectedBlock = document.getElementById('oauth-disconnected-block');
     const notConfiguredBlock = document.getElementById('oauth-not-configured-block');
+    const badge = document.getElementById('token-status-badge');
     if (!connectedBlock) return;
 
     connectedBlock.style.display = 'none';
@@ -7796,19 +7877,32 @@ async function loadOAuthStatus() {
 
     if (!d.configured) {
       notConfiguredBlock.style.display = 'block';
+      if(badge){badge.textContent='⚠️ Non configuré';badge.style.background='rgba(245,158,11,.12)';badge.style.color='#fbbf24';badge.style.border='1px solid rgba(245,158,11,.3)'}
     } else if (d.connected) {
       connectedBlock.style.display = 'block';
+      if(badge){badge.textContent='🟢 Streamer connecté';badge.style.background='var(--accent-bg)';badge.style.color='var(--accent)';badge.style.border='1px solid var(--accent-brd)'}
     } else {
       disconnectedBlock.style.display = 'block';
+      if(badge){badge.textContent='⚪ À reconnecter';badge.style.background='rgba(148,163,184,.10)';badge.style.color='var(--muted)';badge.style.border='1px solid var(--brd)'}
     }
   } catch(e) {}
 }
 
+function startStreamerOAuthReconnect(){
+  const btn=document.getElementById('oauth-connect-streamer-btn');
+  if(btn){btn.disabled=true;btn.textContent='Redirection vers Kick…'}
+  const returnTo=location.pathname+location.search;
+  window.location.assign('/auth/login?force=1&returnTo='+encodeURIComponent(returnTo));
+}
+
 async function disconnectOAuth() {
   if (!confirm('Déconnecter le compte Kick officiel ? Le bot repassera sur le token manuel si configuré.')) return;
-  await fetch('/api/admin/oauth/disconnect', { method:'POST', headers:{'Content-Type':'application/json'}, body:'{}' });
+  const r=await fetch('/api/admin/oauth/disconnect', { method:'POST', headers:{'Content-Type':'application/json'}, body:'{}' });
+  const d=await r.json();
+  if(!r.ok){toast(d.error||'Déconnexion impossible',false);return}
   toast('Compte Kick déconnecté');
-  loadOAuthStatus();
+  await loadOAuthStatus();
+  await loadKickRewards();
 }
 
 async function loadBotIdentity() {
@@ -7821,6 +7915,7 @@ async function loadBotIdentity() {
     const payload = await r.json();
     if (!r.ok) throw new Error(payload.error || 'Identité indisponible');
     const d = payload.data || {};
+    window.setThemePremiumAccess?.(Boolean(d.premium));
     const assigned = d.assigned;
     const connected = assigned?.status === 'connected';
     planBadge.textContent = d.premium ? 'PREMIUM' : 'STANDARD';
@@ -7839,7 +7934,7 @@ async function loadBotIdentity() {
     const customAction = d.custom?.status === 'connected'
       ? `<button class="btnx ${customActive?'btn-green':'btn-outline'} btn-sm" ${customActive?'disabled':''} onclick="assignBotIdentity('custom')">${customActive?'Actif':'Utiliser ce bot'}</button>`
       : `<button class="btnx btn-outline btn-sm" onclick="connectBotIdentity('custom')">Connecter mon bot</button>`;
-    const premiumAllowed = d.premium || d.platformAdmin;
+    const premiumAllowed = Boolean(d.premium);
 
     optionsEl.innerHTML = `
       <div style="padding:11px;border:1px solid ${elbotActive?'var(--accent)':'var(--brd)'};border-radius:10px;display:flex;align-items:center;justify-content:space-between;gap:10px">
@@ -7855,6 +7950,22 @@ async function loadBotIdentity() {
     optionsEl.innerHTML = '';
   }
 }
+window.addEventListener('elbot-premium-change',()=>loadBotIdentity());
+setInterval(()=>{if(!document.hidden)loadBotIdentity()},10000);
+
+async function loadKickTimeoutReward(){const status=document.getElementById('kick-to-status');if(!status)return;try{const r=await fetch('/api/channel-rewards/timeout',{cache:'no-store'}),j=await r.json();if(!r.ok)throw new Error(j.error||'Chargement impossible');const d=j.data||{};document.getElementById('kick-to-enabled').checked=!!d.enabled;document.getElementById('kick-to-title').value=d.title||'Timeout un viewer';document.getElementById('kick-to-cost').value=d.cost||1000;document.getElementById('kick-to-duration').value=d.duration||300;status.innerHTML=d.rewardId?`✅ Récompense liée à ElBot · <b>${esc(d.rewardId)}</b>`:(d.oauthConnected?'Prête à être créée sur Kick.':'⚠️ Reconnecte ton compte Kick avant la création.')}catch(e){status.textContent=e.message}}
+async function setupKickTimeoutReward(){const status=document.getElementById('kick-to-status');status.textContent='Configuration sur Kick…';const body={enabled:document.getElementById('kick-to-enabled').checked,title:document.getElementById('kick-to-title').value,cost:Number(document.getElementById('kick-to-cost').value),duration:Number(document.getElementById('kick-to-duration').value)};try{const r=await fetch('/api/admin/channel-rewards/timeout/setup',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}),j=await r.json();if(!r.ok)throw new Error(j.error||'Configuration impossible');status.textContent='✅ Récompense créée et reliée à ElBot';toast('Récompense points Kick enregistrée ✓')}catch(e){status.innerHTML=`❌ ${esc(e.message)}<br><button class="btnx btn-outline btn-sm" style="margin-top:7px" onclick="startStreamerOAuthReconnect()">Reconnecter le compte streamer Kick</button>`;toast(e.message,false)}}
+async function loadKickRewards(){try{const r=await fetch('/api/channel-rewards',{cache:'no-store'}),j=await r.json();if(!r.ok)throw new Error(j.error||'Chargement impossible');for(const d of j.data?.rewards||[]){const p=`kick-${d.type}`;document.getElementById(`${p}-enabled`).checked=!!d.enabled;document.getElementById(`${p}-title`).value=d.title||'';document.getElementById(`${p}-cost`).value=d.cost||1;if(d.type==='timeout')document.getElementById(`${p}-duration`).value=d.duration||300;document.getElementById(`${p}-status`).textContent=d.rewardId?'✅ Récompense liée et prête':(j.data.oauthConnected?'Prête à être créée':'⚠️ Reconnecte le compte streamer Kick')}}catch(e){['timeout','counter','message'].forEach(t=>{const x=document.getElementById(`kick-${t}-status`);if(x)x.textContent=e.message})}}
+async function setupKickReward(type){const p=`kick-${type}`,status=document.getElementById(`${p}-status`),body={enabled:document.getElementById(`${p}-enabled`).checked,title:document.getElementById(`${p}-title`).value,cost:Number(document.getElementById(`${p}-cost`).value)};if(type==='timeout')body.duration=Number(document.getElementById(`${p}-duration`).value);status.textContent='Configuration sur Kick…';try{const r=await fetch(`/api/admin/channel-rewards/${type}/setup`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}),j=await r.json();if(!r.ok)throw new Error(j.error||'Configuration impossible');status.textContent='✅ Récompense créée et reliée à ElBot';toast('Interaction points Kick enregistrée ✓')}catch(e){status.innerHTML=`❌ ${esc(e.message)}<br><button class="btnx btn-outline btn-sm" style="margin-top:7px" onclick="startStreamerOAuthReconnect()">Reconnecter Kick</button>`;toast(e.message,false)}}
+async function deleteKickReward(type){const labels={timeout:'Timeout un viewer',counter:'Counter TO',message:'Message du viewer'};if(!confirm(`Retirer « ${labels[type]||type} » de la chaîne Kick ? La commande restera disponible dans le panel.`))return;const status=document.getElementById(`kick-${type}-status`);status.textContent='Suppression sur Kick…';try{const r=await fetch('/api/admin/channel-rewards/'+encodeURIComponent(type),{method:'DELETE'}),j=await r.json();if(!r.ok)throw new Error(j.error||'Suppression impossible');status.textContent='✅ Retirée de Kick · toujours disponible dans le panel';await loadKickRewards();toast('Interaction retirée de la chaîne Kick ✓')}catch(e){status.textContent='❌ '+e.message;toast(e.message,false)}}
+let KICK_CUSTOM_CACHE=[];
+function updateKickCustomFields(){const a=document.getElementById('kick-custom-action')?.value;document.getElementById('kick-custom-amount-wrap').style.display=a==='meme_points'?'block':'none';const response=document.getElementById('kick-custom-response');if(response)response.disabled=a==='meme_points'}
+function resetKickCustomForm(){document.getElementById('kick-custom-id').value='';document.getElementById('kick-custom-title').value='';document.getElementById('kick-custom-cost').value=500;document.getElementById('kick-custom-action').value='chat_fixed';document.getElementById('kick-custom-description').value='';document.getElementById('kick-custom-response').value='';document.getElementById('kick-custom-amount').value=100;document.getElementById('kick-custom-enabled').checked=true;document.getElementById('kick-custom-save').textContent='✨ Créer l’interaction';updateKickCustomFields()}
+function editKickCustomInteraction(id){const x=KICK_CUSTOM_CACHE.find(v=>v.id===id);if(!x)return;document.getElementById('kick-custom-id').value=x.id;document.getElementById('kick-custom-title').value=x.title||'';document.getElementById('kick-custom-cost').value=x.cost||500;document.getElementById('kick-custom-color').value=x.color||'#a855f7';document.getElementById('kick-custom-action').value=x.action||'chat_fixed';document.getElementById('kick-custom-description').value=x.description||'';document.getElementById('kick-custom-response').value=x.response||'';document.getElementById('kick-custom-amount').value=x.amount||100;document.getElementById('kick-custom-enabled').checked=x.enabled!==false;document.getElementById('kick-custom-save').textContent='💾 Mettre à jour';updateKickCustomFields();document.getElementById('kick-custom-builder').open=true;document.getElementById('kick-custom-builder').scrollIntoView({behavior:'smooth'})}
+async function loadKickCustomInteractions(){const list=document.getElementById('kick-custom-list');if(!list)return;try{const r=await fetch('/api/channel-rewards/custom?ts='+Date.now(),{cache:'no-store'}),j=await r.json();if(!r.ok)throw new Error(j.error||'Chargement impossible');const d=j.data||{},premium=!!d.premium;KICK_CUSTOM_CACHE=d.interactions||[];document.getElementById('kick-custom-plan').textContent=premium?'PREMIUM ACTIF':'STANDARD · VERROUILLÉ';document.getElementById('kick-custom-builder').querySelectorAll('input,select,button').forEach(el=>el.disabled=!premium);list.innerHTML=KICK_CUSTOM_CACHE.length?KICK_CUSTOM_CACHE.map(x=>`<div style="padding:9px 0;border-bottom:1px solid var(--brd);display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap"><div style="min-width:180px;flex:1"><b>${esc(x.title)}</b><br><span>${esc(x.action)} · ${Number(x.cost)||0} points · ${x.rewardId?(x.enabled!==false?'active sur Kick':'désactivée'):'modèle panel uniquement'}</span></div><div style="display:flex;gap:5px;flex-wrap:wrap"><button class="btnx btn-ghost btn-sm" onclick="editKickCustomInteraction('${escapeAttr(x.id)}')">Modifier</button><button class="btnx btn-ghost btn-sm" onclick="deleteKickCustomInteraction('${escapeAttr(x.id)}','panel')">Retirer du panel</button><button class="btnx btn-ghost btn-sm" ${x.rewardId?'':'disabled'} onclick="deleteKickCustomInteraction('${escapeAttr(x.id)}','kick')">Retirer de Kick</button><button class="btnx btn-red btn-sm" onclick="deleteKickCustomInteraction('${escapeAttr(x.id)}','both')">Supprimer des deux</button></div></div>`).join(''):'Aucune interaction Premium créée.';const h=document.getElementById('kick-custom-history'),history=Array.isArray(d.history)?d.history:[];h.innerHTML=history.length?history.slice(0,20).map(x=>`<div style="padding:7px 0;border-bottom:1px solid var(--brd)"><b>@${esc(x.username||'?')}</b> · ${esc(x.title||'Interaction')}<br><span>${esc(x.status||'')} · ${esc(x.detail||'')} · ${new Date(x.at).toLocaleString('fr-FR')}</span></div>`).join(''):'Aucune utilisation.'}catch(e){list.textContent=e.message}}
+async function saveKickCustomInteraction(){const status=document.getElementById('kick-custom-status'),body={id:document.getElementById('kick-custom-id').value,title:document.getElementById('kick-custom-title').value,cost:Number(document.getElementById('kick-custom-cost').value),color:document.getElementById('kick-custom-color').value,action:document.getElementById('kick-custom-action').value,description:document.getElementById('kick-custom-description').value,response:document.getElementById('kick-custom-response').value,amount:Number(document.getElementById('kick-custom-amount').value),enabled:document.getElementById('kick-custom-enabled').checked};status.textContent='Création sur Kick…';try{const r=await fetch('/api/admin/channel-rewards/custom',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}),j=await r.json();if(!r.ok)throw new Error(j.error||'Création impossible');status.textContent='✅ Interaction publiée immédiatement sur Kick';resetKickCustomForm();await loadKickCustomInteractions();toast('Interaction Premium créée ✓')}catch(e){status.textContent='❌ '+e.message;toast(e.message,false)}}
+async function deleteKickCustomInteraction(id,target='both'){const item=KICK_CUSTOM_CACHE.find(x=>x.id===id),labels={panel:'du panel uniquement',kick:'de la chaîne Kick uniquement',both:'de Kick et du panel'};if(!confirm(`Retirer « ${item?.title||'cette interaction'} » ${labels[target]} ?`))return;const r=await fetch('/api/admin/channel-rewards/custom/'+encodeURIComponent(id)+'?target='+encodeURIComponent(target),{method:'DELETE'}),j=await r.json();if(!r.ok)return toast(j.error||'Suppression impossible',false);await loadKickCustomInteractions();toast(target==='panel'?'Interaction retirée du panel ✓':target==='kick'?'Interaction retirée de Kick, modèle conservé ✓':'Interaction supprimée des deux ✓')}
+setInterval(()=>{const section=document.getElementById('widget-kickrewards-settings');if(!document.hidden&&section&&section.style.display!=='none')loadKickCustomInteractions()},5000);
 
 async function assignBotIdentity(choice) {
   if (!confirm(`Confirmer le changement vers ${choice === 'elbot' ? 'ElBot' : 'ton bot personnalisé'} ? L’autre bot ne pourra plus écrire sur la chaîne.`)) return;
@@ -7863,6 +7974,7 @@ async function assignBotIdentity(choice) {
   if (!r.ok) return showInline('bot-identity-message', d.error || 'Changement impossible', false);
   toast(`${d.assigned.displayName} est maintenant le seul bot autorisé`);
   loadBotIdentity();
+  loadKickTimeoutReward();
 }
 
 function connectBotIdentity(choice) {
@@ -8634,21 +8746,21 @@ function renderWidgetEngine(data) {
   const widgets = Array.isArray(data?.widgets) ? data.widgets : [];
   grid.innerHTML = widgets.map(w => {
     const color = w.color || '#94a3b8';
-    const status = w.enabled ? 'Actif' : 'Désactivé';
+    const hasOverlay = w.hasOverlay !== false;
+    const status = hasOverlay ? (w.enabled ? 'Actif' : 'Inactif') : 'Disponible';
+    const statusColor = hasOverlay ? (w.enabled ? '#86efac' : '#94a3b8') : '#7dd3fc';
     return `<article class="widget-engine-card">
       <div class="widget-engine-glow" style="background:radial-gradient(circle,${color}38,transparent 68%)"></div>
       <div class="widget-engine-top">
         <div class="widget-engine-icon" style="color:${color};background:${color}16">${escapeHtml(w.icon || '🧩')}</div>
-        <span class="widget-engine-status" style="color:${w.enabled ? '#86efac' : '#94a3b8'}">${status}</span>
+        <span class="widget-engine-status" style="color:${statusColor}">${status}</span>
       </div>
       <div class="widget-engine-name">${escapeHtml(w.name)}</div>
       <div class="widget-engine-desc">${escapeHtml(w.description || '')}</div>
-      <div class="widget-engine-link" id="widget-engine-link-${escapeAttr(w.id)}">${escapeHtml(w.url || '')}</div>
+      ${w.hasOverlay===false?'':`<div class="widget-engine-link" id="widget-engine-link-${escapeAttr(w.id)}">${escapeHtml(w.url || '')}</div>`}
       <div class="widget-engine-actions">
         <button class="dark-btn" onclick="configureEngineWidget('${escapeAttr(w.id)}')">⚙ Configurer</button>
-        <button class="dark-btn" onclick="copyEngineWidget('${escapeAttr(w.id)}')">⧉ Copier</button>
-        <button class="dark-btn" onclick="openEngineWidget('${escapeAttr(w.id)}')">↗ Ouvrir</button>
-        <button class="dark-btn" onclick="regenerateEngineWidget('${escapeAttr(w.id)}')">⟳ Régénérer</button>
+        ${w.hasOverlay===false?'':`<button class="dark-btn" onclick="copyEngineWidget('${escapeAttr(w.id)}')">⧉ Copier</button><button class="dark-btn" onclick="openEngineWidget('${escapeAttr(w.id)}')">↗ Ouvrir</button><button class="dark-btn" onclick="regenerateEngineWidget('${escapeAttr(w.id)}')">⟳ Régénérer</button>`}
       </div>
     </article>`;
   }).join('') || '<div class="panel" style="grid-column:1/-1;color:var(--muted)">Aucun widget disponible.</div>';
@@ -8733,7 +8845,7 @@ function escapeAttr(v) { return escapeHtml(v); }
 
 // ── Alertes OBS ───────────────────────────────────────────────────────────────
 function alertSetVal(id,value){const el=document.getElementById(id);if(el)el.value=value??'';}function alertSetChk(id,v){const el=document.getElementById(id);if(el)el.checked=!!v;}function alertVal(id){return document.getElementById(id)?.value||'';}
-const ALERT_TYPES_UI=['follow','sub','renew','gift','raid','donation','bits','custom'];const ALERT_LABELS_UI={follow:'❤️ Follow',sub:'⭐ Abonnement',renew:'🔄 Renouvellement',gift:'🎁 Sub offerte',raid:'🚨 Raid',donation:'💸 Don',bits:'💎 Bits',custom:'🧪 Custom'};
+const ALERT_TYPES_UI=['follow','sub','renew','gift','raid','donation','bits','custom'];const ALERT_LABELS_UI={follow:'❤️ Follow',sub:'⭐ Abonnement',renew:'🔄 Renouvellement',gift:'🎁 Sub offerte',raid:'🚨 Raid',donation:'💸 Don',bits:'💎 Bits / KICKs',custom:'🧪 Custom'};
 let alertsConfigs={},alertProfiles=[],activeAlertProfile='default',currentAlertType='follow';
 async function loadAlertsPanel(){hydrateAllObsLinks();const r=await fetch(API+'/api/widgets/alerts',{cache:'no-store'});const d=await r.json();alertsConfigs=d.configs||{};alertProfiles=d.profiles||[{id:'default',name:'Défaut'}];activeAlertProfile=d.activeProfile||'default';renderAlertProfiles();renderAlertTabs();selectAlertType(currentAlertType||'follow');loadAlertHistory();}
 function renderAlertProfiles(){const s=document.getElementById('alert-profile-select');if(!s)return;s.innerHTML=alertProfiles.map(p=>`<option value="${escapeAttr(p.id)}" ${p.id===activeAlertProfile?'selected':''}>${escapeHtml(p.name)}</option>`).join('');}
@@ -9068,6 +9180,7 @@ const ChatOverlayUI = (() => {
     setValue('co-group-window', settings.groupWindow);
     setValue('co-ignored', settings.ignoredUsers);
     setValue('co-font-size', settings.fontSize);
+    const fontSizeOutput=byId('co-font-size-output');if(fontSizeOutput)fontSizeOutput.textContent=settings.fontSize+' px';
     setValue('co-duration', settings.messageDuration);
     setValue('co-max', settings.maxMessages);
     setValue('co-animation', settings.animation);
@@ -10194,6 +10307,35 @@ async function toggleBannedWord(id, enabled) {
   loadBannedWords();
 }
 
+// ── Anti-spam ────────────────────────────────────────────────────────────────
+const SPAM_FILTER_META={
+  caps:{icon:'Aa',title:'Protection des majuscules',desc:'Supprime les messages contenant trop de lettres majuscules.',fields:[['maxAmount','Quantité maximale',''],['minChars','Nombre minimum de caractères',''],['maxPercent','Pourcentage maximal','%']]},
+  links:{icon:'↗',title:'Protection des liens',desc:'Supprime les messages contenant des liens non autorisés.',fields:[]},
+  emotes:{icon:'☻',title:'Protection des émotes',desc:'Supprime les messages contenant trop d’émotes.',fields:[['maxAmount','Quantité maximale','']]},
+  paragraph:{icon:'≡',title:'Protection des paragraphes',desc:'Supprime les longs murs de texte.',fields:[['maxAmount','Nombre maximal de caractères','']]},
+  symbols:{icon:'#!',title:'Protection des symboles',desc:'Supprime les messages contenant trop de symboles.',fields:[['maxAmount','Quantité maximale',''],['minChars','Nombre minimum de caractères',''],['maxPercent','Pourcentage maximal','%']]},
+  repetition:{icon:'↻',title:'Protection des répétitions',desc:'Supprime les messages contenant des mots ou expressions très répétés.',fields:[['maxRepeats','Répétitions maximales d’un mot',''],['minChars','Taille minimale du mot','caractères']]},
+  zalgo:{icon:'⚡',title:'Protection ElBot',desc:'Bloque les caractères corrompus et les messages visuellement malveillants.',fields:[['maxAmount','Caractères suspects maximum','']]},
+  oneMan:{icon:'☷',title:'Protection contre le spam individuel',desc:'Supprime les messages répétés par un même utilisateur.',fields:[['minChars','Caractères minimum',''],['minMessages','Messages minimum',''],['lookback','Période analysée','secondes'],['threshold','Seuil de ressemblance','%']]}
+};
+let spamState={level:0,filters:{},settings:{}},spamOpenFilters={};
+const SPAM_LEVEL_PRESETS={
+  0:{enabled:false,announce:false,probation:false,caps:{duration:30,maxAmount:30,minChars:10,maxPercent:50},links:{duration:120},emotes:{duration:30,maxAmount:15},paragraph:{duration:30,maxAmount:140},symbols:{duration:15,maxAmount:25,minChars:10,maxPercent:50},repetition:{duration:30,maxRepeats:15,minChars:3},zalgo:{duration:30,maxAmount:15},oneMan:{duration:30,minChars:4,minMessages:5,lookback:30,threshold:75}},
+  1:{enabled:true,announce:false,probation:false,caps:{duration:15,maxAmount:45,minChars:15,maxPercent:75},links:{duration:60},emotes:{duration:15,maxAmount:25},paragraph:{duration:15,maxAmount:300},symbols:{duration:15,maxAmount:40,minChars:15,maxPercent:70},repetition:{duration:15,maxRepeats:20,minChars:3},zalgo:{duration:15,maxAmount:25},oneMan:{duration:15,minChars:4,minMessages:7,lookback:30,threshold:90}},
+  2:{enabled:true,announce:true,probation:false,caps:{duration:30,maxAmount:30,minChars:10,maxPercent:55},links:{duration:120},emotes:{duration:30,maxAmount:15},paragraph:{duration:30,maxAmount:180},symbols:{duration:30,maxAmount:25,minChars:10,maxPercent:50},repetition:{duration:30,maxRepeats:12,minChars:3},zalgo:{duration:30,maxAmount:15},oneMan:{duration:30,minChars:4,minMessages:5,lookback:30,threshold:78}},
+  3:{enabled:true,announce:true,probation:true,caps:{duration:120,maxAmount:15,minChars:6,maxPercent:40},links:{duration:300},emotes:{duration:120,maxAmount:8},paragraph:{duration:120,maxAmount:100},symbols:{duration:120,maxAmount:12,minChars:6,maxPercent:35},repetition:{duration:120,maxRepeats:6,minChars:2},zalgo:{duration:120,maxAmount:5},oneMan:{duration:120,minChars:3,minMessages:3,lookback:45,threshold:65}}
+};
+function spamGeneralFields(key,rule){return `<div class="spam-section-title"><b>Réglages généraux</b><small>Configure la sanction et les exceptions de ce filtre.</small></div><div class="spam-settings-grid"><label>Sanction<select onchange="spamState.settings.${key}.action=this.value"><option value="timeout" ${rule.action==='timeout'?'selected':''}>Timeout</option><option value="ban" ${rule.action==='ban'?'selected':''}>Bannissement permanent</option></select><small>Action appliquée lorsque le filtre se déclenche</small></label><label>Durée<input type="number" min="1" value="${Number(rule.duration)||30}" oninput="spamState.settings.${key}.duration=Number(this.value)"><small>Durée du timeout en secondes</small></label><label>Groupe exclu<select onchange="spamState.settings.${key}.exclude=this.value"><option value="none" ${rule.exclude==='none'?'selected':''}>Aucun viewer</option><option value="subscribers" ${rule.exclude==='subscribers'?'selected':''}>Abonnés</option></select><small>Les modérateurs et le streamer sont toujours immunisés</small></label></div>`}
+function spamSpecificFields(key,meta,rule){if(key==='links')return `<div class="spam-section-title"><b>Réglages du filtre</b><small>Les domaines autorisés passent le filtre. La liste bloquée double la sanction.</small></div><div class="spam-settings-grid spam-links-grid"><label>Liens autorisés<textarea rows="3" oninput="spamState.settings.links.allowlist=this.value.split(/[\\n,;]+/).map(x=>x.trim()).filter(Boolean)">${esc((rule.allowlist||[]).join('\n'))}</textarea><small>Un domaine par ligne, par exemple youtube.com</small></label><label>Liens bloqués avec sanction doublée<textarea rows="3" oninput="spamState.settings.links.blocklist=this.value.split(/[\\n,;]+/).map(x=>x.trim()).filter(Boolean)">${esc((rule.blocklist||[]).join('\n'))}</textarea><small>Domaines dangereux ou indésirables</small></label></div>`;return `<div class="spam-section-title"><b>Réglages du filtre</b><small>Ajuste précisément la sensibilité de cette protection.</small></div><div class="spam-settings-grid">${meta.fields.map(([field,label,unit])=>`<label>${label}<span class="spam-number"><input type="number" min="0" value="${Number(rule[field]??0)}" oninput="spamState.settings.${key}.${field}=Number(this.value)"><i>${unit}</i></span></label>`).join('')}</div>`}
+function renderSpamConfig(){document.querySelectorAll('[data-spam-level]').forEach(x=>x.classList.toggle('active',Number(x.dataset.spamLevel)===Number(spamState.level)));const progress=document.getElementById('spam-level-progress');if(progress)progress.style.width=(Number(spamState.level)/3*100)+'%';const root=document.getElementById('spam-filter-list');if(!root)return;root.innerHTML=Object.entries(SPAM_FILTER_META).map(([key,m])=>{const enabled=!!spamState.filters?.[key],open=!!spamOpenFilters[key],rule=spamState.settings?.[key]||{};return `<section class="spam-filter-row ${enabled?'enabled':''} ${open?'open':''}"><div class="spam-filter-head" onclick="toggleSpamPanel('${key}')"><div class="spam-filter-icon">${m.icon}</div><div class="spam-filter-copy"><strong>${m.title}</strong><small>${m.desc}</small></div><label class="co-toggle-line" onclick="event.stopPropagation()"><span class="co-switch"><input type="checkbox" ${enabled?'checked':''} onchange="toggleSpamFilter('${key}',this.checked)"><span></span></span></label><button class="spam-chevron" type="button">⌄</button></div>${open?`<div class="spam-filter-body">${spamGeneralFields(key,rule)}${spamSpecificFields(key,m,rule)}<div class="spam-extra-toggles"><label><span class="co-switch"><input type="checkbox" ${rule.announce?'checked':''} onchange="spamState.settings.${key}.announce=this.checked"><span></span></span><b>Avertissement public</b><small>Le bot annonce la sanction dans le chat.</small></label><label><span class="co-switch"><input type="checkbox" ${rule.probation?'checked':''} onchange="spamState.settings.${key}.probation=this.checked"><span></span></span><b>Récidive progressive</b><small>Augmente la durée pour les récidivistes.</small></label></div></div>`:''}</section>`}).join('');root.onchange=()=>scheduleSpamAutoSave();root.oninput=e=>{if(e.target.matches('input[type="number"],textarea'))scheduleSpamAutoSave()}}
+async function loadSpamConfig(){try{const r=await fetch('/api/spam/config',{cache:'no-store'}),j=await r.json();if(r.ok){spamState=j.data;spamOpenFilters={};renderSpamConfig()}}catch(e){toast('Chargement anti-spam impossible',false)}}
+function toggleSpamPanel(key){spamOpenFilters[key]=!spamOpenFilters[key];renderSpamConfig()}
+function toggleSpamFilter(key,enabled){spamState.filters[key]=!!enabled;if(enabled&&Number(spamState.level)===0)spamState.level=1;if(!Object.values(spamState.filters).some(Boolean))spamState.level=0;renderSpamConfig();scheduleSpamAutoSave()}
+function setSpamLevel(level){const value=Math.max(0,Math.min(3,Number(level)||0)),preset=SPAM_LEVEL_PRESETS[value];spamState.level=value;for(const key of Object.keys(SPAM_FILTER_META)){spamState.filters[key]=preset.enabled;spamState.settings[key]={...(spamState.settings[key]||{}),...(preset[key]||{}),announce:preset.announce,probation:preset.probation}}renderSpamConfig();scheduleSpamAutoSave()}
+let spamAutoSaveTimer=null,spamSaveInFlight=false,spamSaveQueued=false;
+function scheduleSpamAutoSave(){const status=document.getElementById('spam-save-status');if(status)status.textContent='Enregistrement automatique…';clearTimeout(spamAutoSaveTimer);spamAutoSaveTimer=setTimeout(()=>saveSpamConfig(true),450)}
+async function saveSpamConfig(silent=false){if(spamSaveInFlight){spamSaveQueued=true;return}spamSaveInFlight=true;const snapshot=JSON.stringify(spamState),status=document.getElementById('spam-save-status');try{const r=await fetch('/api/admin/spam/config',{method:'POST',headers:{'Content-Type':'application/json'},body:snapshot}),j=await r.json().catch(()=>({}));if(!r.ok)throw new Error(j.error||'Enregistrement impossible');spamState=j.data;if(status)status.textContent='✓ Réglages enregistrés automatiquement pour cette chaîne';renderSpamConfig();if(!silent)toast('Filtres anti-spam enregistrés ✓')}catch(e){if(status)status.textContent=e.message;toast(e.message,false)}finally{spamSaveInFlight=false;if(spamSaveQueued){spamSaveQueued=false;scheduleSpamAutoSave()}}}
+
 // ── Toggle toutes les commandes ───────────────────────────────────────────────
 
 async function toggleAllCommands(enabled) {
@@ -10331,6 +10473,7 @@ applyStoredPrefs();
 checkPanelAuth().then(ok => { if (ok) { hydrateAllObsLinks(); loadAll(); } });
 setTimeout(() => { hydrateAllObsLinks(); if (document.getElementById('widget-engine-grid')) loadWidgetEngine(); }, 250);
 setInterval(() => { if (!document.hidden && document.getElementById('page-dashboard')?.classList.contains('active')) loadAll(); },60000);
+setInterval(() => { if (!document.hidden && document.getElementById('page-widgets')?.classList.contains('active')) loadWidgetEngine(true); },15000);
 setInterval(()=>{if(!document.hidden && document.getElementById('page-lobby').classList.contains('active'))loadLobby();},30000);
 
 // Résolveur de dates de follow : le navigateur peut appeler l'API interne Kick
@@ -10684,6 +10827,13 @@ setInterval(() => {
       <h3>Thèmes Premium ElBot</h3>
       <div class="premium-theme-gallery">
 
+        <button type="button" data-ref-interface="classic" onclick="applyReferenceInterface('classic')">
+          <span class="premium-theme-preview" style="background:linear-gradient(145deg,#071225,#020817 58%,#07101f)">
+            <i class="pv-side"></i><i class="pv-top"></i><i class="pv-card a"></i><i class="pv-card b"></i><i class="pv-wide"></i>
+          </span>
+          <span class="premium-theme-copy"><b>ElBot Classique</b><small>Simple • Fluide • Inclus par défaut</small></span>
+          <em>Appliquer</em>
+        </button>
         <button type="button" data-ref-interface="control" onclick="applyReferenceInterface('control')">
           <span class="premium-theme-preview" style="background-image:url('/assets/themes/control.webp?v=28')">
             <i class="pv-side"></i><i class="pv-top"></i><i class="pv-card a"></i><i class="pv-card b"></i><i class="pv-wide"></i>
@@ -10962,7 +11112,7 @@ function openReferenceDrawer(id) {
   backdrop.classList.add('open');
   document.body.style.overflow = 'hidden';
 }
-function openInterfaceCustomizer() { openReferenceDrawer('ref-customizer-drawer'); }
+function openInterfaceCustomizer() { if(!window.ELBOT_PREMIUM_ACCESS)return toast('🔒 La personnalisation est réservée aux comptes Premium',false);openReferenceDrawer('ref-customizer-drawer'); }
 let supportTickets=[],supportActiveTicket=null,supportIsAdmin=false;
 function openHelpSupport(){openReferenceDrawer('ref-help-drawer');showSupportTab('new');loadSupportTickets()}
 function showSupportTab(tab){const isNew=tab==='new',isDetail=tab==='detail';document.getElementById('support-new').style.display=isNew?'block':'none';document.getElementById('support-list-view').style.display=tab==='list'?'block':'none';document.getElementById('support-detail').style.display=isDetail?'block':'none';document.getElementById('support-tab-new').classList.toggle('active',isNew);document.getElementById('support-tab-list').classList.toggle('active',!isNew);if(tab==='list')loadSupportTickets()}
@@ -11521,8 +11671,8 @@ body:has(#page-dashboard.active) .ref-player-controls .ref-play{width:40px!impor
 </style>
 
 <!-- ElBot Theme Engine V2 — chargé en dernier pour rester prioritaire -->
-<link rel="stylesheet" href="/themes/engine.css?v=33">
-<script src="/theme-engine.js?v=32"></script>
+<link rel="stylesheet" href="/themes/engine.css?v=34">
+<script src="/theme-engine.js?v=33"></script>
 <style>
 /* Mode équilibré : conserve le verre, mais limite les couches GPU coûteuses. */
 body[data-ref-interface="liquid"] .sidebar,
@@ -11548,6 +11698,8 @@ body[data-ref-interface="aurora"] .ref-panel{
 @media(prefers-reduced-motion:reduce){.ref-wave,.lpd.blink{animation:none!important}}
 .elbot-support{display:block!important}.support-tabs{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:14px}.support-tabs button{border:1px solid var(--theme-soft-border,var(--brd));background:var(--theme-soft-bg,var(--surface2));color:var(--theme-muted,var(--muted));padding:9px;border-radius:9px;font:700 10px inherit;cursor:pointer}.support-tabs button.active{background:var(--accent);border-color:var(--accent);color:#06101f}.support-discord-state{font-size:9px;color:var(--muted);margin-bottom:9px}.support-ticket{padding:11px;margin-bottom:7px;border:1px solid var(--theme-soft-border,var(--brd));border-radius:10px;background:var(--theme-soft-bg,var(--surface2));cursor:pointer}.support-ticket:hover{border-color:var(--accent)}.support-ticket-top{display:flex;gap:7px;align-items:center}.support-ticket-top strong{font-size:11px;flex:1}.support-pill{font-size:7px;font-weight:900;text-transform:uppercase;padding:3px 6px;border-radius:999px;background:rgba(38,143,255,.15);color:#71c7ff}.support-pill.closed{background:rgba(111,124,145,.15);color:#9ca8b8}.support-ticket small{display:block;color:var(--muted);font-size:8px;margin-top:5px}.support-detail-card{padding:12px 0}.support-detail-card h3{font-size:14px;margin:8px 0 4px}.support-message{padding:9px 10px;margin:7px 0;border-radius:10px;background:rgba(27,105,210,.12);border:1px solid rgba(82,157,255,.15);font-size:10px;line-height:1.5}.support-message.admin{background:rgba(37,211,131,.10);border-color:rgba(37,211,131,.18)}.support-message b{display:block;font-size:8px;color:var(--accent);margin-bottom:4px}.support-message time{display:block;font-size:7px;color:var(--muted);margin-top:5px}.support-thread{max-height:310px;overflow:auto;margin:8px 0 10px}
 .dbd-roulette{--dbd-red:#a91419;position:relative;overflow:hidden;border:1px solid rgba(255,255,255,.11);border-radius:18px;padding:18px;background:radial-gradient(circle at 50% -20%,rgba(166,16,24,.24),transparent 42%),linear-gradient(160deg,rgba(19,20,22,.97),rgba(5,6,7,.98));box-shadow:0 28px 80px rgba(0,0,0,.4)}.dbd-roulette:before{content:"";position:absolute;inset:0;pointer-events:none;opacity:.22;background:repeating-linear-gradient(105deg,transparent 0 90px,rgba(255,255,255,.025) 92px,transparent 94px)}.dbd-roulette-head{position:relative;display:flex;justify-content:space-between;align-items:center;margin-bottom:15px}.dbd-role-tabs{display:flex;gap:5px}.dbd-role-tabs button{padding:8px 18px;border:1px solid rgba(255,255,255,.12);background:#111315;color:#87909a;border-radius:7px;font:900 10px inherit;text-transform:uppercase;letter-spacing:.7px;cursor:pointer}.dbd-role-tabs button.active{color:#fff;border-color:#ba252a;background:linear-gradient(#a7191e,#681014);box-shadow:0 0 18px rgba(202,26,34,.28)}.dbd-color-toggle{display:flex;gap:7px;align-items:center;color:#aeb5bc;font-size:9px}.dbd-machine{position:relative;border:1px solid #3b3d3f;border-radius:12px;padding:20px;background:linear-gradient(180deg,#1a1c1e,#090a0b);box-shadow:inset 0 1px rgba(255,255,255,.07),inset 0 -30px 60px rgba(0,0,0,.55)}.dbd-machine-title{text-align:center;margin-bottom:18px}.dbd-machine-title span{display:block;color:#c3252b;font-size:9px;font-weight:950;letter-spacing:5px}.dbd-machine-title strong{display:block;color:#f0f1f1;font-size:20px;letter-spacing:2px;margin-top:5px;text-shadow:0 2px 12px #000}.dbd-machine-title small{display:block;color:#7e858b;font-size:9px;margin-top:6px}.dbd-reels{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}.dbd-reel{position:relative;min-height:245px;border:1px solid #44484c;border-radius:9px;overflow:hidden;background:linear-gradient(180deg,#060708,#17191b 50%,#060708);cursor:pointer;box-shadow:inset 0 0 30px #000,0 9px 24px rgba(0,0,0,.38)}.dbd-reel:before,.dbd-reel:after{content:"";position:absolute;z-index:4;left:0;right:0;height:54px;pointer-events:none}.dbd-reel:before{top:0;background:linear-gradient(#050607,transparent)}.dbd-reel:after{bottom:0;background:linear-gradient(transparent,#050607)}.dbd-reel-window{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;padding:16px}.dbd-perk-diamond{width:130px;height:130px;display:grid;place-items:center;transform:rotate(45deg);border:3px solid #d4d4d4;background:linear-gradient(135deg,#53276c,#1d0c28);box-shadow:0 0 0 4px #17191b,0 0 28px rgba(152,55,192,.35);transition:.16s}.dbd-perk-diamond.killer{background:linear-gradient(135deg,#761c22,#25080a);box-shadow:0 0 0 4px #17191b,0 0 28px rgba(207,37,45,.34)}.dbd-perk-diamond.mono{filter:grayscale(1);background:#303236}.dbd-perk-rune{transform:rotate(-45deg);font-size:30px;font-weight:950;color:#fff;text-shadow:0 2px 8px #000;letter-spacing:-2px}.dbd-perk-name{position:absolute;z-index:6;left:8px;right:8px;bottom:14px;text-align:center;color:#f4f4f4;font-size:10px;font-weight:900;text-transform:uppercase;text-shadow:0 2px 5px #000}.dbd-reel-lock{position:absolute;z-index:7;right:7px;top:7px;width:25px;height:25px;border-radius:50%;border:1px solid rgba(255,255,255,.15);background:#111;color:#8e969e;display:grid;place-items:center}.dbd-reel.locked{border-color:#d5a448}.dbd-reel.locked .dbd-reel-lock{color:#ffd36b;border-color:#d5a448}.dbd-reel.spinning .dbd-perk-diamond{animation:dbdSlot .11s linear infinite;filter:blur(1px)}@keyframes dbdSlot{0%{transform:translateY(-22px) rotate(45deg);opacity:.25}50%{transform:translateY(0) rotate(45deg);opacity:1}100%{transform:translateY(22px) rotate(45deg);opacity:.25}}.dbd-spin-button{display:flex;align-items:center;justify-content:center;gap:10px;width:min(420px,90%);margin:19px auto 0;padding:12px;border:1px solid #e04147;border-radius:7px;background:linear-gradient(#b51e24,#681014);color:#fff;font:950 11px inherit;letter-spacing:1px;cursor:pointer;box-shadow:0 8px 24px rgba(160,16,23,.28)}.dbd-spin-button:hover{filter:brightness(1.18)}.dbd-spin-button span{font-size:18px}.dbd-build-actions{position:relative;display:flex;justify-content:center;gap:7px;margin-top:13px}.dbd-history-panel #dbd-history{display:grid;gap:6px;max-height:180px;overflow:auto}.dbd-history-row{display:grid;grid-template-columns:70px 1fr auto;gap:10px;align-items:center;padding:8px 10px;border-bottom:1px solid rgba(255,255,255,.07);font-size:9px}.dbd-history-row b{color:#d64a50;text-transform:uppercase}.dbd-history-row span{color:#d9dde1}.dbd-history-row time{color:#737c84}@media(max-width:900px){.dbd-reels{grid-template-columns:repeat(2,1fr)}.dbd-reel{min-height:210px}.dbd-perk-diamond{width:105px;height:105px}}
+.dbd-perk-diamond img{width:142%;height:142%;object-fit:contain;transform:rotate(-45deg);filter:drop-shadow(0 2px 5px #000)}.dbd-perk-diamond.mono img{filter:grayscale(1) contrast(1.15) drop-shadow(0 2px 5px #000)}
+.spam-level-card{padding:22px 26px;margin-bottom:14px;border:1px solid var(--brd);border-radius:14px;background:linear-gradient(180deg,rgba(9,14,22,.82),rgba(6,9,14,.66))}.spam-level-title{text-align:center;font-size:11px;font-weight:900;margin-bottom:16px}.spam-levels{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;max-width:600px;margin:auto}.spam-levels button{border:0;background:transparent;color:var(--muted);display:grid;place-items:center;gap:6px;cursor:pointer}.spam-levels button span{font-size:25px;color:#438eea}.spam-levels button b{font-size:9px}.spam-levels button.active{color:var(--text)}.spam-levels button.active span{color:#72b6ff;filter:drop-shadow(0 0 7px #1979f0)}.spam-level-track{height:7px;max-width:460px;margin:12px auto 0;border-radius:99px;background:#111b2d;overflow:hidden}.spam-level-track i{display:block;height:100%;width:0;background:linear-gradient(90deg,#0961df,#42a1ff);transition:.25s}.spam-filter-list{display:grid;gap:9px}.spam-filter-row{display:block;padding:0;overflow:hidden;border:1px solid transparent;border-radius:12px;background:rgba(15,20,28,.78);opacity:1}.spam-filter-row.enabled{border-color:rgba(53,139,255,.18)}.spam-filter-head{display:grid;grid-template-columns:40px minmax(0,1fr) auto 25px;align-items:center;gap:12px;padding:13px 14px;cursor:pointer;min-height:62px}.spam-filter-head:hover{background:rgba(45,123,226,.045)}.spam-filter-icon{width:34px;height:34px;display:grid;place-items:center;border-radius:9px;background:#0d42a0;color:#d9ecff;font-weight:900}.spam-filter-copy{display:grid;grid-template-columns:minmax(190px,230px) 1fr;align-items:center;gap:15px}.spam-filter-copy strong{font-size:11px}.spam-filter-copy small{color:var(--muted);font-size:9px}.spam-chevron{border:0;background:transparent;color:var(--muted);font-size:17px;cursor:pointer;transition:.2s}.spam-filter-row.open .spam-chevron{transform:rotate(180deg)}.spam-filter-body{padding:24px 34px 30px;border-top:1px solid rgba(255,255,255,.055);background:rgba(6,9,13,.27)}.spam-section-title{margin:3px 0 18px}.spam-section-title b{display:block;font-size:11px}.spam-section-title small{display:block;color:var(--muted);font-size:9px;margin-top:5px}.spam-section-title:not(:first-child){margin-top:30px}.spam-settings-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:18px}.spam-settings-grid label{display:flex;flex-direction:column;gap:7px;font-size:9px}.spam-settings-grid label>small{color:var(--muted);font-size:7px}.spam-settings-grid input,.spam-settings-grid select,.spam-settings-grid textarea{width:100%;border:1px solid var(--brd3,var(--brd));border-radius:7px;padding:9px 11px;background:rgba(12,16,22,.72);color:var(--text);font:10px inherit;outline:none}.spam-settings-grid input:focus,.spam-settings-grid select:focus,.spam-settings-grid textarea:focus{border-color:var(--accent)}.spam-number{position:relative;display:flex;align-items:center}.spam-number input{padding-right:55px}.spam-number i{position:absolute;right:10px;color:var(--muted);font:8px inherit}.spam-links-grid{grid-template-columns:1fr 1fr}.spam-extra-toggles{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-top:28px}.spam-extra-toggles>label{display:grid;grid-template-columns:34px 1fr;column-gap:10px;align-items:center;padding:13px;border-top:1px solid rgba(255,255,255,.05)}.spam-extra-toggles .co-switch{grid-row:1/3}.spam-extra-toggles b{font-size:10px}.spam-extra-toggles small{font-size:8px;color:var(--muted);margin-top:3px}.dbd-reel-window{display:grid!important;place-items:center!important;padding:34px 20px 48px!important}.dbd-perk-diamond{position:relative!important;display:grid!important;place-items:center!important;margin:auto!important}.dbd-perk-diamond img{position:absolute!important;left:50%!important;top:50%!important;width:112%!important;height:112%!important;object-fit:contain!important;transform:translate(-50%,-50%) rotate(-45deg)!important;transform-origin:center!important}.dbd-perk-rune{position:absolute;inset:0;place-items:center!important}.dbd-perk-name{bottom:10px!important;display:flex;flex-direction:column;align-items:center;gap:2px}.dbd-perk-name small{font-size:7px;color:#929aa3;text-transform:none;font-weight:600}@media(max-width:900px){.spam-filter-copy{display:block}.spam-filter-copy small{display:block;margin-top:3px}.spam-settings-grid,.spam-links-grid,.spam-extra-toggles{grid-template-columns:1fr}.spam-levels{grid-template-columns:repeat(2,1fr)}}
 </style>
 </body>
 </html>

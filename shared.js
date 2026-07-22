@@ -9,6 +9,8 @@ let _songRequestAdder = null;
 let _songRequestSkipVoter = null;
 let _chatOverlayEmitter = null;
 let _memeTrigger = null;
+let _announcementReloader = null;
+let _moderateUser = null;
 
 module.exports = {
   registerSendChat(fn) { _sendChat = fn; },
@@ -18,6 +20,10 @@ module.exports = {
     return Promise.resolve(false);
   },
   hasSendChat() { return typeof _sendChat === 'function'; },
+  sendChatTo(msg, ctx = null) {
+    if (_sendChat) return _sendChat(msg, ctx);
+    return Promise.resolve(false);
+  },
 
   registerKickEventHandler(fn) { _kickEventHandler = fn; },
   processKickEvent(eventType, payload) {
@@ -47,6 +53,18 @@ module.exports = {
   triggerMeme(username, meme, text = '', ctx = null) {
     if (_memeTrigger) return _memeTrigger(username, meme, text, ctx);
     return Promise.resolve({ error: 'Module Memes pas encore initialisé.' });
+  },
+
+  registerAnnouncementReloader(fn) { _announcementReloader = fn; },
+  reloadAnnouncements() {
+    if (_announcementReloader) return _announcementReloader();
+    return Promise.resolve(false);
+  },
+
+  registerModerateUser(fn) { _moderateUser = fn; },
+  moderateUser(username, kickId, action, duration, reason, ctx = null) {
+    if (_moderateUser) return _moderateUser(username, kickId, action, duration, reason, ctx);
+    return Promise.resolve(false);
   },
 
   registerOpenChest(fn) { _openChest = fn; },

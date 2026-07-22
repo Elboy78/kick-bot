@@ -5,12 +5,13 @@
   const LEGACY_KEYS = ['elbot_theme_v2','elbot_ref_appearance_v1','elbot_ref_appearance'];
 
   const THEMES = new Set([
-    'control','dbd','obs','vision','neon','elite','steam','riot',
+    'classic','control','dbd','obs','vision','neon','elite','steam','riot',
     'midnight','ocean','sunset','forest','minimal'
   ]);
   const SIDEBAR_MODES = new Set(['solid','theme','transparent','glass']);
 
-  const LEGACY_NAMES = {classic:'control',liquid:'control',aurora:'vision'};
+  const LEGACY_NAMES = {liquid:'control',aurora:'vision'};
+  let premiumThemeAccess = false;
 
   const PRESETS = {
     kick:{primary:'#53fc18',secondary:'#168cff'},
@@ -22,7 +23,7 @@
   };
 
   const DEFAULTS = {
-    theme:'control',
+    theme:'classic',
     backgroundVisibility:100,
     panelOpacity:92,
     primaryColor:'#28ff66',
@@ -119,9 +120,12 @@
   function refreshThemeButtons(theme){
     document.querySelectorAll('[data-ref-interface]').forEach(button => {
       const active = button.dataset.refInterface === theme;
+      const locked = button.dataset.refInterface !== 'classic' && !premiumThemeAccess;
       button.classList.toggle('active',active);
+      button.classList.toggle('premium-locked',locked);
+      button.setAttribute('aria-disabled',String(locked));
       const action = button.querySelector('em');
-      if (action) action.textContent = active ? 'Actif' : 'Appliquer';
+      if (action) action.textContent = locked ? '🔒 Premium' : (active ? 'Actif' : 'Appliquer');
     });
   }
 
@@ -142,7 +146,13 @@
   }
 
   function applyTheme(value,save=true){
-    const theme = normalizeTheme(value);
+    const requested = normalizeTheme(value);
+    if (requested !== 'classic' && !premiumThemeAccess) {
+      if (save && typeof window.toast === 'function') window.toast('Les fonds personnalisés sont réservés aux comptes Premium',false);
+      refreshThemeButtons(DEFAULTS.theme);
+      return;
+    }
+    const theme = requested;
 
     document.body.removeAttribute('data-ref-interface');
     document.body.removeAttribute('data-ref-wallpaper');
@@ -287,6 +297,30 @@
   }
 
   window.applyReferenceInterface = applyTheme;
+  let premiumEntitlementLoaded = false;
+  window.setThemePremiumAccess = allowed => {
+    const next = !!allowed;
+    const changed = !premiumEntitlementLoaded || premiumThemeAccess !== next;
+    premiumEntitlementLoaded = true;
+    premiumThemeAccess = next;
+    window.ELBOT_PREMIUM_ACCESS = premiumThemeAccess;
+    const accessButton = document.getElementById('ref-personalization-button');
+    if (accessButton) {
+      accessButton.classList.toggle('premium-locked',!premiumThemeAccess);
+      accessButton.setAttribute('aria-disabled',String(!premiumThemeAccess));
+      const subtitle = accessButton.querySelector('small');
+      const arrow = accessButton.querySelector('em');
+      if (subtitle) subtitle.textContent = premiumThemeAccess ? 'Thème et apparence' : 'Réservé aux comptes Premium';
+      if (arrow) arrow.textContent = premiumThemeAccess ? '›' : '🔒';
+    }
+    if (!premiumThemeAccess && changed) {
+      saveState({theme:'classic'});
+      applyTheme('classic',false);
+      window.closeReferenceDrawers?.();
+    } else if (changed) loadAppearance();
+    refreshThemeButtons(readState().theme);
+    if (changed) window.dispatchEvent(new CustomEvent('elbot-premium-change',{detail:{premium:premiumThemeAccess}}));
+  };
   window.setReferenceBackgroundIntensity = applyBackgroundVisibility;
   window.setReferencePanelOpacity = applyPanelOpacity;
 
@@ -322,6 +356,17 @@
   window.applyReferenceBackground = () => {};
   window.loadReferenceAppearance = loadAppearance;
 
+  async function loadPremiumEntitlement(){
+    try {
+      const response = await fetch('/api/bot-identity',{cache:'no-store'});
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload.error || 'Accès indisponible');
+      window.setThemePremiumAccess(Boolean(payload.data?.premium));
+    } catch (_) {
+      window.setThemePremiumAccess(false);
+    }
+  }
+
   window.resetReferenceAppearance = () => {
     localStorage.removeItem(storageKey());
     LEGACY_KEYS.forEach(key => localStorage.removeItem(key));
@@ -330,9 +375,11 @@
   };
 
   if (document.readyState === 'loading'){
-    document.addEventListener('DOMContentLoaded',loadAppearance,{once:true});
+    document.addEventListener('DOMContentLoaded',()=>{loadAppearance();loadPremiumEntitlement()},{once:true});
   } else {
     loadAppearance();
+    loadPremiumEntitlement();
   }
+  setInterval(()=>{ if (!document.hidden) loadPremiumEntitlement(); },5000);
   window.addEventListener('pageshow',loadAppearance);
 })();
