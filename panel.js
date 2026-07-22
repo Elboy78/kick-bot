@@ -31,8 +31,8 @@ app.use(loadSession(db));
 // Les pages/API publiques de classement doivent uniquement consulter un tenant
 // existant. Un slug inventé ne doit jamais créer automatiquement un streamer.
 app.use((req, res, next) => {
-  req.publicTenantLookupOnly = /^\/classement\/[^/]+(?:\/)?(?:[?#].*)?$/.test(req.originalUrl || req.url || '')
-    || /^\/api\/public\/(?:leaderboard|levels|streamer)\/[^/?#]+/.test(req.originalUrl || req.url || '');
+  req.publicTenantLookupOnly = /^\/(?:classement|subgifts)\/[^/]+(?:\/)?(?:[?#].*)?$/.test(req.originalUrl || req.url || '')
+    || /^\/api\/public\/(?:leaderboard|subgifts|levels|streamer)\/[^/?#]+/.test(req.originalUrl || req.url || '');
   next();
 });
 app.use((req, res, next) => tenant.attachTenant(db, req, res, next));
@@ -367,6 +367,13 @@ app.get('/classement/:streamer', waitDB, (req, res) => {
   res.set('Cache-Control', 'no-store');
   res.sendFile(path.join(__dirname, 'public', 'classement.html'));
 });
+app.get('/subgifts/:streamer', waitDB, (req, res) => {
+  if (!req.streamer || tenant.normalizeSlug(req.params.streamer) !== req.streamer.slug) {
+    return res.status(404).send('Classement sub gifts introuvable');
+  }
+  res.set('Cache-Control', 'no-store');
+  res.sendFile(path.join(__dirname, 'public', 'subgifts.html'));
+});
 // Ancienne URL conservée pour compatibilité, redirigée vers l'URL publique canonique.
 app.get('/s/:streamer/classement', (req, res) => {
   res.redirect(301, `/classement/${encodeURIComponent(tenant.normalizeSlug(req.params.streamer))}`);
@@ -486,7 +493,9 @@ app.get('/api/community', waitDB, async (req, res) => {
 app.post('/api/admin/community/kick-gifts-import', waitDB, requireAuth, async (req, res) => {
   try {
     const rows = Array.isArray(req.body?.rows) ? req.body.rows : [];
-    const imported = await db.importCommunityGiftLeaderboard(rows, req.streamer?.id);
+    const authoritative = req.body?.authoritative === true;
+    const source = authoritative ? 'kick_leaderboard' : 'kick_history';
+    const imported = await db.importCommunityGiftLeaderboard(rows, req.streamer?.id, { authoritative, source });
     res.json({ success: true, imported });
   } catch (e) {
     console.error('[COMMUNAUTÉ] Import leaderboard Kick impossible:', e.message);
@@ -525,6 +534,38 @@ app.get('/api/public/leaderboard/:streamer', waitDB, async (req, res) => {
     res.json({ data });
   } catch (error) {
     res.status(500).json({ error: 'Impossible de charger le classement', data: [] });
+  }
+});
+
+app.get('/api/public/subgifts/:streamer', waitDB, async (req, res) => {
+  try {
+    const requestedSlug = tenant.normalizeSlug(req.params.streamer);
+    if (!req.streamer || req.streamer.slug !== requestedSlug) {
+      return res.status(404).json({ error:'Classement introuvable', data:[] });
+    }
+    const limit = Math.min(Math.max(parseInt(req.query.limit || '100',10) || 100,1),500);
+    const community = await db.getCommunityData(limit, req.streamer.id);
+    const rows = new Map();
+    for (const item of community.supporters || []) {
+      const username = String(item.username || '').trim().toLowerCase();
+      if (username) rows.set(username,{ username:item.username, gifts:Number(item.gifts||0), source:'events' });
+    }
+    for (const item of community.historicalSupporters || []) {
+      const username = String(item.username || '').trim().toLowerCase();
+      if (!username) continue;
+      const current = rows.get(username) || { username:item.username, gifts:0 };
+      current.gifts = Number(item.gifts_all_time || current.gifts || 0);
+      current.source = item.source || 'kick';
+      rows.set(username,current);
+    }
+    const data = [...rows.values()].filter(item=>item.gifts>0)
+      .sort((a,b)=>b.gifts-a.gifts||String(a.username).localeCompare(String(b.username),'fr'))
+      .slice(0,limit).map((item,index)=>({...item,rank:index+1}));
+    res.set('Cache-Control','no-store');
+    res.json({ data, updatedAt:new Date().toISOString() });
+  } catch (error) {
+    console.error('[SUBGIFTS PUBLIC]',error.message);
+    res.status(500).json({ error:'Impossible de charger le classement',data:[] });
   }
 });
 
