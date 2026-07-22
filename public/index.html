@@ -4720,9 +4720,9 @@ body.ref-theme-transition *:after{
 
           <div id="oauth-disconnected-block" style="display:none">
             <div style="font-size:10px;color:var(--muted);margin-bottom:10px;line-height:1.6">
-              Connecte le compte du bot une seule fois via l'authentification officielle Kick — le token se renouvellera ensuite automatiquement, sans plus jamais avoir à le faire à la main.
+              Connecte le compte streamer propriétaire de cette chaîne via l’authentification officielle Kick. Ne connecte pas ElBotApp ici.
             </div>
-            <button class="btnx btn-outline" style="width:100%;justify-content:center" onclick="window.location.href='/auth/login'">🔗 Connecter le compte Kick</button>
+            <button type="button" class="btnx btn-outline" id="oauth-connect-streamer-btn" style="width:100%;justify-content:center" onclick="startStreamerOAuthReconnect()">🔗 Connecter le compte streamer Kick</button>
           </div>
 
           <div id="oauth-not-configured-block" style="display:none">
@@ -7838,24 +7838,11 @@ async function checkBotTokenStatus() {
     const r = await fetch('/api/bot-status');
     const d = await r.json();
     const banner = document.getElementById('token-alert-banner');
-    const badge  = document.getElementById('token-status-badge');
 
     if (d.tokenExpired) {
       if (banner) banner.style.display = 'flex';
-      if (badge) {
-        badge.textContent = '🔴 Expiré';
-        badge.style.background = 'rgba(255,59,95,.15)';
-        badge.style.color = '#ff3b5f';
-        badge.style.border = '1px solid rgba(255,59,95,.35)';
-      }
     } else {
       if (banner) banner.style.display = 'none';
-      if (badge) {
-        badge.textContent = '🟢 Actif';
-        badge.style.background = 'var(--accent-bg)';
-        badge.style.color = 'var(--accent)';
-        badge.style.border = '1px solid var(--accent-brd)';
-      }
     }
 
     const botLiveEl = document.getElementById('ic-bot-live-status');
@@ -7881,6 +7868,7 @@ async function loadOAuthStatus() {
     const connectedBlock    = document.getElementById('oauth-connected-block');
     const disconnectedBlock = document.getElementById('oauth-disconnected-block');
     const notConfiguredBlock = document.getElementById('oauth-not-configured-block');
+    const badge = document.getElementById('token-status-badge');
     if (!connectedBlock) return;
 
     connectedBlock.style.display = 'none';
@@ -7889,12 +7877,22 @@ async function loadOAuthStatus() {
 
     if (!d.configured) {
       notConfiguredBlock.style.display = 'block';
+      if(badge){badge.textContent='⚠️ Non configuré';badge.style.background='rgba(245,158,11,.12)';badge.style.color='#fbbf24';badge.style.border='1px solid rgba(245,158,11,.3)'}
     } else if (d.connected) {
       connectedBlock.style.display = 'block';
+      if(badge){badge.textContent='🟢 Streamer connecté';badge.style.background='var(--accent-bg)';badge.style.color='var(--accent)';badge.style.border='1px solid var(--accent-brd)'}
     } else {
       disconnectedBlock.style.display = 'block';
+      if(badge){badge.textContent='⚪ À reconnecter';badge.style.background='rgba(148,163,184,.10)';badge.style.color='var(--muted)';badge.style.border='1px solid var(--brd)'}
     }
   } catch(e) {}
+}
+
+function startStreamerOAuthReconnect(){
+  const btn=document.getElementById('oauth-connect-streamer-btn');
+  if(btn){btn.disabled=true;btn.textContent='Redirection vers Kick…'}
+  const returnTo=location.pathname+location.search;
+  window.location.assign('/auth/login?force=1&returnTo='+encodeURIComponent(returnTo));
 }
 
 async function disconnectOAuth() {
@@ -7956,9 +7954,9 @@ window.addEventListener('elbot-premium-change',()=>loadBotIdentity());
 setInterval(()=>{if(!document.hidden)loadBotIdentity()},10000);
 
 async function loadKickTimeoutReward(){const status=document.getElementById('kick-to-status');if(!status)return;try{const r=await fetch('/api/channel-rewards/timeout',{cache:'no-store'}),j=await r.json();if(!r.ok)throw new Error(j.error||'Chargement impossible');const d=j.data||{};document.getElementById('kick-to-enabled').checked=!!d.enabled;document.getElementById('kick-to-title').value=d.title||'Timeout un viewer';document.getElementById('kick-to-cost').value=d.cost||1000;document.getElementById('kick-to-duration').value=d.duration||300;status.innerHTML=d.rewardId?`✅ Récompense liée à ElBot · <b>${esc(d.rewardId)}</b>`:(d.oauthConnected?'Prête à être créée sur Kick.':'⚠️ Reconnecte ton compte Kick avant la création.')}catch(e){status.textContent=e.message}}
-async function setupKickTimeoutReward(){const status=document.getElementById('kick-to-status');status.textContent='Configuration sur Kick…';const body={enabled:document.getElementById('kick-to-enabled').checked,title:document.getElementById('kick-to-title').value,cost:Number(document.getElementById('kick-to-cost').value),duration:Number(document.getElementById('kick-to-duration').value)};try{const r=await fetch('/api/admin/channel-rewards/timeout/setup',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}),j=await r.json();if(!r.ok)throw new Error(j.error||'Configuration impossible');status.textContent='✅ Récompense créée et reliée à ElBot';toast('Récompense points Kick enregistrée ✓')}catch(e){status.innerHTML=`❌ ${esc(e.message)}<br><button class="btnx btn-outline btn-sm" style="margin-top:7px" onclick="window.location.href='/auth/login'">Reconnecter le compte streamer Kick</button>`;toast(e.message,false)}}
+async function setupKickTimeoutReward(){const status=document.getElementById('kick-to-status');status.textContent='Configuration sur Kick…';const body={enabled:document.getElementById('kick-to-enabled').checked,title:document.getElementById('kick-to-title').value,cost:Number(document.getElementById('kick-to-cost').value),duration:Number(document.getElementById('kick-to-duration').value)};try{const r=await fetch('/api/admin/channel-rewards/timeout/setup',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}),j=await r.json();if(!r.ok)throw new Error(j.error||'Configuration impossible');status.textContent='✅ Récompense créée et reliée à ElBot';toast('Récompense points Kick enregistrée ✓')}catch(e){status.innerHTML=`❌ ${esc(e.message)}<br><button class="btnx btn-outline btn-sm" style="margin-top:7px" onclick="startStreamerOAuthReconnect()">Reconnecter le compte streamer Kick</button>`;toast(e.message,false)}}
 async function loadKickRewards(){try{const r=await fetch('/api/channel-rewards',{cache:'no-store'}),j=await r.json();if(!r.ok)throw new Error(j.error||'Chargement impossible');for(const d of j.data?.rewards||[]){const p=`kick-${d.type}`;document.getElementById(`${p}-enabled`).checked=!!d.enabled;document.getElementById(`${p}-title`).value=d.title||'';document.getElementById(`${p}-cost`).value=d.cost||1;if(d.type==='timeout')document.getElementById(`${p}-duration`).value=d.duration||300;document.getElementById(`${p}-status`).textContent=d.rewardId?'✅ Récompense liée et prête':(j.data.oauthConnected?'Prête à être créée':'⚠️ Reconnecte le compte streamer Kick')}}catch(e){['timeout','counter','message'].forEach(t=>{const x=document.getElementById(`kick-${t}-status`);if(x)x.textContent=e.message})}}
-async function setupKickReward(type){const p=`kick-${type}`,status=document.getElementById(`${p}-status`),body={enabled:document.getElementById(`${p}-enabled`).checked,title:document.getElementById(`${p}-title`).value,cost:Number(document.getElementById(`${p}-cost`).value)};if(type==='timeout')body.duration=Number(document.getElementById(`${p}-duration`).value);status.textContent='Configuration sur Kick…';try{const r=await fetch(`/api/admin/channel-rewards/${type}/setup`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}),j=await r.json();if(!r.ok)throw new Error(j.error||'Configuration impossible');status.textContent='✅ Récompense créée et reliée à ElBot';toast('Interaction points Kick enregistrée ✓')}catch(e){status.innerHTML=`❌ ${esc(e.message)}<br><button class="btnx btn-outline btn-sm" style="margin-top:7px" onclick="window.location.href='/auth/login'">Reconnecter Kick</button>`;toast(e.message,false)}}
+async function setupKickReward(type){const p=`kick-${type}`,status=document.getElementById(`${p}-status`),body={enabled:document.getElementById(`${p}-enabled`).checked,title:document.getElementById(`${p}-title`).value,cost:Number(document.getElementById(`${p}-cost`).value)};if(type==='timeout')body.duration=Number(document.getElementById(`${p}-duration`).value);status.textContent='Configuration sur Kick…';try{const r=await fetch(`/api/admin/channel-rewards/${type}/setup`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}),j=await r.json();if(!r.ok)throw new Error(j.error||'Configuration impossible');status.textContent='✅ Récompense créée et reliée à ElBot';toast('Interaction points Kick enregistrée ✓')}catch(e){status.innerHTML=`❌ ${esc(e.message)}<br><button class="btnx btn-outline btn-sm" style="margin-top:7px" onclick="startStreamerOAuthReconnect()">Reconnecter Kick</button>`;toast(e.message,false)}}
 let KICK_CUSTOM_CACHE=[];
 function updateKickCustomFields(){const a=document.getElementById('kick-custom-action')?.value;document.getElementById('kick-custom-amount-wrap').style.display=a==='meme_points'?'block':'none';const response=document.getElementById('kick-custom-response');if(response)response.disabled=a==='meme_points'}
 function resetKickCustomForm(){document.getElementById('kick-custom-id').value='';document.getElementById('kick-custom-title').value='';document.getElementById('kick-custom-cost').value=500;document.getElementById('kick-custom-action').value='chat_fixed';document.getElementById('kick-custom-description').value='';document.getElementById('kick-custom-response').value='';document.getElementById('kick-custom-amount').value=100;document.getElementById('kick-custom-enabled').checked=true;document.getElementById('kick-custom-save').textContent='✨ Créer l’interaction';updateKickCustomFields()}

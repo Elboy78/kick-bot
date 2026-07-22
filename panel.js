@@ -2761,13 +2761,14 @@ app.get('/auth/bot-identity/login', requireAuth, requireTenant, waitDB, async (r
 app.get('/auth/login', (req, res) => {
   // Une session encore valide ouvre directement le panel : aucune nouvelle
   // autorisation Kick n'est demandée tant que l'utilisateur ne se déconnecte pas.
-  if (req.authStreamer?.slug) {
+  const forceReconnect = ['1','true','yes'].includes(String(req.query?.force||'').toLowerCase());
+  if (req.authStreamer?.slug && !forceReconnect) {
     return res.redirect(`/s/${encodeURIComponent(req.authStreamer.slug)}/dashboard`);
   }
   if (!kickOAuth.isConfigured()) {
     return res.status(400).send('KICK_CLIENT_ID, KICK_CLIENT_SECRET ou KICK_REDIRECT_URI manquant dans le fichier .env.');
   }
-  const url = kickOAuth.getAuthorizationUrl(null, { mode: 'streamer_login', returnTo: '' });
+  const url = kickOAuth.getAuthorizationUrl(null, { mode: 'streamer_login', returnTo: String(req.query?.returnTo||'').slice(0,200) });
   console.log('[OAUTH LOGIN V2] Connexion streamer Kick lancée');
   return res.redirect(url);
 });
