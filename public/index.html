@@ -828,7 +828,7 @@ body.light .card,body.light .panel,body.light .widget-engine-card{background:lin
 
   <!-- ══ COMMUNAUTÉ ══ -->
   <div class="page" id="page-communaute">
-    <div class="header"><div><h1>Communauté</h1><p>Mémoire de la chaîne, soutiens et followers connus</p></div><button class="btn" id="community-refresh-btn" onclick="refreshCommunity()">↻ Actualiser</button></div>
+    <div class="header"><div><h1>Communauté</h1><p>Mémoire de la chaîne, soutiens et followers connus</p></div><div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btnx btn-outline" onclick="copySubgiftsLeaderboardLink()">🔗 Lien Top Sub Gifts</button><button class="btn" id="community-refresh-btn" onclick="refreshCommunity()">↻ Actualiser</button></div></div>
     <div class="g3" style="margin-bottom:14px">
       <div class="panel"><h3>👥 Viewers connus</h3><div id="community-known-viewers" style="font-size:28px;font-weight:900;color:var(--accent)">—</div></div>
       <div class="panel"><h3>💚 Follows datés</h3><div id="community-known-followers" style="font-size:28px;font-weight:900;color:#22c55e">—</div></div>
@@ -5498,6 +5498,13 @@ async function copyPublicLeaderboardLink(){
   } catch(e) {
     window.prompt('Copie le lien public du classement :', url);
   }
+}
+async function copySubgiftsLeaderboardLink(){
+  const slug=String(CURRENT_STREAMER_SLUG||activeKickChannel||'').trim().toLowerCase();
+  if(!slug)return toast('Chaîne introuvable',false);
+  const url=`${location.origin}/subgifts/${encodeURIComponent(slug)}`;
+  try{await navigator.clipboard.writeText(url);toast('Lien public Top Sub Gifts copié ✓')}
+  catch(_){window.prompt('Copie ce lien dans ton panneau Kick :',url)}
 }
 
 async function refreshLeaderboard() {
