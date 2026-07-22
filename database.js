@@ -1768,6 +1768,14 @@ async function importCommunityGiftLeaderboard(rows = [], streamerId = null, opti
           ELSE community_support_snapshots.gifts_all_time END,
         source = excluded.source, synced_at = excluded.synced_at`,
       [sid, username, gifts, source, authoritative ? 1 : 0]);
+    if (authoritative) {
+      const adjusted = await upsertCommunityGiftBadge(username, gifts, sid);
+      if (adjusted.gifts !== gifts) {
+        await run(`UPDATE community_support_snapshots
+          SET source = 'kick_leaderboard_events', synced_at = datetime('now')
+          WHERE streamer_id = ? AND username = ?`, [sid, username]);
+      }
+    }
     imported++;
   }
   return imported;
@@ -1783,6 +1791,32 @@ async function upsertCommunityGiftBadge(username, giftCount, streamerId = null) 
   const normalizedCount = Math.max(0, Math.min(100000000, parseInt(giftCount, 10) || 0));
   if (!normalizedUsername || !normalizedCount) return { changed: false, gifts: 0 };
 
+  // Kick peut continuer à exposer pendant plusieurs heures un badge absolu
+  // ancien. Si nous possédons exactement ce même badge en cache, on ajoute
+  // uniquement les vrais événements Kick arrivés après sa synchronisation.
+  // Les événements legacy sont volontairement exclus pour éviter tout doublon.
+  let effectiveCount = normalizedCount;
+  const cachedViewer = await get(`SELECT badges_json,badges_synced_at FROM viewers
+    WHERE COALESCE(streamer_id,1) = ? AND username = ?`, [sid, normalizedUsername]);
+  if (cachedViewer?.badges_synced_at) {
+    let cachedBadges = [];
+    try { cachedBadges = JSON.parse(cachedViewer.badges_json || '[]'); } catch (_) {}
+    const cachedGiftBadge = (Array.isArray(cachedBadges) ? cachedBadges : []).find(item =>
+      ['sub_gifter','subgifter','subscription_gifter','gift_sub_gifter'].includes(
+        String(item?.type||item?.slug||item?.name||'').toLowerCase().replace(/[\s-]+/g,'_')));
+    const cachedGiftCount = parseInt(String(cachedGiftBadge?.count ?? cachedGiftBadge?.gift_count ??
+      cachedGiftBadge?.gifts ?? cachedGiftBadge?.quantity ?? cachedGiftBadge?.value ?? '').replace(/[^0-9]/g,''),10);
+    if (Number.isSafeInteger(cachedGiftCount) && cachedGiftCount === normalizedCount) {
+      const newerEvents = await get(`SELECT COALESCE(SUM(amount),0) AS gifts
+        FROM community_events
+        WHERE streamer_id = ? AND event_type = 'gift' AND source = 'kick_event'
+          AND LOWER(COALESCE(gifter,username)) = ?
+          AND julianday(occurred_at) > julianday(?)`,
+        [sid, normalizedUsername, cachedViewer.badges_synced_at]);
+      effectiveCount = Math.min(100000000, normalizedCount + Math.max(0, Number(newerEvents?.gifts || 0)));
+    }
+  }
+
   const previous = await get(`SELECT gifts_all_time FROM community_support_snapshots
     WHERE streamer_id = ? AND username = ?`, [sid, normalizedUsername]);
   const previousCount = Math.max(0, Number(previous?.gifts_all_time || 0));
@@ -1794,11 +1828,11 @@ async function upsertCommunityGiftBadge(username, giftCount, streamerId = null) 
       gifts_all_time = excluded.gifts_all_time,
       source = excluded.source,
       synced_at = excluded.synced_at`,
-    [sid, normalizedUsername, normalizedCount]);
+    [sid, normalizedUsername, effectiveCount]);
 
   return {
-    changed: normalizedCount !== previousCount,
-    gifts: normalizedCount,
+    changed: effectiveCount !== previousCount,
+    gifts: effectiveCount,
     previous: previousCount
   };
 }
@@ -1806,7 +1840,7 @@ async function upsertCommunityGiftBadge(username, giftCount, streamerId = null) 
 async function reconcileStoredCommunityGiftBadges(streamerId = null) {
   const sid=Number(streamerId||scopedStreamerId());
   const rows=await all(`SELECT v.username,v.badges_json,v.badges_synced_at,
-      s.synced_at AS snapshot_synced_at
+      s.synced_at AS snapshot_synced_at,s.source AS snapshot_source
     FROM viewers v
     LEFT JOIN community_support_snapshots s
       ON s.streamer_id = ? AND s.username = LOWER(v.username)
@@ -1814,8 +1848,8 @@ async function reconcileStoredCommunityGiftBadges(streamerId = null) {
   for(const row of rows){
     // Un ancien badge mis en cache ne doit jamais annuler une correction plus
     // récente récupérée depuis le leaderboard Kick.
-    if(row.snapshot_synced_at&&row.badges_synced_at&&
-      new Date(String(row.badges_synced_at).replace(' ','T')+'Z').getTime()<
+    if(row.snapshot_source==='kick_leaderboard'&&row.snapshot_synced_at&&row.badges_synced_at&&
+      new Date(String(row.badges_synced_at).replace(' ','T')+'Z').getTime()<=
       new Date(String(row.snapshot_synced_at).replace(' ','T')+'Z').getTime())continue;
     let badges=[];try{badges=JSON.parse(row.badges_json||'[]')}catch(_){continue}
     const badge=(Array.isArray(badges)?badges:[]).find(item=>['sub_gifter','subgifter','subscription_gifter','gift_sub_gifter'].includes(String(item?.type||item?.slug||item?.name||'').toLowerCase().replace(/[\s-]+/g,'_')));
