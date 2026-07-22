@@ -1460,6 +1460,12 @@ async function moderateUser(username, kickId, action, duration, word) {
     return false;
   }
 }
+shared.registerModerateUser((username,kickId,action,duration,reason,requestedContext=null)=>{
+  const context = requestedContext?.streamerId
+    ? ([...botChannelState.chatrooms.values()].find(item=>Number(item.streamerId)===Number(requestedContext.streamerId)) || requestedContext)
+    : currentChatContext();
+  return withChatContext(context,()=>moderateUser(username,kickId,action,duration,reason));
+});
 
 // ─── Token actif (OAuth officiel en priorité, sinon token manuel legacy) ──────
 

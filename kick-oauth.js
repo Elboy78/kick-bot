@@ -21,6 +21,7 @@ const STREAMER_EVENT_TYPES = [
   'channel.subscription.new',
   'channel.subscription.renewal',
   'channel.subscription.gifts',
+  'channel.reward.redemption.updated',
 ];
 
 let pendingPKCE = null;
@@ -46,7 +47,10 @@ function safeJson(value, fallback = {}) {
 
 function normalizeScopes(scopes, includeEvents = true) {
   const requested = String(scopes || process.env.KICK_OAUTH_SCOPES || 'user:read channel:read chat:write');
-  return [...new Set(`${requested}${includeEvents?' events:subscribe':''}`.trim().split(/\s+/))].join(' ');
+  const required = includeEvents
+    ? 'events:subscribe channel:rewards:read channel:rewards:write moderation:ban'
+    : '';
+  return [...new Set(`${requested} ${required}`.trim().split(/\s+/))].join(' ');
 }
 
 async function subscribeStreamerEvents(accessToken, broadcasterUserId) {

@@ -355,7 +355,7 @@
       const response = await fetch('/api/bot-identity',{cache:'no-store'});
       const payload = await response.json();
       if (!response.ok) throw new Error(payload.error || 'Accès indisponible');
-      window.setThemePremiumAccess(Boolean(payload.data?.premium || payload.data?.platformAdmin));
+      window.setThemePremiumAccess(Boolean(payload.data?.premium));
     } catch (_) {
       window.setThemePremiumAccess(false);
     }

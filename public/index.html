@@ -4665,6 +4665,16 @@ body.ref-theme-transition *:after{
           <div id="bot-identity-message" style="margin-top:9px"></div>
         </div>
 
+        <div class="panel" style="margin-bottom:14px" id="kick-timeout-reward-card">
+          <h3>🎟️ Récompense points Kick · Timeout</h3>
+          <div style="font-size:9px;color:var(--muted);line-height:1.55;margin-bottom:10px">ElBot crée la récompense sur ta chaîne. Le viewer indique un pseudo ; les streamers et modérateurs restent protégés.</div>
+          <label style="display:flex;align-items:center;gap:8px;margin-bottom:9px"><input type="checkbox" id="kick-to-enabled"> Activer la récompense</label>
+          <label class="lbl">Nom de la récompense</label><input class="inp" id="kick-to-title" value="Timeout un viewer" maxlength="50">
+          <div class="form-row" style="margin-top:8px"><div><label class="lbl">Coût en points Kick</label><input class="inp" type="number" id="kick-to-cost" min="1" value="1000"></div><div><label class="lbl">Durée du timeout (secondes)</label><input class="inp" type="number" id="kick-to-duration" min="60" max="86400" value="300"></div></div>
+          <button class="btnx btn-outline" style="width:100%;justify-content:center;margin-top:10px" onclick="setupKickTimeoutReward()">⚡ Créer ou mettre à jour sur Kick</button>
+          <div id="kick-to-status" style="font-size:9px;color:var(--muted);margin-top:8px;line-height:1.5">Chargement…</div>
+        </div>
+
         <div class="panel" style="margin-bottom:14px" id="token-card">
           <h3>🔑 Connexion Kick <span id="token-status-badge" style="font-size:9px;font-weight:700;padding:3px 9px;border-radius:20px"></span></h3>
 
@@ -7858,7 +7868,7 @@ async function loadBotIdentity() {
     const payload = await r.json();
     if (!r.ok) throw new Error(payload.error || 'Identité indisponible');
     const d = payload.data || {};
-    window.setThemePremiumAccess?.(Boolean(d.premium || d.platformAdmin));
+    window.setThemePremiumAccess?.(Boolean(d.premium));
     const assigned = d.assigned;
     const connected = assigned?.status === 'connected';
     planBadge.textContent = d.premium ? 'PREMIUM' : 'STANDARD';
@@ -7894,6 +7904,9 @@ async function loadBotIdentity() {
   }
 }
 
+async function loadKickTimeoutReward(){const status=document.getElementById('kick-to-status');if(!status)return;try{const r=await fetch('/api/channel-rewards/timeout',{cache:'no-store'}),j=await r.json();if(!r.ok)throw new Error(j.error||'Chargement impossible');const d=j.data||{};document.getElementById('kick-to-enabled').checked=!!d.enabled;document.getElementById('kick-to-title').value=d.title||'Timeout un viewer';document.getElementById('kick-to-cost').value=d.cost||1000;document.getElementById('kick-to-duration').value=d.duration||300;status.innerHTML=d.rewardId?`✅ Récompense liée à ElBot · <b>${esc(d.rewardId)}</b>`:(d.oauthConnected?'Prête à être créée sur Kick.':'⚠️ Reconnecte ton compte Kick avant la création.')}catch(e){status.textContent=e.message}}
+async function setupKickTimeoutReward(){const status=document.getElementById('kick-to-status');status.textContent='Configuration sur Kick…';const body={enabled:document.getElementById('kick-to-enabled').checked,title:document.getElementById('kick-to-title').value,cost:Number(document.getElementById('kick-to-cost').value),duration:Number(document.getElementById('kick-to-duration').value)};try{const r=await fetch('/api/admin/channel-rewards/timeout/setup',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}),j=await r.json();if(!r.ok)throw new Error(j.error||'Configuration impossible');status.textContent='✅ Récompense créée et reliée à ElBot';toast('Récompense points Kick enregistrée ✓')}catch(e){status.innerHTML=`❌ ${esc(e.message)}<br><button class="btnx btn-outline btn-sm" style="margin-top:7px" onclick="window.location.href='/auth/login'">Reconnecter le compte streamer Kick</button>`;toast(e.message,false)}}
+
 async function assignBotIdentity(choice) {
   if (!confirm(`Confirmer le changement vers ${choice === 'elbot' ? 'ElBot' : 'ton bot personnalisé'} ? L’autre bot ne pourra plus écrire sur la chaîne.`)) return;
   const r = await fetch('/api/bot-identity/assign', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ choice }) });
@@ -7901,6 +7914,7 @@ async function assignBotIdentity(choice) {
   if (!r.ok) return showInline('bot-identity-message', d.error || 'Changement impossible', false);
   toast(`${d.assigned.displayName} est maintenant le seul bot autorisé`);
   loadBotIdentity();
+  loadKickTimeoutReward();
 }
 
 function connectBotIdentity(choice) {

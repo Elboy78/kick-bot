@@ -10,6 +10,7 @@ let _songRequestSkipVoter = null;
 let _chatOverlayEmitter = null;
 let _memeTrigger = null;
 let _announcementReloader = null;
+let _moderateUser = null;
 
 module.exports = {
   registerSendChat(fn) { _sendChat = fn; },
@@ -53,6 +54,12 @@ module.exports = {
   registerAnnouncementReloader(fn) { _announcementReloader = fn; },
   reloadAnnouncements() {
     if (_announcementReloader) return _announcementReloader();
+    return Promise.resolve(false);
+  },
+
+  registerModerateUser(fn) { _moderateUser = fn; },
+  moderateUser(username, kickId, action, duration, reason, ctx = null) {
+    if (_moderateUser) return _moderateUser(username, kickId, action, duration, reason, ctx);
     return Promise.resolve(false);
   },
 

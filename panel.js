@@ -689,7 +689,7 @@ async function recordSubEvent(type, payload = {}, source = null) {
     }
 
     state.latest = [event, ...state.latest].slice(0, 12);
-    await db.addCommunityEvent({
+    const communityEvent = await db.addCommunityEvent({
       type,
       username: event.username,
       gifter: event.gifter,
@@ -709,6 +709,15 @@ async function recordSubEvent(type, payload = {}, source = null) {
     ]);
     tm.emit('subcounter-update', state);
     tm.emit('subgoal-update', publicSubGoalState(state));
+    if (communityEvent?.inserted) {
+      tm.emit('community-update', {
+        type,
+        username: event.username,
+        gifter: event.gifter,
+        count: amount,
+        at: event.at
+      });
+    }
     console.log(`[SUBCOUNTER:${tm.slug}] ${type} +${amount} → total=${state.total} session=${state.session}`);
     return state;
   } catch(e) {
@@ -810,6 +819,44 @@ async function sendAnnouncementToChat(message, logLabel) {
   }
 }
 function emitDashboardActivity(tm,payload){tm.emit('dashboard-activity',{id:`${Date.now()}_${Math.random().toString(36).slice(2,7)}`,at:new Date().toISOString(),...payload})}
+async function settleKickReward(streamerId, redemptionId, accepted) {
+  const token = await kickOAuth.getValidAccessToken(streamerId);
+  if (!token) throw new Error('Reconnecte le compte streamer Kick pour gérer les récompenses.');
+  const action = accepted ? 'accept' : 'reject';
+  await axios.post(`https://api.kick.com/public/v1/channels/rewards/redemptions/${action}`, { ids:[String(redemptionId)] }, {
+    headers:{Authorization:`Bearer ${token}`,'Content-Type':'application/json',Accept:'application/json'}, timeout:12000
+  });
+}
+async function processTimeoutReward(tm, data) {
+  const enabled = (await tm.getSetting('kick_timeout_reward_enabled','0')) === '1';
+  const configuredId = String(await tm.getSetting('kick_timeout_reward_id','')).trim();
+  const rewardId = String(data?.reward?.id || '').trim();
+  const status = String(data?.status || 'pending').toLowerCase();
+  if (!enabled || !configuredId || rewardId !== configuredId || status !== 'pending') return {ok:true,ignored:true,eventType:'channel.reward.redemption.updated'};
+  const redemptionId = String(data?.id || '').trim();
+  const redeemer = String(data?.redeemer?.username || 'viewer').trim().replace(/^@+/, '');
+  const target = String(data?.user_input || '').trim().replace(/^@+/, '').replace(/[^a-zA-Z0-9_]/g,'').slice(0,25);
+  const duration = Math.max(60,Math.min(86400,parseInt(await tm.getSetting('kick_timeout_reward_duration','300'))||300));
+  let rejection = '';
+  if (!redemptionId || !target) rejection = 'Pseudo cible manquant ou invalide';
+  if (target.toLowerCase() === String(tm.slug||'').toLowerCase()) rejection = 'Le streamer est protégé';
+  if (target.toLowerCase() === redeemer.toLowerCase()) rejection = 'Un viewer ne peut pas se cibler lui-même';
+  const viewer = target ? await db.getViewerForStreamer(target,tm.streamerId).catch(()=>null) : null;
+  let badges=[];try{badges=JSON.parse(viewer?.badges_json||'[]')}catch(_){}
+  if (badges.some(b=>/moderator|broadcaster/i.test(String(b?.type||b?.text||'')))) rejection = 'Les modérateurs et le streamer sont protégés';
+  if (!viewer?.kick_user_id) rejection = 'Ce viewer doit avoir parlé au moins une fois dans le chat';
+  if (rejection) {
+    if (redemptionId) await settleKickReward(tm.streamerId,redemptionId,false);
+    console.log(`[REWARD TO:${tm.slug}] Refus ${redeemer} → ${target||'?'}: ${rejection}`);
+    return {ok:true,rejected:true,reason:rejection,eventType:'channel.reward.redemption.updated'};
+  }
+  const success = await shared.moderateUser(target,viewer.kick_user_id,'timeout',duration,`Récompense Kick achetée par ${redeemer}`,{streamerId:tm.streamerId,slug:tm.slug});
+  await settleKickReward(tm.streamerId,redemptionId,!!success);
+  if (!success) throw new Error(`Le timeout de @${target} a échoué; la récompense a été remboursée.`);
+  await db.addModerationLog('timeout',target,duration,`Récompense points Kick par ${redeemer}`,'',redeemer).catch(()=>{});
+  console.log(`[REWARD TO:${tm.slug}] ${redeemer} → ${target} (${duration}s)`);
+  return {ok:true,accepted:true,target,duration,eventType:'channel.reward.redemption.updated'};
+}
 async function processKickEvent(eventTypeRaw, payload = {}) {
   const eventContext = payload?.__streamerContext || payload?.streamer || null;
   const tm = getSubCounterManager(eventContext);
@@ -823,6 +870,8 @@ async function processKickEvent(eventTypeRaw, payload = {}) {
   if (semantic&&processedKickEventSemantics.has(semantic)) return {ok:true,duplicate:true,eventType};
   processedKickEvents.set(dedupe, Date.now());
   if(semantic)processedKickEventSemantics.set(semantic,Date.now());
+
+  if (eventType === 'channel.reward.redemption.updated') return processTimeoutReward(tm,data);
 
   if (eventType === 'channel.followed') {
     const username = pick(
@@ -2695,7 +2744,7 @@ app.get('/auth/callback', async (req, res) => {
     if(mode==='meme_moderator_login'){
       const streamerId=Number(token.meta?.streamerId),streamer=await db.getStreamerById(streamerId);
       if(!streamer)throw new Error('Chaîne inconnue.');
-      if(!await verifyMemeModerator(streamer,username))throw new Error(`@${username} n’est pas modérateur de la chaîne ${streamer.slug}.`);
+      if(!await verifyMemeModerator(streamer,username,kickUser.id||''))throw new Error(`@${username} n’est pas modérateur de la chaîne ${streamer.slug}.`);
       const identity=await db.createMemeAuthSession(streamerId,kickUser.id||'',username,'moderator');
       res.cookie(MEME_AUTH_COOKIE,identity.session_token,memeAuthCookieOptions(req));
       return res.redirect(`/memes-moderation/${encodeURIComponent(streamer.slug)}`);
@@ -2877,6 +2926,49 @@ app.get('/api/bot-identity', requireAuth, requireTenant, waitDB, async (req, res
       lockedToBot7up: options.lockedToBot7up
     }});
   } catch (e) { res.status(500).json({ error:e.message }); }
+});
+
+app.get('/api/channel-rewards/timeout',requireAuth,requireTenant,waitDB,async(req,res)=>{
+  try{
+    const tm=createTenantManager({db,io,req});
+    res.set('Cache-Control','no-store');
+    res.json({data:{
+      enabled:(await tm.getSetting('kick_timeout_reward_enabled','0'))==='1',
+      rewardId:await tm.getSetting('kick_timeout_reward_id',''),
+      title:await tm.getSetting('kick_timeout_reward_title','Timeout un viewer'),
+      cost:parseInt(await tm.getSetting('kick_timeout_reward_cost','1000'))||1000,
+      duration:parseInt(await tm.getSetting('kick_timeout_reward_duration','300'))||300,
+      oauthConnected:await kickOAuth.isConnected(tm.streamerId)
+    }});
+  }catch(e){res.status(500).json({error:e.message})}
+});
+app.post('/api/admin/channel-rewards/timeout/setup',requireAuth,requireTenant,waitDB,async(req,res)=>{
+  try{
+    const tm=createTenantManager({db,io,req}),token=await kickOAuth.getValidAccessToken(tm.streamerId);
+    if(!token)return res.status(409).json({error:'Reconnecte le compte streamer Kick pour autoriser les récompenses de chaîne.'});
+    const title=String(req.body?.title||'Timeout un viewer').trim().slice(0,50)||'Timeout un viewer';
+    const cost=Math.max(1,Math.min(10000000,parseInt(req.body?.cost)||1000));
+    const duration=Math.max(60,Math.min(86400,parseInt(req.body?.duration)||300));
+    const enabled=req.body?.enabled!==false,rewardId=String(await tm.getSetting('kick_timeout_reward_id','')).trim();
+    const body={title,cost,is_enabled:enabled,is_user_input_required:true,should_redemptions_skip_request_queue:false,background_color:'#168cff',description:`Choisis le pseudo du viewer à timeout pendant ${duration} secondes.`};
+    const headers={Authorization:`Bearer ${token}`,'Content-Type':'application/json',Accept:'application/json'};
+    let reward;
+    if(rewardId){
+      try{const response=await axios.patch(`https://api.kick.com/public/v1/channels/rewards/${rewardId}`,body,{headers,timeout:12000});reward=response.data?.data||response.data}
+      catch(e){if(e.response?.status!==404)throw e}
+    }
+    if(!reward){const response=await axios.post('https://api.kick.com/public/v1/channels/rewards',body,{headers,timeout:12000});reward=response.data?.data||response.data}
+    const id=String(reward?.id||rewardId||'');if(!id)throw new Error('Kick n’a renvoyé aucun identifiant de récompense.');
+    await Promise.all([
+      tm.setSetting('kick_timeout_reward_enabled',enabled?'1':'0'),tm.setSetting('kick_timeout_reward_id',id),
+      tm.setSetting('kick_timeout_reward_title',title),tm.setSetting('kick_timeout_reward_cost',String(cost)),tm.setSetting('kick_timeout_reward_duration',String(duration))
+    ]);
+    res.json({success:true,data:{enabled,rewardId:id,title,cost,duration}});
+  }catch(e){
+    const detail=e.response?.data?.message||e.response?.data?.error||e.message;
+    const scope=/scope|forbidden|403/i.test(String(detail))?'Reconnecte le compte streamer Kick afin d’accorder les droits Récompenses et Modération.':detail;
+    res.status(e.response?.status===403?409:500).json({error:scope});
+  }
 });
 
 app.post('/api/bot-identity/assign', requireAuth, requireTenant, waitDB, async (req, res) => {
@@ -3671,16 +3763,46 @@ async function memeAccessAuthorized(req,access,token){
   return !!access?.kick_user_id;
 }
 function profileBadges(payload){
-  const found=[];const visit=(value,key='')=>{if(!value||typeof value!=='object')return;if(Array.isArray(value)){if(/badge/i.test(key))found.push(...value);else value.forEach(v=>visit(v,key));return}for(const [k,v] of Object.entries(value))visit(v,k)};visit(payload);return found.filter(x=>x&&typeof x==='object');
+  const found=[],seen=new Set();
+  const add=value=>{if(!value||typeof value!=='object'||seen.has(value))return;const kind=String(value.type||value.slug||value.name||value.badge_type||'').trim();if(kind){seen.add(value);found.push(value)}};
+  const visit=(value,key='')=>{if(!value||typeof value!=='object')return;if(Array.isArray(value)){if(/badge/i.test(key))value.forEach(add);value.forEach(v=>visit(v,key));return}add(value);for(const [k,v] of Object.entries(value))visit(v,k)};
+  visit(payload);return found;
 }
-function isModeratorBadge(b){return ['moderator','broadcaster'].includes(String(b?.type||b?.slug||b?.name||'').toLowerCase())}
-async function verifyMemeModerator(streamer,username){
+function isModeratorBadge(b){
+  const type=String(b?.type||b?.slug||b?.name||b?.badge_type||'').trim().toLowerCase().replace(/[\s-]+/g,'_');
+  return ['moderator','mod','broadcaster','channel_moderator','channel_broadcaster'].includes(type)||/(^|_)moderator$/.test(type);
+}
+function profileSaysModerator(payload){
+  let allowed=false;
+  const visit=value=>{if(allowed||!value||typeof value!=='object')return;for(const [rawKey,rawValue] of Object.entries(value)){const key=String(rawKey).toLowerCase().replace(/[\s-]+/g,'_'),text=String(rawValue||'').toLowerCase();if((key==='is_moderator'||key==='moderator'||key==='is_broadcaster'||key==='broadcaster')&&(rawValue===true||rawValue===1||text==='true'||text==='1')){allowed=true;return}if(['role','channel_role','user_role'].includes(key)&&['moderator','mod','broadcaster','owner'].includes(text)){allowed=true;return}if(rawValue&&typeof rawValue==='object')visit(rawValue)}};
+  visit(payload);return allowed;
+}
+function profileContainsUsername(payload,username){
+  const expected=tenant.normalizeSlug(username);let found=false;
+  const visit=value=>{if(found||!value||typeof value!=='object')return;if(Array.isArray(value)){value.forEach(visit);return}const candidate=tenant.normalizeSlug(value.username||value.name||value.slug||value.user?.username||value.user?.name||'');if(candidate&&candidate===expected){found=true;return}Object.values(value).forEach(visit)};
+  visit(payload);return found;
+}
+async function verifyMemeModerator(streamer,username,kickUserId=''){
   const normalized=tenant.normalizeSlug(username);if(normalized===tenant.normalizeSlug(streamer.slug)||normalized===tenant.normalizeSlug(streamer.kick_username))return true;
+  const cachedModerator=async()=>{const viewer=await tenant.runWithStreamer(streamer,()=>db.getViewer(normalized));let badges=[];try{badges=JSON.parse(viewer?.badges_json||'[]')}catch(_e){}const checkedAt=viewer?.badges_synced_at?new Date(String(viewer.badges_synced_at).replace(' ','T')+'Z').getTime():0;return !!checkedAt&&Date.now()-checkedAt<86400000&&badges.some(isModeratorBadge)};
+  const wasCachedModerator=await cachedModerator();
+  const headers={Accept:'application/json','User-Agent':'Mozilla/5.0'};
+  if(kickUserId){
+    try{
+      const identity=await axios.get(`https://kick.com/api/internal/v1/channels/${encodeURIComponent(streamer.slug)}/chatroom/users/${encodeURIComponent(String(kickUserId))}/identity`,{headers,timeout:8000});
+      const badges=profileBadges(identity.data),verified=profileSaysModerator(identity.data)||badges.some(isModeratorBadge);if(badges.length)await tenant.runWithStreamer(streamer,()=>db.setViewerKickProfile(normalized,{badges}));if(verified){console.log(`[MEME MOD:${streamer.slug}] @${normalized} confirmé par identité chat`);return true}
+    }catch(e){console.warn(`[MEME MOD:${streamer.slug}] Identité chat indisponible pour @${normalized}: ${e.response?.status||e.message}`)}
+  }
   try{
-    const response=await axios.get(`https://kick.com/api/v2/channels/${encodeURIComponent(streamer.slug)}/users/${encodeURIComponent(normalized)}`,{headers:{Accept:'application/json','User-Agent':'Mozilla/5.0'},timeout:8000});
-    const badges=profileBadges(response.data);await tenant.runWithStreamer(streamer,()=>db.setViewerKickProfile(normalized,{badges}));return badges.some(isModeratorBadge);
-  }catch(_){
-    const viewer=await tenant.runWithStreamer(streamer,()=>db.getViewer(normalized));let badges=[];try{badges=JSON.parse(viewer?.badges_json||'[]')}catch(_e){}const fresh=viewer?.badges_synced_at&&Date.now()-new Date(String(viewer.badges_synced_at).replace(' ','T')+'Z').getTime()<86400000;return !!fresh&&badges.some(isModeratorBadge);
+    const moderators=await axios.get(`https://kick.com/api/internal/v1/channels/${encodeURIComponent(streamer.slug)}/community/moderators`,{headers,timeout:8000});
+    if(profileContainsUsername(moderators.data,normalized)){console.log(`[MEME MOD:${streamer.slug}] @${normalized} confirmé par liste modérateurs`);return true}
+  }catch(e){console.warn(`[MEME MOD:${streamer.slug}] Liste modérateurs indisponible: ${e.response?.status||e.message}`)}
+  try{
+    const response=await axios.get(`https://kick.com/api/v2/channels/${encodeURIComponent(streamer.slug)}/users/${encodeURIComponent(normalized)}`,{headers,timeout:8000});
+    const badges=profileBadges(response.data),verified=profileSaysModerator(response.data)||badges.some(isModeratorBadge);if(badges.length)await tenant.runWithStreamer(streamer,()=>db.setViewerKickProfile(normalized,{badges}));return verified||wasCachedModerator;
+  }catch(e){
+    console.warn(`[MEME MOD:${streamer.slug}] Fiche Kick indisponible pour @${normalized}: ${e.response?.status||e.message}`);
+    return wasCachedModerator;
   }
 }
 const cleanupMemeFiles=()=>{for(const file of fs.readdirSync(memeTempDir)){const full=path.join(memeTempDir,file);try{if(Date.now()-fs.statSync(full).mtimeMs>86400000)fs.unlinkSync(full)}catch(_){}}};cleanupMemeFiles();setInterval(cleanupMemeFiles,3600000).unref();
@@ -3690,7 +3812,7 @@ app.get('/memes-moderation/:streamer',(req,res)=>res.sendFile(path.join(__dirnam
 async function requireMemeModerator(req,res){
   const streamer=await db.getStreamerBySlug(tenant.normalizeSlug(req.params.streamer));if(!streamer){res.status(404).json({error:'Chaîne inconnue'});return null}
   const identity=await getMemeIdentity(req,streamer.id);if(!identity||identity.role!=='moderator'){res.status(401).json({error:'Connexion modérateur requise',authUrl:`/auth/meme/moderator?streamer=${encodeURIComponent(streamer.slug)}`});return null}
-  const verifiedAt=new Date(String(identity.verified_at||'').replace(' ','T')+'Z').getTime();if(!verifiedAt||Date.now()-verifiedAt>10*60*1000){if(!await verifyMemeModerator(streamer,identity.username)){await db.deleteMemeAuthSession(identity.session_token);res.status(403).json({error:'Tu n’es plus modérateur de cette chaîne.'});return null}await db.refreshMemeAuthSession(identity.session_token,streamer.id)}
+  const verifiedAt=new Date(String(identity.verified_at||'').replace(' ','T')+'Z').getTime();if(!verifiedAt||Date.now()-verifiedAt>10*60*1000){if(!await verifyMemeModerator(streamer,identity.username,identity.kick_user_id)){await db.deleteMemeAuthSession(identity.session_token);res.status(403).json({error:'Tu n’es plus modérateur de cette chaîne.'});return null}await db.refreshMemeAuthSession(identity.session_token,streamer.id)}
   return {streamer,identity,tm:createTenantManager({db,io,streamer,req})};
 }
 app.get('/api/public/memes-moderation/:streamer',async(req,res)=>{const auth=await requireMemeModerator(req,res);if(!auth)return;res.set('Cache-Control','no-store');res.json({data:{username:auth.identity.username,streamer:auth.streamer.display_name||auth.streamer.slug,mode:(await getMemesConfig(auth.tm)).mode,submissions:await db.getMemeSubmissions(auth.streamer.id,'all')}})});
