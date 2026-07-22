@@ -1756,7 +1756,7 @@ async function importCommunityGiftLeaderboard(rows = [], streamerId = null, opti
   const source = String(options?.source || (authoritative ? 'kick_leaderboard' : 'kick_history'))
     .replace(/[^a-z0-9_-]/gi, '').slice(0, 40) || 'kick_history';
   let imported = 0;
-  for (const item of Array.isArray(rows) ? rows.slice(0, 500) : []) {
+  for (const item of Array.isArray(rows) ? rows.slice(0, 5000) : []) {
     const username = String(item.username || '').trim().toLowerCase();
     const gifts = Math.max(0, parseInt(item.quantity ?? item.gifts ?? 0) || 0);
     if (!username || !gifts) continue;
@@ -1931,6 +1931,24 @@ async function getCommunityData(limit = 100, streamerId = null) {
       SUM(CASE WHEN COALESCE(subscribed_for,0) > 0 THEN 1 ELSE 0 END) AS current_subscribers
     FROM viewers WHERE COALESCE(streamer_id,1) = ?`, [sid]);
   return { totals: totals || {}, supporters, historicalSupporters, followers, currentSubscribers, events };
+}
+async function getCommunityGiftLeaderboard(limit = 5000, streamerId = null) {
+  const sid = Number(streamerId || scopedStreamerId());
+  await backfillCommunityHistory(sid);
+  await reconcilePendingCommunityGiftEvents(sid);
+  await reconcileStoredCommunityGiftBadges(sid);
+  const safeLimit = Math.max(100, Math.min(5000, parseInt(limit,10) || 5000));
+  const snapshots = await all(`SELECT username,gifts_all_time,source,synced_at
+    FROM community_support_snapshots
+    WHERE streamer_id = ? AND gifts_all_time > 0
+    ORDER BY gifts_all_time DESC,username ASC LIMIT ?`,[sid,safeLimit]);
+  const eventOnly = await all(`SELECT LOWER(username) AS username,SUM(amount) AS gifts
+    FROM community_events
+    WHERE streamer_id = ? AND event_type = 'gift'
+    GROUP BY LOWER(username)
+    HAVING SUM(amount) > 0
+    ORDER BY gifts DESC LIMIT ?`,[sid,safeLimit]);
+  return { snapshots,eventOnly };
 }
 async function getRecentCommunityEvents(limit=20,streamerId=null){const sid=Number(streamerId||scopedStreamerId()),safe=Math.max(1,Math.min(50,parseInt(limit)||20));return all(`SELECT event_type AS type,username,gifter,amount AS count,months,occurred_at AS at FROM community_events WHERE streamer_id=? ORDER BY occurred_at DESC LIMIT ?`,[sid,safe])}
 async function toggleAnnouncement(id, enabled) { await run(`UPDATE announcements SET enabled = ? WHERE id = ?`, [enabled ? 1 : 0, id]); }
@@ -2612,7 +2630,7 @@ module.exports = {
   getDB,
   upsertViewer, addPoints, addMemePoints, grantMemePointsIfDue, getMemeLeaderboard, getViewer, getLeaderboard, getViewerRank,
   getGlobalStats, getRecentLogs, getActiveViewers, getViewersMissingFollow, getViewersForBadgeSync, setViewerKickProfile, clearAllPoints,
-  addCommunityEvent, backfillCommunityHistory, importCommunityGiftLeaderboard, upsertCommunityGiftBadge, getCommunityData, getRecentCommunityEvents,
+  addCommunityEvent, backfillCommunityHistory, importCommunityGiftLeaderboard, upsertCommunityGiftBadge, getCommunityData, getCommunityGiftLeaderboard, getRecentCommunityEvents,
   getLevel, getNextLevel, getLevels, getRankingEngine, addLevel, updateLevel, deleteLevel,
   getCustomCommands, getCustomCommand, setCustomCommand, deleteCustomCommand, toggleCustomCommand,
   getObjectives, createObjective, deleteObjective, achieveObjective,

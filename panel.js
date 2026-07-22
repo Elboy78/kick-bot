@@ -543,14 +543,14 @@ app.get('/api/public/subgifts/:streamer', waitDB, async (req, res) => {
     if (!req.streamer || req.streamer.slug !== requestedSlug) {
       return res.status(404).json({ error:'Classement introuvable', data:[] });
     }
-    const limit = Math.min(Math.max(parseInt(req.query.limit || '100',10) || 100,1),500);
-    const community = await db.getCommunityData(limit, req.streamer.id);
+    const limit = Math.min(Math.max(parseInt(req.query.limit || '5000',10) || 5000,1),5000);
+    const community = await db.getCommunityGiftLeaderboard(limit, req.streamer.id);
     const rows = new Map();
-    for (const item of community.supporters || []) {
+    for (const item of community.eventOnly || []) {
       const username = String(item.username || '').trim().toLowerCase();
       if (username) rows.set(username,{ username:item.username, gifts:Number(item.gifts||0), source:'events' });
     }
-    for (const item of community.historicalSupporters || []) {
+    for (const item of community.snapshots || []) {
       const username = String(item.username || '').trim().toLowerCase();
       if (!username) continue;
       const current = rows.get(username) || { username:item.username, gifts:0 };
