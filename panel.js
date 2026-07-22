@@ -458,7 +458,11 @@ app.post('/api/platform-admin/streamers/:id/plan', requireAuth, requirePlatformA
     if (!streamerId || !['standard','premium'].includes(plan)) return res.status(400).json({ error: 'Offre invalide' });
     const streamer = await db.getStreamerById(streamerId);
     if (!streamer) return res.status(404).json({ error: 'Streamer introuvable' });
-    await db.setStreamerPlan(streamerId, plan);
+    const updated=await db.setStreamerPlan(streamerId, plan);
+    const tm=createTenantManager({db,io,streamer:updated});
+    tm.emit('streamer-plan-update',{plan,premium:plan==='premium',at:new Date().toISOString()});
+    const rows=await getCustomKickInteractions(tm).catch(()=>[]),token=await kickOAuth.getValidAccessToken(streamerId).catch(()=>null);
+    if(token)for(const item of rows.filter(x=>x.rewardId)){await axios.patch(`https://api.kick.com/public/v1/channels/rewards/${item.rewardId}`,{is_enabled:plan==='premium'&&item.enabled!==false},{headers:{Authorization:`Bearer ${token}`,'Content-Type':'application/json',Accept:'application/json'},timeout:12000}).catch(()=>{})}
     res.json({ success:true, plan });
   } catch (error) { res.status(500).json({ error:error.message }); }
 });
@@ -837,6 +841,26 @@ async function settleKickReward(streamerId, redemptionId, accepted) {
     headers:{Authorization:`Bearer ${token}`,'Content-Type':'application/json',Accept:'application/json'}, timeout:12000
   });
 }
+const CUSTOM_KICK_INTERACTIONS_KEY='kick_custom_interactions_v1';
+const CUSTOM_KICK_HISTORY_KEY='kick_custom_interactions_history_v1';
+const CUSTOM_KICK_ACTIONS=new Set(['chat_fixed','chat_input','alert','meme_points']);
+async function getCustomKickInteractions(tm){let rows=[];try{rows=JSON.parse(await tm.getSetting(CUSTOM_KICK_INTERACTIONS_KEY,'[]')||'[]')}catch(_){}return Array.isArray(rows)?rows.slice(0,25):[]}
+async function saveCustomKickInteractions(tm,rows){const clean=Array.isArray(rows)?rows.slice(0,25):[];await tm.setSetting(CUSTOM_KICK_INTERACTIONS_KEY,JSON.stringify(clean));tm.emit('kick-interactions-update',{interactions:clean,at:new Date().toISOString()});return clean}
+async function addCustomKickHistory(tm,item){let rows=[];try{rows=JSON.parse(await tm.getSetting(CUSTOM_KICK_HISTORY_KEY,'[]')||'[]')}catch(_){}rows.unshift({...item,at:new Date().toISOString()});rows=rows.slice(0,100);await tm.setSetting(CUSTOM_KICK_HISTORY_KEY,JSON.stringify(rows));tm.emit('kick-interactions-history',{entry:rows[0]})}
+async function processCustomKickInteraction(tm,data,rewardId,redeemer,redemptionId){
+  const rows=await getCustomKickInteractions(tm),item=rows.find(x=>x.enabled!==false&&String(x.rewardId||'')===rewardId);if(!item)return null;
+  const streamer=await db.getStreamerById(tm.streamerId),premium=String(streamer?.plan||'standard').toLowerCase()==='premium';
+  if(!premium){await settleKickReward(tm.streamerId,redemptionId,false);await addCustomKickHistory(tm,{interactionId:item.id,title:item.title,username:redeemer,status:'refunded',detail:'Premium inactif'});return {ok:true,rejected:true,reason:'Premium requis',eventType:'channel.reward.redemption.updated'}}
+  const ctx={streamerId:tm.streamerId,slug:tm.slug},input=String(data?.user_input||'').replace(/[\r\n]+/g,' ').trim().slice(0,240);let success=false,detail='';
+  try{
+    if(item.action==='chat_fixed'){detail=String(item.response||'Merci @{username} !').replace(/\{username\}/gi,redeemer).replace(/\{input\}/gi,input).slice(0,450);success=await shared.sendChatTo(detail,ctx)}
+    else if(item.action==='chat_input'){if(!input)throw new Error('Texte manquant');detail=String(item.response||'🎟️ @{username} : {input}').replace(/\{username\}/gi,redeemer).replace(/\{input\}/gi,input).slice(0,450);success=await shared.sendChatTo(detail,ctx)}
+    else if(item.action==='alert'){detail=String(item.response||'Interaction de {username}').replace(/\{username\}/gi,redeemer).replace(/\{input\}/gi,input).slice(0,200);await pushObsAlert('custom',{username:redeemer,message:detail},false,tm);success=true}
+    else if(item.action==='meme_points'){const amount=Math.max(1,Math.min(10000,parseInt(item.amount)||100));await tenant.runWithStreamer(streamer,()=>db.addMemePoints(redeemer,amount));detail=`+${amount} points mèmes`;success=true}
+  }catch(e){detail=e.message;success=false}
+  await settleKickReward(tm.streamerId,redemptionId,success);await addCustomKickHistory(tm,{interactionId:item.id,title:item.title,username:redeemer,status:success?'accepted':'refunded',detail});
+  return {ok:true,accepted:success,rejected:!success,type:'custom_interaction',eventType:'channel.reward.redemption.updated'};
+}
 async function processTimeoutReward(tm, data) {
   const rewardId = String(data?.reward?.id || '').trim();
   const status = String(data?.status || 'pending').toLowerCase();
@@ -844,6 +868,7 @@ async function processTimeoutReward(tm, data) {
   const redeemer = String(data?.redeemer?.username || 'viewer').trim().replace(/^@+/, '');
   const redemptionId = String(data?.id || '').trim();
   const rewardContext={streamerId:tm.streamerId,slug:tm.slug};
+  const customResult=await processCustomKickInteraction(tm,data,rewardId,redeemer,redemptionId);if(customResult)return customResult;
   const counterId=String(await tm.getSetting('kick_counter_reward_id','')).trim();
   const messageId=String(await tm.getSetting('kick_message_reward_id','')).trim();
   if(rewardId===counterId&&(await tm.getSetting('kick_counter_reward_enabled','0'))==='1'){
@@ -3012,6 +3037,23 @@ app.post('/api/admin/channel-rewards/:type/setup',requireAuth,requireTenant,wait
     res.json({success:true,data:{type,enabled,rewardId:id,title,cost,duration}});
   }catch(e){const detail=e.response?.data?.message||e.response?.data?.error||e.message;res.status(e.response?.status===403?409:500).json({error:/scope|forbidden|403/i.test(String(detail))?'Reconnecte le compte streamer Kick afin d’accorder les droits Récompenses et Modération.':detail})}
 });
+app.get('/api/channel-rewards/custom',requireAuth,requireTenant,waitDB,async(req,res)=>{try{const tm=createTenantManager({db,io,req}),streamer=await db.getStreamerById(tm.streamerId);let history=[];try{history=JSON.parse(await tm.getSetting(CUSTOM_KICK_HISTORY_KEY,'[]')||'[]')}catch(_){}res.set('Cache-Control','no-store');res.json({data:{premium:String(streamer?.plan||'standard').toLowerCase()==='premium',interactions:await getCustomKickInteractions(tm),history:Array.isArray(history)?history.slice(0,50):[]}})}catch(e){res.status(500).json({error:e.message})}});
+app.post('/api/admin/channel-rewards/custom',requireAuth,requireTenant,waitDB,async(req,res)=>{
+  try{
+    const tm=createTenantManager({db,io,req}),streamer=await db.getStreamerById(tm.streamerId);if(String(streamer?.plan||'standard').toLowerCase()!=='premium')return res.status(403).json({error:'Le créateur d’interactions est réservé aux streamers Premium.'});
+    const token=await kickOAuth.getValidAccessToken(tm.streamerId);if(!token)return res.status(409).json({error:'Reconnecte le compte streamer Kick.'});
+    const action=String(req.body?.action||'');if(!CUSTOM_KICK_ACTIONS.has(action))return res.status(400).json({error:'Action non autorisée'});
+    const rows=await getCustomKickInteractions(tm),id=String(req.body?.id||crypto.randomBytes(8).toString('hex')).replace(/[^a-z0-9_-]/gi,'').slice(0,32),existing=rows.find(x=>x.id===id);
+    const title=String(req.body?.title||'Interaction ElBot').trim().slice(0,50)||'Interaction ElBot',cost=Math.max(1,Math.min(10000000,parseInt(req.body?.cost)||500)),enabled=req.body?.enabled!==false,response=String(req.body?.response||'').trim().slice(0,450),amount=Math.max(1,Math.min(10000,parseInt(req.body?.amount)||100)),requiresInput=['chat_input'].includes(action),rewardId=String(existing?.rewardId||'');
+    const body={title,cost,is_enabled:enabled,is_user_input_required:requiresInput,should_redemptions_skip_request_queue:false,background_color:String(req.body?.color||'#a855f7').match(/^#[0-9a-f]{6}$/i)?.[0]||'#a855f7',description:String(req.body?.description||`Interaction Premium créée avec ElBot`).trim().slice(0,120)};
+    const headers={Authorization:`Bearer ${token}`,'Content-Type':'application/json',Accept:'application/json'};let reward;
+    if(rewardId){try{const r=await axios.patch(`https://api.kick.com/public/v1/channels/rewards/${rewardId}`,body,{headers,timeout:12000});reward=r.data?.data||r.data}catch(e){if(e.response?.status!==404)throw e}}
+    if(!reward){const r=await axios.post('https://api.kick.com/public/v1/channels/rewards',body,{headers,timeout:12000});reward=r.data?.data||r.data}
+    const saved={id,rewardId:String(reward?.id||rewardId),title,cost,enabled,action,response,amount,color:body.background_color,description:body.description,updatedAt:new Date().toISOString()};if(!saved.rewardId)throw new Error('Kick n’a renvoyé aucun identifiant.');
+    const next=existing?rows.map(x=>x.id===id?saved:x):[saved,...rows];await saveCustomKickInteractions(tm,next);res.json({success:true,data:saved});
+  }catch(e){res.status(e.response?.status===403?409:500).json({error:e.response?.data?.message||e.response?.data?.error||e.message})}
+});
+app.delete('/api/admin/channel-rewards/custom/:id',requireAuth,requireTenant,waitDB,async(req,res)=>{try{const tm=createTenantManager({db,io,req}),rows=await getCustomKickInteractions(tm),item=rows.find(x=>x.id===req.params.id);if(!item)return res.status(404).json({error:'Interaction introuvable'});const token=await kickOAuth.getValidAccessToken(tm.streamerId);if(token&&item.rewardId)await axios.patch(`https://api.kick.com/public/v1/channels/rewards/${item.rewardId}`,{is_enabled:false},{headers:{Authorization:`Bearer ${token}`,'Content-Type':'application/json',Accept:'application/json'},timeout:12000}).catch(()=>{});await saveCustomKickInteractions(tm,rows.filter(x=>x.id!==item.id));res.json({success:true})}catch(e){res.status(500).json({error:e.message})}});
 app.post('/api/admin/channel-rewards/timeout/setup',requireAuth,requireTenant,waitDB,async(req,res)=>{
   try{
     const tm=createTenantManager({db,io,req}),token=await kickOAuth.getValidAccessToken(tm.streamerId);
