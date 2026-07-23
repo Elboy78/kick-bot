@@ -604,6 +604,9 @@ async function initSchema() {
     `ALTER TABLE streamers ADD COLUMN last_bot_sync_at TEXT`,
     `ALTER TABLE streamers ADD COLUMN plan TEXT NOT NULL DEFAULT 'standard'`,
     `ALTER TABLE streamers ADD COLUMN assigned_bot_identity_id INTEGER`,
+    `ALTER TABLE streamers ADD COLUMN primary_platform TEXT NOT NULL DEFAULT 'kick'`,
+    `ALTER TABLE streamers ADD COLUMN twitch_user_id TEXT`,
+    `ALTER TABLE streamers ADD COLUMN twitch_username TEXT`,
   ];
   for (const sql of migrations) {
     try {
@@ -1750,19 +1753,32 @@ async function backfillCommunityHistory(streamerId = null) {
   }
 }
 
-async function importCommunityGiftLeaderboard(rows = [], streamerId = null) {
+async function importCommunityGiftLeaderboard(rows = [], streamerId = null, options = {}) {
   const sid = Number(streamerId || scopedStreamerId());
+  const authoritative = options?.authoritative === true;
+  const source = String(options?.source || (authoritative ? 'kick_leaderboard' : 'kick_history'))
+    .replace(/[^a-z0-9_-]/gi, '').slice(0, 40) || 'kick_history';
   let imported = 0;
-  for (const item of Array.isArray(rows) ? rows.slice(0, 500) : []) {
+  for (const item of Array.isArray(rows) ? rows.slice(0, 5000) : []) {
     const username = String(item.username || '').trim().toLowerCase();
     const gifts = Math.max(0, parseInt(item.quantity ?? item.gifts ?? 0) || 0);
     if (!username || !gifts) continue;
     await run(`INSERT INTO community_support_snapshots (streamer_id,username,gifts_all_time,source,synced_at)
-      VALUES (?,?,?,'kick_leaderboard',datetime('now'))
+      VALUES (?,?,?,?,datetime('now'))
       ON CONFLICT(streamer_id,username) DO UPDATE SET
-        gifts_all_time = CASE WHEN excluded.gifts_all_time > community_support_snapshots.gifts_all_time THEN excluded.gifts_all_time ELSE community_support_snapshots.gifts_all_time END,
+        gifts_all_time = CASE WHEN ? = 1 THEN excluded.gifts_all_time
+          WHEN excluded.gifts_all_time > community_support_snapshots.gifts_all_time THEN excluded.gifts_all_time
+          ELSE community_support_snapshots.gifts_all_time END,
         source = excluded.source, synced_at = excluded.synced_at`,
-      [sid, username, gifts]);
+      [sid, username, gifts, source, authoritative ? 1 : 0]);
+    if (authoritative) {
+      const adjusted = await upsertCommunityGiftBadge(username, gifts, sid);
+      if (adjusted.gifts !== gifts) {
+        await run(`UPDATE community_support_snapshots
+          SET source = 'kick_leaderboard_events', synced_at = datetime('now')
+          WHERE streamer_id = ? AND username = ?`, [sid, username]);
+      }
+    }
     imported++;
   }
   return imported;
@@ -1778,6 +1794,32 @@ async function upsertCommunityGiftBadge(username, giftCount, streamerId = null) 
   const normalizedCount = Math.max(0, Math.min(100000000, parseInt(giftCount, 10) || 0));
   if (!normalizedUsername || !normalizedCount) return { changed: false, gifts: 0 };
 
+  // Kick peut continuer à exposer pendant plusieurs heures un badge absolu
+  // ancien. Si nous possédons exactement ce même badge en cache, on ajoute
+  // uniquement les vrais événements Kick arrivés après sa synchronisation.
+  // Les événements legacy sont volontairement exclus pour éviter tout doublon.
+  let effectiveCount = normalizedCount;
+  const cachedViewer = await get(`SELECT badges_json,badges_synced_at FROM viewers
+    WHERE COALESCE(streamer_id,1) = ? AND username = ?`, [sid, normalizedUsername]);
+  if (cachedViewer?.badges_synced_at) {
+    let cachedBadges = [];
+    try { cachedBadges = JSON.parse(cachedViewer.badges_json || '[]'); } catch (_) {}
+    const cachedGiftBadge = (Array.isArray(cachedBadges) ? cachedBadges : []).find(item =>
+      ['sub_gifter','subgifter','subscription_gifter','gift_sub_gifter'].includes(
+        String(item?.type||item?.slug||item?.name||'').toLowerCase().replace(/[\s-]+/g,'_')));
+    const cachedGiftCount = parseInt(String(cachedGiftBadge?.count ?? cachedGiftBadge?.gift_count ??
+      cachedGiftBadge?.gifts ?? cachedGiftBadge?.quantity ?? cachedGiftBadge?.value ?? '').replace(/[^0-9]/g,''),10);
+    if (Number.isSafeInteger(cachedGiftCount) && cachedGiftCount === normalizedCount) {
+      const newerEvents = await get(`SELECT COALESCE(SUM(amount),0) AS gifts
+        FROM community_events
+        WHERE streamer_id = ? AND event_type = 'gift' AND source = 'kick_event'
+          AND LOWER(COALESCE(gifter,username)) = ?
+          AND julianday(occurred_at) > julianday(?)`,
+        [sid, normalizedUsername, cachedViewer.badges_synced_at]);
+      effectiveCount = Math.min(100000000, normalizedCount + Math.max(0, Number(newerEvents?.gifts || 0)));
+    }
+  }
+
   const previous = await get(`SELECT gifts_all_time FROM community_support_snapshots
     WHERE streamer_id = ? AND username = ?`, [sid, normalizedUsername]);
   const previousCount = Math.max(0, Number(previous?.gifts_all_time || 0));
@@ -1789,19 +1831,29 @@ async function upsertCommunityGiftBadge(username, giftCount, streamerId = null) 
       gifts_all_time = excluded.gifts_all_time,
       source = excluded.source,
       synced_at = excluded.synced_at`,
-    [sid, normalizedUsername, normalizedCount]);
+    [sid, normalizedUsername, effectiveCount]);
 
   return {
-    changed: normalizedCount !== previousCount,
-    gifts: normalizedCount,
+    changed: effectiveCount !== previousCount,
+    gifts: effectiveCount,
     previous: previousCount
   };
 }
 
 async function reconcileStoredCommunityGiftBadges(streamerId = null) {
   const sid=Number(streamerId||scopedStreamerId());
-  const rows=await all(`SELECT username,badges_json FROM viewers WHERE COALESCE(streamer_id,1)=? AND badges_json IS NOT NULL AND badges_json!=''`,[sid]);
+  const rows=await all(`SELECT v.username,v.badges_json,v.badges_synced_at,
+      s.synced_at AS snapshot_synced_at,s.source AS snapshot_source
+    FROM viewers v
+    LEFT JOIN community_support_snapshots s
+      ON s.streamer_id = ? AND s.username = LOWER(v.username)
+    WHERE COALESCE(v.streamer_id,1)=? AND v.badges_json IS NOT NULL AND v.badges_json!=''`,[sid,sid]);
   for(const row of rows){
+    // Un ancien badge mis en cache ne doit jamais annuler une correction plus
+    // récente récupérée depuis le leaderboard Kick.
+    if(row.snapshot_source==='kick_leaderboard'&&row.snapshot_synced_at&&row.badges_synced_at&&
+      new Date(String(row.badges_synced_at).replace(' ','T')+'Z').getTime()<=
+      new Date(String(row.snapshot_synced_at).replace(' ','T')+'Z').getTime())continue;
     let badges=[];try{badges=JSON.parse(row.badges_json||'[]')}catch(_){continue}
     const badge=(Array.isArray(badges)?badges:[]).find(item=>['sub_gifter','subgifter','subscription_gifter','gift_sub_gifter'].includes(String(item?.type||item?.slug||item?.name||'').toLowerCase().replace(/[\s-]+/g,'_')));
     if(!badge)continue;
@@ -1882,6 +1934,24 @@ async function getCommunityData(limit = 100, streamerId = null) {
       SUM(CASE WHEN COALESCE(subscribed_for,0) > 0 THEN 1 ELSE 0 END) AS current_subscribers
     FROM viewers WHERE COALESCE(streamer_id,1) = ?`, [sid]);
   return { totals: totals || {}, supporters, historicalSupporters, followers, currentSubscribers, events };
+}
+async function getCommunityGiftLeaderboard(limit = 5000, streamerId = null) {
+  const sid = Number(streamerId || scopedStreamerId());
+  await backfillCommunityHistory(sid);
+  await reconcilePendingCommunityGiftEvents(sid);
+  await reconcileStoredCommunityGiftBadges(sid);
+  const safeLimit = Math.max(100, Math.min(5000, parseInt(limit,10) || 5000));
+  const snapshots = await all(`SELECT username,gifts_all_time,source,synced_at
+    FROM community_support_snapshots
+    WHERE streamer_id = ? AND gifts_all_time > 0
+    ORDER BY gifts_all_time DESC,username ASC LIMIT ?`,[sid,safeLimit]);
+  const eventOnly = await all(`SELECT LOWER(username) AS username,SUM(amount) AS gifts
+    FROM community_events
+    WHERE streamer_id = ? AND event_type = 'gift'
+    GROUP BY LOWER(username)
+    HAVING SUM(amount) > 0
+    ORDER BY gifts DESC LIMIT ?`,[sid,safeLimit]);
+  return { snapshots,eventOnly };
 }
 async function getRecentCommunityEvents(limit=20,streamerId=null){const sid=Number(streamerId||scopedStreamerId()),safe=Math.max(1,Math.min(50,parseInt(limit)||20));return all(`SELECT event_type AS type,username,gifter,amount AS count,months,occurred_at AS at FROM community_events WHERE streamer_id=? ORDER BY occurred_at DESC LIMIT ?`,[sid,safe])}
 async function toggleAnnouncement(id, enabled) { await run(`UPDATE announcements SET enabled = ? WHERE id = ?`, [enabled ? 1 : 0, id]); }
@@ -2248,6 +2318,53 @@ async function upsertStreamer(data = {}) {
   return getStreamerBySlug(slug);
 }
 
+async function linkStreamerTwitchIdentity(streamerId, twitch = {}) {
+  const id = Number(streamerId);
+  const userId = String(twitch.userId || twitch.id || '').trim();
+  const username = String(twitch.username || twitch.login || '').trim().toLowerCase();
+  if (!id || !userId || !username) throw new Error('Identité Twitch invalide');
+  await run(
+    `UPDATE streamers SET
+       twitch_user_id = ?,
+       twitch_username = ?,
+       primary_platform = CASE
+         WHEN kick_user_id IS NULL OR kick_user_id = '' THEN 'twitch'
+         ELSE primary_platform
+       END,
+       avatar_url = COALESCE(NULLIF(?, ''), avatar_url),
+       display_name = COALESCE(NULLIF(?, ''), display_name),
+       updated_at = datetime('now')
+     WHERE id = ?`,
+    [userId, username, twitch.avatarUrl || twitch.profile_image_url || '', twitch.displayName || twitch.display_name || username, id]
+  );
+  return getStreamerById(id);
+}
+
+async function upsertTwitchStreamer(twitch = {}) {
+  const userId = String(twitch.userId || twitch.id || '').trim();
+  const username = normalizeStreamerSlug(twitch.username || twitch.login || twitch.displayName);
+  if (!userId || !username) throw new Error('Identité Twitch invalide');
+  const displayName = String(twitch.displayName || twitch.display_name || username).trim();
+  await run(
+    `INSERT INTO streamers
+      (slug,twitch_user_id,twitch_username,display_name,avatar_url,primary_platform,role,status,bot_enabled,updated_at)
+     VALUES (?,?,?,?,?,'twitch',?,'active',0,datetime('now'))
+     ON CONFLICT(slug) DO UPDATE SET
+       twitch_user_id = excluded.twitch_user_id,
+       twitch_username = excluded.twitch_username,
+       display_name = COALESCE(NULLIF(excluded.display_name,''),streamers.display_name),
+       avatar_url = COALESCE(NULLIF(excluded.avatar_url,''),streamers.avatar_url),
+       primary_platform = CASE
+         WHEN streamers.kick_user_id IS NULL OR streamers.kick_user_id = '' THEN 'twitch'
+         ELSE streamers.primary_platform
+       END,
+       status = 'active',
+       updated_at = datetime('now')`,
+    [username, userId, username, displayName, twitch.avatarUrl || twitch.profile_image_url || '', canonicalStreamerRole(username, twitch.role)]
+  );
+  return getStreamerBySlug(username);
+}
+
 async function updateStreamerKickMeta(streamerId, meta = {}) {
   const fields = [];
   const params = [];
@@ -2563,7 +2680,7 @@ module.exports = {
   getDB,
   upsertViewer, addPoints, addMemePoints, grantMemePointsIfDue, getMemeLeaderboard, getViewer, getLeaderboard, getViewerRank,
   getGlobalStats, getRecentLogs, getActiveViewers, getViewersMissingFollow, getViewersForBadgeSync, setViewerKickProfile, clearAllPoints,
-  addCommunityEvent, backfillCommunityHistory, importCommunityGiftLeaderboard, upsertCommunityGiftBadge, getCommunityData, getRecentCommunityEvents,
+  addCommunityEvent, backfillCommunityHistory, importCommunityGiftLeaderboard, upsertCommunityGiftBadge, getCommunityData, getCommunityGiftLeaderboard, getRecentCommunityEvents,
   getLevel, getNextLevel, getLevels, getRankingEngine, addLevel, updateLevel, deleteLevel,
   getCustomCommands, getCustomCommand, setCustomCommand, deleteCustomCommand, toggleCustomCommand,
   getObjectives, createObjective, deleteObjective, achieveObjective,
@@ -2599,7 +2716,7 @@ module.exports = {
   getPointsConfig, setPointsConfigValue, setPointsConfigBulk,
   setBotStatus, getBotStatus, getAllBotStatus,
   saveOAuthToken, getOAuthToken, deleteOAuthToken,
-  ensureDefaultStreamer, getStreamerBySlug, getStreamerById, getStreamerByBroadcasterUserId, listStreamers, setStreamerPlan, upsertStreamer, updateStreamerKickMeta, getActiveStreamersForBot,
+  ensureDefaultStreamer, getStreamerBySlug, getStreamerById, getStreamerByBroadcasterUserId, listStreamers, setStreamerPlan, upsertStreamer, upsertTwitchStreamer, linkStreamerTwitchIdentity, updateStreamerKickMeta, getActiveStreamersForBot,
   ensureBotIdentities, getBotIdentityById, getBotIdentityByKey, getAssignedBotIdentity, getBotAssignmentOptions, assignBotIdentity, connectCustomBotIdentity, markBotIdentityConnected, markBotIdentityAuthorizationRequired, enableStreamersForBotIdentity,
   getStreamerSetting, setStreamerSetting, getOrCreateOverlayToken, regenerateOverlayToken, getOverlayTokenByValue, getOverlayTokensForStreamer, saveOAuthTokenForStreamer, getOAuthTokenForStreamer, deleteOAuthTokenForStreamer,
   createMemeEvent, getMemeEvents,

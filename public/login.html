@@ -1,83 +1,32 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="fr">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Bot7uP — Connexion Kick</title>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Connexion — ElBot</title>
   <style>
-    *{box-sizing:border-box}body{margin:0;min-height:100vh;font-family:Inter,system-ui,-apple-system,Segoe UI,sans-serif;background:radial-gradient(circle at 30% 15%,#20ff6622,transparent 32%),linear-gradient(135deg,#060a10,#0b101b 55%,#05070d);color:#f5f7ff;display:grid;place-items:center;padding:24px}.card{width:min(520px,100%);background:rgba(13,19,32,.86);border:1px solid rgba(255,255,255,.1);box-shadow:0 24px 80px rgba(0,0,0,.45);border-radius:28px;padding:32px;text-align:center;backdrop-filter:blur(16px)}.logo{width:66px;height:66px;margin:0 auto 18px;border-radius:20px;background:linear-gradient(135deg,#33ff6e,#13a83d);display:grid;place-items:center;color:#06100a;font-weight:1000;font-size:24px;box-shadow:0 0 38px #25d34f55}h1{margin:0;font-size:30px;letter-spacing:-.04em}.muted{color:#9aa6bb;line-height:1.55}.steps{margin:24px 0;text-align:left;background:#07140d;border:1px solid #25d34f33;border-radius:18px;padding:16px}.step{display:flex;gap:12px;align-items:flex-start;margin:10px 0}.num{min-width:24px;height:24px;border-radius:999px;background:#25d34f;color:#06100a;font-weight:900;display:grid;place-items:center;font-size:13px}.btn{display:flex;align-items:center;justify-content:center;gap:10px;width:100%;border:0;border-radius:14px;background:#25d34f;color:#06100a;padding:15px 18px;text-decoration:none;font-weight:1000;font-size:15px;cursor:pointer;transition:.16s}.btn:hover{transform:translateY(-1px);filter:brightness(1.06)}.btn.secondary{margin-top:10px;background:#121a2a;color:#dce5f5;border:1px solid rgba(255,255,255,.1)}.status{margin-top:18px;font-size:13px;color:#8f9bb0}.error{display:none;margin-top:16px;text-align:left;color:#ffd1d1;background:#2a0f14;border:1px solid #ff5c7a44;border-radius:14px;padding:12px;font-size:13px}.loading{opacity:.72;pointer-events:none}.kick{width:22px;height:22px;border-radius:5px;background:#53fc18;color:#071200;font-weight:1000;display:grid;place-items:center;font-size:13px}.small{font-size:12px;color:#7f8aa0;margin-top:20px}
+    :root{--bg:#030816;--card:#071426;--line:#193753;--text:#f4f9ff;--muted:#8fa6bd;--kick:#53fc18;--twitch:#9147ff}*{box-sizing:border-box}body{margin:0;min-height:100vh;display:grid;place-items:center;padding:24px;background:radial-gradient(circle at 20% 0,#06457866,transparent 34%),radial-gradient(circle at 85% 85%,#41127755,transparent 30%),var(--bg);font-family:Inter,system-ui,-apple-system,Segoe UI,sans-serif;color:var(--text)}.shell{width:min(930px,100%)}.back{display:inline-flex;color:#8fa6bd;text-decoration:none;font-size:13px;margin-bottom:18px}.card{border:1px solid #ffffff11;border-radius:26px;background:linear-gradient(145deg,#09182ddd,#050c19ee);box-shadow:0 35px 100px #0009;overflow:hidden}.head{text-align:center;padding:38px 25px 24px}.head img{width:74px;height:74px;object-fit:contain;filter:drop-shadow(0 0 22px #08bfff55)}h1{font-size:32px;letter-spacing:-.04em;margin:10px 0}.head p{color:var(--muted);margin:0}.choices{display:grid;grid-template-columns:1fr 1fr;gap:14px;padding:18px 26px 30px}.choice{position:relative;display:flex;flex-direction:column;min-height:260px;padding:25px;border:1px solid #ffffff12;border-radius:18px;background:#071224;text-decoration:none;color:var(--text);transition:.2s;overflow:hidden}.choice:hover{transform:translateY(-3px)}.choice.kick:hover{border-color:#53fc1870;box-shadow:0 18px 45px #2cca2730}.choice.twitch:hover{border-color:#9147ff80;box-shadow:0 18px 45px #6f2de830}.platform{width:52px;height:52px;display:grid;place-items:center;border-radius:14px;font-size:22px;font-weight:1000}.kick .platform{background:var(--kick);color:#071200}.twitch .platform{background:var(--twitch);color:#fff}.choice h2{font-size:22px;margin:18px 0 8px}.choice p{font-size:13px;line-height:1.55;color:var(--muted);margin:0}.go{margin-top:auto;padding-top:25px;font-weight:900;font-size:14px}.kick .go{color:var(--kick)}.twitch .go{color:#b98aff}.badge{position:absolute;right:14px;top:14px;padding:5px 8px;border-radius:99px;font-size:9px;font-weight:900}.badge.ready{background:#53fc181c;color:#79ff4e}.badge.soon{background:#9147ff20;color:#c49aff}.notice{padding:15px 26px 24px;text-align:center;color:#7590aa;font-size:12px}.error{display:none;margin:0 26px 22px;padding:12px;border-radius:12px;background:#2b1019;color:#ffafc0;border:1px solid #ff527644}@media(max-width:650px){.choices{grid-template-columns:1fr}.choice{min-height:220px}.head{padding-top:28px}}
   </style>
 </head>
 <body>
-  <main class="card" id="card">
-    <div class="logo">B7</div>
-    <h1>Connexion Bot7uP</h1>
-    <p class="muted">Connecte ton compte Kick pour créer ou ouvrir automatiquement ton espace streamer V2.</p>
-
-    <div class="steps">
-      <div class="step"><span class="num">1</span><div><b>Connexion officielle Kick</b><br><span class="muted">Tu es redirigé vers Kick OAuth, pas une validation manuelle.</span></div></div>
-      <div class="step"><span class="num">2</span><div><b>Création automatique</b><br><span class="muted">Ton panel est lié au pseudo Kick connecté.</span></div></div>
-      <div class="step"><span class="num">3</span><div><b>Dashboard personnel</b><br><span class="muted">Tu arrives sur <code>/s/tonpseudo/dashboard</code>.</span></div></div>
-    </div>
-
-    <a class="btn" id="loginBtn" href="/auth/login"><span class="kick">K</span> Se connecter avec Kick</a>
-    <a class="btn secondary" id="dashBtn" style="display:none">Ouvrir mon dashboard</a>
-    <div class="error" id="err"></div>
-    <div class="status" id="status">Vérification de la session...</div>
-    <div class="small">Aucun pseudo à taper : l’identité vient directement du compte Kick connecté.</div>
+  <main class="shell">
+    <a class="back" href="/">← Retour à l’accueil</a>
+    <section class="card">
+      <header class="head"><img src="/assets/brand/elbot-logo.png" alt="ElBot"><h1>Connexion à ElBot</h1><p>Choisis la plateforme liée à ta chaîne.</p></header>
+      <div class="choices">
+        <a class="choice kick" id="kickLogin" href="/auth/login"><span class="badge ready">DISPONIBLE</span><span class="platform">K</span><h2>Continuer avec Kick</h2><p>Retrouve immédiatement ton panel, tes widgets, tes points et toutes les données de ta chaîne Kick.</p><span class="go">Se connecter avec Kick →</span></a>
+        <a class="choice twitch" id="twitchLogin" href="/auth/twitch/login"><span class="badge soon" id="twitchBadge">INTÉGRATION</span><span class="platform">T</span><h2>Continuer avec Twitch</h2><p>Connecte ton identité Twitch. Les événements, le chat et les récompenses arriveront progressivement dans le même panel.</p><span class="go" id="twitchAction">Configurer Twitch →</span></a>
+      </div>
+      <div class="error" id="error"></div>
+      <div class="notice">Tes identités et tes données restent isolées par streamer et par plateforme.</div>
+    </section>
   </main>
-
   <script>
-    const $ = (id) => document.getElementById(id);
-    function showError(msg){ $('err').style.display='block'; $('err').textContent=msg; }
-
-    async function boot(){
-      const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 5000);
-      try{
-        const r = await fetch('/api/oauth/status', {
-          cache: 'no-store',
-          credentials: 'same-origin',
-          signal: controller.signal
-        });
-        if (!r.ok) throw new Error(`HTTP ${r.status}`);
-        const j = await r.json();
-        const st = j.streamer || {};
-        if(!j.configured){
-          $('status').textContent = 'OAuth Kick non configuré.';
-          showError('Ajoute KICK_CLIENT_ID, KICK_CLIENT_SECRET et KICK_REDIRECT_URI dans le fichier .env.');
-          return;
-        }
-        if(j.authenticated && j.connected && st.slug){
-          $('status').textContent = 'Connecté en tant que ' + (st.displayName || st.slug) + '.';
-          $('dashBtn').style.display = 'flex';
-          $('dashBtn').href = '/s/' + encodeURIComponent(st.slug) + '/dashboard';
-          window.location.replace($('dashBtn').href);
-          return;
-        }
-        $('status').textContent = 'Prêt à connecter ton compte Kick.';
-      }catch(e){
-        console.error('[LOGIN] Vérification de session impossible :', e);
-        $('status').textContent='Impossible de vérifier la session.';
-      }finally{
-        clearTimeout(timeout);
-      }
-    }
-
-    $('loginBtn').addEventListener('click', (event) => {
-      const button = event.currentTarget;
-      if (button.dataset.loading === 'true') {
-        event.preventDefault();
-        return;
-      }
-      button.dataset.loading = 'true';
-      button.style.pointerEvents = 'none';
-      button.setAttribute('aria-disabled', 'true');
-      $('card').classList.add('loading');
-      $('status').textContent='Redirection vers Kick...';
-    });
-
-    boot();
+    fetch('/api/auth/status',{cache:'no-store'}).then(r=>r.json()).then(j=>{
+      if(j.authenticated&&j.dashboardUrl){location.replace(j.dashboardUrl);return}
+      if(j.providers?.twitch?.configured){document.getElementById('twitchBadge').textContent='DISPONIBLE';document.getElementById('twitchAction').textContent='Se connecter avec Twitch →'}
+      else document.getElementById('twitchLogin').addEventListener('click',e=>{e.preventDefault();const box=document.getElementById('error');box.style.display='block';box.textContent='Twitch est prêt dans le code. Il reste à ajouter les identifiants de l’application Twitch sur le VPS.'})
+    }).catch(()=>{});
   </script>
 </body>
 </html>

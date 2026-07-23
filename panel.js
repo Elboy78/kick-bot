@@ -9,6 +9,7 @@ const { Server } = require('socket.io');
 const axios   = require('axios');
 const db      = require('./database');
 const kickOAuth = require('./kick-oauth');
+const twitchOAuth = require('./twitch-oauth');
 const shared = require('./shared');
 const tenant = require('./tenant');
 const { createTenantManager } = require('./tenant-manager');
@@ -60,7 +61,12 @@ function requirePlatformAdmin(req, res, next) {
   next();
 }
 
-// V2 : page d'entrée = login Kick. Le panel complet vit dans /s/:streamer/dashboard.
+// La vitrine publique reste séparée du panel et des sessions streamers.
+function servePublicHome(req, res) {
+  return res.sendFile(path.join(__dirname, 'public', 'home.html'));
+}
+
+// Le choix de plateforme redirige ensuite vers le panel complet.
 function serveLoginOrDashboard(req, res) {
   if (req.authStreamer?.slug) {
     return res.redirect(`/s/${encodeURIComponent(req.authStreamer.slug)}/dashboard`);
@@ -68,7 +74,7 @@ function serveLoginOrDashboard(req, res) {
   return res.sendFile(path.join(__dirname, 'public', 'login.html'));
 }
 
-app.get('/', serveLoginOrDashboard);
+app.get('/', servePublicHome);
 app.get('/login', serveLoginOrDashboard);
 app.get('/login.html', serveLoginOrDashboard);
 
@@ -543,14 +549,14 @@ app.get('/api/public/subgifts/:streamer', waitDB, async (req, res) => {
     if (!req.streamer || req.streamer.slug !== requestedSlug) {
       return res.status(404).json({ error:'Classement introuvable', data:[] });
     }
-    const limit = Math.min(Math.max(parseInt(req.query.limit || '100',10) || 100,1),500);
-    const community = await db.getCommunityData(limit, req.streamer.id);
+    const limit = Math.min(Math.max(parseInt(req.query.limit || '5000',10) || 5000,1),5000);
+    const community = await db.getCommunityGiftLeaderboard(limit, req.streamer.id);
     const rows = new Map();
-    for (const item of community.supporters || []) {
+    for (const item of community.eventOnly || []) {
       const username = String(item.username || '').trim().toLowerCase();
       if (username) rows.set(username,{ username:item.username, gifts:Number(item.gifts||0), source:'events' });
     }
-    for (const item of community.historicalSupporters || []) {
+    for (const item of community.snapshots || []) {
       const username = String(item.username || '').trim().toLowerCase();
       if (!username) continue;
       const current = rows.get(username) || { username:item.username, gifts:0 };
@@ -917,6 +923,7 @@ async function processTimeoutReward(tm, data) {
   const customResult=await processCustomKickInteraction(tm,data,rewardId,redeemer,redemptionId);if(customResult)return customResult;
   const counterId=String(await tm.getSetting('kick_counter_reward_id','')).trim();
   const messageId=String(await tm.getSetting('kick_message_reward_id','')).trim();
+  const untoId=String(await tm.getSetting('kick_unto_reward_id','')).trim();
   if(rewardId===counterId&&(await tm.getSetting('kick_counter_reward_enabled','0'))==='1'){
     let shields={};try{shields=JSON.parse(await tm.getSetting('kick_timeout_shields','{}')||'{}')}catch(_){}
     const key=redeemer.toLowerCase();shields[key]=Math.min(10,(Number(shields[key])||0)+1);
@@ -931,6 +938,27 @@ async function processTimeoutReward(tm, data) {
     const sent=await shared.sendChatTo(`🎟️ @${redeemer} : ${message}`,rewardContext);
     await settleKickReward(tm.streamerId,redemptionId,!!sent);
     return {ok:true,accepted:!!sent,type:'chat_message',eventType:'channel.reward.redemption.updated'};
+  }
+  if(rewardId===untoId&&(await tm.getSetting('kick_unto_reward_enabled','0'))==='1'){
+    const target=String(data?.user_input||'').trim().replace(/^@+/,'').replace(/[^a-zA-Z0-9_]/g,'').slice(0,25);
+    let rejection='';
+    if(!redemptionId||!target)rejection='Pseudo cible manquant ou invalide';
+    if(target.toLowerCase()===redeemer.toLowerCase())rejection='Le viewer doit sauver une autre personne';
+    const viewer=target?await db.getViewerForStreamer(target,tm.streamerId).catch(()=>null):null;
+    if(!viewer?.kick_user_id)rejection='Ce viewer doit avoir parlé au moins une fois dans le chat';
+    let active={};try{active=JSON.parse(await tm.getSetting('kick_reward_active_timeouts','{}')||'{}')}catch(_){}
+    const now=Date.now();for(const [key,value] of Object.entries(active))if(Number(value?.expiresAt||value||0)<=now)delete active[key];
+    const activeTimeout=active[target.toLowerCase()];
+    if(!rejection&&!activeTimeout)rejection='Ce viewer ne possède aucun TO actif créé par ElBot';
+    if(rejection){await tm.setSetting('kick_reward_active_timeouts',JSON.stringify(active));if(redemptionId)await settleKickReward(tm.streamerId,redemptionId,false);console.log(`[REWARD UNTO:${tm.slug}] Refus ${redeemer} → ${target||'?'}: ${rejection}`);return {ok:true,rejected:true,reason:rejection,eventType:'channel.reward.redemption.updated'}}
+    const success=await shared.moderateUser(target,viewer.kick_user_id,'unban',0,`UnTO acheté par ${redeemer}`,rewardContext);
+    await settleKickReward(tm.streamerId,redemptionId,!!success);
+    if(!success)throw new Error(`Le UnTO de @${target} a échoué; la récompense a été remboursée.`);
+    delete active[target.toLowerCase()];await tm.setSetting('kick_reward_active_timeouts',JSON.stringify(active));
+    await shared.sendChatTo(`🕊️ @${redeemer} vient de libérer @${target} de son timeout !`,rewardContext).catch(()=>{});
+    await db.addModerationLog('untimeout',target,0,`UnTO points Kick par ${redeemer}`,'',redeemer).catch(()=>{});
+    console.log(`[REWARD UNTO:${tm.slug}] ${redeemer} → ${target}`);
+    return {ok:true,accepted:true,target,type:'untimeout',eventType:'channel.reward.redemption.updated'};
   }
   const enabled = (await tm.getSetting('kick_timeout_reward_enabled','0')) === '1';
   const configuredId = String(await tm.getSetting('kick_timeout_reward_id','')).trim();
@@ -956,6 +984,9 @@ async function processTimeoutReward(tm, data) {
   await settleKickReward(tm.streamerId,redemptionId,!!success);
   if (!success) throw new Error(`Le timeout de @${target} a échoué; la récompense a été remboursée.`);
   await db.addModerationLog('timeout',target,duration,`Récompense points Kick par ${redeemer}`,'',redeemer).catch(()=>{});
+  let activeTimeouts={};try{activeTimeouts=JSON.parse(await tm.getSetting('kick_reward_active_timeouts','{}')||'{}')}catch(_){}
+  activeTimeouts[target.toLowerCase()]={expiresAt:Date.now()+duration*1000,redeemer,duration};
+  await tm.setSetting('kick_reward_active_timeouts',JSON.stringify(activeTimeouts));
   console.log(`[REWARD TO:${tm.slug}] ${redeemer} → ${target} (${duration}s)`);
   return {ok:true,accepted:true,target,duration,eventType:'channel.reward.redemption.updated'};
 }
@@ -2819,6 +2850,48 @@ app.get('/auth/login', (req, res) => {
   return res.redirect(url);
 });
 
+app.get('/auth/twitch/login', async (req, res) => {
+  try {
+    if (req.authStreamer?.slug && !['1','true','yes'].includes(String(req.query?.force || '').toLowerCase())) {
+      return res.redirect(`/s/${encodeURIComponent(req.authStreamer.slug)}/dashboard`);
+    }
+    if (!twitchOAuth.isConfigured()) {
+      return res.status(503).send('Connexion Twitch en préparation : TWITCH_CLIENT_ID, TWITCH_CLIENT_SECRET et TWITCH_REDIRECT_URI doivent être configurés.');
+    }
+    res.redirect(await twitchOAuth.getAuthorizationUrl());
+  } catch (error) {
+    console.error('[TWITCH OAUTH] Démarrage impossible:', error.message);
+    res.status(500).send(`Erreur OAuth Twitch : ${error.message}`);
+  }
+});
+
+app.get('/auth/twitch/callback', async (req, res) => {
+  try {
+    const { code, state, error, error_description } = req.query;
+    if (error) return res.status(400).send(`Erreur Twitch : ${error_description || error}`);
+    if (!code || !state) return res.status(400).send('Code ou état OAuth Twitch manquant.');
+    const token = await twitchOAuth.exchangeCode(code, state);
+    const twitchUser = await twitchOAuth.fetchCurrentUser(token.accessToken);
+    const streamer = await db.upsertTwitchStreamer(twitchUser);
+    await db.saveOAuthToken(
+      twitchOAuth.providerForStreamer(streamer.id),
+      token.accessToken,
+      token.refreshToken,
+      token.expiresAt
+    );
+    await db.setStreamerSetting(streamer.id, 'twitch_oauth_scopes', JSON.stringify(token.scopes || []));
+    await db.setStreamerSetting(streamer.id, 'twitch_connection_status', 'connected');
+    clearAdminTargetCookie(req, res);
+    setSessionCookie(req, res, { id: streamer.id, slug: streamer.slug });
+    setStreamerSessionCookie(res, streamer.slug);
+    console.log(`[TWITCH OAUTH] ✅ Streamer connecté : ${twitchUser.username} (#${streamer.id})`);
+    return res.redirect(`/s/${encodeURIComponent(streamer.slug)}/dashboard?platform=twitch`);
+  } catch (error) {
+    console.error('[TWITCH OAUTH] ❌ Callback:', error.response?.data || error.message);
+    return res.status(500).send(`<pre style="color:#ff7b9c;background:#080b14;padding:20px;font-family:monospace;white-space:pre-wrap">Erreur OAuth Twitch : ${error.message}</pre>`);
+  }
+});
+
 const MEME_AUTH_COOKIE='elbot_meme_identity';
 function memeAuthCookieOptions(req){const forwarded=String(req.headers['x-forwarded-proto']||'').split(',')[0].trim();return{httpOnly:true,secure:forwarded==='https'||req.secure||process.env.NODE_ENV==='production',sameSite:'lax',path:'/',maxAge:30*86400000}}
 app.get('/auth/meme/login',async(req,res)=>{
@@ -3015,6 +3088,30 @@ app.get('/api/oauth/status', async (req, res) => {
   }
 });
 
+app.get('/api/auth/status', async (req, res) => {
+  res.set('Cache-Control', 'no-store');
+  const streamer = req.authStreamer || null;
+  res.json({
+    authenticated: Boolean(streamer?.id),
+    dashboardUrl: streamer?.slug ? `/s/${encodeURIComponent(streamer.slug)}/dashboard` : null,
+    streamer: streamer ? {
+      id: streamer.id,
+      slug: streamer.slug,
+      displayName: streamer.display_name || streamer.kick_username || streamer.twitch_username || streamer.slug,
+      avatarUrl: streamer.avatar_url || '',
+      primaryPlatform: streamer.primary_platform || (streamer.twitch_user_id && !streamer.kick_user_id ? 'twitch' : 'kick'),
+      platforms: {
+        kick: Boolean(streamer.kick_user_id),
+        twitch: Boolean(streamer.twitch_user_id),
+      },
+    } : null,
+    providers: {
+      kick: { configured: kickOAuth.isConfigured() },
+      twitch: { configured: twitchOAuth.isConfigured(), status: twitchOAuth.isConfigured() ? 'available' : 'coming_soon' },
+    },
+  });
+});
+
 app.post('/api/admin/oauth/disconnect', requireAuth, requireTenant, async (req, res) => {
   try {
     const tm = createTenantManager({ db, io, req });
@@ -3065,6 +3162,7 @@ app.get('/api/channel-rewards/timeout',requireAuth,requireTenant,waitDB,async(re
 
 const KICK_REWARD_TYPES={
   timeout:{title:'Timeout un viewer',cost:1000,duration:300,input:true,color:'#ef4444',description:d=>`Choisis le pseudo du viewer à timeout pendant ${d} secondes.`},
+  unto:{title:'UnTO un viewer',cost:750,duration:0,input:true,color:'#22c55e',description:()=>`Choisis le pseudo d’un viewer temporairement timeout par ElBot pour le libérer.`},
   counter:{title:'Counter TO',cost:750,duration:0,input:false,color:'#168cff',description:()=>`Protège ton pseudo contre le prochain Timeout acheté.`},
   message:{title:'Message du viewer',cost:300,duration:0,input:true,color:'#a855f7',description:()=>`Écris un message que le bot publiera dans le chat.`}
 };
