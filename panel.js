@@ -2846,7 +2846,12 @@ app.get('/auth/login', (req, res) => {
   if (!kickOAuth.isConfigured()) {
     return res.status(400).send('KICK_CLIENT_ID, KICK_CLIENT_SECRET ou KICK_REDIRECT_URI manquant dans le fichier .env.');
   }
-  const url = kickOAuth.getAuthorizationUrl(null, { mode: 'streamer_login', returnTo: String(req.query?.returnTo||'').slice(0,200) });
+  const url = kickOAuth.getAuthorizationUrl(null, {
+    mode: 'streamer_login',
+    returnTo: String(req.query?.returnTo||'').slice(0,200),
+    streamerId: req.authStreamer?.id || null,
+    linkExisting: Boolean(req.authStreamer?.id),
+  });
   console.log('[OAUTH LOGIN V2] Connexion streamer Kick lancée');
   return res.redirect(url);
 });
@@ -2996,7 +3001,7 @@ app.get('/auth/callback', async (req, res) => {
     const slug = tenant.normalizeSlug(username);
 
     const channelInfo = await kickOAuth.fetchChannelInfoForUser(token.accessToken, kickUser).catch(() => ({}));
-    const streamer = await db.upsertStreamer({
+    const kickIdentity = {
       slug,
       kickUserId: kickUser.id || null,
       kickUsername: username,
@@ -3008,7 +3013,16 @@ app.get('/auth/callback', async (req, res) => {
       role: 'streamer',
       status: 'active',
       botEnabled: 1
-    });
+    };
+    let streamer = null;
+    if (token.meta?.linkExisting && token.meta?.streamerId) {
+      const existing = await db.getStreamerById(Number(token.meta.streamerId));
+      if (!existing) throw new Error('Le panel ElBot à relier est introuvable.');
+      streamer = await db.linkStreamerKickIdentity(existing.id, kickIdentity);
+      console.log(`[OAUTH CALLBACK V2] 🔗 Kick @${username} relié au panel ${existing.slug}`);
+    } else {
+      streamer = await db.upsertStreamer(kickIdentity);
+    }
 
     await db.saveOAuthToken(kickOAuth.providerForStreamer(streamer.id), token.accessToken, token.refreshToken, token.expiresAt);
     try {
@@ -3022,7 +3036,7 @@ app.get('/auth/callback', async (req, res) => {
       console.error(`[OAUTH CALLBACK V2] Webhooks Kick non enregistrés pour ${slug}:`, subscriptionError.response?.data || subscriptionError.message);
     }
     // Compatibilité V1 : si c'est le streamer par défaut, on garde aussi le provider global kick.
-    if (slug === tenant.DEFAULT_STREAMER_SLUG) {
+    if (streamer.slug === tenant.DEFAULT_STREAMER_SLUG) {
       await db.saveOAuthToken('kick', token.accessToken, token.refreshToken, token.expiresAt);
     }
 
@@ -3037,8 +3051,8 @@ setSessionCookie(req, res, {
 
 // Ancien cookie conservé temporairement pour les parties V2 encore compatibles.
 setStreamerSessionCookie(res, streamer.slug); // compatibilité temporaire avec les pages publiques V2
-    console.log(`[OAUTH CALLBACK V2] ✅ Streamer connecté: ${slug} (#${streamer.id})`);
-    res.redirect(`/s/${slug}/dashboard`);
+    console.log(`[OAUTH CALLBACK V2] ✅ Streamer connecté: ${streamer.slug} (#${streamer.id})`);
+    res.redirect(`/s/${encodeURIComponent(streamer.slug)}/dashboard`);
   } catch (e) {
     console.error('[OAUTH CALLBACK V2] ❌ Exception:', e.response?.data || e.message, e.stack);
     res.status(500).send(`<pre style="color:#ff5c7a;background:#111;padding:20px;font-family:monospace;white-space:pre-wrap">Erreur OAuth V2: ${e.message}\n\n${e.stack || ''}</pre>`);

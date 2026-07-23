@@ -2340,6 +2340,51 @@ async function linkStreamerTwitchIdentity(streamerId, twitch = {}) {
   return getStreamerById(id);
 }
 
+async function linkStreamerKickIdentity(streamerId, kick = {}) {
+  const id = Number(streamerId);
+  const kickUserId = String(kick.kickUserId || kick.userId || kick.id || '').trim();
+  const kickUsername = normalizeStreamerSlug(kick.kickUsername || kick.username || kick.login || kick.displayName);
+  if (!id || !kickUserId || !kickUsername) throw new Error('Identité Kick invalide');
+  const duplicate = await get(`SELECT id,slug FROM streamers WHERE kick_user_id = ? AND id != ?`, [kickUserId, id]);
+  if (duplicate) throw new Error(`Ce compte Kick est déjà lié au panel ${duplicate.slug}.`);
+  await run(
+    `UPDATE streamers SET
+       kick_user_id = ?,
+       kick_username = ?,
+       channel_id = COALESCE(NULLIF(?,''),channel_id),
+       chatroom_id = COALESCE(NULLIF(?,''),chatroom_id),
+       broadcaster_user_id = COALESCE(NULLIF(?,''),broadcaster_user_id,?),
+       display_name = COALESCE(NULLIF(?,''),display_name),
+       avatar_url = COALESCE(NULLIF(?,''),avatar_url),
+       primary_platform = CASE
+         WHEN twitch_user_id IS NULL OR twitch_user_id = '' THEN 'kick'
+         ELSE primary_platform
+       END,
+       role = ?,
+       bot_enabled = 1,
+       status = 'active',
+       updated_at = datetime('now')
+     WHERE id = ?`,
+    [
+      kickUserId, kickUsername,
+      kick.channelId || kick.channel_id || '',
+      kick.chatroomId || kick.chatroom_id || '',
+      kick.broadcasterUserId || kick.broadcaster_user_id || '',
+      kickUserId,
+      kick.displayName || kick.display_name || kickUsername,
+      kick.avatarUrl || kick.avatar_url || '',
+      canonicalStreamerRole(kickUsername, kick.role),
+      id,
+    ]
+  );
+  await ensureBotIdentities();
+  const identity = await getBotIdentityByKey(kickUsername === 'fack7up' ? 'bot7up' : 'elbot');
+  if (identity?.id) {
+    await run(`UPDATE streamers SET assigned_bot_identity_id = ?, updated_at = datetime('now') WHERE id = ?`, [identity.id, id]);
+  }
+  return getStreamerById(id);
+}
+
 async function upsertTwitchStreamer(twitch = {}) {
   const userId = String(twitch.userId || twitch.id || '').trim();
   const username = normalizeStreamerSlug(twitch.username || twitch.login || twitch.displayName);
@@ -2716,7 +2761,7 @@ module.exports = {
   getPointsConfig, setPointsConfigValue, setPointsConfigBulk,
   setBotStatus, getBotStatus, getAllBotStatus,
   saveOAuthToken, getOAuthToken, deleteOAuthToken,
-  ensureDefaultStreamer, getStreamerBySlug, getStreamerById, getStreamerByBroadcasterUserId, listStreamers, setStreamerPlan, upsertStreamer, upsertTwitchStreamer, linkStreamerTwitchIdentity, updateStreamerKickMeta, getActiveStreamersForBot,
+  ensureDefaultStreamer, getStreamerBySlug, getStreamerById, getStreamerByBroadcasterUserId, listStreamers, setStreamerPlan, upsertStreamer, upsertTwitchStreamer, linkStreamerTwitchIdentity, linkStreamerKickIdentity, updateStreamerKickMeta, getActiveStreamersForBot,
   ensureBotIdentities, getBotIdentityById, getBotIdentityByKey, getAssignedBotIdentity, getBotAssignmentOptions, assignBotIdentity, connectCustomBotIdentity, markBotIdentityConnected, markBotIdentityAuthorizationRequired, enableStreamersForBotIdentity,
   getStreamerSetting, setStreamerSetting, getOrCreateOverlayToken, regenerateOverlayToken, getOverlayTokenByValue, getOverlayTokensForStreamer, saveOAuthTokenForStreamer, getOAuthTokenForStreamer, deleteOAuthTokenForStreamer,
   createMemeEvent, getMemeEvents,

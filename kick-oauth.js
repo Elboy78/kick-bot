@@ -89,6 +89,7 @@ function getAuthorizationUrl(scopes, options = {}) {
     memeToken: options.memeToken || options.meme_token || '',
     expectedUsername: options.expectedUsername || options.expected_username || '',
     platformAdmin: Boolean(options.platformAdmin),
+    linkExisting: Boolean(options.linkExisting && (options.streamerId || options.streamer_id)),
     createdAt: Date.now()
   };
   pendingPKCE = { codeVerifier, state, meta, createdAt: Date.now() };
