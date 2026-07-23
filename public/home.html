@@ -13,14 +13,14 @@
   <div class="wrap">
     <nav>
       <div class="brand"><img src="/assets/brand/elbot-logo.png" alt="">ElBot</div>
-      <div class="nav-actions"><a class="btn" href="#features">Fonctionnalités</a><a class="btn primary" id="navLogin" href="/login">Connexion</a></div>
+      <div class="nav-actions"><a class="btn" href="#features">Fonctionnalités</a><a class="btn primary" id="navLogin" href="/login?choose=1">Connexion</a></div>
     </nav>
     <main class="hero">
       <section>
         <div class="eyebrow">● KICK DISPONIBLE · TWITCH EN INTÉGRATION</div>
         <h1>Ton stream.<br><span>Ton univers.</span><br>Un seul bot.</h1>
         <p class="lead">ElBot réunit widgets OBS, fidélité, modération, alertes et interactions communautaires dans une interface pensée pour les streamers.</p>
-        <div class="hero-actions"><a class="btn primary" id="heroLogin" href="/login">Connecter ma chaîne →</a><a class="btn" href="#features">Découvrir ElBot</a></div>
+        <div class="hero-actions"><a class="btn primary" id="heroLogin" href="/login?choose=1">Connecter une plateforme →</a><a class="btn" id="dashboardLink" href="#features">Découvrir ElBot</a></div>
         <div class="platforms"><b class="kick"><i class="dot"></i>Kick opérationnel</b><b class="twitch"><i class="dot"></i>Twitch arrive dans le même panel</b></div>
       </section>
       <section class="preview" aria-label="Aperçu du panel ElBot">
@@ -38,13 +38,15 @@
         <article class="feature"><div class="icon">🔗</div><h3>Multi-plateforme</h3><p>Kick aujourd’hui, Twitch en cours d’intégration, dans le même espace ElBot.</p></article>
       </div>
     </section>
-    <section class="final"><h2>Prêt à connecter ta communauté ?</h2><p>Choisis ta plateforme et ouvre automatiquement ton espace streamer.</p><a class="btn primary" id="finalLogin" href="/login">Commencer avec ElBot</a></section>
+    <section class="final"><h2>Prêt à connecter ta communauté ?</h2><p>Choisis ta plateforme et ouvre automatiquement ton espace streamer.</p><a class="btn primary" id="finalLogin" href="/login?choose=1">Commencer avec ElBot</a></section>
     <footer><span>© 2026 ElBot</span><span>Conçu pour Kick & Twitch</span></footer>
   </div>
   <script>
     fetch('/api/auth/status',{cache:'no-store'}).then(r=>r.json()).then(j=>{
       if(!j.authenticated||!j.dashboardUrl)return;
-      for(const id of ['navLogin','heroLogin','finalLogin']){const a=document.getElementById(id);a.href=j.dashboardUrl;a.textContent='Ouvrir mon panel →'}
+      const dashboard=document.getElementById('dashboardLink');
+      dashboard.href=j.dashboardUrl;
+      dashboard.textContent='Ouvrir mon panel →';
     }).catch(()=>{});
   </script>
 </body>

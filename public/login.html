@@ -14,8 +14,8 @@
     <section class="card">
       <header class="head"><img src="/assets/brand/elbot-logo.png" alt="ElBot"><h1>Connexion à ElBot</h1><p>Choisis la plateforme liée à ta chaîne.</p></header>
       <div class="choices">
-        <a class="choice kick" id="kickLogin" href="/auth/login"><span class="badge ready">DISPONIBLE</span><span class="platform">K</span><h2>Continuer avec Kick</h2><p>Retrouve immédiatement ton panel, tes widgets, tes points et toutes les données de ta chaîne Kick.</p><span class="go">Se connecter avec Kick →</span></a>
-        <a class="choice twitch" id="twitchLogin" href="/auth/twitch/login"><span class="badge soon" id="twitchBadge">INTÉGRATION</span><span class="platform">T</span><h2>Continuer avec Twitch</h2><p>Connecte ton identité Twitch. Les événements, le chat et les récompenses arriveront progressivement dans le même panel.</p><span class="go" id="twitchAction">Configurer Twitch →</span></a>
+        <a class="choice kick" id="kickLogin" href="/auth/login?force=1"><span class="badge ready">DISPONIBLE</span><span class="platform">K</span><h2>Continuer avec Kick</h2><p>Retrouve immédiatement ton panel, tes widgets, tes points et toutes les données de ta chaîne Kick.</p><span class="go">Se connecter avec Kick →</span></a>
+        <a class="choice twitch" id="twitchLogin" href="/auth/twitch/login?force=1"><span class="badge soon" id="twitchBadge">INTÉGRATION</span><span class="platform">T</span><h2>Continuer avec Twitch</h2><p>Connecte ton identité Twitch. Les événements, le chat et les récompenses arriveront progressivement dans le même panel.</p><span class="go" id="twitchAction">Configurer Twitch →</span></a>
       </div>
       <div class="error" id="error"></div>
       <div class="notice">Tes identités et tes données restent isolées par streamer et par plateforme.</div>
@@ -23,7 +23,6 @@
   </main>
   <script>
     fetch('/api/auth/status',{cache:'no-store'}).then(r=>r.json()).then(j=>{
-      if(j.authenticated&&j.dashboardUrl){location.replace(j.dashboardUrl);return}
       if(j.providers?.twitch?.configured){document.getElementById('twitchBadge').textContent='DISPONIBLE';document.getElementById('twitchAction').textContent='Se connecter avec Twitch →'}
       else document.getElementById('twitchLogin').addEventListener('click',e=>{e.preventDefault();const box=document.getElementById('error');box.style.display='block';box.textContent='Twitch est prêt dans le code. Il reste à ajouter les identifiants de l’application Twitch sur le VPS.'})
     }).catch(()=>{});

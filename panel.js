@@ -68,7 +68,8 @@ function servePublicHome(req, res) {
 
 // Le choix de plateforme redirige ensuite vers le panel complet.
 function serveLoginOrDashboard(req, res) {
-  if (req.authStreamer?.slug) {
+  const choosePlatform = ['1','true','yes'].includes(String(req.query?.choose || '').toLowerCase());
+  if (req.authStreamer?.slug && !choosePlatform) {
     return res.redirect(`/s/${encodeURIComponent(req.authStreamer.slug)}/dashboard`);
   }
   return res.sendFile(path.join(__dirname, 'public', 'login.html'));
