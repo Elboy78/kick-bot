@@ -461,8 +461,10 @@ function filterLeaderboardUsers(rows, ignored) {
 app.get('/api/leaderboard',    waitDB,    async (req,res) => {
   try {
     const limit = Math.min(parseInt(req.query.limit||10),100);
+    const platform = ['kick','twitch','all'].includes(String(req.query.platform||'kick').toLowerCase())
+      ? String(req.query.platform).toLowerCase() : 'kick';
     const ignored = await getLeaderboardIgnoredUsers();
-    const rawRows = await db.getLeaderboard(Math.max(limit + ignored.length + 50, limit));
+    const rawRows = await db.getPlatformLeaderboard(platform, Math.max(limit + ignored.length + 50, limit));
     const data = filterLeaderboardUsers(rawRows, ignored)
       .slice(0, limit)
       .map((v, i) => ({ ...v, original_rank: v.rank, rank: i + 1 }));
@@ -489,8 +491,18 @@ app.post('/api/platform-admin/streamers/:id/plan', requireAuth, requirePlatformA
 app.get('/api/community', waitDB, async (req, res) => {
   try {
     const limit = Math.max(10, Math.min(500, parseInt(req.query.limit || '100') || 100));
+    const platform = ['kick','twitch','all'].includes(String(req.query.platform||'kick').toLowerCase())
+      ? String(req.query.platform).toLowerCase() : 'kick';
+    if (platform === 'twitch') {
+      return res.json({ data:{
+        streamer:req.streamer?.slug,
+        platform,
+        totals:{known_viewers:0,known_followers:0,current_subscribers:0},
+        supporters:[],followers:[],events:[],
+      } });
+    }
     const data = await db.getCommunityData(limit, req.streamer?.id);
-    res.json({ data: { streamer: req.streamer?.slug, ...data } });
+    res.json({ data: { streamer: req.streamer?.slug, platform, ...data } });
   } catch (e) {
     console.error('[COMMUNAUTÉ] Lecture impossible:', e.message);
     res.status(500).json({ error: 'Historique communauté indisponible' });
@@ -3171,6 +3183,55 @@ app.post('/api/admin/oauth/twitch/disconnect', requireAuth, requireTenant, async
     res.json({ success: true, connected: false, streamerId: tm.streamerId });
   } catch (e) {
     res.status(500).json({ error: e.message });
+  }
+});
+
+app.post('/api/account/primary-platform', requireAuth, requireTenant, waitDB, async (req, res) => {
+  try {
+    const platform = String(req.body?.platform || '').trim().toLowerCase();
+    try {
+      if (platform === 'kick') {
+        const token = await kickOAuth.getValidAccessToken(req.streamer.id);
+        if (token) {
+          const user = await kickOAuth.fetchCurrentUser(token);
+          if (user) await db.linkStreamerKickIdentity(req.streamer.id, user);
+        }
+      } else if (platform === 'twitch') {
+        const tokenRow = await db.getOAuthToken(`twitch:${req.streamer.id}`);
+        if (tokenRow?.access_token) {
+          const user = await twitchOAuth.fetchCurrentUser(tokenRow.access_token);
+          if (user) await db.linkStreamerTwitchIdentity(req.streamer.id, user);
+        }
+      }
+    } catch (refreshError) {
+      console.warn(`[ACCOUNT] Rafraîchissement identité ${platform} non bloquant:`, refreshError.message);
+    }
+    const streamer = await db.setStreamerPrimaryPlatform(req.streamer.id, platform);
+    res.set('Cache-Control', 'no-store');
+    res.json({ success:true, data:{
+      primaryPlatform:streamer.primary_platform,
+      avatarUrl:streamer.avatar_url || '',
+    } });
+  } catch (e) {
+    res.status(400).json({ error:e.message });
+  }
+});
+
+app.delete('/api/account/platform/:platform', requireAuth, requireTenant, waitDB, async (req, res) => {
+  try {
+    const platform = String(req.params.platform || '').toLowerCase();
+    if (platform === 'kick') await kickOAuth.disconnect(req.streamer.id);
+    else if (platform === 'twitch') await twitchOAuth.disconnect(req.streamer.id);
+    else return res.status(400).json({ error:'Plateforme invalide' });
+    const streamer = await db.unlinkStreamerPlatform(req.streamer.id, platform);
+    res.set('Cache-Control', 'no-store');
+    res.json({ success:true, data:{
+      primaryPlatform:streamer.primary_platform,
+      kickLinked:Boolean(streamer.kick_user_id),
+      twitchLinked:Boolean(streamer.twitch_user_id),
+    } });
+  } catch (e) {
+    res.status(400).json({ error:e.message });
   }
 });
 

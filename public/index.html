@@ -811,7 +811,7 @@ body.light .card,body.light .panel,body.light .widget-engine-card{background:lin
 
   <!-- ══ CLASSEMENT ══ -->
   <div class="page" id="page-classement">
-    <div class="header"><div><h1>Classement</h1><p>Top viewers et niveaux</p></div><div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn" onclick="copyPublicLeaderboardLink()">🔗 Copier le lien public</button><button class="btn" onclick="refreshLeaderboard()">↻ Actualiser</button></div></div>
+    <div class="header"><div><h1>Classement</h1><p>Top viewers et niveaux</p></div><div style="display:flex;gap:8px;flex-wrap:wrap"><select class="inp inp-sm platform-data-filter" id="leaderboard-platform-filter" onchange="setPanelDataPlatform(this.value)" style="width:150px"><option value="kick">🟢 Kick</option><option value="twitch">🟣 Twitch</option><option value="all">🔗 Les deux</option></select><button class="btn" onclick="copyPublicLeaderboardLink()">🔗 Copier le lien public</button><button class="btn" onclick="refreshLeaderboard()">↻ Actualiser</button></div></div>
     <div class="g2" style="align-items:start;margin-bottom:14px">
     <div class="panel">
       <h3>🏆 Classement complet
@@ -828,7 +828,7 @@ body.light .card,body.light .panel,body.light .widget-engine-card{background:lin
 
   <!-- ══ COMMUNAUTÉ ══ -->
   <div class="page" id="page-communaute">
-    <div class="header"><div><h1>Communauté</h1><p>Mémoire de la chaîne, soutiens et followers connus</p></div><div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btnx btn-outline" onclick="copySubgiftsLeaderboardLink()">🔗 Lien Top Sub Gifts</button><button class="btn" id="community-refresh-btn" onclick="refreshCommunity()">↻ Actualiser</button></div></div>
+    <div class="header"><div><h1>Communauté</h1><p>Mémoire de la chaîne, soutiens et followers connus</p></div><div style="display:flex;gap:8px;flex-wrap:wrap"><select class="inp inp-sm platform-data-filter" id="community-platform-filter" onchange="setPanelDataPlatform(this.value)" style="width:150px"><option value="kick">🟢 Kick</option><option value="twitch">🟣 Twitch</option><option value="all">🔗 Les deux</option></select><button class="btnx btn-outline platform-kick-data-action" onclick="copySubgiftsLeaderboardLink()">🔗 Lien Top Sub Gifts</button><button class="btn" id="community-refresh-btn" onclick="refreshCommunity()">↻ Actualiser</button></div></div>
     <div class="g3" style="margin-bottom:14px">
       <div class="panel"><h3>👥 Viewers connus</h3><div id="community-known-viewers" style="font-size:28px;font-weight:900;color:var(--accent)">—</div></div>
       <div class="panel"><h3>💚 Follows datés</h3><div id="community-known-followers" style="font-size:28px;font-weight:900;color:#22c55e">—</div></div>
@@ -4724,7 +4724,10 @@ body.ref-theme-transition *:after{
             <div style="background:var(--accent-bg);border:1px solid var(--accent-brd);border-radius:8px;padding:10px 12px;margin-bottom:10px;font-size:11px;color:var(--accent);font-weight:600">
               ✅ Compte officiel connecté — le token se rafraîchit automatiquement, plus rien à faire.
             </div>
-            <button class="btnx btn-ghost" style="width:100%;justify-content:center" onclick="disconnectOAuth()">🔌 Déconnecter le compte</button>
+            <div style="display:flex;gap:7px;flex-wrap:wrap">
+              <button class="btnx btn-ghost" style="flex:1;justify-content:center" onclick="disconnectOAuth()">🔌 Retirer l’autorisation</button>
+              <button class="btnx btn-red" id="unlink-kick-button" style="flex:1;justify-content:center;display:none" onclick="unlinkPlatform('kick')">Délier Kick</button>
+            </div>
           </div>
 
           <div id="oauth-disconnected-block" style="display:none">
@@ -4767,6 +4770,7 @@ body.ref-theme-transition *:after{
               <div style="display:flex;gap:7px;flex-wrap:wrap">
                 <button class="btnx btn-outline" style="flex:1;justify-content:center" onclick="startTwitchOAuthReconnect()">↻ Renouveler Twitch</button>
                 <button class="btnx btn-ghost" style="flex:1;justify-content:center" onclick="disconnectTwitchOAuth()">🔌 Déconnecter Twitch</button>
+                <button class="btnx btn-red" id="unlink-twitch-button" style="flex:1;justify-content:center;display:none" onclick="unlinkPlatform('twitch')">Délier Twitch</button>
               </div>
             </div>
             <div id="twitch-disconnected-block" style="display:none">
@@ -4774,6 +4778,20 @@ body.ref-theme-transition *:after{
               <button class="btnx btn-outline" id="oauth-connect-twitch-btn" style="width:100%;justify-content:center" onclick="startTwitchOAuthReconnect()">🟣 Connecter le compte Twitch</button>
             </div>
             <div id="twitch-not-configured-block" style="display:none;font-size:10px;color:#fbbf24;line-height:1.55">OAuth Twitch n’est pas configuré sur ce serveur.</div>
+          </div>
+
+          <div id="primary-platform-box" style="display:none;margin-top:10px;padding:11px 12px;border:1px solid var(--brd);border-radius:12px;background:var(--surface2)">
+            <div style="font-size:10px;font-weight:900;margin-bottom:4px">Plateforme principale du panel</div>
+            <div style="font-size:9px;color:var(--muted);line-height:1.45;margin-bottom:9px">Choisis la photo et l’identité affichées en priorité. Cela ne délie aucun compte.</div>
+            <div class="platform-primary-switch">
+              <button type="button" id="primary-platform-kick" onclick="setPrimaryPlatform('kick')"><span class="platform-logo platform-logo-kick">K</span> Kick</button>
+              <button type="button" id="primary-platform-twitch" onclick="setPrimaryPlatform('twitch')"><span class="platform-logo platform-logo-twitch">T</span> Twitch</button>
+            </div>
+          </div>
+
+          <div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--brd)">
+            <button class="btnx btn-outline" style="width:100%;justify-content:center" onclick="logout()">🚪 Se déconnecter du panel</button>
+            <div style="font-size:8px;color:var(--muted);text-align:center;line-height:1.45;margin-top:6px">Tes autorisations OAuth et toutes tes données sont conservées pour ton prochain retour.</div>
           </div>
         </div>
         <div class="panel" style="margin-bottom:14px"><h3>ℹ️ À propos</h3><ul class="info"><li><span>Version</span><span style="color:#8b35ff;font-weight:700">ElBot v2.1.0</span></li><li><span>Base de données</span><span>SQLite</span></li><li><span>Hébergement</span><span>VPS ElBot</span></li><li><span>Chaîne</span><span id="settings-channel-name">Connecté</span></li></ul></div>
@@ -4841,6 +4859,7 @@ if (typeof window.io === 'function') {
 const MEDALS = ['🥇','🥈','🥉'];
 try { document.querySelectorAll('#settings-channel-name').forEach(el => el.textContent = CURRENT_STREAMER_SLUG || 'connecté'); } catch(e) {}
 let lbData = [], levels = [];
+let PANEL_DATA_PLATFORM_FILTER = localStorage.getItem('elbot_data_platform') || 'kick';
 const PAGE_TITLES = {dashboard:'Dashboard',classement:'Classement',communaute:'Communauté',lobby:'Lobby',jeux:'Jeux',objectifs:'Objectifs',dbd:'Dead by Daylight',moderation:'Modération',spam:'Anti-spam',commands:'Commandes',historique:'Historique',admin:'Administration',settings:'Paramètres',outils:'Outils Chat',alertes:'Alertes'};
 let songRequestRefreshTimer = null;
 
@@ -5206,12 +5225,12 @@ async function loadLevels() {
 
 async function loadDashLB() {
   try {
-    lbData = await get('/api/leaderboard?limit=10') || [];
+    lbData = await get('/api/leaderboard?limit=10&platform='+encodeURIComponent(PANEL_DATA_PLATFORM_FILTER)) || [];
     const max = lbData[0]?.points || 1;
     document.getElementById('dash-lb').innerHTML = lbData.map((v,i) => `
       <tr>
         <td><span class="${i<3?'rank-'+(i+1):'rank-num'}">${i<3?MEDALS[i]:'#'+v.rank}</span></td>
-        <td style="font-weight:600">${esc(v.username)}</td>
+        <td style="font-weight:600">${esc(v.username)}${PANEL_DATA_PLATFORM_FILTER==='all'?` <small class="viewer-platform-tag ${v.platform==='twitch'?'twitch':'kick'}">${v.platform==='twitch'?'Twitch':'Kick'}</small>`:''}</td>
         <td>${lvBadge(v.level)}</td>
         <td>
           <div style="font-weight:700;color:var(--accent)">${(v.points||0).toLocaleString('fr')}</div>
@@ -5350,9 +5369,21 @@ async function loadChatActivityWeek() {
 async function loadLeaderboard() {
   try {
     const limit = document.getElementById('lb-limit')?.value || 10;
-    lbData = await get('/api/leaderboard?limit='+limit) || [];
+    lbData = await get('/api/leaderboard?limit='+limit+'&platform='+encodeURIComponent(PANEL_DATA_PLATFORM_FILTER)) || [];
     renderLB(lbData);
   } catch(e){}
+}
+
+function setPanelDataPlatform(platform) {
+  const requested = ['kick','twitch','all'].includes(platform) ? platform : 'kick';
+  const mode = PLATFORM_CONNECTIONS.mode;
+  PANEL_DATA_PLATFORM_FILTER = mode === 'multi' ? requested : mode;
+  localStorage.setItem('elbot_data_platform', PANEL_DATA_PLATFORM_FILTER);
+  document.querySelectorAll('.platform-data-filter').forEach(select => { select.value=PANEL_DATA_PLATFORM_FILTER; });
+  document.querySelectorAll('.platform-kick-data-action').forEach(el => {
+    el.style.display = PANEL_DATA_PLATFORM_FILTER === 'twitch' ? 'none' : '';
+  });
+  Promise.allSettled([loadLeaderboard(),loadDashLB(),loadCommunity(true)]);
 }
 
 function communityDate(value, unknown = 'Date inconnue') {
@@ -5364,7 +5395,7 @@ function communityDate(value, unknown = 'Date inconnue') {
 async function loadCommunity(skipKickSync = false) {
   const supportersBody = document.getElementById('community-supporters');
   try {
-    const data = await get('/api/community?limit=500') || {};
+    const data = await get('/api/community?limit=500&platform='+encodeURIComponent(PANEL_DATA_PLATFORM_FILTER)) || {};
     const totals = data.totals || {};
     document.getElementById('community-known-viewers').textContent = Number(totals.known_viewers || 0).toLocaleString('fr-FR');
     document.getElementById('community-known-followers').textContent = Number(totals.known_followers || 0).toLocaleString('fr-FR');
@@ -5399,7 +5430,7 @@ async function loadCommunity(skipKickSync = false) {
     const labels = { follow:'💚 Nouveau follow', new:'⭐ Nouveau sub', renewal:'🔄 Renouvellement', gift:'🎁 Subs offerts' };
     const eventsEl = document.getElementById('community-events');
     eventsEl.innerHTML = (data.events || []).length ? data.events.map(item => `<div style="padding:10px 12px;border:1px solid var(--border);border-radius:10px;background:var(--surface2)"><div style="display:flex;justify-content:space-between;gap:8px"><strong>${labels[item.type] || esc(item.type)}</strong><small style="color:var(--muted)">${communityDate(item.at)}</small></div><div style="margin-top:4px;color:var(--text)">${esc(item.username || item.gifter || 'Anonyme')}${item.type==='gift' ? ` · ${Number(item.count||1)} gifts` : ''}${item.months ? ` · ${Number(item.months)} mois` : ''}</div><small style="color:var(--muted)">${item.source === 'legacy_subcounter' ? 'Historique récupéré' : 'Détecté par ElBot'}</small></div>`).join('') : '<div class="empty"><p>Aucun événement enregistré</p></div>';
-    if (!skipKickSync && !communityKickSyncDone) {
+    if (PANEL_DATA_PLATFORM_FILTER !== 'twitch' && !skipKickSync && !communityKickSyncDone) {
       const synchronized = await syncKickHistoricalGiftLeaderboard();
       if (synchronized) return loadCommunity(true);
     }
@@ -5560,7 +5591,7 @@ function renderLB(data) {
     const r = Number(v.rank);
     return `<tr>
       <td><span class="${r<=3?'rank-'+r:'rank-num'}">${r<=3?MEDALS[r-1]:'#'+r}</span></td>
-      <td style="font-weight:600">${esc(v.username)}</td>
+      <td style="font-weight:600">${esc(v.username)}${PANEL_DATA_PLATFORM_FILTER==='all'?` <small class="viewer-platform-tag ${v.platform==='twitch'?'twitch':'kick'}">${v.platform==='twitch'?'Twitch':'Kick'}</small>`:''}</td>
       <td>${lvBadge(v.level)}</td>
       <td>
         <div style="font-weight:700;color:var(--accent)">${(v.points||0).toLocaleString('fr')}</div>
@@ -7955,6 +7986,17 @@ function applyPlatformVisibility() {
     : mode === 'twitch'
       ? 'Ce panel affiche uniquement les informations Twitch. Tu peux lier Kick quand tu le souhaites.'
       : 'Ce panel affiche uniquement les informations Kick. Tu peux lier Twitch quand tu le souhaites.';
+  const allowedDataPlatform = mode === 'multi' ? PANEL_DATA_PLATFORM_FILTER : mode;
+  if (PANEL_DATA_PLATFORM_FILTER !== allowedDataPlatform) PANEL_DATA_PLATFORM_FILTER = allowedDataPlatform;
+  document.querySelectorAll('.platform-data-filter').forEach(select => {
+    select.querySelector('option[value="kick"]').disabled = !kick;
+    select.querySelector('option[value="twitch"]').disabled = !twitch;
+    select.querySelector('option[value="all"]').disabled = mode !== 'multi';
+    select.value = PANEL_DATA_PLATFORM_FILTER;
+  });
+  document.querySelectorAll('.platform-kick-data-action').forEach(el => {
+    el.style.display = PANEL_DATA_PLATFORM_FILTER === 'twitch' ? 'none' : '';
+  });
   if (WIDGET_ENGINE_CACHE) renderWidgetEngine(WIDGET_ENGINE_CACHE);
 }
 
@@ -7986,6 +8028,16 @@ async function loadOAuthStatus() {
     const twitch = normalizePlatformConnection(auth?.streamer?.platforms?.twitch);
     PLATFORM_CONNECTIONS = { mode:'kick', kick, twitch };
     applyPlatformVisibility();
+    const primaryPlatform = auth?.streamer?.primaryPlatform || (twitch.linked && !kick.linked ? 'twitch' : 'kick');
+    const primaryBox = document.getElementById('primary-platform-box');
+    if (primaryBox) primaryBox.style.display = kick.linked && twitch.linked ? 'block' : 'none';
+    ['kick','twitch'].forEach(platform => {
+      document.getElementById(`primary-platform-${platform}`)?.classList.toggle('active', primaryPlatform === platform);
+    });
+    const unlinkKick = document.getElementById('unlink-kick-button');
+    const unlinkTwitch = document.getElementById('unlink-twitch-button');
+    if (unlinkKick) unlinkKick.style.display = kick.linked && twitch.linked ? '' : 'none';
+    if (unlinkTwitch) unlinkTwitch.style.display = kick.linked && twitch.linked ? '' : 'none';
 
     const kickUsername = document.getElementById('kick-connection-username');
     if (kickUsername) kickUsername.textContent = kick.username ? `@${kick.username}` : 'Aucun compte lié';
@@ -8064,6 +8116,28 @@ async function disconnectTwitchOAuth() {
   if(!r.ok){toast(d.error||'Déconnexion Twitch impossible',false);return}
   toast('Compte Twitch déconnecté');
   await loadOAuthStatus();
+}
+
+async function setPrimaryPlatform(platform) {
+  const response = await fetch('/api/account/primary-platform', {
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({ platform })
+  });
+  const payload = await response.json().catch(()=>({}));
+  if (!response.ok) return toast(payload.error || 'Changement impossible', false);
+  toast(`Plateforme principale : ${platform === 'kick' ? 'Kick' : 'Twitch'} ✓`);
+  await Promise.all([loadOAuthStatus(), loadConnectedStreamerIdentity()]);
+}
+
+async function unlinkPlatform(platform) {
+  const label = platform === 'kick' ? 'Kick' : 'Twitch';
+  if (!confirm(`Délier complètement ${label} de ce panel ? Les données déjà enregistrées seront conservées, mais cette plateforme ne sera plus associée au compte.`)) return;
+  const response = await fetch('/api/account/platform/' + platform, { method:'DELETE' });
+  const payload = await response.json().catch(()=>({}));
+  if (!response.ok) return toast(payload.error || `Impossible de délier ${label}`, false);
+  toast(`${label} a été délié du panel`);
+  await Promise.all([loadOAuthStatus(), loadConnectedStreamerIdentity()]);
 }
 
 setInterval(() => {
@@ -11871,6 +11945,8 @@ body[data-ref-interface="aurora"] .ref-panel{
 .platform-logo-twitch{color:#fff;background:#9146ff;box-shadow:0 0 14px rgba(145,70,255,.2)}
 .platform-status-pill{font-size:8px;font-weight:900;padding:4px 7px;border-radius:999px;white-space:nowrap}
 .platform-connected-note{background:rgba(34,197,94,.08);border:1px solid rgba(34,197,94,.23);border-radius:8px;padding:9px 10px;margin-bottom:9px;font-size:9px;color:#86efac;line-height:1.5}
+.platform-primary-switch{display:grid;grid-template-columns:1fr 1fr;gap:7px}.platform-primary-switch button{display:flex;align-items:center;justify-content:center;gap:8px;padding:8px;border:1px solid var(--brd);border-radius:10px;background:var(--card);color:var(--muted);font:900 10px inherit;cursor:pointer}.platform-primary-switch button.active{color:var(--text);border-color:var(--accent);box-shadow:inset 0 0 0 1px var(--accent-brd),0 0 16px var(--accent-bg)}.platform-primary-switch .platform-logo{width:24px;height:24px;border-radius:7px;font-size:9px}
+.viewer-platform-tag{display:inline-flex;margin-left:5px;padding:2px 5px;border-radius:999px;font-size:7px;font-weight:900;vertical-align:middle}.viewer-platform-tag.kick{background:rgba(83,252,24,.11);color:#86efac}.viewer-platform-tag.twitch{background:rgba(145,70,255,.15);color:#c4a1ff}
 [data-platform-mode="twitch"] .platform-kick-only{display:none!important}
 [data-platform-mode="kick"] .platform-twitch-only{display:none!important}
 @media(prefers-reduced-motion:reduce){.ref-wave,.lpd.blink{animation:none!important}}

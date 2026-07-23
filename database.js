@@ -240,6 +240,21 @@ async function initSchema() {
       created_at    TEXT    NOT NULL DEFAULT (datetime('now')),
       UNIQUE(streamer_id, username)
     )`,
+    `CREATE TABLE IF NOT EXISTS platform_viewers (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      streamer_id INTEGER NOT NULL,
+      platform TEXT NOT NULL CHECK(platform IN ('kick','twitch')),
+      platform_user_id TEXT,
+      username TEXT NOT NULL,
+      points INTEGER NOT NULL DEFAULT 0,
+      total_minutes INTEGER NOT NULL DEFAULT 0,
+      sessions INTEGER NOT NULL DEFAULT 0,
+      level TEXT NOT NULL DEFAULT 'Bronze',
+      last_seen TEXT,
+      first_seen TEXT NOT NULL DEFAULT (datetime('now')),
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      UNIQUE(streamer_id,platform,username)
+    )`,
     `CREATE TABLE IF NOT EXISTS points_log (
       id          INTEGER PRIMARY KEY AUTOINCREMENT,
       streamer_id INTEGER NOT NULL DEFAULT 1,
@@ -607,6 +622,8 @@ async function initSchema() {
     `ALTER TABLE streamers ADD COLUMN primary_platform TEXT NOT NULL DEFAULT 'kick'`,
     `ALTER TABLE streamers ADD COLUMN twitch_user_id TEXT`,
     `ALTER TABLE streamers ADD COLUMN twitch_username TEXT`,
+    `ALTER TABLE streamers ADD COLUMN kick_avatar_url TEXT`,
+    `ALTER TABLE streamers ADD COLUMN twitch_avatar_url TEXT`,
   ];
   for (const sql of migrations) {
     try {
@@ -812,6 +829,56 @@ async function getLeaderboard(limit = 10) {
   `, [scopedStreamerId(), limit]);
   const engine = await getRankingEngine();
   return rows.map((v, i) => ({ ...engine.apply(v), rank: i + 1 }));
+}
+
+async function upsertPlatformViewer(streamerId, platform, username, platformUserId = null) {
+  const sid = Number(streamerId || scopedStreamerId());
+  const source = String(platform || '').trim().toLowerCase();
+  const user = String(username || '').trim().toLowerCase();
+  if (!sid || !['kick','twitch'].includes(source) || !user) throw new Error('Viewer plateforme invalide');
+  await run(`INSERT INTO platform_viewers
+    (streamer_id,platform,platform_user_id,username,last_seen)
+    VALUES (?,?,?,?,datetime('now'))
+    ON CONFLICT(streamer_id,platform,username) DO UPDATE SET
+      platform_user_id=COALESCE(excluded.platform_user_id,platform_viewers.platform_user_id),
+      last_seen=datetime('now')`,
+    [sid,source,platformUserId ? String(platformUserId) : null,user]);
+}
+
+async function addPlatformViewerPoints(streamerId, platform, username, points, minutesWatched = 0, platformUserId = null) {
+  await upsertPlatformViewer(streamerId, platform, username, platformUserId);
+  await run(`UPDATE platform_viewers SET
+    points=MAX(0,points+?),
+    total_minutes=total_minutes+?,
+    last_seen=datetime('now')
+    WHERE streamer_id=? AND platform=? AND username=?`,
+    [Number(points)||0,Number(minutesWatched)||0,Number(streamerId||scopedStreamerId()),String(platform).toLowerCase(),String(username).toLowerCase()]);
+}
+
+async function getPlatformLeaderboard(platform = 'kick', limit = 10) {
+  const source = ['kick','twitch','all'].includes(String(platform).toLowerCase()) ? String(platform).toLowerCase() : 'kick';
+  const safeLimit = Math.max(1,Math.min(500,parseInt(limit)||10));
+  const sid = scopedStreamerId();
+  let rows;
+  if (source === 'kick') {
+    rows = await all(`SELECT username,points,total_minutes,sessions,last_seen,level,'kick' AS platform
+      FROM viewers WHERE COALESCE(streamer_id,1)=?
+      ORDER BY points DESC,last_seen DESC LIMIT ?`,[sid,safeLimit]);
+  } else if (source === 'twitch') {
+    rows = await all(`SELECT username,points,total_minutes,sessions,last_seen,level,'twitch' AS platform
+      FROM platform_viewers WHERE streamer_id=? AND platform='twitch'
+      ORDER BY points DESC,last_seen DESC LIMIT ?`,[sid,safeLimit]);
+  } else {
+    rows = await all(`SELECT * FROM (
+      SELECT username,points,total_minutes,sessions,last_seen,level,'kick' AS platform
+      FROM viewers WHERE COALESCE(streamer_id,1)=?
+      UNION ALL
+      SELECT username,points,total_minutes,sessions,last_seen,level,'twitch' AS platform
+      FROM platform_viewers WHERE streamer_id=? AND platform='twitch'
+    ) ORDER BY points DESC,last_seen DESC LIMIT ?`,[sid,sid,safeLimit]);
+  }
+  const engine = await getRankingEngine();
+  return rows.map((viewer,index)=>({...engine.apply(viewer),platform:viewer.platform,rank:index+1}));
 }
 
 async function getViewerRank(username) {
@@ -2289,13 +2356,14 @@ async function upsertStreamer(data = {}) {
   const displayName = data.display_name || data.displayName || kickUsername;
   const role = canonicalStreamerRole(slug, data.role);
   await run(
-    `INSERT INTO streamers (slug, kick_user_id, kick_username, display_name, avatar_url, role, status, channel_id, chatroom_id, broadcaster_user_id, bot_enabled, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
+    `INSERT INTO streamers (slug, kick_user_id, kick_username, display_name, avatar_url, kick_avatar_url, role, status, channel_id, chatroom_id, broadcaster_user_id, bot_enabled, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
      ON CONFLICT(slug) DO UPDATE SET
        kick_user_id = COALESCE(?, kick_user_id),
        kick_username = COALESCE(?, kick_username),
        display_name = COALESCE(?, display_name),
        avatar_url = COALESCE(?, avatar_url),
+       kick_avatar_url = COALESCE(?, kick_avatar_url),
        role = COALESCE(?, role),
        status = COALESCE(?, status),
        channel_id = COALESCE(?, channel_id),
@@ -2303,9 +2371,9 @@ async function upsertStreamer(data = {}) {
        broadcaster_user_id = COALESCE(?, broadcaster_user_id),
        bot_enabled = COALESCE(?, bot_enabled),
        updated_at = datetime('now')`,
-    [slug, data.kick_user_id || data.kickUserId || null, kickUsername, displayName, data.avatar_url || data.avatarUrl || null, role, data.status || 'active',
+    [slug, data.kick_user_id || data.kickUserId || null, kickUsername, displayName, data.avatar_url || data.avatarUrl || null, data.avatar_url || data.avatarUrl || null, role, data.status || 'active',
      data.channel_id || data.channelId || null, data.chatroom_id || data.chatroomId || null, data.broadcaster_user_id || data.broadcasterUserId || null, data.bot_enabled ?? data.botEnabled ?? 1,
-     data.kick_user_id || data.kickUserId || null, kickUsername, displayName, data.avatar_url || data.avatarUrl || null, role, data.status || null,
+     data.kick_user_id || data.kickUserId || null, kickUsername, displayName, data.avatar_url || data.avatarUrl || null, data.avatar_url || data.avatarUrl || null, role, data.status || null,
      data.channel_id || data.channelId || null, data.chatroom_id || data.chatroomId || null, data.broadcaster_user_id || data.broadcasterUserId || null, data.bot_enabled ?? data.botEnabled ?? null]
   );
   await ensureBotIdentities();
@@ -2327,6 +2395,7 @@ async function linkStreamerTwitchIdentity(streamerId, twitch = {}) {
     `UPDATE streamers SET
        twitch_user_id = ?,
        twitch_username = ?,
+       twitch_avatar_url = COALESCE(NULLIF(?, ''), twitch_avatar_url),
        primary_platform = CASE
          WHEN kick_user_id IS NULL OR kick_user_id = '' THEN 'twitch'
          ELSE primary_platform
@@ -2335,7 +2404,7 @@ async function linkStreamerTwitchIdentity(streamerId, twitch = {}) {
        display_name = COALESCE(NULLIF(?, ''), display_name),
        updated_at = datetime('now')
      WHERE id = ?`,
-    [userId, username, twitch.avatarUrl || twitch.profile_image_url || '', twitch.displayName || twitch.display_name || username, id]
+    [userId, username, twitch.avatarUrl || twitch.profile_image_url || '', twitch.avatarUrl || twitch.profile_image_url || '', twitch.displayName || twitch.display_name || username, id]
   );
   return getStreamerById(id);
 }
@@ -2351,6 +2420,7 @@ async function linkStreamerKickIdentity(streamerId, kick = {}) {
     `UPDATE streamers SET
        kick_user_id = ?,
        kick_username = ?,
+       kick_avatar_url = COALESCE(NULLIF(?,''),kick_avatar_url),
        channel_id = COALESCE(NULLIF(?,''),channel_id),
        chatroom_id = COALESCE(NULLIF(?,''),chatroom_id),
        broadcaster_user_id = COALESCE(NULLIF(?,''),broadcaster_user_id,?),
@@ -2366,7 +2436,7 @@ async function linkStreamerKickIdentity(streamerId, kick = {}) {
        updated_at = datetime('now')
      WHERE id = ?`,
     [
-      kickUserId, kickUsername,
+      kickUserId, kickUsername, kick.avatarUrl || kick.avatar_url || '',
       kick.channelId || kick.channel_id || '',
       kick.chatroomId || kick.chatroom_id || '',
       kick.broadcasterUserId || kick.broadcaster_user_id || '',
@@ -2392,11 +2462,12 @@ async function upsertTwitchStreamer(twitch = {}) {
   const displayName = String(twitch.displayName || twitch.display_name || username).trim();
   await run(
     `INSERT INTO streamers
-      (slug,twitch_user_id,twitch_username,display_name,avatar_url,primary_platform,role,status,bot_enabled,updated_at)
-     VALUES (?,?,?,?,?,'twitch',?,'active',0,datetime('now'))
+      (slug,twitch_user_id,twitch_username,display_name,avatar_url,twitch_avatar_url,primary_platform,role,status,bot_enabled,updated_at)
+     VALUES (?,?,?,?,?,?,'twitch',?,'active',0,datetime('now'))
      ON CONFLICT(slug) DO UPDATE SET
        twitch_user_id = excluded.twitch_user_id,
        twitch_username = excluded.twitch_username,
+       twitch_avatar_url = COALESCE(NULLIF(excluded.twitch_avatar_url,''),streamers.twitch_avatar_url),
        display_name = COALESCE(NULLIF(excluded.display_name,''),streamers.display_name),
        avatar_url = COALESCE(NULLIF(excluded.avatar_url,''),streamers.avatar_url),
        primary_platform = CASE
@@ -2405,9 +2476,55 @@ async function upsertTwitchStreamer(twitch = {}) {
        END,
        status = 'active',
        updated_at = datetime('now')`,
-    [username, userId, username, displayName, twitch.avatarUrl || twitch.profile_image_url || '', canonicalStreamerRole(username, twitch.role)]
+    [username, userId, username, displayName, twitch.avatarUrl || twitch.profile_image_url || '', twitch.avatarUrl || twitch.profile_image_url || '', canonicalStreamerRole(username, twitch.role)]
   );
   return getStreamerBySlug(username);
+}
+
+async function setStreamerPrimaryPlatform(streamerId, platform) {
+  const id = Number(streamerId);
+  const value = String(platform || '').trim().toLowerCase();
+  if (!id || !['kick','twitch'].includes(value)) throw new Error('Plateforme principale invalide');
+  const streamer = await getStreamerById(id);
+  if (!streamer) throw new Error('Streamer introuvable');
+  if (value === 'kick' && !streamer.kick_user_id) throw new Error('Aucun compte Kick lié');
+  if (value === 'twitch' && !streamer.twitch_user_id) throw new Error('Aucun compte Twitch lié');
+  await run(`UPDATE streamers SET
+    primary_platform = ?,
+    avatar_url = CASE
+      WHEN ? = 'kick' THEN COALESCE(NULLIF(kick_avatar_url,''),avatar_url)
+      ELSE COALESCE(NULLIF(twitch_avatar_url,''),avatar_url)
+    END,
+    updated_at = datetime('now')
+    WHERE id = ?`, [value, value, id]);
+  return getStreamerById(id);
+}
+
+async function unlinkStreamerPlatform(streamerId, platform) {
+  const id = Number(streamerId);
+  const value = String(platform || '').trim().toLowerCase();
+  if (!id || !['kick','twitch'].includes(value)) throw new Error('Plateforme invalide');
+  const streamer = await getStreamerById(id);
+  if (!streamer) throw new Error('Streamer introuvable');
+  const otherLinked = value === 'kick' ? Boolean(streamer.twitch_user_id) : Boolean(streamer.kick_user_id);
+  if (!otherLinked) throw new Error('Impossible de délier la seule plateforme du panel');
+  if (value === 'kick') {
+    await run(`UPDATE streamers SET
+      kick_user_id=NULL,kick_username=NULL,kick_avatar_url=NULL,
+      channel_id=NULL,chatroom_id=NULL,broadcaster_user_id=NULL,
+      primary_platform='twitch',
+      avatar_url=COALESCE(NULLIF(twitch_avatar_url,''),avatar_url),
+      bot_enabled=0,updated_at=datetime('now')
+      WHERE id=?`, [id]);
+  } else {
+    await run(`UPDATE streamers SET
+      twitch_user_id=NULL,twitch_username=NULL,twitch_avatar_url=NULL,
+      primary_platform='kick',
+      avatar_url=COALESCE(NULLIF(kick_avatar_url,''),avatar_url),
+      updated_at=datetime('now')
+      WHERE id=?`, [id]);
+  }
+  return getStreamerById(id);
 }
 
 async function updateStreamerKickMeta(streamerId, meta = {}) {
@@ -2723,7 +2840,7 @@ async function ensureInit() {
 module.exports = {
   ensureInit,
   getDB,
-  upsertViewer, addPoints, addMemePoints, grantMemePointsIfDue, getMemeLeaderboard, getViewer, getLeaderboard, getViewerRank,
+  upsertViewer, addPoints, upsertPlatformViewer, addPlatformViewerPoints, getPlatformLeaderboard, addMemePoints, grantMemePointsIfDue, getMemeLeaderboard, getViewer, getLeaderboard, getViewerRank,
   getGlobalStats, getRecentLogs, getActiveViewers, getViewersMissingFollow, getViewersForBadgeSync, setViewerKickProfile, clearAllPoints,
   addCommunityEvent, backfillCommunityHistory, importCommunityGiftLeaderboard, upsertCommunityGiftBadge, getCommunityData, getCommunityGiftLeaderboard, getRecentCommunityEvents,
   getLevel, getNextLevel, getLevels, getRankingEngine, addLevel, updateLevel, deleteLevel,
@@ -2761,7 +2878,7 @@ module.exports = {
   getPointsConfig, setPointsConfigValue, setPointsConfigBulk,
   setBotStatus, getBotStatus, getAllBotStatus,
   saveOAuthToken, getOAuthToken, deleteOAuthToken,
-  ensureDefaultStreamer, getStreamerBySlug, getStreamerById, getStreamerByBroadcasterUserId, listStreamers, setStreamerPlan, upsertStreamer, upsertTwitchStreamer, linkStreamerTwitchIdentity, linkStreamerKickIdentity, updateStreamerKickMeta, getActiveStreamersForBot,
+  ensureDefaultStreamer, getStreamerBySlug, getStreamerById, getStreamerByBroadcasterUserId, listStreamers, setStreamerPlan, setStreamerPrimaryPlatform, unlinkStreamerPlatform, upsertStreamer, upsertTwitchStreamer, linkStreamerTwitchIdentity, linkStreamerKickIdentity, updateStreamerKickMeta, getActiveStreamersForBot,
   ensureBotIdentities, getBotIdentityById, getBotIdentityByKey, getAssignedBotIdentity, getBotAssignmentOptions, assignBotIdentity, connectCustomBotIdentity, markBotIdentityConnected, markBotIdentityAuthorizationRequired, enableStreamersForBotIdentity,
   getStreamerSetting, setStreamerSetting, getOrCreateOverlayToken, regenerateOverlayToken, getOverlayTokenByValue, getOverlayTokensForStreamer, saveOAuthTokenForStreamer, getOAuthTokenForStreamer, deleteOAuthTokenForStreamer,
   createMemeEvent, getMemeEvents,
