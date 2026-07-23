@@ -30,10 +30,14 @@ function isConfigured() {
   }
 }
 
-async function getAuthorizationUrl() {
+async function getAuthorizationUrl(options = {}) {
   if (!isConfigured()) throw new Error('OAuth Twitch non configuré');
   const state = crypto.randomBytes(24).toString('hex');
-  await db.setBotStatus(`twitch_oauth_state_${state}`, JSON.stringify({ createdAt: Date.now() }));
+  await db.setBotStatus(`twitch_oauth_state_${state}`, JSON.stringify({
+    createdAt: Date.now(),
+    streamerId: Number(options.streamerId) || null,
+    linkExisting: Boolean(options.linkExisting && options.streamerId),
+  }));
   const params = new URLSearchParams({
     client_id: CLIENT_ID,
     redirect_uri: REDIRECT_URI,
@@ -53,10 +57,11 @@ async function consumeState(state) {
   if (!parsed.createdAt || Date.now() - Number(parsed.createdAt) > STATE_TTL_MS) {
     throw new Error('État OAuth Twitch invalide ou expiré');
   }
+  return parsed;
 }
 
 async function exchangeCode(code, state) {
-  await consumeState(state);
+  const meta = await consumeState(state);
   const params = new URLSearchParams({
     client_id: CLIENT_ID,
     client_secret: CLIENT_SECRET,
@@ -72,6 +77,7 @@ async function exchangeCode(code, state) {
     refreshToken: data.refresh_token,
     expiresAt: Date.now() + Math.max(60, Number(data.expires_in) || 14400) * 1000,
     scopes: data.scope || [],
+    meta,
   };
 }
 

@@ -2859,7 +2859,10 @@ app.get('/auth/twitch/login', async (req, res) => {
     if (!twitchOAuth.isConfigured()) {
       return res.status(503).send('Connexion Twitch en préparation : TWITCH_CLIENT_ID, TWITCH_CLIENT_SECRET et TWITCH_REDIRECT_URI doivent être configurés.');
     }
-    res.redirect(await twitchOAuth.getAuthorizationUrl());
+    res.redirect(await twitchOAuth.getAuthorizationUrl({
+      streamerId: req.authStreamer?.id || null,
+      linkExisting: Boolean(req.authStreamer?.id),
+    }));
   } catch (error) {
     console.error('[TWITCH OAUTH] Démarrage impossible:', error.message);
     res.status(500).send(`Erreur OAuth Twitch : ${error.message}`);
@@ -2873,7 +2876,15 @@ app.get('/auth/twitch/callback', async (req, res) => {
     if (!code || !state) return res.status(400).send('Code ou état OAuth Twitch manquant.');
     const token = await twitchOAuth.exchangeCode(code, state);
     const twitchUser = await twitchOAuth.fetchCurrentUser(token.accessToken);
-    const streamer = await db.upsertTwitchStreamer(twitchUser);
+    let streamer = null;
+    if (token.meta?.linkExisting && token.meta?.streamerId) {
+      const existing = await db.getStreamerById(Number(token.meta.streamerId));
+      if (!existing) throw new Error('Le panel ElBot à relier est introuvable.');
+      streamer = await db.linkStreamerTwitchIdentity(existing.id, twitchUser);
+      console.log(`[TWITCH OAUTH] 🔗 Twitch @${twitchUser.username} relié au panel ${existing.slug}`);
+    } else {
+      streamer = await db.upsertTwitchStreamer(twitchUser);
+    }
     await db.saveOAuthToken(
       twitchOAuth.providerForStreamer(streamer.id),
       token.accessToken,
