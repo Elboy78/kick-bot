@@ -1464,6 +1464,7 @@ Option 3" rows="4"></textarea><div style="display:flex;gap:6px;margin-top:10px">
     <div class="panel" style="margin-bottom:14px"><h3>🎟️ Interactions avec les points de chaîne</h3><p style="font-size:10px;color:var(--muted);line-height:1.6">ElBot crée et relie les récompenses à ta chaîne. Chaque interaction est isolée par streamer et les achats sont validés ou remboursés automatiquement.</p></div>
     <div class="kir-list">
       <details class="kir-item"><summary><span class="kir-icon">⏱️</span><span><span class="kir-name">Timeout un viewer</span><span class="kir-desc">Le viewer choisit la personne à timeout</span></span><span class="kir-chip">COMMANDE DE BASE</span><span class="kir-arrow">⌄</span></summary><div class="kir-body"><div><label class="lbl">Nom</label><input class="inp" id="kick-timeout-title" value="Timeout un viewer"></div><div><label class="lbl">Coût</label><input class="inp" type="number" id="kick-timeout-cost" min="1" value="1000"></div><div><label class="lbl">Durée (s)</label><input class="inp" type="number" id="kick-timeout-duration" min="60" value="300"></div><div><label><input type="checkbox" id="kick-timeout-enabled"> Activer</label><div><button class="btnx btn-outline btn-sm" onclick="setupKickReward('timeout')">Enregistrer</button> <button class="btnx btn-red btn-sm" onclick="deleteKickReward('timeout')">Retirer de Kick</button></div></div><div id="kick-timeout-status" class="kir-status">Chargement…</div></div></details>
+      <details class="kir-item"><summary><span class="kir-icon">🕊️</span><span><span class="kir-name">UnTO un viewer</span><span class="kir-desc">Libère un autre viewer temporairement timeout par ElBot</span></span><span class="kir-chip">COMMANDE DE BASE</span><span class="kir-arrow">⌄</span></summary><div class="kir-body"><div><label class="lbl">Nom</label><input class="inp" id="kick-unto-title" value="UnTO un viewer"></div><div><label class="lbl">Coût</label><input class="inp" type="number" id="kick-unto-cost" min="1" value="750"></div><div><label><input type="checkbox" id="kick-unto-enabled"> Activer</label></div><div><button class="btnx btn-outline btn-sm" onclick="setupKickReward('unto')">Enregistrer</button> <button class="btnx btn-red btn-sm" onclick="deleteKickReward('unto')">Retirer de Kick</button></div><div id="kick-unto-status" class="kir-status">Chargement…</div></div></details>
       <details class="kir-item"><summary><span class="kir-icon">🛡️</span><span><span class="kir-name">Counter TO</span><span class="kir-desc">Protège contre le prochain timeout acheté</span></span><span class="kir-chip">COMMANDE DE BASE</span><span class="kir-arrow">⌄</span></summary><div class="kir-body"><div><label class="lbl">Nom</label><input class="inp" id="kick-counter-title" value="Counter TO"></div><div><label class="lbl">Coût</label><input class="inp" type="number" id="kick-counter-cost" min="1" value="750"></div><div><label><input type="checkbox" id="kick-counter-enabled"> Activer</label></div><div><button class="btnx btn-outline btn-sm" onclick="setupKickReward('counter')">Enregistrer</button> <button class="btnx btn-red btn-sm" onclick="deleteKickReward('counter')">Retirer de Kick</button></div><div id="kick-counter-status" class="kir-status">Chargement…</div></div></details>
       <details class="kir-item"><summary><span class="kir-icon">💬</span><span><span class="kir-name">Message du viewer</span><span class="kir-desc">ElBot publie le texte saisi dans la récompense</span></span><span class="kir-chip">COMMANDE DE BASE</span><span class="kir-arrow">⌄</span></summary><div class="kir-body"><div><label class="lbl">Nom</label><input class="inp" id="kick-message-title" value="Message du viewer"></div><div><label class="lbl">Coût</label><input class="inp" type="number" id="kick-message-cost" min="1" value="300"></div><div><label><input type="checkbox" id="kick-message-enabled"> Activer</label></div><div><button class="btnx btn-outline btn-sm" onclick="setupKickReward('message')">Enregistrer</button> <button class="btnx btn-red btn-sm" onclick="deleteKickReward('message')">Retirer de Kick</button></div><div id="kick-message-status" class="kir-status">Chargement…</div></div></details>
     </div>
@@ -4708,8 +4709,16 @@ body.ref-theme-transition *:after{
           <div id="bot-identity-message" style="margin-top:9px"></div>
         </div>
 
-        <div class="panel" style="margin-bottom:14px" id="token-card">
-          <h3>🔑 Connexion Kick <span id="token-status-badge" style="font-size:9px;font-weight:700;padding:3px 9px;border-radius:20px"></span></h3>
+        <div class="panel" style="margin-bottom:14px" id="platform-connections-card">
+          <h3 style="display:flex;align-items:center;justify-content:space-between;gap:8px">🔗 Plateformes liées <span id="platform-mode-badge" style="font-size:9px;font-weight:800;padding:4px 9px;border-radius:20px;background:var(--accent-bg);color:var(--accent)">CHARGEMENT…</span></h3>
+          <div id="platform-connections-summary" style="font-size:10px;color:var(--muted);line-height:1.55;margin-bottom:11px">Vérification des comptes liés…</div>
+
+          <div class="platform-connection-box" id="kick-connection-box">
+            <div class="platform-connection-head">
+              <span class="platform-logo platform-logo-kick">K</span>
+              <div><b>Kick</b><small id="kick-connection-username">Aucun compte lié</small></div>
+              <span id="token-status-badge" class="platform-status-pill">Vérification…</span>
+            </div>
 
           <div id="oauth-connected-block" style="display:none">
             <div style="background:var(--accent-bg);border:1px solid var(--accent-brd);border-radius:8px;padding:10px 12px;margin-bottom:10px;font-size:11px;color:var(--accent);font-weight:600">
@@ -4731,18 +4740,41 @@ body.ref-theme-transition *:after{
             </div>
           </div>
 
-          <hr class="div">
+          <div class="platform-kick-only">
+            <hr class="div">
 
-          <div style="font-size:9px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px">Méthode manuelle (dépannage)</div>
-          <button class="btnx btn-ghost btn-sm" style="width:100%;justify-content:center" onclick="detectKickToken()">🔍 Détecter mon token Kick</button>
-          <div id="token-detect-result" style="margin-top:10px;display:none">
-            <label class="lbl">Token détecté</label>
-            <div style="display:flex;gap:6px">
-              <input class="inp inp-sm" id="token-detected-value" readonly style="flex:1;font-family:monospace;font-size:10px">
-              <button class="btnx btn-green btn-sm" onclick="copyDetectedToken()">📋 Copier</button>
+            <div style="font-size:9px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px">Méthode manuelle (dépannage)</div>
+            <button class="btnx btn-ghost btn-sm" style="width:100%;justify-content:center" onclick="detectKickToken()">🔍 Détecter mon token Kick</button>
+            <div id="token-detect-result" style="margin-top:10px;display:none">
+              <label class="lbl">Token détecté</label>
+              <div style="display:flex;gap:6px">
+                <input class="inp inp-sm" id="token-detected-value" readonly style="flex:1;font-family:monospace;font-size:10px">
+                <button class="btnx btn-green btn-sm" onclick="copyDetectedToken()">📋 Copier</button>
+              </div>
             </div>
+            <div id="token-msg" style="margin-top:7px"></div>
           </div>
-          <div id="token-msg" style="margin-top:7px"></div>
+          </div>
+
+          <div class="platform-connection-box" id="twitch-connection-box" style="margin-top:10px">
+            <div class="platform-connection-head">
+              <span class="platform-logo platform-logo-twitch">T</span>
+              <div><b>Twitch</b><small id="twitch-connection-username">Aucun compte lié</small></div>
+              <span id="twitch-status-badge" class="platform-status-pill">Vérification…</span>
+            </div>
+            <div id="twitch-connected-block" style="display:none">
+              <div class="platform-connected-note">✅ Compte Twitch autorisé — ElBot peut utiliser cette identité pour les fonctionnalités Twitch.</div>
+              <div style="display:flex;gap:7px;flex-wrap:wrap">
+                <button class="btnx btn-outline" style="flex:1;justify-content:center" onclick="startTwitchOAuthReconnect()">↻ Renouveler Twitch</button>
+                <button class="btnx btn-ghost" style="flex:1;justify-content:center" onclick="disconnectTwitchOAuth()">🔌 Déconnecter Twitch</button>
+              </div>
+            </div>
+            <div id="twitch-disconnected-block" style="display:none">
+              <div style="font-size:10px;color:var(--muted);line-height:1.55;margin-bottom:9px">Lie le compte Twitch appartenant à ce streamer. Il peut avoir un pseudo différent du compte Kick.</div>
+              <button class="btnx btn-outline" id="oauth-connect-twitch-btn" style="width:100%;justify-content:center" onclick="startTwitchOAuthReconnect()">🟣 Connecter le compte Twitch</button>
+            </div>
+            <div id="twitch-not-configured-block" style="display:none;font-size:10px;color:#fbbf24;line-height:1.55">OAuth Twitch n’est pas configuré sur ce serveur.</div>
+          </div>
         </div>
         <div class="panel" style="margin-bottom:14px"><h3>ℹ️ À propos</h3><ul class="info"><li><span>Version</span><span style="color:#8b35ff;font-weight:700">ElBot v2.1.0</span></li><li><span>Base de données</span><span>SQLite</span></li><li><span>Hébergement</span><span>VPS ElBot</span></li><li><span>Chaîne</span><span id="settings-channel-name">Connecté</span></li></ul></div>
         <div class="danger"><div class="danger-t">⚠ Réinitialisation</div><p style="font-size:10px;color:#a1a1aa;margin-bottom:8px">Remet les préférences aux valeurs par défaut.</p><button class="btnx btn-red" style="width:100%;justify-content:center" onclick="resetSettings()">🔄 Réinitialiser</button></div>
@@ -5099,13 +5131,19 @@ async function loadConnectedStreamerIdentity() {
     const payload = await r.json();
     const profile = payload.data || {};
     connectedStreamerProfile = profile;
-    activeKickChannel = profile.kickUsername || profile.slug || CURRENT_STREAMER_SLUG || '';
+    activeKickChannel = profile.kickUsername || '';
+    activeTwitchChannel = profile.twitchUsername || '';
 
-    const displayName = profile.displayName || profile.display_name || profile.kickUsername || profile.slug || 'Streamer';
+    const displayName = profile.displayName || profile.display_name
+      || (profile.primaryPlatform === 'twitch' ? profile.twitchUsername : profile.kickUsername)
+      || profile.kickUsername || profile.twitchUsername || profile.slug || 'Streamer';
     const avatarUrl = profile.avatarUrl || profile.avatar_url || '';
     const setText = (id, value) => { const el=document.getElementById(id); if(el) el.textContent=value; };
     setText('dashboard-greeting-name', displayName);
-    setText('sb-channel', activeKickChannel || '—');
+    setText('sb-channel', activeKickChannel && activeTwitchChannel
+      ? `Kick @${activeKickChannel} · Twitch @${activeTwitchChannel}`
+      : activeKickChannel ? `Kick @${activeKickChannel}`
+        : activeTwitchChannel ? `Twitch @${activeTwitchChannel}` : '—');
     setText('prof-name', displayName);
     setText('top-prof-name', displayName);
     const role = profile.role === 'owner' ? 'Propriétaire' : (profile.role === 'admin' ? 'Admin' : 'Streamer');
@@ -6696,7 +6734,8 @@ const VOD_CAT_LABELS = { moment:'🎯 Moment', funny:'😂 Funny', clutch:'🔥 
 let currentVodTab    = 'replays';
 let allVodsData      = [];
 let allClipsData     = [];
-let activeKickChannel = CURRENT_STREAMER_SLUG || '';
+let activeKickChannel = '';
+let activeTwitchChannel = '';
 let connectedStreamerProfile = null;
 
 function openOnKick() {
@@ -7880,10 +7919,79 @@ async function checkBotTokenStatus() {
   } catch(e) {}
 }
 
+let PLATFORM_CONNECTIONS = {
+  mode: 'kick',
+  kick: { linked:false, connected:false, username:null },
+  twitch: { linked:false, connected:false, username:null }
+};
+
+function normalizePlatformConnection(value) {
+  if (value && typeof value === 'object') return {
+    linked: Boolean(value.linked),
+    connected: Boolean(value.connected),
+    username: value.username || null
+  };
+  return { linked:Boolean(value), connected:Boolean(value), username:null };
+}
+
+function applyPlatformVisibility() {
+  const kick = Boolean(PLATFORM_CONNECTIONS.kick.linked);
+  const twitch = Boolean(PLATFORM_CONNECTIONS.twitch.linked);
+  const mode = kick && twitch ? 'multi' : twitch ? 'twitch' : 'kick';
+  PLATFORM_CONNECTIONS.mode = mode;
+  document.body.dataset.platformMode = mode;
+  document.documentElement.dataset.platformMode = mode;
+  document.querySelectorAll('.platform-kick-only').forEach(el => {
+    el.hidden = mode === 'twitch';
+  });
+  document.querySelectorAll('.platform-twitch-only').forEach(el => {
+    el.hidden = mode === 'kick';
+  });
+  const badge = document.getElementById('platform-mode-badge');
+  if (badge) badge.textContent = mode === 'multi' ? 'KICK + TWITCH' : mode.toUpperCase();
+  const summary = document.getElementById('platform-connections-summary');
+  if (summary) summary.textContent = mode === 'multi'
+    ? 'Les données restent séparées par plateforme et sont réunies dans ce même panel.'
+    : mode === 'twitch'
+      ? 'Ce panel affiche uniquement les informations Twitch. Tu peux lier Kick quand tu le souhaites.'
+      : 'Ce panel affiche uniquement les informations Kick. Tu peux lier Twitch quand tu le souhaites.';
+  if (WIDGET_ENGINE_CACHE) renderWidgetEngine(WIDGET_ENGINE_CACHE);
+}
+
+function setPlatformBadge(id, state, configured = true) {
+  const badge = document.getElementById(id);
+  if (!badge) return;
+  const styles = state === 'connected'
+    ? ['● LIÉ', 'rgba(34,197,94,.12)', '#86efac', 'rgba(34,197,94,.3)']
+    : state === 'linked'
+      ? ['● À RECONNECTER', 'rgba(245,158,11,.12)', '#fbbf24', 'rgba(245,158,11,.3)']
+      : configured
+        ? ['○ NON LIÉ', 'rgba(148,163,184,.10)', 'var(--muted)', 'var(--brd)']
+        : ['⚠ NON CONFIGURÉ', 'rgba(245,158,11,.12)', '#fbbf24', 'rgba(245,158,11,.3)'];
+  badge.textContent = styles[0];
+  badge.style.background = styles[1];
+  badge.style.color = styles[2];
+  badge.style.border = `1px solid ${styles[3]}`;
+}
+
 async function loadOAuthStatus() {
   try {
-    const r = await fetch('/api/oauth/status');
-    const d = await r.json();
+    const [kickResponse, authResponse] = await Promise.all([
+      fetch('/api/oauth/status', { cache:'no-store' }),
+      fetch('/api/auth/status?ts=' + Date.now(), { cache:'no-store' })
+    ]);
+    const d = await kickResponse.json();
+    const auth = await authResponse.json();
+    const kick = normalizePlatformConnection(auth?.streamer?.platforms?.kick);
+    const twitch = normalizePlatformConnection(auth?.streamer?.platforms?.twitch);
+    PLATFORM_CONNECTIONS = { mode:'kick', kick, twitch };
+    applyPlatformVisibility();
+
+    const kickUsername = document.getElementById('kick-connection-username');
+    if (kickUsername) kickUsername.textContent = kick.username ? `@${kick.username}` : 'Aucun compte lié';
+    const twitchUsername = document.getElementById('twitch-connection-username');
+    if (twitchUsername) twitchUsername.textContent = twitch.username ? `@${twitch.username}` : 'Aucun compte lié';
+
     const connectedBlock    = document.getElementById('oauth-connected-block');
     const disconnectedBlock = document.getElementById('oauth-disconnected-block');
     const notConfiguredBlock = document.getElementById('oauth-not-configured-block');
@@ -7896,13 +8004,28 @@ async function loadOAuthStatus() {
 
     if (!d.configured) {
       notConfiguredBlock.style.display = 'block';
-      if(badge){badge.textContent='⚠️ Non configuré';badge.style.background='rgba(245,158,11,.12)';badge.style.color='#fbbf24';badge.style.border='1px solid rgba(245,158,11,.3)'}
-    } else if (d.connected) {
+      setPlatformBadge('token-status-badge', 'unlinked', false);
+    } else if (kick.connected || d.connected) {
       connectedBlock.style.display = 'block';
-      if(badge){badge.textContent='🟢 Streamer connecté';badge.style.background='var(--accent-bg)';badge.style.color='var(--accent)';badge.style.border='1px solid var(--accent-brd)'}
+      setPlatformBadge('token-status-badge', 'connected');
     } else {
       disconnectedBlock.style.display = 'block';
-      if(badge){badge.textContent='⚪ À reconnecter';badge.style.background='rgba(148,163,184,.10)';badge.style.color='var(--muted)';badge.style.border='1px solid var(--brd)'}
+      setPlatformBadge('token-status-badge', kick.linked ? 'linked' : 'unlinked');
+    }
+
+    const twitchConnected = document.getElementById('twitch-connected-block');
+    const twitchDisconnected = document.getElementById('twitch-disconnected-block');
+    const twitchNotConfigured = document.getElementById('twitch-not-configured-block');
+    [twitchConnected,twitchDisconnected,twitchNotConfigured].forEach(el => { if(el) el.style.display='none'; });
+    if (!auth?.providers?.twitch?.configured) {
+      if (twitchNotConfigured) twitchNotConfigured.style.display='block';
+      setPlatformBadge('twitch-status-badge', 'unlinked', false);
+    } else if (twitch.connected) {
+      if (twitchConnected) twitchConnected.style.display='block';
+      setPlatformBadge('twitch-status-badge', 'connected');
+    } else {
+      if (twitchDisconnected) twitchDisconnected.style.display='block';
+      setPlatformBadge('twitch-status-badge', twitch.linked ? 'linked' : 'unlinked');
     }
   } catch(e) {}
 }
@@ -7914,6 +8037,12 @@ function startStreamerOAuthReconnect(){
   window.location.assign('/auth/login?force=1&returnTo='+encodeURIComponent(returnTo));
 }
 
+function startTwitchOAuthReconnect(){
+  const btn=document.getElementById('oauth-connect-twitch-btn');
+  if(btn){btn.disabled=true;btn.textContent='Redirection vers Twitch…'}
+  window.location.assign('/auth/twitch/login?force=1');
+}
+
 async function disconnectOAuth() {
   if (!confirm('Déconnecter le compte Kick officiel ? Le bot repassera sur le token manuel si configuré.')) return;
   const r=await fetch('/api/admin/oauth/disconnect', { method:'POST', headers:{'Content-Type':'application/json'}, body:'{}' });
@@ -7923,6 +8052,23 @@ async function disconnectOAuth() {
   await loadOAuthStatus();
   await loadKickRewards();
 }
+
+async function disconnectTwitchOAuth() {
+  if (!confirm('Déconnecter l’autorisation Twitch de ce panel ? La liaison du pseudo sera conservée pour pouvoir le reconnecter.')) return;
+  const r = await fetch('/api/admin/oauth/twitch/disconnect', {
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body:'{}'
+  });
+  const d = await r.json().catch(()=>({}));
+  if(!r.ok){toast(d.error||'Déconnexion Twitch impossible',false);return}
+  toast('Compte Twitch déconnecté');
+  await loadOAuthStatus();
+}
+
+setInterval(() => {
+  if (!document.hidden) loadOAuthStatus();
+}, 30000);
 
 async function loadBotIdentity() {
   const current = document.getElementById('bot-identity-current');
@@ -7974,9 +8120,9 @@ setInterval(()=>{if(!document.hidden)loadBotIdentity()},10000);
 
 async function loadKickTimeoutReward(){const status=document.getElementById('kick-to-status');if(!status)return;try{const r=await fetch('/api/channel-rewards/timeout',{cache:'no-store'}),j=await r.json();if(!r.ok)throw new Error(j.error||'Chargement impossible');const d=j.data||{};document.getElementById('kick-to-enabled').checked=!!d.enabled;document.getElementById('kick-to-title').value=d.title||'Timeout un viewer';document.getElementById('kick-to-cost').value=d.cost||1000;document.getElementById('kick-to-duration').value=d.duration||300;status.innerHTML=d.rewardId?`✅ Récompense liée à ElBot · <b>${esc(d.rewardId)}</b>`:(d.oauthConnected?'Prête à être créée sur Kick.':'⚠️ Reconnecte ton compte Kick avant la création.')}catch(e){status.textContent=e.message}}
 async function setupKickTimeoutReward(){const status=document.getElementById('kick-to-status');status.textContent='Configuration sur Kick…';const body={enabled:document.getElementById('kick-to-enabled').checked,title:document.getElementById('kick-to-title').value,cost:Number(document.getElementById('kick-to-cost').value),duration:Number(document.getElementById('kick-to-duration').value)};try{const r=await fetch('/api/admin/channel-rewards/timeout/setup',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}),j=await r.json();if(!r.ok)throw new Error(j.error||'Configuration impossible');status.textContent='✅ Récompense créée et reliée à ElBot';toast('Récompense points Kick enregistrée ✓')}catch(e){status.innerHTML=`❌ ${esc(e.message)}<br><button class="btnx btn-outline btn-sm" style="margin-top:7px" onclick="startStreamerOAuthReconnect()">Reconnecter le compte streamer Kick</button>`;toast(e.message,false)}}
-async function loadKickRewards(){try{const r=await fetch('/api/channel-rewards',{cache:'no-store'}),j=await r.json();if(!r.ok)throw new Error(j.error||'Chargement impossible');for(const d of j.data?.rewards||[]){const p=`kick-${d.type}`;document.getElementById(`${p}-enabled`).checked=!!d.enabled;document.getElementById(`${p}-title`).value=d.title||'';document.getElementById(`${p}-cost`).value=d.cost||1;if(d.type==='timeout')document.getElementById(`${p}-duration`).value=d.duration||300;document.getElementById(`${p}-status`).textContent=d.rewardId?'✅ Récompense liée et prête':(j.data.oauthConnected?'Prête à être créée':'⚠️ Reconnecte le compte streamer Kick')}}catch(e){['timeout','counter','message'].forEach(t=>{const x=document.getElementById(`kick-${t}-status`);if(x)x.textContent=e.message})}}
+async function loadKickRewards(){try{const r=await fetch('/api/channel-rewards',{cache:'no-store'}),j=await r.json();if(!r.ok)throw new Error(j.error||'Chargement impossible');for(const d of j.data?.rewards||[]){const p=`kick-${d.type}`;document.getElementById(`${p}-enabled`).checked=!!d.enabled;document.getElementById(`${p}-title`).value=d.title||'';document.getElementById(`${p}-cost`).value=d.cost||1;if(d.type==='timeout')document.getElementById(`${p}-duration`).value=d.duration||300;document.getElementById(`${p}-status`).textContent=d.rewardId?'✅ Récompense liée et prête':(j.data.oauthConnected?'Prête à être créée':'⚠️ Reconnecte le compte streamer Kick')}}catch(e){['timeout','unto','counter','message'].forEach(t=>{const x=document.getElementById(`kick-${t}-status`);if(x)x.textContent=e.message})}}
 async function setupKickReward(type){const p=`kick-${type}`,status=document.getElementById(`${p}-status`),body={enabled:document.getElementById(`${p}-enabled`).checked,title:document.getElementById(`${p}-title`).value,cost:Number(document.getElementById(`${p}-cost`).value)};if(type==='timeout')body.duration=Number(document.getElementById(`${p}-duration`).value);status.textContent='Configuration sur Kick…';try{const r=await fetch(`/api/admin/channel-rewards/${type}/setup`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}),j=await r.json();if(!r.ok)throw new Error(j.error||'Configuration impossible');status.textContent='✅ Récompense créée et reliée à ElBot';toast('Interaction points Kick enregistrée ✓')}catch(e){status.innerHTML=`❌ ${esc(e.message)}<br><button class="btnx btn-outline btn-sm" style="margin-top:7px" onclick="startStreamerOAuthReconnect()">Reconnecter Kick</button>`;toast(e.message,false)}}
-async function deleteKickReward(type){const labels={timeout:'Timeout un viewer',counter:'Counter TO',message:'Message du viewer'};if(!confirm(`Retirer « ${labels[type]||type} » de la chaîne Kick ? La commande restera disponible dans le panel.`))return;const status=document.getElementById(`kick-${type}-status`);status.textContent='Suppression sur Kick…';try{const r=await fetch('/api/admin/channel-rewards/'+encodeURIComponent(type),{method:'DELETE'}),j=await r.json();if(!r.ok)throw new Error(j.error||'Suppression impossible');status.textContent='✅ Retirée de Kick · toujours disponible dans le panel';await loadKickRewards();toast('Interaction retirée de la chaîne Kick ✓')}catch(e){status.textContent='❌ '+e.message;toast(e.message,false)}}
+async function deleteKickReward(type){const labels={timeout:'Timeout un viewer',unto:'UnTO un viewer',counter:'Counter TO',message:'Message du viewer'};if(!confirm(`Retirer « ${labels[type]||type} » de la chaîne Kick ? La commande restera disponible dans le panel.`))return;const status=document.getElementById(`kick-${type}-status`);status.textContent='Suppression sur Kick…';try{const r=await fetch('/api/admin/channel-rewards/'+encodeURIComponent(type),{method:'DELETE'}),j=await r.json();if(!r.ok)throw new Error(j.error||'Suppression impossible');status.textContent='✅ Retirée de Kick · toujours disponible dans le panel';await loadKickRewards();toast('Interaction retirée de la chaîne Kick ✓')}catch(e){status.textContent='❌ '+e.message;toast(e.message,false)}}
 let KICK_CUSTOM_CACHE=[];
 function updateKickCustomFields(){const a=document.getElementById('kick-custom-action')?.value;document.getElementById('kick-custom-amount-wrap').style.display=a==='meme_points'?'block':'none';const response=document.getElementById('kick-custom-response');if(response)response.disabled=a==='meme_points'}
 function resetKickCustomForm(){document.getElementById('kick-custom-id').value='';document.getElementById('kick-custom-title').value='';document.getElementById('kick-custom-cost').value=500;document.getElementById('kick-custom-action').value='chat_fixed';document.getElementById('kick-custom-description').value='';document.getElementById('kick-custom-response').value='';document.getElementById('kick-custom-amount').value=100;document.getElementById('kick-custom-enabled').checked=true;document.getElementById('kick-custom-save').textContent='✨ Créer l’interaction';updateKickCustomFields()}
@@ -8762,7 +8908,10 @@ async function loadWidgetEngine(force = false) {
 function renderWidgetEngine(data) {
   const grid = document.getElementById('widget-engine-grid');
   if (!grid) return;
-  const widgets = Array.isArray(data?.widgets) ? data.widgets : [];
+  const widgets = (Array.isArray(data?.widgets) ? data.widgets : []).filter(widget => {
+    if (PLATFORM_CONNECTIONS.mode === 'twitch' && widget.id === 'kickrewards') return false;
+    return true;
+  });
   grid.innerHTML = widgets.map(w => {
     const color = w.color || '#94a3b8';
     const hasOverlay = w.hasOverlay !== false;
@@ -11714,6 +11863,16 @@ body[data-ref-interface="aurora"] .ref-panel{
   -webkit-backdrop-filter:blur(12px) saturate(135%)!important;
 }
 .page:not(.active),.widget-settings[style*="display: none"]{animation:none!important}
+.platform-connection-box{padding:11px 12px;border:1px solid var(--brd);border-radius:12px;background:var(--surface2)}
+.platform-connection-head{display:grid;grid-template-columns:34px minmax(0,1fr) auto;align-items:center;gap:9px;margin-bottom:10px}
+.platform-connection-head>div{min-width:0}.platform-connection-head b{display:block;font-size:11px}.platform-connection-head small{display:block;color:var(--muted);font-size:9px;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.platform-logo{width:32px;height:32px;border-radius:9px;display:grid;place-items:center;font-size:12px;font-weight:950}
+.platform-logo-kick{color:#071106;background:#53fc18;box-shadow:0 0 14px rgba(83,252,24,.18)}
+.platform-logo-twitch{color:#fff;background:#9146ff;box-shadow:0 0 14px rgba(145,70,255,.2)}
+.platform-status-pill{font-size:8px;font-weight:900;padding:4px 7px;border-radius:999px;white-space:nowrap}
+.platform-connected-note{background:rgba(34,197,94,.08);border:1px solid rgba(34,197,94,.23);border-radius:8px;padding:9px 10px;margin-bottom:9px;font-size:9px;color:#86efac;line-height:1.5}
+[data-platform-mode="twitch"] .platform-kick-only{display:none!important}
+[data-platform-mode="kick"] .platform-twitch-only{display:none!important}
 @media(prefers-reduced-motion:reduce){.ref-wave,.lpd.blink{animation:none!important}}
 .elbot-support{display:block!important}.support-tabs{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:14px}.support-tabs button{border:1px solid var(--theme-soft-border,var(--brd));background:var(--theme-soft-bg,var(--surface2));color:var(--theme-muted,var(--muted));padding:9px;border-radius:9px;font:700 10px inherit;cursor:pointer}.support-tabs button.active{background:var(--accent);border-color:var(--accent);color:#06101f}.support-discord-state{font-size:9px;color:var(--muted);margin-bottom:9px}.support-ticket{padding:11px;margin-bottom:7px;border:1px solid var(--theme-soft-border,var(--brd));border-radius:10px;background:var(--theme-soft-bg,var(--surface2));cursor:pointer}.support-ticket:hover{border-color:var(--accent)}.support-ticket-top{display:flex;gap:7px;align-items:center}.support-ticket-top strong{font-size:11px;flex:1}.support-pill{font-size:7px;font-weight:900;text-transform:uppercase;padding:3px 6px;border-radius:999px;background:rgba(38,143,255,.15);color:#71c7ff}.support-pill.closed{background:rgba(111,124,145,.15);color:#9ca8b8}.support-ticket small{display:block;color:var(--muted);font-size:8px;margin-top:5px}.support-detail-card{padding:12px 0}.support-detail-card h3{font-size:14px;margin:8px 0 4px}.support-message{padding:9px 10px;margin:7px 0;border-radius:10px;background:rgba(27,105,210,.12);border:1px solid rgba(82,157,255,.15);font-size:10px;line-height:1.5}.support-message.admin{background:rgba(37,211,131,.10);border-color:rgba(37,211,131,.18)}.support-message b{display:block;font-size:8px;color:var(--accent);margin-bottom:4px}.support-message time{display:block;font-size:7px;color:var(--muted);margin-top:5px}.support-thread{max-height:310px;overflow:auto;margin:8px 0 10px}
 .dbd-roulette{--dbd-red:#a91419;position:relative;overflow:hidden;border:1px solid rgba(255,255,255,.11);border-radius:18px;padding:18px;background:radial-gradient(circle at 50% -20%,rgba(166,16,24,.24),transparent 42%),linear-gradient(160deg,rgba(19,20,22,.97),rgba(5,6,7,.98));box-shadow:0 28px 80px rgba(0,0,0,.4)}.dbd-roulette:before{content:"";position:absolute;inset:0;pointer-events:none;opacity:.22;background:repeating-linear-gradient(105deg,transparent 0 90px,rgba(255,255,255,.025) 92px,transparent 94px)}.dbd-roulette-head{position:relative;display:flex;justify-content:space-between;align-items:center;margin-bottom:15px}.dbd-role-tabs{display:flex;gap:5px}.dbd-role-tabs button{padding:8px 18px;border:1px solid rgba(255,255,255,.12);background:#111315;color:#87909a;border-radius:7px;font:900 10px inherit;text-transform:uppercase;letter-spacing:.7px;cursor:pointer}.dbd-role-tabs button.active{color:#fff;border-color:#ba252a;background:linear-gradient(#a7191e,#681014);box-shadow:0 0 18px rgba(202,26,34,.28)}.dbd-color-toggle{display:flex;gap:7px;align-items:center;color:#aeb5bc;font-size:9px}.dbd-machine{position:relative;border:1px solid #3b3d3f;border-radius:12px;padding:20px;background:linear-gradient(180deg,#1a1c1e,#090a0b);box-shadow:inset 0 1px rgba(255,255,255,.07),inset 0 -30px 60px rgba(0,0,0,.55)}.dbd-machine-title{text-align:center;margin-bottom:18px}.dbd-machine-title span{display:block;color:#c3252b;font-size:9px;font-weight:950;letter-spacing:5px}.dbd-machine-title strong{display:block;color:#f0f1f1;font-size:20px;letter-spacing:2px;margin-top:5px;text-shadow:0 2px 12px #000}.dbd-machine-title small{display:block;color:#7e858b;font-size:9px;margin-top:6px}.dbd-reels{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}.dbd-reel{position:relative;min-height:245px;border:1px solid #44484c;border-radius:9px;overflow:hidden;background:linear-gradient(180deg,#060708,#17191b 50%,#060708);cursor:pointer;box-shadow:inset 0 0 30px #000,0 9px 24px rgba(0,0,0,.38)}.dbd-reel:before,.dbd-reel:after{content:"";position:absolute;z-index:4;left:0;right:0;height:54px;pointer-events:none}.dbd-reel:before{top:0;background:linear-gradient(#050607,transparent)}.dbd-reel:after{bottom:0;background:linear-gradient(transparent,#050607)}.dbd-reel-window{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;padding:16px}.dbd-perk-diamond{width:130px;height:130px;display:grid;place-items:center;transform:rotate(45deg);border:3px solid #d4d4d4;background:linear-gradient(135deg,#53276c,#1d0c28);box-shadow:0 0 0 4px #17191b,0 0 28px rgba(152,55,192,.35);transition:.16s}.dbd-perk-diamond.killer{background:linear-gradient(135deg,#761c22,#25080a);box-shadow:0 0 0 4px #17191b,0 0 28px rgba(207,37,45,.34)}.dbd-perk-diamond.mono{filter:grayscale(1);background:#303236}.dbd-perk-rune{transform:rotate(-45deg);font-size:30px;font-weight:950;color:#fff;text-shadow:0 2px 8px #000;letter-spacing:-2px}.dbd-perk-name{position:absolute;z-index:6;left:8px;right:8px;bottom:14px;text-align:center;color:#f4f4f4;font-size:10px;font-weight:900;text-transform:uppercase;text-shadow:0 2px 5px #000}.dbd-reel-lock{position:absolute;z-index:7;right:7px;top:7px;width:25px;height:25px;border-radius:50%;border:1px solid rgba(255,255,255,.15);background:#111;color:#8e969e;display:grid;place-items:center}.dbd-reel.locked{border-color:#d5a448}.dbd-reel.locked .dbd-reel-lock{color:#ffd36b;border-color:#d5a448}.dbd-reel.spinning .dbd-perk-diamond{animation:dbdSlot .11s linear infinite;filter:blur(1px)}@keyframes dbdSlot{0%{transform:translateY(-22px) rotate(45deg);opacity:.25}50%{transform:translateY(0) rotate(45deg);opacity:1}100%{transform:translateY(22px) rotate(45deg);opacity:.25}}.dbd-spin-button{display:flex;align-items:center;justify-content:center;gap:10px;width:min(420px,90%);margin:19px auto 0;padding:12px;border:1px solid #e04147;border-radius:7px;background:linear-gradient(#b51e24,#681014);color:#fff;font:950 11px inherit;letter-spacing:1px;cursor:pointer;box-shadow:0 8px 24px rgba(160,16,23,.28)}.dbd-spin-button:hover{filter:brightness(1.18)}.dbd-spin-button span{font-size:18px}.dbd-build-actions{position:relative;display:flex;justify-content:center;gap:7px;margin-top:13px}.dbd-history-panel #dbd-history{display:grid;gap:6px;max-height:180px;overflow:auto}.dbd-history-row{display:grid;grid-template-columns:70px 1fr auto;gap:10px;align-items:center;padding:8px 10px;border-bottom:1px solid rgba(255,255,255,.07);font-size:9px}.dbd-history-row b{color:#d64a50;text-transform:uppercase}.dbd-history-row span{color:#d9dde1}.dbd-history-row time{color:#737c84}@media(max-width:900px){.dbd-reels{grid-template-columns:repeat(2,1fr)}.dbd-reel{min-height:210px}.dbd-perk-diamond{width:105px;height:105px}}

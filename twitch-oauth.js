@@ -103,8 +103,22 @@ function providerForStreamer(streamerId) {
   return `twitch:${Number(streamerId)}`;
 }
 
+async function isConnected(streamerId) {
+  const token = await db.getOAuthToken(providerForStreamer(streamerId));
+  return Boolean(token?.access_token && Number(token.expires_at) > Date.now());
+}
+
+async function disconnect(streamerId) {
+  const id = Number(streamerId);
+  if (!id) throw new Error('Streamer Twitch invalide');
+  await db.deleteOAuthToken(providerForStreamer(id));
+  await db.setStreamerSetting(id, 'twitch_connection_status', 'disconnected');
+}
+
 module.exports = {
   isConfigured,
+  isConnected,
+  disconnect,
   getAuthorizationUrl,
   exchangeCode,
   fetchCurrentUser,

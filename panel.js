@@ -3117,6 +3117,14 @@ app.get('/api/oauth/status', async (req, res) => {
 app.get('/api/auth/status', async (req, res) => {
   res.set('Cache-Control', 'no-store');
   const streamer = req.authStreamer || null;
+  const kickLinked = Boolean(streamer?.kick_user_id);
+  const twitchLinked = Boolean(streamer?.twitch_user_id);
+  const [kickConnected, twitchConnected] = streamer?.id
+    ? await Promise.all([
+        kickLinked ? kickOAuth.isConnected(streamer.id).catch(() => false) : false,
+        twitchLinked ? twitchOAuth.isConnected(streamer.id).catch(() => false) : false,
+      ])
+    : [false, false];
   res.json({
     authenticated: Boolean(streamer?.id),
     dashboardUrl: streamer?.slug ? `/s/${encodeURIComponent(streamer.slug)}/dashboard` : null,
@@ -3127,8 +3135,16 @@ app.get('/api/auth/status', async (req, res) => {
       avatarUrl: streamer.avatar_url || '',
       primaryPlatform: streamer.primary_platform || (streamer.twitch_user_id && !streamer.kick_user_id ? 'twitch' : 'kick'),
       platforms: {
-        kick: Boolean(streamer.kick_user_id),
-        twitch: Boolean(streamer.twitch_user_id),
+        kick: {
+          linked: kickLinked,
+          connected: Boolean(kickConnected),
+          username: streamer.kick_username || null,
+        },
+        twitch: {
+          linked: twitchLinked,
+          connected: Boolean(twitchConnected),
+          username: streamer.twitch_username || null,
+        },
       },
     } : null,
     providers: {
@@ -3145,6 +3161,17 @@ app.post('/api/admin/oauth/disconnect', requireAuth, requireTenant, async (req, 
     res.set('Cache-Control','no-store');
     res.json({ success: true, connected:false, streamerId:tm.streamerId });
   } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.post('/api/admin/oauth/twitch/disconnect', requireAuth, requireTenant, async (req, res) => {
+  try {
+    const tm = createTenantManager({ db, io, req });
+    await twitchOAuth.disconnect(tm.streamerId);
+    res.set('Cache-Control', 'no-store');
+    res.json({ success: true, connected: false, streamerId: tm.streamerId });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
 });
 
 app.get('/api/bot-identity', requireAuth, requireTenant, waitDB, async (req, res) => {
@@ -3293,13 +3320,25 @@ app.get('/api/v2/account', requireAuth, requireTenant, async (req, res) => {
   try {
     const tm = createTenantManager({ db, io, req });
     const st = req.streamer || {};
+    const kickLinked = Boolean(st.kick_user_id);
+    const twitchLinked = Boolean(st.twitch_user_id);
+    const [kickConnected, twitchConnected] = await Promise.all([
+      kickLinked ? kickOAuth.isConnected(tm.streamerId).catch(() => false) : false,
+      twitchLinked ? twitchOAuth.isConnected(tm.streamerId).catch(() => false) : false,
+    ]);
     res.json({ data: {
       ...tm.info(),
       id: tm.streamerId,
       role: st.role || 'streamer',
-      kickUsername: st.kick_username || st.kickUsername || st.slug || tm.slug,
+      primaryPlatform: st.primary_platform || (twitchLinked && !kickLinked ? 'twitch' : 'kick'),
+      kickUsername: st.kick_username || st.kickUsername || null,
+      twitchUsername: st.twitch_username || st.twitchUsername || null,
+      platforms: {
+        kick: { linked:kickLinked, connected:Boolean(kickConnected), username:st.kick_username || null },
+        twitch: { linked:twitchLinked, connected:Boolean(twitchConnected), username:st.twitch_username || null },
+      },
       avatarUrl: st.avatar_url || st.avatarUrl || '',
-      oauthConnected: await kickOAuth.isConnected(tm.streamerId),
+      oauthConnected: Boolean(kickConnected),
       overlayLinks: tm.overlayLinks()
     } });
   } catch(e) { res.status(500).json({ error: e.message }); }
